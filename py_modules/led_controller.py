@@ -14,13 +14,16 @@ class LedController:
         self._led_path = led_path
         self._zones = max(1, zones)
         self._max_brightness = max_brightness or 255
+        self.last_error = None
 
     @property
     def available(self):
         return bool(self._led_path)
 
     def apply(self, color, brightness, power):
+        self.last_error = None
         if not self._led_path:
+            self.last_error = "no led path"
             return False
 
         r, g, b = color
@@ -39,5 +42,6 @@ class LedController:
                 with open(brightness_path, "w") as handle:
                     handle.write(str(level))
             return True
-        except OSError:
+        except OSError as error:
+            self.last_error = str(error)
             return False

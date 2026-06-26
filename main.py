@@ -64,11 +64,25 @@ class Plugin:
         self._persist_and_apply()
 
     def _apply(self) -> None:
-        self._controller.apply(
+        ok = self._controller.apply(
             self._settings["color"],
             self._settings["brightness"],
             self._settings["power"],
         )
+        if ok:
+            decky.logger.info(
+                "applied color=%s brightness=%s power=%s",
+                self._settings["color"],
+                self._settings["brightness"],
+                self._settings["power"],
+            )
+        else:
+            decky.logger.warning(
+                "apply failed (euid=%s ledPath=%s): %s",
+                os.geteuid(),
+                self._capabilities.get("ledPath"),
+                self._controller.last_error,
+            )
 
     def _persist_and_apply(self) -> None:
         self._store.save(self._settings)
@@ -77,11 +91,13 @@ class Plugin:
     async def _main(self):
         self._init()
         decky.logger.info(
-            "Colores v%s on %s (color=%s zones=%s)",
+            "Colores v%s on %s (euid=%s color=%s zones=%s ledPath=%s)",
             read_version(),
             self._device["name"],
+            os.geteuid(),
             self._capabilities["color"],
             self._capabilities["zones"],
+            self._capabilities.get("ledPath"),
         )
         self._apply()
 
