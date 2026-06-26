@@ -1,7 +1,7 @@
 {
   "name": "Colores",
   "author": "Hooandee",
-  "flags": ["_root"],
+  "flags": ["root", "_root"],
   "api_version": 1,
   "publish": {
     "tags": ["root", "rgb", "led"],
