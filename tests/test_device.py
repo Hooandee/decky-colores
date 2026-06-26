@@ -58,6 +58,16 @@ def test_detect_capabilities_no_rgb_led(tmp_path):
     assert caps["ledPath"] is None
 
 
+def test_detect_capabilities_zero_max_brightness_falls_back(tmp_path):
+    _make_led(
+        str(tmp_path),
+        "ally:rgb:joystick_rings",
+        {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb", "max_brightness": "0"},
+    )
+    caps = detect_capabilities(str(tmp_path))
+    assert caps["maxBrightness"] == 255
+
+
 def test_detect_capabilities_no_leds_dir(tmp_path):
     caps = detect_capabilities(str(tmp_path))
     assert caps["color"] is False

@@ -1,8 +1,12 @@
 import os
 
 
+def _clamp8(value):
+    return max(0, min(255, int(value)))
+
+
 def _packed(r, g, b):
-    return f"0x{r:02x}{g:02x}{b:02x}"
+    return f"0x{_clamp8(r):02x}{_clamp8(g):02x}{_clamp8(b):02x}"
 
 
 class LedController:
@@ -20,7 +24,8 @@ class LedController:
             return False
 
         r, g, b = color
-        level = round((brightness / 100) * self._max_brightness) if power else 0
+        pct = max(0, min(100, brightness))
+        level = round((pct / 100) * self._max_brightness) if power else 0
 
         try:
             intensity_path = os.path.join(self._led_path, "multi_intensity")

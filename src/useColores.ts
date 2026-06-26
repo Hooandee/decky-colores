@@ -34,7 +34,9 @@ export function useColores() {
   const [state, setState] = useState<ColoresState | null>(null);
 
   useEffect(() => {
-    api.getState().then(setState);
+    api.getState()
+      .then(setState)
+      .catch((e) => console.error("Colores: getState failed", e));
   }, []);
 
   const pushColor = useThrottle((c: RGB) => api.setColor(c.r, c.g, c.b), 60);

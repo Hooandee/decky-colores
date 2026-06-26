@@ -42,3 +42,11 @@ def test_power_off_sets_brightness_zero(tmp_path):
     controller = LedController(led, zones=4, max_brightness=255)
     controller.apply((0, 0, 255), 100, False)
     assert _read(os.path.join(led, "brightness")) == "0"
+
+
+def test_apply_clamps_out_of_range_values(tmp_path):
+    led = _make_led(tmp_path)
+    controller = LedController(led, zones=2, max_brightness=255)
+    controller.apply((300, -5, 128), 250, True)
+    assert _read(os.path.join(led, "multi_intensity")) == "0xff0080 0xff0080"
+    assert _read(os.path.join(led, "brightness")) == "255"

@@ -65,7 +65,7 @@ function Content() {
 
   useEffect(() => {
     if (state && !init.current) {
-      setHsv(rgbToHsv(state.color));
+      setHsv({ ...rgbToHsv(state.color), v: 100 });
       init.current = true;
     }
   }, [state]);
@@ -83,6 +83,7 @@ function Content() {
   }
 
   const { capabilities: caps, color, brightness, power, device } = state;
+  const hasLeds = caps.color || caps.brightness;
 
   const editHsv = (next: HSV) => {
     setHsv(next);
@@ -102,18 +103,30 @@ function Content() {
         <DeviceHeader name={device.name} color={color} />
       </PanelSectionRow>
 
-      <PanelSectionRow>
-        <DevicePreview color={color} brightness={brightness} power={power} />
-      </PanelSectionRow>
+      {!hasLeds && (
+        <PanelSectionRow>
+          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", padding: "4px 2px" }}>
+            No controllable LEDs detected on this device.
+          </div>
+        </PanelSectionRow>
+      )}
 
-      <PanelSectionRow>
-        <ToggleField
-          label="Power"
-          checked={power}
-          onChange={setPower}
-          bottomSeparator="thick"
-        />
-      </PanelSectionRow>
+      {hasLeds && (
+        <>
+          <PanelSectionRow>
+            <DevicePreview color={color} brightness={brightness} power={power} />
+          </PanelSectionRow>
+
+          <PanelSectionRow>
+            <ToggleField
+              label="Power"
+              checked={power}
+              onChange={setPower}
+              bottomSeparator="thick"
+            />
+          </PanelSectionRow>
+        </>
+      )}
 
       {caps.color && (
         <>

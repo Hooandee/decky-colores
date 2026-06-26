@@ -15,10 +15,27 @@ DEFAULTS = {
 
 
 class Plugin:
+    def _init(self) -> None:
+        if getattr(self, "_ready", False):
+            return
+        self._device = detect_device()
+        self._capabilities = detect_capabilities()
+        self._store = SettingsStore(
+            os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
+        )
+        self._settings = self._store.load(DEFAULTS)
+        self._controller = LedController(
+            self._capabilities.get("ledPath"),
+            self._capabilities.get("zones", 1),
+            self._capabilities.get("maxBrightness", 255),
+        )
+        self._ready = True
+
     async def get_version(self) -> str:
         return read_version()
 
     async def get_state(self) -> dict:
+        self._init()
         return {
             "device": self._device,
             "capabilities": self._capabilities,
@@ -32,14 +49,17 @@ class Plugin:
         }
 
     async def set_color(self, r: int, g: int, b: int) -> None:
+        self._init()
         self._settings["color"] = [r, g, b]
         self._persist_and_apply()
 
     async def set_brightness(self, value: int) -> None:
+        self._init()
         self._settings["brightness"] = value
         self._persist_and_apply()
 
     async def set_power(self, on: bool) -> None:
+        self._init()
         self._settings["power"] = on
         self._persist_and_apply()
 
@@ -55,17 +75,7 @@ class Plugin:
         self._apply()
 
     async def _main(self):
-        self._device = detect_device()
-        self._capabilities = detect_capabilities()
-        self._store = SettingsStore(
-            os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
-        )
-        self._settings = self._store.load(DEFAULTS)
-        self._controller = LedController(
-            self._capabilities.get("ledPath"),
-            self._capabilities.get("zones", 1),
-            self._capabilities.get("maxBrightness", 255),
-        )
+        self._init()
         decky.logger.info(
             "Colores v%s on %s (color=%s zones=%s)",
             read_version(),

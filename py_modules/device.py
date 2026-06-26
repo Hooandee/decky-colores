@@ -67,16 +67,25 @@ def detect_capabilities(sysfs_root="/"):
         "color": has_color,
         "brightness": True,
         "zones": zones,
-        "maxBrightness": int(max_brightness) if max_brightness.isdigit() else 255,
+        "maxBrightness": _max_brightness(max_brightness),
         "ledPath": led_path,
     }
+
+
+def _max_brightness(raw):
+    return int(raw) if raw.isdigit() and int(raw) > 0 else 255
 
 
 def _find_rgb_led(leds_dir):
     if not os.path.isdir(leds_dir):
         return None
 
-    candidates = sorted(os.listdir(leds_dir), key=lambda c: "rgb" not in c.lower())
+    try:
+        entries = os.listdir(leds_dir)
+    except OSError:
+        return None
+
+    candidates = sorted(entries, key=lambda c: "rgb" not in c.lower())
     for name in candidates:
         path = os.path.join(leds_dir, name)
         if os.path.exists(os.path.join(path, "multi_intensity")):
