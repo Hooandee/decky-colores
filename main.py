@@ -43,13 +43,16 @@ class Plugin:
         self._settings["power"] = on
         self._persist_and_apply()
 
-    def _persist_and_apply(self) -> None:
-        self._store.save(self._settings)
+    def _apply(self) -> None:
         self._controller.apply(
             self._settings["color"],
             self._settings["brightness"],
             self._settings["power"],
         )
+
+    def _persist_and_apply(self) -> None:
+        self._store.save(self._settings)
+        self._apply()
 
     async def _main(self):
         self._device = detect_device()
@@ -70,11 +73,7 @@ class Plugin:
             self._capabilities["color"],
             self._capabilities["zones"],
         )
-        self._controller.apply(
-            self._settings["color"],
-            self._settings["brightness"],
-            self._settings["power"],
-        )
+        self._apply()
 
     async def _unload(self):
         decky.logger.info("Colores unloaded")

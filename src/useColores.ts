@@ -1,37 +1,41 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ColoresState, RGB } from "./types";
 import * as api from "./api";
 
 function useThrottle<A extends unknown[]>(fn: (...args: A) => void, ms: number) {
+  const fnRef = useRef(fn);
+  fnRef.current = fn;
   const last = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const latest = useRef<A | undefined>(undefined);
 
-  return (...args: A) => {
-    latest.current = args;
-    const now = Date.now();
-    const elapsed = now - last.current;
-    if (elapsed >= ms) {
-      last.current = now;
-      fn(...args);
-    } else if (!timer.current) {
-      timer.current = setTimeout(() => {
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  return useCallback(
+    (...args: A) => {
+      latest.current = args;
+      const elapsed = Date.now() - last.current;
+      if (elapsed >= ms) {
         last.current = Date.now();
-        timer.current = undefined;
-        if (latest.current) fn(...latest.current);
-      }, ms - elapsed);
-    }
-  };
+        fnRef.current(...args);
+      } else if (!timer.current) {
+        timer.current = setTimeout(() => {
+          last.current = Date.now();
+          timer.current = undefined;
+          if (latest.current) fnRef.current(...latest.current);
+        }, ms - elapsed);
+      }
+    },
+    [ms],
+  );
 }
 
 export function useColores() {
   const [state, setState] = useState<ColoresState | null>(null);
 
   useEffect(() => {
-    getState();
+    api.getState().then(setState);
   }, []);
-
-  const getState = () => api.getState().then(setState);
 
   const pushColor = useThrottle((c: RGB) => api.setColor(c.r, c.g, c.b), 60);
   const pushBrightness = useThrottle((v: number) => api.setBrightness(v), 60);

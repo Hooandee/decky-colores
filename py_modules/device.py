@@ -76,9 +76,8 @@ def _find_rgb_led(leds_dir):
     if not os.path.isdir(leds_dir):
         return None
 
-    candidates = sorted(os.listdir(leds_dir))
-    rgb_named = [c for c in candidates if "rgb" in c.lower()]
-    for name in rgb_named + candidates:
+    candidates = sorted(os.listdir(leds_dir), key=lambda c: "rgb" not in c.lower())
+    for name in candidates:
         path = os.path.join(leds_dir, name)
         if os.path.exists(os.path.join(path, "multi_intensity")):
             return path

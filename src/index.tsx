@@ -12,7 +12,7 @@ import { useEffect, useRef, useState } from "react";
 import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
-import { hsvToRgb, rgbToHsv, rgbToCss } from "./color";
+import { hsvToRgb, rgbToHsv, rgbToCss, HSV } from "./color";
 import { RGB } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { Swatches } from "./components/Swatches";
@@ -60,15 +60,12 @@ function GradientTrack({ background }: { background: string }) {
 
 function Content() {
   const { state, setColor, setBrightness, setPower } = useColores();
-  const [hue, setHue] = useState(0);
-  const [sat, setSat] = useState(100);
+  const [hsv, setHsv] = useState<HSV>({ h: 0, s: 100, v: 100 });
   const init = useRef(false);
 
   useEffect(() => {
     if (state && !init.current) {
-      const hsv = rgbToHsv(state.color);
-      setHue(hsv.h);
-      setSat(hsv.s);
+      setHsv(rgbToHsv(state.color));
       init.current = true;
     }
   }, [state]);
@@ -87,20 +84,17 @@ function Content() {
 
   const { capabilities: caps, color, brightness, power, device } = state;
 
-  const applyHsv = (h: number, s: number) => {
-    setHue(h);
-    setSat(s);
-    setColor(hsvToRgb(h, s, 100));
+  const editHsv = (next: HSV) => {
+    setHsv(next);
+    setColor(hsvToRgb(next.h, next.s, 100));
   };
 
   const pickPreset = (rgb: RGB) => {
-    const hsv = rgbToHsv(rgb);
-    setHue(hsv.h);
-    setSat(hsv.s);
+    setHsv(rgbToHsv(rgb));
     setColor(rgb);
   };
 
-  const satTrack = `linear-gradient(90deg, #808080, ${rgbToCss(hsvToRgb(hue, 100, 100))})`;
+  const satTrack = `linear-gradient(90deg, #808080, ${rgbToCss(hsvToRgb(hsv.h, 100, 100))})`;
 
   return (
     <PanelSection>
@@ -133,12 +127,12 @@ function Content() {
             <GradientTrack background={HUE_BAR} />
             <SliderField
               label="Hue"
-              value={hue}
+              value={hsv.h}
               min={0}
               max={360}
               step={1}
               disabled={!power}
-              onChange={(h) => applyHsv(h, sat)}
+              onChange={(h) => editHsv({ ...hsv, h })}
             />
           </PanelSectionRow>
 
@@ -146,14 +140,14 @@ function Content() {
             <GradientTrack background={satTrack} />
             <SliderField
               label="Saturation"
-              value={sat}
+              value={hsv.s}
               min={0}
               max={100}
               step={1}
               valueSuffix="%"
               showValue
               disabled={!power}
-              onChange={(s) => applyHsv(hue, s)}
+              onChange={(s) => editHsv({ ...hsv, s })}
             />
           </PanelSectionRow>
         </>
