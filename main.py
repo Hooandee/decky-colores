@@ -1,6 +1,6 @@
 import decky
 
-from py_modules.version import read_version
+from version import read_version
 
 
 class Plugin:
