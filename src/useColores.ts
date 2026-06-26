@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ColoresState, RGB } from "./types";
+import { ColoresState, EffectId, Mode, RGB } from "./types";
 import * as api from "./api";
 
 function useThrottle<A extends unknown[]>(fn: (...args: A) => void, ms: number) {
@@ -39,13 +39,9 @@ export function useColores() {
       .catch((e) => console.error("Colores: getState failed", e));
   }, []);
 
-  const pushColor = useThrottle((c: RGB) => api.setColor(c.r, c.g, c.b), 60);
+  const pushSolid = useThrottle((c: RGB) => api.setSolid(c.r, c.g, c.b), 60);
   const pushBrightness = useThrottle((v: number) => api.setBrightness(v), 60);
-
-  const setColor = (color: RGB) => {
-    setState((s) => (s ? { ...s, color } : s));
-    pushColor(color);
-  };
+  const pushEffect = useThrottle((id: EffectId, speed: number) => api.setEffect(id, speed), 60);
 
   const setBrightness = (brightness: number) => {
     setState((s) => (s ? { ...s, brightness } : s));
@@ -57,5 +53,39 @@ export function useColores() {
     api.setPower(power);
   };
 
-  return { state, setColor, setBrightness, setPower };
+  const setMode = (mode: Mode) => {
+    setState((s) => (s ? { ...s, mode } : s));
+    api.setMode(mode);
+  };
+
+  const setSolid = (color: RGB) => {
+    setState((s) => (s ? { ...s, color, mode: "solid" } : s));
+    pushSolid(color);
+  };
+
+  const setGradient = (gradient: RGB[]) => {
+    setState((s) => (s ? { ...s, gradient } : s));
+    api.setGradient(gradient.map((c) => [c.r, c.g, c.b]));
+  };
+
+  const setEffectId = (id: EffectId) => {
+    setState((s) => (s ? { ...s, effect: { ...s.effect, id } } : s));
+    if (state) pushEffect(id, state.effect.speed);
+  };
+
+  const setEffectSpeed = (speed: number) => {
+    setState((s) => (s ? { ...s, effect: { ...s.effect, speed } } : s));
+    if (state) pushEffect(state.effect.id, speed);
+  };
+
+  return {
+    state,
+    setBrightness,
+    setPower,
+    setMode,
+    setSolid,
+    setGradient,
+    setEffectId,
+    setEffectSpeed,
+  };
 }

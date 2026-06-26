@@ -1,51 +1,63 @@
 import { FC } from "react";
 import { RGB } from "../types";
-import { dim, rgbToCss } from "../color";
+import { dim, rgbToCss, softenForDisplay } from "../color";
 
 interface DevicePreviewProps {
-  color: RGB;
+  colors: RGB[];
   brightness: number;
   power: boolean;
+  label?: string;
 }
 
-const Ring: FC<{ cx: number; glow: string; intensity: number }> = ({ cx, glow, intensity }) => (
-  <g>
-    <circle
-      cx={cx}
-      cy={70}
-      r={38}
-      fill="none"
-      stroke="#0c0c10"
-      strokeWidth={14}
-    />
-    <circle
-      cx={cx}
-      cy={70}
-      r={38}
-      fill="none"
-      stroke={glow}
-      strokeWidth={9}
-      strokeLinecap="round"
-      style={{
-        filter: `drop-shadow(0 0 ${6 + intensity * 14}px ${glow})`,
-        opacity: 0.35 + intensity * 0.65,
-        transition: "stroke 120ms ease, opacity 120ms ease, filter 120ms ease",
-      }}
-    />
-  </g>
-);
+const OFF: RGB = { r: 26, g: 26, b: 32 };
 
-export const DevicePreview: FC<DevicePreviewProps> = ({ color, brightness, power }) => {
-  const lit = power ? dim(color, brightness) : { r: 24, g: 24, b: 30 };
-  const css = rgbToCss(lit);
+const Ring: FC<{ cx: number; gradId: string; intensity: number; lit: RGB[] }> = ({
+  cx,
+  gradId,
+  intensity,
+  lit,
+}) => {
+  const mid = lit[Math.floor(lit.length / 2)] ?? lit[0];
+  return (
+    <g>
+      <circle cx={cx} cy={70} r={38} fill="none" stroke="#0c0c10" strokeWidth={14} />
+      <circle
+        cx={cx}
+        cy={70}
+        r={38}
+        fill="none"
+        stroke={`url(#${gradId})`}
+        strokeWidth={9}
+        strokeLinecap="round"
+        style={{
+          filter: `drop-shadow(0 0 ${4 + intensity * 9}px ${rgbToCss(mid)})`,
+          opacity: 0.4 + intensity * 0.6,
+          transition: "opacity 140ms ease, filter 140ms ease",
+        }}
+      />
+    </g>
+  );
+};
+
+export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, power, label }) => {
+  const source = power && colors.length ? colors : [OFF];
+  const lit = source.map((c) => dim(softenForDisplay(c), power ? Math.max(brightness, 12) : 100));
   const intensity = power ? brightness / 100 : 0;
+
+  const stops = lit.map((c, i) => (
+    <stop
+      key={i}
+      offset={`${lit.length === 1 ? 50 : (i / (lit.length - 1)) * 100}%`}
+      stopColor={rgbToCss(c)}
+    />
+  ));
 
   return (
     <div
       style={{
         position: "relative",
-        borderRadius: 12,
-        padding: "14px 8px 10px",
+        borderRadius: 14,
+        padding: "16px 8px 10px",
         background:
           "radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.05), rgba(0,0,0,0) 60%), #060608",
         boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.05)",
@@ -53,8 +65,16 @@ export const DevicePreview: FC<DevicePreviewProps> = ({ color, brightness, power
       }}
     >
       <svg viewBox="0 0 300 140" style={{ width: "100%", display: "block" }}>
-        <Ring cx={92} glow={css} intensity={intensity} />
-        <Ring cx={208} glow={css} intensity={intensity} />
+        <defs>
+          <linearGradient id="ring-left" x1="0%" y1="0%" x2="100%" y2="100%">
+            {stops}
+          </linearGradient>
+          <linearGradient id="ring-right" x1="100%" y1="0%" x2="0%" y2="100%">
+            {stops}
+          </linearGradient>
+        </defs>
+        <Ring cx={92} gradId="ring-left" intensity={intensity} lit={lit} />
+        <Ring cx={208} gradId="ring-right" intensity={intensity} lit={lit} />
       </svg>
       <div
         style={{
@@ -66,7 +86,7 @@ export const DevicePreview: FC<DevicePreviewProps> = ({ color, brightness, power
           marginTop: 2,
         }}
       >
-        {power ? "Joystick rings" : "Off"}
+        {power ? (label ?? "Joystick rings") : "Off"}
       </div>
     </div>
   );

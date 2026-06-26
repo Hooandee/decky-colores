@@ -66,3 +66,12 @@ export function dim({ r, g, b }: RGB, percent: number): RGB {
     b: Math.round(b * factor),
   };
 }
+
+export function softenForDisplay({ r, g, b }: RGB, amount = 0.18): RGB {
+  const mix = clamp(amount, 0, 1);
+  return {
+    r: Math.round(r + (255 - r) * mix),
+    g: Math.round(g + (255 - g) * mix),
+    b: Math.round(b + (255 - b) * mix),
+  };
+}
