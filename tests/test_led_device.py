@@ -62,3 +62,17 @@ def test_clamps_out_of_range(tmp_path):
 
 def test_supports_per_zone():
     assert SysfsRgbDevice("/x").supports_per_zone() is True
+
+
+def test_decimal_format_writes_space_separated_channels(tmp_path):
+    led = _make_led(tmp_path, multi_index="red green blue red green blue red green blue red green blue")
+    device = SysfsRgbDevice(led, zones=4, max_brightness=255, index_format="decimal")
+    device.apply_zones([(255, 0, 0)], 100, True)
+    assert _read(os.path.join(led, "multi_intensity")) == "255 0 0 255 0 0 255 0 0 255 0 0"
+
+
+def test_decimal_format_respects_color_order(tmp_path):
+    led = _make_led(tmp_path, multi_index="red green blue red green blue")
+    device = SysfsRgbDevice(led, zones=2, max_brightness=255, index_format="decimal", color_order="bgr")
+    device.apply_zones([(255, 0, 0)], 100, True)
+    assert _read(os.path.join(led, "multi_intensity")) == "0 0 255 0 0 255"
