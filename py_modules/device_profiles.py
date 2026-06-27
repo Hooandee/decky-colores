@@ -55,6 +55,8 @@ PROFILES = [
     ("product", "83N1", _profile(LEGION_TABLET_HID, "Legion Go 2")),
     ("product", "83L3", _profile(LEGION_GO_S_HID, "Legion Go S")),
     ("product", "83Q2", _profile(LEGION_GO_S_HID, "Legion Go S")),
+    ("product", "83N6", _profile(LEGION_GO_S_HID, "Legion Go S")),
+    ("product", "83Q3", _profile(LEGION_GO_S_HID, "Legion Go S")),
     ("product_contains", "Claw 8 AI+", _profile(MSI_HID, "MSI Claw 8 AI+")),
     ("product_contains", "Claw A1M", _profile(MSI_HID, "MSI Claw")),
 ]

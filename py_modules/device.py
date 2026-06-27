@@ -2,6 +2,7 @@ import os
 
 from device_profiles import resolve_profile
 from led_device import SysfsRgbDevice, NullDevice
+from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device
 
 DEVICE_REGISTRY = [
     ("board", "Jupiter", "Steam Deck"),
@@ -13,6 +14,8 @@ DEVICE_REGISTRY = [
     ("product", "83E1", "Legion Go"),
     ("product", "83L3", "Legion Go S"),
     ("product", "83Q2", "Legion Go S"),
+    ("product", "83N6", "Legion Go S"),
+    ("product", "83Q3", "Legion Go S"),
     ("product", "83N0", "Legion Go 2"),
     ("product", "83N1", "Legion Go 2"),
 ]
@@ -168,13 +171,41 @@ def _find_rgb_led(leds_dir):
     return None
 
 
-_IMPLEMENTED_DRIVERS = {"sysfs"}
+_IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s"}
+
+
+def _build_hid_context(profile, ambilight):
+    device = build_hid_device(profile["driver"])
+    if device is None or not device.available:
+        return None
+    profile = dict(profile)
+    profile["experimental"] = [
+        f for f in profile.get("experimental", []) if f not in ("color", "brightness", "effects")
+    ]
+    zones = profile.get("zones") or 1
+    capabilities = build_capabilities(profile, True, zones, 100, ambilight)
+    capabilities["perZone"] = device.supports_per_zone()
+    return {"device": device, "capabilities": capabilities}
 
 
 def build_device(sysfs_root="/", ambilight=False):
     info = detect_device(sysfs_root)
     profile = resolve_profile(info["board"], info["product"])
     info["name"] = profile["name"]
+
+    if profile["driver"] in HID_DRIVERS:
+        if HID_AVAILABLE:
+            hid_ctx = _build_hid_context(profile, ambilight)
+            if hid_ctx is not None:
+                return {
+                    "info": info,
+                    "capabilities": hid_ctx["capabilities"],
+                    "layout": hid_ctx["capabilities"]["layout"],
+                    "device": hid_ctx["device"],
+                }
+        for feature in ("color", "brightness", "effects", "ambilight"):
+            if feature not in profile["experimental"]:
+                profile["experimental"].append(feature)
 
     leds_dir = os.path.join(sysfs_root, "sys/class/leds")
     led_path = _find_rgb_led(leds_dir)
