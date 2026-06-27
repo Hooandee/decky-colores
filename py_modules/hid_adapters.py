@@ -23,6 +23,7 @@ try:
     )
     from legion_go_tablet_hid import LegionGoTabletHID
     from legion_led_device_hid import LegionGoLEDDeviceHID
+    from hhd_legino_go_s_hid import rgb_enable, rgb_multi_load_settings
 
     HID_AVAILABLE = True
 except Exception as error:  # pragma: no cover - exercised only without libhidapi
@@ -227,16 +228,31 @@ class LegionGoSHidDevice(_LegionHidDevice):
             )
         )
 
+    def _write(self, reps):
+        if not self._transport.is_ready():
+            return False
+        device = self._transport.hid_device
+        if device is None:
+            return False
+        for rep in reps:
+            device.write(rep)
+        return True
+
     def apply_solid(self, color, brightness, power):
         try:
-            if not power:
-                return bool(self._transport.set_led_color(Color(0, 0, 0), RGBMode.Disabled))
-            return bool(
-                self._transport.set_led_color(
-                    Color(*[_clamp8(c) for c in color]),
-                    RGBMode.Solid,
-                )
+            r, g, b = (_clamp8(c) for c in color)
+            if not power or (r == 0 and g == 0 and b == 0):
+                self._transport.prev_mode = None
+                return self._write([rgb_enable(False)])
+            init = self._transport.prev_mode != "solid"
+            reps = rgb_multi_load_settings(
+                "solid", 0x03, r, g, b, brightness=max(0, min(100, int(brightness))) / 100.0,
+                speed=1, init=init,
             )
+            ok = self._write(reps)
+            if ok:
+                self._transport.prev_mode = "solid"
+            return ok
         except Exception:
             return False
 

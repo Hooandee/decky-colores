@@ -180,6 +180,21 @@ def test_legion_go_s_solid_bytes(hid_env):
     ]
 
 
+def test_legion_go_s_solid_honors_brightness(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_go_s_entry()]
+    dev = adapters.LegionGoSHidDevice.create()
+    writes.clear()
+    assert dev.apply_solid((255, 0, 0), 50, True) is True
+    assert [w.hex() for w in writes] == [
+        "040601",
+        "100203",
+        "100500ff0000203f",
+    ]
+    profile = writes[-1]
+    assert profile[6] == 0x20
+
+
 def test_legion_go_s_power_off_disables(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_go_s_entry()]
