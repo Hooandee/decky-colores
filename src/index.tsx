@@ -15,7 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus } from "./api";
+import { getAmbilightStatus, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -603,16 +603,35 @@ function Content() {
   );
 }
 
-export default definePlugin(() => ({
-  name: "Colores",
-  titleView: <div className={staticClasses.Title}>Colores</div>,
-  content: (
-    <ErrorBoundary>
-      <I18nProvider>
-        <Content />
-      </I18nProvider>
-    </ErrorBoundary>
-  ),
-  icon: <FaPalette />,
-  onDismount() {},
-}));
+export default definePlugin(() => {
+  // SteamOS restores its own controller lighting on resume from suspend, wiping
+  // whatever the user set. Re-apply the saved settings shortly after waking so
+  // the user's choice survives a sleep/wake cycle. reconnect() reconnects the
+  // controller (which re-enumerates after resume) and re-applies the settings.
+  // The delay lets SteamOS finish writing its color first so we win the race.
+  // Registered at the plugin level so it runs even when the QAM panel is closed.
+  let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+  const resumeReg = SteamClient?.System?.RegisterForOnResumeFromSuspend?.(() => {
+    clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(() => {
+      apiReconnect().catch(() => {});
+    }, 2000);
+  });
+
+  return {
+    name: "Colores",
+    titleView: <div className={staticClasses.Title}>Colores</div>,
+    content: (
+      <ErrorBoundary>
+        <I18nProvider>
+          <Content />
+        </I18nProvider>
+      </ErrorBoundary>
+    ),
+    icon: <FaPalette />,
+    onDismount() {
+      clearTimeout(resumeTimer);
+      resumeReg?.unregister?.();
+    },
+  };
+});
