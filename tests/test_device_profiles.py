@@ -38,3 +38,17 @@ def test_unknown_device_is_generic_experimental():
     assert p["name"] == "MysteryHandheld"
     assert p["driver"] == "sysfs"
     assert set(p["experimental"]) == {"color", "brightness", "effects", "ambilight"}
+
+
+def test_resolve_profile_experimental_is_not_shared():
+    first = resolve_profile("", "83L3")
+    first["experimental"].append("mutated")
+    second = resolve_profile("", "83L3")
+    assert "mutated" not in second["experimental"]
+
+
+def test_generic_fallback_experimental_is_not_shared():
+    first = resolve_profile("X", "MysteryHandheld")
+    first["experimental"].append("mutated")
+    second = resolve_profile("Y", "OtherMystery")
+    assert "mutated" not in second["experimental"]

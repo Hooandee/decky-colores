@@ -62,14 +62,20 @@ PROFILES = [
 ]
 
 
+def _copy_profile(profile):
+    merged = dict(profile)
+    merged["experimental"] = list(profile.get("experimental", []))
+    return merged
+
+
 def resolve_profile(board, product):
     for field, value, profile in PROFILES:
         if field == "board" and value == board:
-            return dict(profile)
+            return _copy_profile(profile)
         if field == "product" and value == product:
-            return dict(profile)
+            return _copy_profile(profile)
         if field == "product_contains" and value in (product or ""):
-            return dict(profile)
-    fallback = dict(GENERIC)
+            return _copy_profile(profile)
+    fallback = _copy_profile(GENERIC)
     fallback["name"] = product or board or "Unknown device"
     return fallback

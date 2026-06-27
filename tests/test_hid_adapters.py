@@ -281,3 +281,16 @@ def test_build_device_hid_unavailable_falls_back(hid_env, tmp_path, monkeypatch)
     assert caps["states"]["color"] == "experimental"
     assert caps["states"]["effects"] == "experimental"
     sys.modules.pop("device", None)
+
+
+def test_build_device_hid_unavailable_states_do_not_accumulate(hid_env, tmp_path, monkeypatch):
+    adapters, _ = hid_env
+    monkeypatch.setattr(adapters, "HID_AVAILABLE", False)
+    device = _reload_device()
+    monkeypatch.setattr(device, "HID_AVAILABLE", False)
+    root = _make_dmi_root(tmp_path, "83L3")
+    first = device.build_device(sysfs_root=root, ambilight=False)
+    second = device.build_device(sysfs_root=root, ambilight=False)
+    assert first["capabilities"]["states"] == second["capabilities"]["states"]
+    assert first["capabilities"]["experimental"] == second["capabilities"]["experimental"]
+    sys.modules.pop("device", None)
