@@ -205,6 +205,8 @@ class Plugin:
             )
         elif s["mode"] == "gradient":
             self._controller.apply_solid(tuple(s["gradient"][0]), brightness, power)
+        elif s["mode"] == "ambient":
+            self._controller.apply_solid(tuple(s["color"]), brightness, power)
         else:
             self._controller.apply_solid(tuple(s["color"]), brightness, power)
 
