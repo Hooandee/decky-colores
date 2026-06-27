@@ -1,7 +1,7 @@
 import os
 import sys
 
-from led_device import LedDevice
+from led_device import LedDevice, _clamp8, _clamp_pct
 
 _HUESYNC_DIR = os.path.join(os.path.dirname(__file__), "huesync")
 if _HUESYNC_DIR not in sys.path:
@@ -65,10 +65,6 @@ def _effect_mode(effect_id):
     return mapping.get(effect_id, RGBMode.Solid)
 
 
-def _clamp8(value):
-    return max(0, min(255, int(value)))
-
-
 def _msi_speed(speed):
     return max(0, min(20, round((max(0, min(100, int(speed))) / 100) * 20)))
 
@@ -113,7 +109,7 @@ class MsiHidDevice(_BaseHidDevice):
 
     def _solid_config(self, color, brightness):
         return build_solid_color(
-            Color(*[_clamp8(c) for c in color]), brightness=max(0, min(100, int(brightness))), speed=17
+            Color(*[_clamp8(c) for c in color]), brightness=_clamp_pct(brightness), speed=17
         )
 
     def _zone_config(self, zone_colors, brightness):
@@ -123,7 +119,7 @@ class MsiHidDevice(_BaseHidDevice):
         zones = [Color(r, g, b) for (r, g, b) in colors[:RGB_ZONES_PER_FRAME]]
         return MSIRGBConfig(
             speed=normalize_speed(17),
-            brightness=max(0, min(100, int(brightness))),
+            brightness=_clamp_pct(brightness),
             effect=MSIEffect.UNKNOWN_09,
             keyframes=[MSIKeyFrame(rgb_zones=zones)],
         )
@@ -164,6 +160,9 @@ class _LegionHidDevice(_BaseHidDevice):
     def supports_per_zone(self):
         return False
 
+    def supports_hardware_effects(self):
+        return True
+
     def apply_zones(self, zone_colors, brightness, power):
         colors = list(zone_colors) or [(0, 0, 0)]
         return self.apply_solid(colors[0], brightness, power)
@@ -191,7 +190,7 @@ class LegionTabletHidDevice(_LegionHidDevice):
                 self._transport.set_led_color(
                     RGBMode.Solid,
                     Color(*[_clamp8(c) for c in color]),
-                    brightness=max(0, min(100, int(brightness))),
+                    brightness=_clamp_pct(brightness),
                 )
             )
         except Exception:
@@ -246,7 +245,7 @@ class LegionGoSHidDevice(_LegionHidDevice):
                 return self._write([rgb_enable(False)])
             init = self._transport.prev_mode != "solid"
             reps = rgb_multi_load_settings(
-                "solid", 0x03, r, g, b, brightness=max(0, min(100, int(brightness))) / 100.0,
+                "solid", 0x03, r, g, b, brightness=_clamp_pct(brightness) / 100.0,
                 speed=1, init=init,
             )
             ok = self._write(reps)

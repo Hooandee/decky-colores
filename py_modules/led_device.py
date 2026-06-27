@@ -5,12 +5,19 @@ def _clamp8(value):
     return max(0, min(255, int(value)))
 
 
+def _clamp_pct(value):
+    return max(0, min(100, int(value)))
+
+
 class LedDevice:
     @property
     def available(self):
         return False
 
     def supports_per_zone(self):
+        return False
+
+    def supports_hardware_effects(self):
         return False
 
     def apply_zones(self, zone_colors, brightness, power):

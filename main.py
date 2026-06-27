@@ -6,7 +6,6 @@ import decky
 
 from version import read_version
 from device import build_device
-from hid_adapters import _BaseHidDevice
 from settings_store import SettingsStore
 from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
@@ -184,7 +183,7 @@ class Plugin:
         self._apply()
 
     def _apply(self) -> None:
-        if isinstance(self._controller, _BaseHidDevice) and not self._controller.supports_per_zone():
+        if self._controller.supports_hardware_effects():
             self._apply_hardware()
             return
         self._apply_per_zone()
@@ -203,12 +202,9 @@ class Plugin:
             self._controller.apply_hardware_effect(
                 effect["id"], tuple(s["color"]), effect["speed"], power
             )
-        elif s["mode"] == "gradient":
-            self._controller.apply_solid(tuple(s["gradient"][0]), brightness, power)
-        elif s["mode"] == "ambient":
-            self._controller.apply_solid(tuple(s["color"]), brightness, power)
         else:
-            self._controller.apply_solid(tuple(s["color"]), brightness, power)
+            color = tuple(s["gradient"][0]) if s["mode"] == "gradient" else tuple(s["color"])
+            self._controller.apply_solid(color, brightness, power)
 
     def _apply_per_zone(self) -> None:
         s = self._settings
