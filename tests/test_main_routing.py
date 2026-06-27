@@ -167,6 +167,35 @@ def test_wave_on_per_controller_device_runs_in_software(main_module):
     assert not any(c[0] == "hw_effect" for c in p._controller.calls)
 
 
+def test_spiral_on_legion_uses_firmware_effect(main_module):
+    # Legion Go (hardware effects): spiral is the device's native firmware effect.
+    p = _plugin(
+        main_module,
+        "effect",
+        {"id": "spiral", "speed": 50, "use_gradient": False},
+        hw=True,
+        per_zone=False,
+        per_controller=True,
+    )
+    p._apply()
+    assert any(c[0] == "hw_effect" and c[1] == "spiral" for c in p._controller.calls)
+    assert not any(e[0] == "effect" for e in p._engine.events)
+
+
+def test_spiral_on_ally_runs_in_software(main_module):
+    # Ally (no hardware effects): spiral spins the user's gradient in software.
+    p = _plugin(
+        main_module,
+        "effect",
+        {"id": "spiral", "speed": 50, "use_gradient": False},
+        hw=False,
+        per_zone=True,
+    )
+    p._apply()
+    assert any(e[0] == "effect" and e[1] == "spiral" for e in p._engine.events)
+    assert not any(c[0] == "hw_effect" for c in p._controller.calls)
+
+
 def test_breathing_with_use_gradient_runs_in_software(main_module):
     p = _plugin(main_module, "effect", {"id": "breathing", "speed": 50, "use_gradient": True})
     p._apply()

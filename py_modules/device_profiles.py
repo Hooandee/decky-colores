@@ -2,7 +2,7 @@ ASUS_SYSFS = {
     "driver": "sysfs",
     "color_order": "rgb",
     "zones": 4,
-    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle", "spiral"],
     "color_correction": [1.0, 0.85, 1.0],
     "experimental": [],
 }
@@ -11,7 +11,7 @@ MSI_HID = {
     "driver": "hid_msi",
     "color_order": "bgr",
     "zones": 9,
-    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle", "spiral"],
     "swap_sticks": True,
     "experimental": [],
 }
@@ -20,7 +20,7 @@ LEGION_TABLET_HID = {
     "driver": "hid_legion_tablet",
     "color_order": "rgb",
     "zones": 2,
-    "supported_effects": ["breathing", "rainbow", "wave"],
+    "supported_effects": ["breathing", "rainbow", "spiral"],
     "per_controller": True,
     "experimental": [],
 }
@@ -29,7 +29,7 @@ LEGION_GO_S_HID = {
     "driver": "hid_legion_go_s",
     "color_order": "rgb",
     "zones": 2,
-    "supported_effects": ["breathing", "rainbow", "wave"],
+    "supported_effects": ["breathing", "rainbow", "spiral"],
     "experimental": [],
 }
 

@@ -97,6 +97,32 @@ def frame_cycle(zones, t, speed):
     return [hsv_to_rgb((base + (360.0 * i / zones)) % 360.0, 1.0, 1.0) for i in range(zones)]
 
 
+def frame_spiral(stops, zones, t, speed):
+    # Software spiral for devices that CAN paint multiple zones (e.g. the Ally):
+    # rotate the user's gradient around the ring as a seamless loop, interpolating
+    # between zones so the motion is smooth. On single-color firmware devices
+    # (Legion Go) the spiral is rendered natively and never reaches this loop.
+    if zones <= 0:
+        return []
+    palette = interpolate_gradient([tuple(s) for s in stops], zones)
+    shift = ((_freq(speed) * t) % 1.0) * zones
+    result = []
+    for i in range(zones):
+        src = (i + shift) % zones
+        lo = int(math.floor(src)) % zones
+        hi = (lo + 1) % zones
+        frac = src - math.floor(src)
+        a, b = palette[lo], palette[hi]
+        result.append(
+            (
+                clamp8(a[0] + (b[0] - a[0]) * frac),
+                clamp8(a[1] + (b[1] - a[1]) * frac),
+                clamp8(a[2] + (b[2] - a[2]) * frac),
+            )
+        )
+    return result
+
+
 def frame_gradient_sweep(stops, zones, t, speed):
     # Temporal crossfade through the whole palette for devices that cannot render
     # a spatial gradient (single-color zones, e.g. Legion rings). All zones share
@@ -153,6 +179,8 @@ class EffectEngine:
             return frame_rainbow(self._zones, t, speed)
         if effect_id == "wave":
             return frame_wave(params.get("stops", [(255, 0, 0), (0, 0, 255)]), self._zones, t, speed)
+        if effect_id == "spiral":
+            return frame_spiral(params.get("stops", [(255, 0, 0), (0, 0, 255)]), self._zones, t, speed)
         if effect_id == "cycle":
             return frame_cycle(self._zones, t, speed)
         if effect_id == "gradient_sweep":

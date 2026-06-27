@@ -302,13 +302,16 @@ function Content() {
 
   const selectedEffect = visibleEffects.find((e) => e.id === effect.id) ?? visibleEffects[0];
 
-  // A gradient-based effect only points at the gradient editor when the device
-  // actually exposes one. On single-color devices (no gradient tab) it falls back
-  // to the shared solid color, which the firmware wave uses.
+  // Devices with native firmware effects (Legion Go) run spiral as their own
+  // fixed-palette effect — labelled "Spiral GO", taking no user color. Devices
+  // that paint zones in software (Ally) spin the user's gradient instead.
+  const firmwareSpiral = caps.hardwareEffects;
   const effectNeed: EffectColorNeed =
-    selectedEffect?.needs === "gradient" && !canGradient
-      ? "color"
-      : (selectedEffect?.needs ?? "none");
+    selectedEffect?.id === "spiral" && firmwareSpiral
+      ? "none"
+      : selectedEffect?.needs === "gradient" && !canGradient
+        ? "color"
+        : (selectedEffect?.needs ?? "none");
 
   const effectPreview = (): RGB[] => {
     if (!selectedEffect || effectNeed === "none") return selectedEffect?.colors ?? [color];
@@ -391,6 +394,7 @@ function Content() {
                       selected={effect.id}
                       speed={effect.speed}
                       disabled={!power}
+                      firmwareSpiral={firmwareSpiral}
                       onSelect={setEffectId}
                       onSpeed={setEffectSpeed}
                     />
@@ -426,7 +430,9 @@ function Content() {
                           padding: "4px 2px 8px",
                         }}
                       >
-                        {t("effect.spectrumNote")}
+                        {selectedEffect?.id === "spiral" && firmwareSpiral
+                          ? t("effect.spiral.firmwareNote")
+                          : t("effect.spectrumNote")}
                       </div>
                     </PanelSectionRow>
                   )}

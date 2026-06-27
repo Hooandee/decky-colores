@@ -214,6 +214,10 @@ class Plugin:
             effect = s["effect"]
             if effect.get("use_gradient", False):
                 return True
+            if effect["id"] == "spiral":
+                # Legion Go renders spiral with its own firmware effect; only
+                # software-painting devices (e.g. the Ally) run the per-frame loop.
+                return not self._controller.supports_hardware_effects()
             if effect["id"] == "wave":
                 return self._controller.supports_per_zone() or bool(
                     self._capabilities.get("perControllerColor", False)

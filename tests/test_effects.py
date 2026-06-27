@@ -3,6 +3,7 @@ from py_modules.effects import (
     frame_cycle,
     frame_gradient_sweep,
     frame_rainbow,
+    frame_spiral,
     hsv_to_rgb,
     interpolate_gradient,
 )
@@ -91,3 +92,21 @@ def test_frame_cycle_valid():
         frame = frame_cycle(4, t / 5.0, 50)
         assert len(frame) == 4
         assert all(_valid(c) for c in frame)
+
+
+def test_frame_spiral_at_t0_matches_palette():
+    stops = [(255, 0, 0), (0, 0, 255)]
+    assert frame_spiral(stops, 4, 0.0, 50) == interpolate_gradient(stops, 4)
+
+
+def test_frame_spiral_rotates_and_stays_valid():
+    stops = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
+    start = frame_spiral(stops, 4, 0.0, 60)
+    moved = False
+    for t in range(1, 30):
+        frame = frame_spiral(stops, 4, t / 10.0, 60)
+        assert len(frame) == 4
+        assert all(_valid(c) for c in frame)
+        if frame != start:
+            moved = True
+    assert moved

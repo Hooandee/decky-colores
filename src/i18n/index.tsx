@@ -70,6 +70,9 @@ const es: Record<string, string> = {
   "effect.rainbow.label": "Arcoíris",
   "effect.wave.label": "Onda",
   "effect.cycle.label": "Ciclo",
+  "effect.spiral.label": "Espiral",
+  "effect.spiral.legion.label": "Espiral GO",
+  "effect.spiral.firmwareNote": "Efecto giratorio propio del firmware de tu Legion Go.",
 
   "ambient.gameModeBanner": "Aún no hay pantalla que leer. Ambilight funciona en Modo Juego con un juego abierto (no en Escritorio ni Big Picture).",
   "ambient.stickHint": "Las luces siguen la pantalla cerca de cada joystick. La izquierda desde arriba a la izquierda, la derecha desde el centro a la derecha.",
@@ -160,6 +163,9 @@ const en: Record<string, string> = {
   "effect.rainbow.label": "Rainbow",
   "effect.wave.label": "Wave",
   "effect.cycle.label": "Cycle",
+  "effect.spiral.label": "Spiral",
+  "effect.spiral.legion.label": "Spiral GO",
+  "effect.spiral.firmwareNote": "Your Legion Go's built-in rotating firmware effect.",
 
   "ambient.gameModeBanner": "No screen to read yet. Ambient works in Game Mode with a game running (not in Desktop or Big Picture).",
   "ambient.stickHint": "Lights follow the screen near each stick. Left from the top-left, right from the mid-right.",

@@ -25,6 +25,7 @@ export interface Capabilities {
   maxBrightness: number;
   layout: ZoneGroup[];
   perZone: boolean;
+  hardwareEffects: boolean;
   reconnectable: boolean;
   perControllerColor: boolean;
   supportedEffects: string[];
@@ -41,7 +42,7 @@ export interface AmbilightState {
   fps: number;
 }
 
-export type EffectId = "breathing" | "rainbow" | "wave" | "cycle";
+export type EffectId = "breathing" | "rainbow" | "wave" | "cycle" | "spiral";
 
 export interface EffectState {
   id: EffectId;

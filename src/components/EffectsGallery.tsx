@@ -9,6 +9,7 @@ interface EffectsGalleryProps {
   selected: EffectId;
   speed: number;
   disabled?: boolean;
+  firmwareSpiral?: boolean;
   onSelect: (id: EffectId) => void;
   onSpeed: (v: number) => void;
 }
@@ -133,10 +134,15 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
   selected,
   speed,
   disabled,
+  firmwareSpiral,
   onSelect,
   onSpeed,
 }) => {
   const { t } = useI18n();
+  const labelFor = (id: EffectId) =>
+    id === "spiral" && firmwareSpiral
+      ? t("effect.spiral.legion.label")
+      : t(`effect.${id}.label`);
   return (
   <div style={{ display: "flex", flexDirection: "column", gap: 12, opacity: disabled ? 0.4 : 1 }}>
     <Keyframes />
@@ -181,7 +187,7 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
                 textAlign: "center",
               }}
             >
-              {t(`effect.${effect.id}.label`)}
+              {labelFor(effect.id)}
             </div>
           </Focusable>
         );
