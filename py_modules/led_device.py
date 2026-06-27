@@ -16,6 +16,12 @@ class LedDevice:
     def apply_zones(self, zone_colors, brightness, power):
         return False
 
+    def apply_solid(self, color, brightness, power):
+        return False
+
+    def apply_hardware_effect(self, effect_id, color, speed, power):
+        return False
+
 
 class NullDevice(LedDevice):
     pass
