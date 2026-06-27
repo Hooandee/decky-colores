@@ -18,7 +18,7 @@ DEFAULTS = {
     "color": [255, 255, 255],
     "gradient": [[0, 196, 255], [136, 86, 255]],
     "effect": {"id": "breathing", "speed": 50},
-    "ambilight": {"saturation": 140, "smoothing": 75},
+    "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
 }
 
 
@@ -49,6 +49,7 @@ class Plugin:
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
         )
         self._settings = self._store.load(DEFAULTS)
+        self._settings["ambilight"] = {**DEFAULTS["ambilight"], **self._settings["ambilight"]}
         self._controller = LedController(
             self._capabilities.get("ledPath"),
             self._zones,
@@ -111,9 +112,9 @@ class Plugin:
         self._init()
         return self._ambilight.status
 
-    async def set_ambilight(self, saturation: int, smoothing: int) -> None:
+    async def set_ambilight(self, saturation: int, smoothing: int, fps: int) -> None:
         self._init()
-        self._settings["ambilight"] = {"saturation": saturation, "smoothing": smoothing}
+        self._settings["ambilight"] = {"saturation": saturation, "smoothing": smoothing, "fps": fps}
         self._save_and_apply()
 
     def _render(self, zone_colors) -> None:
@@ -136,7 +137,11 @@ class Plugin:
             self._engine.stop()
             amb = s["ambilight"]
             self._ambilight.start(
-                {"saturation": amb["saturation"] / 100.0, "smoothing": amb["smoothing"], "fps": 15}
+                {
+                    "saturation": amb["saturation"] / 100.0,
+                    "smoothing": amb["smoothing"],
+                    "fps": amb.get("fps", 10),
+                }
             )
             return
 

@@ -1,10 +1,22 @@
 from py_modules.ambilight import (
+    _gst_command,
     alpha_for,
     avg_region,
     boost_saturation,
     lerp,
     zone_colors,
 )
+
+
+def test_gst_command_caps_rate_before_scaling():
+    cmd = _gst_command(68, 24, 14, max_rate=10)
+    assert "videorate" in cmd
+    assert "max-rate=10" in cmd
+    assert cmd.index("videorate") < cmd.index("videoscale")
+
+
+def test_gst_command_uncapped_has_no_videorate():
+    assert "videorate" not in _gst_command(68, 24, 14, max_rate=None)
 
 
 def _solid_frame(width, height, color):

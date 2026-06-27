@@ -341,7 +341,7 @@ function Content() {
                       valueSuffix="%"
                       showValue
                       disabled={!power}
-                      onChange={(v) => setAmbilight(v, ambilight.smoothing)}
+                      onChange={(v) => setAmbilight(v, ambilight.smoothing, ambilight.fps)}
                     />
                   </PanelSectionRow>
                   <PanelSectionRow>
@@ -354,7 +354,20 @@ function Content() {
                       valueSuffix="%"
                       showValue
                       disabled={!power}
-                      onChange={(v) => setAmbilight(ambilight.saturation, v)}
+                      onChange={(v) => setAmbilight(ambilight.saturation, v, ambilight.fps)}
+                    />
+                  </PanelSectionRow>
+                  <PanelSectionRow>
+                    <SliderField
+                      label="Capture rate"
+                      value={ambilight.fps}
+                      min={5}
+                      max={30}
+                      step={5}
+                      valueSuffix=" fps"
+                      showValue
+                      disabled={!power}
+                      onChange={(v) => setAmbilight(ambilight.saturation, ambilight.smoothing, v)}
                     />
                   </PanelSectionRow>
                 </>

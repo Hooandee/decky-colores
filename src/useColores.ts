@@ -43,7 +43,7 @@ export function useColores() {
   const pushBrightness = useThrottle((v: number) => api.setBrightness(v), 60);
   const pushEffect = useThrottle((id: EffectId, speed: number) => api.setEffect(id, speed), 60);
   const pushAmbilight = useThrottle(
-    (sat: number, sm: number) => api.setAmbilight(sat, sm),
+    (sat: number, sm: number, fps: number) => api.setAmbilight(sat, sm, fps),
     80,
   );
 
@@ -82,9 +82,9 @@ export function useColores() {
     if (state) pushEffect(state.effect.id, speed);
   };
 
-  const setAmbilight = (saturation: number, smoothing: number) => {
-    setState((s) => (s ? { ...s, ambilight: { saturation, smoothing } } : s));
-    pushAmbilight(saturation, smoothing);
+  const setAmbilight = (saturation: number, smoothing: number, fps: number) => {
+    setState((s) => (s ? { ...s, ambilight: { saturation, smoothing, fps } } : s));
+    pushAmbilight(saturation, smoothing, fps);
   };
 
   return {

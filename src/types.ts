@@ -24,6 +24,7 @@ export type Mode = "solid" | "gradient" | "effect" | "ambient";
 export interface AmbilightState {
   saturation: number;
   smoothing: number;
+  fps: number;
 }
 
 export type EffectId = "breathing" | "rainbow" | "wave" | "cycle";

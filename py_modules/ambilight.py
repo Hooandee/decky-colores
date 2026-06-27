@@ -54,13 +54,13 @@ def zone_colors(left, right, zones):
     return [left] * half + [right] * (zones - half)
 
 
-def _gst_command(node, width, height):
+def _gst_command(node, width, height, max_rate=None):
     caps = f"video/x-raw,format=RGB,width={width},height={height}"
-    return [
-        "gst-launch-1.0", "-q", "pipewiresrc", f"path={int(node)}",
-        "!", "videoconvert", "!", "videoscale",
-        "!", caps, "!", "fdsink", "fd=1",
-    ]
+    parts = ["gst-launch-1.0", "-q", "pipewiresrc", f"path={int(node)}"]
+    if max_rate:
+        parts += ["!", "videorate", f"max-rate={int(max_rate)}", "drop-only=true"]
+    parts += ["!", "videoconvert", "!", "videoscale", "!", caps, "!", "fdsink", "fd=1"]
+    return parts
 
 
 class Ambilight:
@@ -142,13 +142,21 @@ class Ambilight:
             self._apply([(0, 0, 0)] * self._zones)
             return
 
-        command = _gst_command(node, CAP_W, CAP_H)
+        fps = int(self._options.get("fps", 10))
+        produced = await self._stream(node, fps)
+        if produced is False:
+            logger.warning("rate-capped capture produced no frames; retrying uncapped")
+            await self._stream(node, None)
+
+    async def _stream(self, node, max_rate):
+        command = _gst_command(node, CAP_W, CAP_H, max_rate)
         frame_bytes = CAP_W * CAP_H * 3
-        interval = 1.0 / max(1, int(self._options.get("fps", 15)))
+        interval = 1.0 / max(1, int(self._options.get("fps", 10)))
         loop = asyncio.get_event_loop()
         last = 0.0
+        got = False
         proc = None
-        logger.info("ambilight start: node=%s interval=%.3fs", node, interval)
+        logger.info("ambilight stream: node=%s max_rate=%s", node, max_rate)
         try:
             proc = await asyncio.create_subprocess_exec(
                 *command,
@@ -160,12 +168,16 @@ class Ambilight:
             self._proc = proc
             self.status = "running"
             while True:
-                frame = await proc.stdout.readexactly(frame_bytes)
+                read = proc.stdout.readexactly(frame_bytes)
+                frame = await (read if got else asyncio.wait_for(read, timeout=4))
+                got = True
                 now = loop.time()
                 if now - last >= interval:
                     self._update_targets(frame)
                     self._tick()
                     last = now
+        except asyncio.TimeoutError:
+            return False
         except asyncio.IncompleteReadError:
             self.status = "no_source"
             await self._log_exit(proc)
@@ -182,6 +194,7 @@ class Ambilight:
                     pass
             if self._proc is proc:
                 self._proc = None
+        return True
 
     async def _log_exit(self, proc):
         if proc is None:
