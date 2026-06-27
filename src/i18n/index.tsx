@@ -52,13 +52,9 @@ const es: Record<string, string> = {
   "effect.spectrumNote": "Este efecto usa todo el espectro de color.",
 
   "effect.breathing.label": "Respiración",
-  "effect.breathing.desc": "Un solo color se desvanece suavemente.",
   "effect.rainbow.label": "Arcoíris",
-  "effect.rainbow.desc": "Recorre todo el espectro de color sin cortes.",
   "effect.wave.label": "Onda",
-  "effect.wave.desc": "Los colores fluyen por el anillo como una ola.",
   "effect.cycle.label": "Ciclo",
-  "effect.cycle.desc": "Pasa por una secuencia de colores vivos.",
 
   "ambient.gameModeBanner": "Aún no hay pantalla que leer. Ambilight funciona en Modo Juego con un juego abierto (no en Escritorio ni Big Picture).",
   "ambient.stickHint": "Las luces siguen la pantalla cerca de cada joystick. La izquierda desde arriba a la izquierda, la derecha desde el centro a la derecha.",
@@ -124,13 +120,9 @@ const en: Record<string, string> = {
   "effect.spectrumNote": "This effect uses the full color spectrum.",
 
   "effect.breathing.label": "Breathing",
-  "effect.breathing.desc": "A single color gently fades in and out.",
   "effect.rainbow.label": "Rainbow",
-  "effect.rainbow.desc": "Smoothly cycles through the full color spectrum.",
   "effect.wave.label": "Wave",
-  "effect.wave.desc": "Colors ripple across the ring like a moving wave.",
   "effect.cycle.label": "Cycle",
-  "effect.cycle.desc": "Steps through a sequence of vivid solid colors.",
 
   "ambient.gameModeBanner": "No screen to read yet. Ambient works in Game Mode with a game running (not in Desktop or Big Picture).",
   "ambient.stickHint": "Lights follow the screen near each stick. Left from the top-left, right from the mid-right.",
@@ -151,11 +143,27 @@ const en: Record<string, string> = {
 
 const DICTS: Record<Lang, Record<string, string>> = { es, en };
 
+type Params = Record<string, string | number>;
+
 interface I18nValue {
   lang: Lang;
   setLang: (lang: Lang) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Params) => string;
 }
+
+function translate(lang: Lang, key: string, params?: Params): string {
+  const raw = DICTS[lang][key] ?? key;
+  if (!params) return raw;
+  return raw.replace(/\{(\w+)\}/g, (match, token) =>
+    token in params ? String(params[token]) : match,
+  );
+}
+
+const FALLBACK_I18N: I18nValue = {
+  lang: "es",
+  setLang: () => {},
+  t: (key, params) => translate("es", key, params),
+};
 
 const I18nContext = createContext<I18nValue | null>(null);
 
@@ -164,7 +172,7 @@ function readInitialLang(): Lang {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "es" || stored === "en") return stored;
   } catch {
-    return "es";
+    void 0;
   }
   return "es";
 }
@@ -185,7 +193,7 @@ export const I18nProvider: FC<{ children: ReactNode }> = ({ children }) => {
     () => ({
       lang,
       setLang,
-      t: (key: string) => DICTS[lang][key] ?? key,
+      t: (key, params) => translate(lang, key, params),
     }),
     [lang, setLang],
   );
@@ -194,9 +202,7 @@ export const I18nProvider: FC<{ children: ReactNode }> = ({ children }) => {
 };
 
 export function useI18n(): I18nValue {
-  const ctx = useContext(I18nContext);
-  if (!ctx) return { lang: "es", setLang: () => {}, t: (key: string) => DICTS.es[key] ?? key };
-  return ctx;
+  return useContext(I18nContext) ?? FALLBACK_I18N;
 }
 
 const FlagES: FC = () => (
