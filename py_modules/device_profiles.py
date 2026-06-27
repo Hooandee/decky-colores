@@ -18,7 +18,7 @@ LEGION_TABLET_HID = {
     "driver": "hid_legion_tablet",
     "color_order": "rgb",
     "zones": 2,
-    "supported_effects": ["breathing", "rainbow"],
+    "supported_effects": ["breathing", "rainbow", "wave"],
     "experimental": ["ambilight"],
 }
 
@@ -26,7 +26,7 @@ LEGION_GO_S_HID = {
     "driver": "hid_legion_go_s",
     "color_order": "rgb",
     "zones": 2,
-    "supported_effects": ["breathing", "rainbow"],
+    "supported_effects": ["breathing", "rainbow", "wave"],
     "experimental": ["ambilight"],
 }
 
