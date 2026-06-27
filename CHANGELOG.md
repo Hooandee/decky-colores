@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.7.0...decky-colores-v0.8.0) (2026-06-27)
+
+
+### Features
+
+* **ux:** redesign gradient editor with tabs and horizontal zone grid ([c4793a1](https://github.com/Hooandee/decky-colores/commit/c4793a1bb5849c413bc416624f2dea65c6047cb5))
+* **ux:** redesign gradient editor with tabs and horizontal zone grid ([662538b](https://github.com/Hooandee/decky-colores/commit/662538b3e509fa00fcd3cf163365b8bdd5ed749b))
+
 ## [0.7.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.6.0...decky-colores-v0.7.0) (2026-06-27)
 
 
