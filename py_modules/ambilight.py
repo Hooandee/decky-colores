@@ -104,11 +104,10 @@ class Ambilight:
         return None
 
     def start(self, options):
-        options = options or {}
-        if self.running and options == self._options:
+        self._options = options or {}
+        if self.running:
             return
         self.stop()
-        self._options = options
         self._task = asyncio.get_event_loop().create_task(self._run())
 
     def stop(self):
@@ -129,6 +128,7 @@ class Ambilight:
         node = self._find_node()
         if node is None:
             logger.warning("gamescope PipeWire node not found; ambilight idle")
+            self._apply([(0, 0, 0)] * self._zones)
             return
 
         command = _gst_command(node, CAP_W, CAP_H)
@@ -136,29 +136,52 @@ class Ambilight:
         interval = 1.0 / max(1, int(self._options.get("fps", 15)))
         loop = asyncio.get_event_loop()
         last = 0.0
+        proc = None
         logger.info("ambilight start: node=%s interval=%.3fs", node, interval)
         try:
-            self._proc = await asyncio.create_subprocess_exec(
+            proc = await asyncio.create_subprocess_exec(
                 *command,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
                 env=self._env(),
             )
+            self._proc = proc
             while True:
-                frame = await self._proc.stdout.readexactly(frame_bytes)
+                frame = await proc.stdout.readexactly(frame_bytes)
                 now = loop.time()
                 if now - last >= interval:
                     self._update_targets(frame)
                     self._tick()
                     last = now
         except asyncio.IncompleteReadError:
-            logger.warning("ambilight stream ended")
+            await self._log_exit(proc)
+            self._apply([(0, 0, 0)] * self._zones)
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("ambilight loop failed")
         finally:
-            self._kill()
+            if proc is not None:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+            if self._proc is proc:
+                self._proc = None
+
+    async def _log_exit(self, proc):
+        if proc is None:
+            return
+        err = b""
+        try:
+            err = await proc.stderr.read()
+        except (OSError, ValueError):
+            pass
+        logger.warning(
+            "ambilight stream ended (rc=%s): %s",
+            proc.returncode,
+            err.decode(errors="replace")[:300],
+        )
 
     def _update_targets(self, frame):
         sat = float(self._options.get("saturation", 1.4))
