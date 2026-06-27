@@ -35,12 +35,13 @@ class NullDevice(LedDevice):
 
 
 class SysfsRgbDevice(LedDevice):
-    def __init__(self, led_path, zones=1, max_brightness=255, color_order="rgb", index_format="hex"):
+    def __init__(self, led_path, zones=1, max_brightness=255, color_order="rgb", index_format="hex", color_correction=(1.0, 1.0, 1.0)):
         self._led_path = led_path
         self._zones = max(1, zones)
         self._max_brightness = max_brightness or 255
         self._color_order = color_order
         self._index_format = index_format
+        self._color_correction = tuple(color_correction)
         self.last_error = None
         self._intensity_path = os.path.join(led_path, "multi_intensity") if led_path else None
         self._brightness_path = os.path.join(led_path, "brightness") if led_path else None
@@ -65,7 +66,8 @@ class SysfsRgbDevice(LedDevice):
         return colors[: self._zones]
 
     def _order(self, color):
-        r, g, b = (_clamp8(c) for c in color)
+        gains = self._color_correction
+        r, g, b = (_clamp8(round(c * gains[i])) for i, c in enumerate(color))
         if self._color_order == "bgr":
             return b, g, r
         return r, g, b

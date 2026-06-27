@@ -60,6 +60,20 @@ def test_clamps_out_of_range(tmp_path):
     assert _read(os.path.join(led, "brightness")) == "255"
 
 
+def test_color_correction_scales_channel(tmp_path):
+    led = _make_led(tmp_path)
+    device = SysfsRgbDevice(led, zones=4, max_brightness=255, color_correction=(1.0, 0.5, 1.0))
+    device.apply_zones([(255, 255, 255)], 100, True)
+    assert _read(os.path.join(led, "multi_intensity")) == "0xff80ff 0xff80ff 0xff80ff 0xff80ff"
+
+
+def test_color_correction_default_unchanged(tmp_path):
+    led = _make_led(tmp_path)
+    device = SysfsRgbDevice(led, zones=4, max_brightness=255)
+    device.apply_zones([(255, 0, 0)], 100, True)
+    assert _read(os.path.join(led, "multi_intensity")) == "0xff0000 0xff0000 0xff0000 0xff0000"
+
+
 def test_supports_per_zone():
     assert SysfsRgbDevice("/x").supports_per_zone() is True
 

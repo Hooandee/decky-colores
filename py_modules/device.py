@@ -213,7 +213,8 @@ def build_device(sysfs_root="/", ambilight=False):
             zones = profile["zones"]
         max_brightness = _max_brightness(_read(os.path.join(led_path, "max_brightness")))
         device = SysfsRgbDevice(
-            led_path, zones, max_brightness, profile["color_order"], index_format
+            led_path, zones, max_brightness, profile["color_order"], index_format,
+            color_correction=profile.get("color_correction", [1.0, 1.0, 1.0]),
         )
         has_led = True
     else:

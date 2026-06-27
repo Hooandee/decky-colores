@@ -3,6 +3,7 @@ ASUS_SYSFS = {
     "color_order": "rgb",
     "zones": 4,
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "color_correction": [1.0, 0.85, 1.0],
     "experimental": [],
 }
 
