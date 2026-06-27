@@ -101,6 +101,7 @@ export const EFFECT_PRESETS: EffectMeta[] = [
   {
     id: "breathing",
     label: "Breathing",
+    needs: "color",
     description: "A single color gently fades in and out.",
     colors: [
       { r: 124, g: 77, b: 255 },
@@ -110,6 +111,7 @@ export const EFFECT_PRESETS: EffectMeta[] = [
   {
     id: "rainbow",
     label: "Rainbow",
+    needs: "none",
     description: "Smoothly cycles through the full color spectrum.",
     colors: [
       { r: 255, g: 0, b: 0 },
@@ -120,6 +122,7 @@ export const EFFECT_PRESETS: EffectMeta[] = [
   {
     id: "wave",
     label: "Wave",
+    needs: "gradient",
     description: "Colors ripple across the ring like a moving wave.",
     colors: [
       { r: 0, g: 180, b: 216 },
@@ -130,6 +133,7 @@ export const EFFECT_PRESETS: EffectMeta[] = [
   {
     id: "cycle",
     label: "Cycle",
+    needs: "none",
     description: "Steps through a sequence of vivid solid colors.",
     colors: [
       { r: 255, g: 64, b: 129 },

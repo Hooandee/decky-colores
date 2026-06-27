@@ -62,8 +62,8 @@ export function useColores() {
     api.setMode(mode);
   };
 
-  const setSolid = (color: RGB) => {
-    setState((s) => (s ? { ...s, color, mode: "solid" } : s));
+  const setColor = (color: RGB) => {
+    setState((s) => (s ? { ...s, color } : s));
     pushSolid(color);
   };
 
@@ -92,7 +92,7 @@ export function useColores() {
     setBrightness,
     setPower,
     setMode,
-    setSolid,
+    setColor,
     setGradient,
     setEffectId,
     setEffectSpeed,

@@ -1,6 +1,23 @@
 import os
 
-from py_modules.device import detect_device, detect_capabilities, lookup_name
+from py_modules.device import build_layout, detect_device, detect_capabilities, lookup_name
+
+
+def test_build_layout_splits_into_two_sticks():
+    layout = build_layout(4)
+    assert [g["name"] for g in layout] == ["Left stick", "Right stick"]
+    assert layout[0]["zones"] == [0, 1]
+    assert layout[1]["zones"] == [2, 3]
+
+
+def test_build_layout_single_zone():
+    layout = build_layout(1)
+    assert len(layout) == 1
+    assert layout[0]["zones"] == [0]
+
+
+def test_build_layout_none_when_no_zones():
+    assert build_layout(0) == []
 
 
 def _make_dmi(root, board, product):

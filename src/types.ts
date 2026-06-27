@@ -10,6 +10,12 @@ export interface DeviceInfo {
   product: string;
 }
 
+export interface ZoneGroup {
+  name: string;
+  region: number[];
+  zones: number[];
+}
+
 export interface Capabilities {
   color: boolean;
   brightness: boolean;
@@ -17,6 +23,7 @@ export interface Capabilities {
   ambilight: boolean;
   zones: number;
   maxBrightness: number;
+  layout: ZoneGroup[];
 }
 
 export type Mode = "solid" | "gradient" | "effect" | "ambient";
@@ -51,9 +58,12 @@ export interface GradientPreset {
   stops: RGB[];
 }
 
+export type EffectColorNeed = "color" | "gradient" | "none";
+
 export interface EffectMeta {
   id: EffectId;
   label: string;
   description: string;
   colors: RGB[];
+  needs: EffectColorNeed;
 }

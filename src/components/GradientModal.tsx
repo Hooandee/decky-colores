@@ -6,13 +6,13 @@ import {
   ButtonItem,
   DialogButton,
 } from "@decky/ui";
-import { RGB, GradientPreset } from "../types";
+import { RGB, GradientPreset, ZoneGroup } from "../types";
 import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss, expandGradient } from "../color";
 import { GRADIENT_PRESETS, harmoniousGradient, randomGradient } from "../palette";
 
 interface GradientModalProps {
   initial: RGB[];
-  zones: number;
+  layout: ZoneGroup[];
   closeModal?: () => void;
   onApply: (stops: RGB[]) => void;
 }
@@ -98,33 +98,34 @@ const StopEditor: FC<{ label: string; color: RGB; onChange: (color: RGB) => void
 
 const StickGroup: FC<{
   title: string;
-  colors: RGB[];
-  offset: number;
+  indices: number[];
+  stops: RGB[];
   onChange: (index: number, color: RGB) => void;
-}> = ({ title, colors, offset, onChange }) => (
+}> = ({ title, indices, stops, onChange }) => (
   <div>
     <SectionLabel>{title}</SectionLabel>
     <Focusable style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {colors.map((color, i) => (
+      {indices.map((zone, i) => (
         <StopEditor
-          key={i}
-          label={`Color ${i + 1}`}
-          color={color}
-          onChange={(c) => onChange(offset + i, c)}
+          key={zone}
+          label={indices.length > 1 ? `Color ${i + 1}` : "Color"}
+          color={stops[zone] ?? { r: 255, g: 255, b: 255 }}
+          onChange={(c) => onChange(zone, c)}
         />
       ))}
     </Focusable>
   </div>
 );
 
-export const GradientModal: FC<GradientModalProps> = ({ initial, zones, closeModal, onApply }) => {
-  const count = Math.max(2, zones);
+export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeModal, onApply }) => {
+  const groups =
+    layout.length > 0 ? layout : [{ name: "Lights", region: [], zones: [0, 1] }];
+  const count = Math.max(2, groups.reduce((n, g) => n + g.zones.length, 0));
   const [stops, setStops] = useState<RGB[]>(() => expandGradient(initial, count));
 
   const setStopAt = (index: number, color: RGB) =>
     setStops((prev) => prev.map((c, i) => (i === index ? color : c)));
 
-  const half = Math.ceil(count / 2);
   const apply = () => {
     onApply(stops);
     closeModal?.();
@@ -194,18 +195,15 @@ export const GradientModal: FC<GradientModalProps> = ({ initial, zones, closeMod
 
         <Card>
           <Focusable style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <StickGroup
-              title="Left stick"
-              colors={stops.slice(0, half)}
-              offset={0}
-              onChange={setStopAt}
-            />
-            <StickGroup
-              title="Right stick"
-              colors={stops.slice(half)}
-              offset={half}
-              onChange={setStopAt}
-            />
+            {groups.map((group, i) => (
+              <StickGroup
+                key={i}
+                title={group.name}
+                indices={group.zones}
+                stops={stops}
+                onChange={setStopAt}
+              />
+            ))}
           </Focusable>
         </Card>
 

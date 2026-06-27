@@ -4,7 +4,7 @@ from py_modules.ambilight import (
     avg_region,
     boost_saturation,
     lerp,
-    zone_colors,
+    subdivide,
 )
 
 
@@ -56,6 +56,12 @@ def test_alpha_for_mapping():
     assert 0.2 < alpha_for(75) < 0.3
 
 
-def test_zone_colors_splits_left_right():
-    assert zone_colors((1, 1, 1), (2, 2, 2), 4) == [(1, 1, 1), (1, 1, 1), (2, 2, 2), (2, 2, 2)]
-    assert zone_colors((1, 1, 1), (2, 2, 2), 1) == [(1, 1, 1)]
+def test_subdivide_splits_region_horizontally():
+    subs = subdivide([0.0, 0.0, 1.0, 1.0], 2)
+    assert len(subs) == 2
+    assert subs[0] == (0.0, 0.0, 0.5, 1.0)
+    assert subs[1] == (0.5, 0.0, 1.0, 1.0)
+
+
+def test_subdivide_single_returns_region():
+    assert subdivide([0.1, 0.2, 0.3, 0.4], 1) == [(0.1, 0.2, 0.3, 0.4)]

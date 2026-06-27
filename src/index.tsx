@@ -10,22 +10,19 @@ import {
   staticClasses,
 } from "@decky/ui";
 import { definePlugin } from "@decky/api";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
 import { getAmbilightStatus } from "./api";
-import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss } from "./color";
-import { Mode, RGB } from "./types";
+import { rgbToCss, gradientCss } from "./color";
+import { Mode, RGB, ZoneGroup } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
-import { Swatches } from "./components/Swatches";
+import { ColorEditor } from "./components/ColorEditor";
 import { ModeTabs } from "./components/ModeTabs";
 import { EffectsGallery } from "./components/EffectsGallery";
 import { GradientModal } from "./components/GradientModal";
 import { GRADIENT_PRESETS, EFFECT_PRESETS } from "./palette";
-
-const HUE_BAR =
-  "linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)";
 
 function DeviceHeader({ name, color }: { name: string; color: RGB }) {
   return (
@@ -44,20 +41,6 @@ function DeviceHeader({ name, color }: { name: string; color: RGB }) {
   );
 }
 
-function GradientTrack({ background }: { background: string }) {
-  return (
-    <div
-      style={{
-        height: 6,
-        borderRadius: 3,
-        background,
-        margin: "10px 16px 2px",
-        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.1)",
-      }}
-    />
-  );
-}
-
 const AMBIENT_HINT: RGB[] = [
   { r: 0, g: 196, b: 255 },
   { r: 124, g: 92, b: 255 },
@@ -65,15 +48,15 @@ const AMBIENT_HINT: RGB[] = [
 
 function GradientControls({
   gradient,
-  zones,
+  layout,
   onChange,
 }: {
   gradient: RGB[];
-  zones: number;
+  layout: ZoneGroup[];
   onChange: (stops: RGB[]) => void;
 }) {
   const open = () =>
-    showModal(<GradientModal initial={gradient} zones={zones} onApply={onChange} />);
+    showModal(<GradientModal initial={gradient} layout={layout} onApply={onChange} />);
   return (
     <>
       <PanelSectionRow>
@@ -135,22 +118,13 @@ function Content() {
     setBrightness,
     setPower,
     setMode,
-    setSolid,
+    setColor,
     setGradient,
     setEffectId,
     setEffectSpeed,
     setAmbilight,
   } = useColores();
-  const [hsv, setHsv] = useState({ h: 0, s: 100, v: 100 });
   const [ambStatus, setAmbStatus] = useState<string>("idle");
-  const init = useRef(false);
-
-  useEffect(() => {
-    if (state && !init.current) {
-      setHsv({ ...rgbToHsv(state.color), v: 100 });
-      init.current = true;
-    }
-  }, [state]);
 
   const ambientActive = state?.mode === "ambient" && state?.power;
   useEffect(() => {
@@ -188,26 +162,16 @@ function Content() {
     ? ["solid", "gradient", "effect", "ambient"]
     : ["solid", "gradient", "effect"];
 
+  const selectedEffect = EFFECT_PRESETS.find((e) => e.id === effect.id);
+
   const previewColors: RGB[] =
     mode === "gradient"
       ? gradient
       : mode === "effect"
-        ? EFFECT_PRESETS.find((e) => e.id === effect.id)?.colors ?? [color]
+        ? selectedEffect?.colors ?? [color]
         : mode === "ambient"
           ? AMBIENT_HINT
           : [color];
-
-  const editHsv = (next: { h: number; s: number; v: number }) => {
-    setHsv(next);
-    setSolid(hsvToRgb(next.h, next.s, 100));
-  };
-
-  const pickPreset = (rgb: RGB) => {
-    setHsv({ ...rgbToHsv(rgb), v: 100 });
-    setSolid(rgb);
-  };
-
-  const satTrack = `linear-gradient(90deg, #808080, ${rgbToCss(hsvToRgb(hsv.h, 100, 100))})`;
 
   return (
     <PanelSection>
@@ -247,55 +211,48 @@ function Content() {
               </PanelSectionRow>
 
               {mode === "solid" && (
-                <>
-                  <PanelSectionRow>
-                    <Focusable style={{ padding: "6px 0 10px" }}>
-                      <Swatches selected={color} onPick={pickPreset} />
-                    </Focusable>
-                  </PanelSectionRow>
-                  <PanelSectionRow>
-                    <GradientTrack background={HUE_BAR} />
-                    <SliderField
-                      label="Hue"
-                      value={hsv.h}
-                      min={0}
-                      max={360}
-                      step={1}
-                      disabled={!power}
-                      onChange={(h) => editHsv({ ...hsv, h })}
-                    />
-                  </PanelSectionRow>
-                  <PanelSectionRow>
-                    <GradientTrack background={satTrack} />
-                    <SliderField
-                      label="Saturation"
-                      value={hsv.s}
-                      min={0}
-                      max={100}
-                      step={1}
-                      valueSuffix="%"
-                      showValue
-                      disabled={!power}
-                      onChange={(s) => editHsv({ ...hsv, s })}
-                    />
-                  </PanelSectionRow>
-                </>
+                <ColorEditor color={color} disabled={!power} onChange={setColor} />
               )}
 
               {mode === "gradient" && (
-                <GradientControls gradient={gradient} zones={caps.zones} onChange={setGradient} />
+                <GradientControls gradient={gradient} layout={caps.layout} onChange={setGradient} />
               )}
 
               {mode === "effect" && (
-                <PanelSectionRow>
-                  <EffectsGallery
-                    effects={EFFECT_PRESETS}
-                    selected={effect.id}
-                    speed={effect.speed}
-                    onSelect={setEffectId}
-                    onSpeed={setEffectSpeed}
-                  />
-                </PanelSectionRow>
+                <>
+                  <PanelSectionRow>
+                    <EffectsGallery
+                      effects={EFFECT_PRESETS}
+                      selected={effect.id}
+                      speed={effect.speed}
+                      onSelect={setEffectId}
+                      onSpeed={setEffectSpeed}
+                    />
+                  </PanelSectionRow>
+                  {selectedEffect?.needs === "color" && (
+                    <ColorEditor color={color} disabled={!power} onChange={setColor} />
+                  )}
+                  {selectedEffect?.needs === "gradient" && (
+                    <GradientControls
+                      gradient={gradient}
+                      layout={caps.layout}
+                      onChange={setGradient}
+                    />
+                  )}
+                  {selectedEffect?.needs === "none" && (
+                    <PanelSectionRow>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "rgba(255,255,255,0.5)",
+                          padding: "4px 2px 8px",
+                        }}
+                      >
+                        This effect uses the full color spectrum.
+                      </div>
+                    </PanelSectionRow>
+                  )}
+                </>
               )}
 
               {mode === "ambient" && (

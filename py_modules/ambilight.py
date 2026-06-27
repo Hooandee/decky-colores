@@ -7,11 +7,18 @@ import subprocess
 logger = logging.getLogger("colores.ambilight")
 
 GAMESCOPE_NODE = "gamescope"
-CAP_W = 24
-CAP_H = 14
+CAP_W = 32
+CAP_H = 18
 
-LEFT_REGION = (0.0, 0.0, 0.30, 0.35)
-RIGHT_REGION = (0.70, 0.33, 1.0, 0.67)
+_FULL_REGION = [0.0, 0.0, 1.0, 1.0]
+
+
+def subdivide(region, count):
+    x0, y0, x1, y1 = region
+    if count <= 1:
+        return [tuple(region)]
+    width = (x1 - x0) / count
+    return [(x0 + i * width, y0, x0 + (i + 1) * width, y1) for i in range(count)]
 
 
 def avg_region(frame, width, height, region):
@@ -49,11 +56,6 @@ def alpha_for(smoothing):
     return max(0.04, 1.0 - s / 100.0)
 
 
-def zone_colors(left, right, zones):
-    half = zones // 2 or 1
-    return [left] * half + [right] * (zones - half)
-
-
 def _gst_command(node, width, height):
     caps = f"video/x-raw,format=RGB,width={width},height={height}"
     return [
@@ -64,20 +66,19 @@ def _gst_command(node, width, height):
 
 
 class Ambilight:
-    def __init__(self, apply_zones, zones, runtime_dir, uid=None, gid=None):
+    def __init__(self, apply_zones, zones, runtime_dir, uid=None, gid=None, layout=None):
         self._apply = apply_zones
         self._zones = max(1, zones)
         self._runtime_dir = runtime_dir
         self._uid = uid
         self._gid = gid
+        self._layout = layout or [{"name": "Lights", "region": _FULL_REGION, "zones": list(range(self._zones))}]
         self._task = None
         self._proc = None
         self._options = {}
         self.status = "idle"
-        self._left = (0, 0, 0)
-        self._right = (0, 0, 0)
-        self._target_left = (0, 0, 0)
-        self._target_right = (0, 0, 0)
+        self._current = [(0, 0, 0)] * self._zones
+        self._targets = [(0, 0, 0)] * self._zones
 
     @property
     def running(self):
@@ -195,11 +196,13 @@ class Ambilight:
 
     def _update_targets(self, frame):
         sat = float(self._options.get("saturation", 1.4))
-        self._target_left = boost_saturation(avg_region(frame, CAP_W, CAP_H, LEFT_REGION), sat)
-        self._target_right = boost_saturation(avg_region(frame, CAP_W, CAP_H, RIGHT_REGION), sat)
+        for group in self._layout:
+            indices = group["zones"]
+            for sub, zone in zip(subdivide(group["region"], len(indices)), indices):
+                if 0 <= zone < self._zones:
+                    self._targets[zone] = boost_saturation(avg_region(frame, CAP_W, CAP_H, sub), sat)
 
     def _tick(self):
         alpha = alpha_for(self._options.get("smoothing", 75))
-        self._left = lerp(self._left, self._target_left, alpha)
-        self._right = lerp(self._right, self._target_right, alpha)
-        self._apply(zone_colors(self._left, self._right, self._zones))
+        self._current = [lerp(c, t, alpha) for c, t in zip(self._current, self._targets)]
+        self._apply(list(self._current))

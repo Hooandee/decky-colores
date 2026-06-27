@@ -53,6 +53,7 @@ def detect_capabilities(sysfs_root="/"):
             "zones": 0,
             "maxBrightness": 0,
             "ledPath": None,
+            "layout": [],
         }
 
     zones = 1
@@ -69,11 +70,39 @@ def detect_capabilities(sysfs_root="/"):
         "zones": zones,
         "maxBrightness": _max_brightness(max_brightness),
         "ledPath": led_path,
+        "layout": build_layout(zones),
     }
 
 
 def _max_brightness(raw):
     return int(raw) if raw.isdigit() and int(raw) > 0 else 255
+
+
+# Per-stick screen anchors (normalized x0, y0, x1, y1) used for Ambilight sampling.
+# Layout describes how flat LED zones group into physical joysticks; each group's
+# zones are sampled across its screen region (one sub-region per LED for richness).
+_STICK_ANCHORS = [
+    ("Left stick", [0.0, 0.0, 0.30, 0.35]),
+    ("Right stick", [0.70, 0.33, 1.0, 0.67]),
+]
+
+
+def build_layout(zones):
+    if zones <= 0:
+        return []
+    if zones == 1:
+        return [{"name": "Lights", "region": [0.0, 0.0, 1.0, 1.0], "zones": [0]}]
+    groups = _STICK_ANCHORS
+    base, extra = divmod(zones, len(groups))
+    layout = []
+    index = 0
+    for i, (name, region) in enumerate(groups):
+        count = base + (1 if i < extra else 0)
+        if count == 0:
+            continue
+        layout.append({"name": name, "region": list(region), "zones": list(range(index, index + count))})
+        index += count
+    return layout
 
 
 def _find_rgb_led(leds_dir):

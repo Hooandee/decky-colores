@@ -57,7 +57,14 @@ class Plugin:
         )
         self._engine = EffectEngine(self._render, self._zones)
         runtime_dir, uid, gid = _user_creds()
-        self._ambilight = Ambilight(self._render, self._zones, runtime_dir, uid, gid)
+        self._ambilight = Ambilight(
+            self._render,
+            self._zones,
+            runtime_dir,
+            uid,
+            gid,
+            layout=self._capabilities.get("layout"),
+        )
         self._ready = True
 
     async def get_version(self) -> str:
