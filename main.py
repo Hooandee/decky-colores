@@ -10,6 +10,7 @@ from settings_store import SettingsStore
 from led_controller import LedController
 from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
+from saved_gradients import upsert_gradient, remove_gradient
 
 DEFAULTS = {
     "power": True,
@@ -19,11 +20,16 @@ DEFAULTS = {
     "gradient": [[0, 196, 255], [136, 86, 255]],
     "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
     "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
+    "saved_gradients": [],
 }
 
 
 def _rgb(values):
     return {"r": values[0], "g": values[1], "b": values[2]}
+
+
+def _saved(entry):
+    return {"name": entry["name"], "stops": [_rgb(c) for c in entry["stops"]]}
 
 
 def _user_creds():
@@ -88,6 +94,7 @@ class Plugin:
                 "useGradient": s["effect"].get("use_gradient", False),
             },
             "ambilight": s["ambilight"],
+            "savedGradients": [_saved(g) for g in s["saved_gradients"]],
         }
 
     async def set_power(self, on: bool) -> None:
@@ -119,6 +126,22 @@ class Plugin:
         self._init()
         self._settings["effect"] = {"id": effect_id, "speed": speed, "use_gradient": use_gradient}
         self._save_and_apply()
+
+    async def save_gradient(self, name: str, stops: list) -> list:
+        self._init()
+        self._settings["saved_gradients"] = upsert_gradient(
+            self._settings["saved_gradients"], name, stops
+        )
+        self._store.save(self._settings)
+        return [_saved(g) for g in self._settings["saved_gradients"]]
+
+    async def delete_gradient(self, name: str) -> list:
+        self._init()
+        self._settings["saved_gradients"] = remove_gradient(
+            self._settings["saved_gradients"], name
+        )
+        self._store.save(self._settings)
+        return [_saved(g) for g in self._settings["saved_gradients"]]
 
     async def get_ambilight_status(self) -> str:
         self._init()

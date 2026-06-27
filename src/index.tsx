@@ -16,7 +16,7 @@ import { FaPalette } from "react-icons/fa";
 import { useColores } from "./useColores";
 import { getAmbilightStatus } from "./api";
 import { rgbToCss, gradientCss } from "./color";
-import { Mode, RGB, ZoneGroup } from "./types";
+import { Mode, RGB, ZoneGroup, GradientPreset } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { ColorEditor } from "./components/ColorEditor";
 import { ModeTabs } from "./components/ModeTabs";
@@ -50,15 +50,30 @@ const AMBIENT_HINT: RGB[] = [
 function GradientControls({
   gradient,
   layout,
+  savedGradients,
   onChange,
+  onSave,
+  onDelete,
 }: {
   gradient: RGB[];
   layout: ZoneGroup[];
+  savedGradients: GradientPreset[];
   onChange: (stops: RGB[]) => void;
+  onSave: (name: string, stops: RGB[]) => void;
+  onDelete: (name: string) => void;
 }) {
   const { t } = useI18n();
   const open = () =>
-    showModal(<GradientModal initial={gradient} layout={layout} onApply={onChange} />);
+    showModal(
+      <GradientModal
+        initial={gradient}
+        layout={layout}
+        savedGradients={savedGradients}
+        onApply={onChange}
+        onSave={onSave}
+        onDelete={onDelete}
+      />,
+    );
   return (
     <>
       <PanelSectionRow>
@@ -92,7 +107,7 @@ function GradientControls({
         <Focusable
           style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, paddingTop: 4 }}
         >
-          {GRADIENT_PRESETS.map((preset) => (
+          {[...GRADIENT_PRESETS, ...savedGradients].map((preset) => (
             <Focusable
               key={preset.name}
               onActivate={() => onChange(preset.stops)}
@@ -126,6 +141,8 @@ function Content() {
     setEffectSpeed,
     setEffectGradient,
     setAmbilight,
+    saveGradient,
+    deleteGradient,
   } = useColores();
   const { t } = useI18n();
   const [ambStatus, setAmbStatus] = useState<string>("idle");
@@ -158,8 +175,18 @@ function Content() {
     );
   }
 
-  const { capabilities: caps, color, gradient, effect, ambilight, brightness, power, mode, device } =
-    state;
+  const {
+    capabilities: caps,
+    color,
+    gradient,
+    effect,
+    ambilight,
+    brightness,
+    power,
+    mode,
+    device,
+    savedGradients,
+  } = state;
   const hasLeds = caps.color || caps.brightness;
 
   const modes: Mode[] = caps.ambilight
@@ -228,7 +255,14 @@ function Content() {
               )}
 
               {mode === "gradient" && (
-                <GradientControls gradient={gradient} layout={caps.layout} onChange={setGradient} />
+                <GradientControls
+                  gradient={gradient}
+                  layout={caps.layout}
+                  savedGradients={savedGradients}
+                  onChange={setGradient}
+                  onSave={saveGradient}
+                  onDelete={deleteGradient}
+                />
               )}
 
               {mode === "effect" && (
@@ -256,7 +290,10 @@ function Content() {
                         <GradientControls
                           gradient={gradient}
                           layout={caps.layout}
+                          savedGradients={savedGradients}
                           onChange={setGradient}
+                          onSave={saveGradient}
+                          onDelete={deleteGradient}
                         />
                       ) : (
                         <ColorEditor color={color} disabled={!power} onChange={setColor} />
@@ -267,7 +304,10 @@ function Content() {
                     <GradientControls
                       gradient={gradient}
                       layout={caps.layout}
+                      savedGradients={savedGradients}
                       onChange={setGradient}
+                      onSave={saveGradient}
+                      onDelete={deleteGradient}
                     />
                   )}
                   {selectedEffect?.needs === "none" && (

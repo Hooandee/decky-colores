@@ -47,6 +47,13 @@ const es: Record<string, string> = {
   "gradient.preset.ice": "Hielo",
   "gradient.preset.candy": "Caramelo",
 
+  "saved.sectionTitle": "Mis degradados",
+  "saved.save": "Guardar degradado",
+  "saved.delete": "Borrar",
+  "saved.namePlaceholder": "Ponle un nombre",
+  "saved.suggest": "Otro nombre",
+  "saved.confirm": "Guardar",
+
   "effect.speed": "Velocidad",
   "effect.useGradient": "Usar degradado personalizado",
   "effect.spectrumNote": "Este efecto usa todo el espectro de color.",
@@ -113,6 +120,13 @@ const en: Record<string, string> = {
   "gradient.preset.ember": "Ember",
   "gradient.preset.ice": "Ice",
   "gradient.preset.candy": "Candy",
+
+  "saved.sectionTitle": "My gradients",
+  "saved.save": "Save gradient",
+  "saved.delete": "Delete",
+  "saved.namePlaceholder": "Give it a name",
+  "saved.suggest": "Another name",
+  "saved.confirm": "Save",
 
   "effect.speed": "Speed",
   "effect.useGradient": "Use custom gradient",

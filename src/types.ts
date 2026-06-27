@@ -52,6 +52,7 @@ export interface ColoresState {
   gradient: RGB[];
   effect: EffectState;
   ambilight: AmbilightState;
+  savedGradients: GradientPreset[];
 }
 
 export interface GradientPreset {

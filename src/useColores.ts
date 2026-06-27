@@ -95,6 +95,23 @@ export function useColores() {
     pushAmbilight(saturation, smoothing, fps);
   };
 
+  const saveGradient = (name: string, stops: RGB[]) => {
+    api
+      .saveGradient(name, stops.map((c) => [c.r, c.g, c.b]))
+      .then((savedGradients) => setState((s) => (s ? { ...s, savedGradients } : s)))
+      .catch((e) => console.error("Colores: saveGradient failed", e));
+  };
+
+  const deleteGradient = (name: string) => {
+    setState((s) =>
+      s ? { ...s, savedGradients: s.savedGradients.filter((g) => g.name !== name) } : s,
+    );
+    api
+      .deleteGradient(name)
+      .then((savedGradients) => setState((s) => (s ? { ...s, savedGradients } : s)))
+      .catch((e) => console.error("Colores: deleteGradient failed", e));
+  };
+
   return {
     state,
     setBrightness,
@@ -106,5 +123,7 @@ export function useColores() {
     setEffectSpeed,
     setEffectGradient,
     setAmbilight,
+    saveGradient,
+    deleteGradient,
   };
 }

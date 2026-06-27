@@ -143,6 +143,24 @@ export const EFFECT_PRESETS: EffectMeta[] = [
   },
 ];
 
+const NAME_PARTS: Record<"es" | "en", { adjectives: string[]; nouns: string[] }> = {
+  es: {
+    adjectives: ["Borracho", "Eléctrico", "Cósmico", "Disco", "Pastel", "Neón", "Salvaje", "Turbo", "Místico", "Picante"],
+    nouns: ["Atardecer", "Unicornio", "Mango", "Pulpo", "Trueno", "Gato", "Dragón", "Flamenco", "Tucán", "Cactus"],
+  },
+  en: {
+    adjectives: ["Drunken", "Electric", "Cosmic", "Disco", "Pastel", "Neon", "Wild", "Turbo", "Mystic", "Spicy"],
+    nouns: ["Sunset", "Unicorn", "Mango", "Octopus", "Thunder", "Cat", "Dragon", "Flamingo", "Toucan", "Cactus"],
+  },
+};
+
+export function suggestGradientName(lang: "es" | "en"): string {
+  const parts = NAME_PARTS[lang] ?? NAME_PARTS.en;
+  const noun = parts.nouns[Math.floor(Math.random() * parts.nouns.length)];
+  const adjective = parts.adjectives[Math.floor(Math.random() * parts.adjectives.length)];
+  return lang === "es" ? `${noun} ${adjective}` : `${adjective} ${noun}`;
+}
+
 export function harmoniousGradient(base: RGB): RGB[] {
   const { h } = rgbToHsv(base);
   const s = 85;

@@ -5,17 +5,21 @@ import {
   SliderField,
   ButtonItem,
   DialogButton,
+  TextField,
 } from "@decky/ui";
 import { RGB, GradientPreset, ZoneGroup } from "../types";
 import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss, expandGradient } from "../color";
-import { GRADIENT_PRESETS, harmoniousGradient, randomGradient } from "../palette";
+import { GRADIENT_PRESETS, harmoniousGradient, randomGradient, suggestGradientName } from "../palette";
 import { useI18n } from "../i18n";
 
 interface GradientModalProps {
   initial: RGB[];
   layout: ZoneGroup[];
+  savedGradients: GradientPreset[];
   closeModal?: () => void;
   onApply: (stops: RGB[]) => void;
+  onSave: (name: string, stops: RGB[]) => void;
+  onDelete: (name: string) => void;
 }
 
 const ACCENT = "#7c5cff";
@@ -55,6 +59,65 @@ const Card: FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({ 
   >
     {children}
   </div>
+);
+
+const PresetTile: FC<{
+  label: string;
+  stops: RGB[];
+  onSelect: () => void;
+  onDelete?: () => void;
+  deleteLabel?: string;
+}> = ({ label, stops, onSelect, onDelete, deleteLabel }) => (
+  <Focusable
+    onActivate={onSelect}
+    onClick={onSelect}
+    style={{ display: "flex", flexDirection: "column", gap: 6, cursor: "pointer", position: "relative" }}
+  >
+    <div
+      style={{
+        height: 40,
+        borderRadius: 12,
+        background: gradientCss(stops),
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
+      }}
+    />
+    {onDelete && (
+      <DialogButton
+        onClick={(e: MouseEvent) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        aria-label={deleteLabel}
+        style={{
+          position: "absolute",
+          top: 4,
+          right: 4,
+          width: 20,
+          minWidth: 20,
+          height: 20,
+          padding: 0,
+          lineHeight: "18px",
+          textAlign: "center",
+          fontSize: 13,
+          borderRadius: 10,
+          background: "rgba(0,0,0,0.55)",
+          border: "1px solid rgba(255,255,255,0.18)",
+        }}
+      >
+        ×
+      </DialogButton>
+    )}
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 600,
+        color: "rgba(255,255,255,0.7)",
+        textAlign: "center",
+      }}
+    >
+      {label}
+    </div>
+  </Focusable>
 );
 
 const StopEditor: FC<{
@@ -125,12 +188,21 @@ const StickGroup: FC<{
   </div>
 );
 
-export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeModal, onApply }) => {
-  const { t } = useI18n();
+export const GradientModal: FC<GradientModalProps> = ({
+  initial,
+  layout,
+  savedGradients,
+  closeModal,
+  onApply,
+  onSave,
+  onDelete,
+}) => {
+  const { t, lang } = useI18n();
   const groups =
     layout.length > 0 ? layout : [{ name: t("gradient.defaultGroup"), region: [], zones: [0, 1] }];
   const count = Math.max(2, groups.reduce((n, g) => n + g.zones.length, 0));
   const [stops, setStops] = useState<RGB[]>(() => expandGradient(initial, count));
+  const [name, setName] = useState<string>(() => suggestGradientName(lang));
   const hueLabel = t("color.hue");
   const satLabel = t("color.saturation");
   const colorLabel = (i: number, total: number) =>
@@ -144,6 +216,13 @@ export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeMo
   const apply = () => {
     onApply(stops);
     closeModal?.();
+  };
+
+  const save = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onSave(trimmed, stops);
+    setName(suggestGradientName(lang));
   };
 
   return (
@@ -179,32 +258,49 @@ export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeMo
             }}
           >
             {GRADIENT_PRESETS.map((preset: GradientPreset, i: number) => (
-              <Focusable
-                key={i}
-                onActivate={() => setStops(expandGradient(preset.stops, count))}
-                onClick={() => setStops(expandGradient(preset.stops, count))}
-                style={{ display: "flex", flexDirection: "column", gap: 6, cursor: "pointer" }}
-              >
-                <div
-                  style={{
-                    height: 40,
-                    borderRadius: 12,
-                    background: gradientCss(preset.stops),
-                    boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
-                  }}
-                />
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "rgba(255,255,255,0.7)",
-                    textAlign: "center",
-                  }}
-                >
-                  {presetName(preset)}
-                </div>
-              </Focusable>
+              <PresetTile
+                key={`builtin-${i}`}
+                label={presetName(preset)}
+                stops={preset.stops}
+                onSelect={() => setStops(expandGradient(preset.stops, count))}
+              />
             ))}
+            {savedGradients.map((preset) => (
+              <PresetTile
+                key={`saved-${preset.name}`}
+                label={preset.name}
+                stops={preset.stops}
+                onSelect={() => setStops(expandGradient(preset.stops, count))}
+                onDelete={() => onDelete(preset.name)}
+                deleteLabel={t("saved.delete")}
+              />
+            ))}
+          </Focusable>
+        </Card>
+
+        <Card>
+          <SectionLabel>{t("saved.save")}</SectionLabel>
+          <Focusable style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <TextField
+              value={name}
+              label={t("saved.namePlaceholder")}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <Focusable style={{ display: "flex", gap: 10 }}>
+              <DialogButton
+                onClick={() => setName(suggestGradientName(lang))}
+                style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}` }}
+              >
+                {t("saved.suggest")}
+              </DialogButton>
+              <DialogButton
+                onClick={save}
+                disabled={!name.trim()}
+                style={{ flex: 1, background: `linear-gradient(135deg, ${ACCENT}, #00c4ff)`, border: "none" }}
+              >
+                {t("saved.confirm")}
+              </DialogButton>
+            </Focusable>
           </Focusable>
         </Card>
 
