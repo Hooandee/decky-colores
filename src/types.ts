@@ -24,6 +24,11 @@ export interface Capabilities {
   zones: number;
   maxBrightness: number;
   layout: ZoneGroup[];
+  perZone: boolean;
+  supportedEffects: string[];
+  experimental: string[];
+  states: Record<string, "supported" | "experimental" | "unsupported">;
+  enabledExperiments: string[];
 }
 
 export type Mode = "solid" | "gradient" | "effect" | "ambient";
