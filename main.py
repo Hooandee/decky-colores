@@ -77,6 +77,9 @@ class Plugin:
     async def get_version(self) -> str:
         return read_version()
 
+    def _serialized_saved(self) -> list:
+        return [_saved(g) for g in self._settings["saved_gradients"]]
+
     async def get_state(self) -> dict:
         self._init()
         s = self._settings
@@ -94,7 +97,7 @@ class Plugin:
                 "useGradient": s["effect"].get("use_gradient", False),
             },
             "ambilight": s["ambilight"],
-            "savedGradients": [_saved(g) for g in s["saved_gradients"]],
+            "savedGradients": self._serialized_saved(),
         }
 
     async def set_power(self, on: bool) -> None:
@@ -133,7 +136,7 @@ class Plugin:
             self._settings["saved_gradients"], name, stops
         )
         self._store.save(self._settings)
-        return [_saved(g) for g in self._settings["saved_gradients"]]
+        return self._serialized_saved()
 
     async def delete_gradient(self, name: str) -> list:
         self._init()
@@ -141,7 +144,7 @@ class Plugin:
             self._settings["saved_gradients"], name
         )
         self._store.save(self._settings)
-        return [_saved(g) for g in self._settings["saved_gradients"]]
+        return self._serialized_saved()
 
     async def get_ambilight_status(self) -> str:
         self._init()

@@ -10,7 +10,7 @@ import {
   staticClasses,
 } from "@decky/ui";
 import { definePlugin } from "@decky/api";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
@@ -63,6 +63,10 @@ function GradientControls({
   onDelete: (name: string) => void;
 }) {
   const { t } = useI18n();
+  const allPresets = useMemo(
+    () => [...GRADIENT_PRESETS, ...savedGradients],
+    [savedGradients],
+  );
   const open = () =>
     showModal(
       <GradientModal
@@ -107,7 +111,7 @@ function GradientControls({
         <Focusable
           style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, paddingTop: 4 }}
         >
-          {[...GRADIENT_PRESETS, ...savedGradients].map((preset) => (
+          {allPresets.map((preset) => (
             <Focusable
               key={preset.name}
               onActivate={() => onChange(preset.stops)}
