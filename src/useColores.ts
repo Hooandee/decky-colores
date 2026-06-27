@@ -79,6 +79,12 @@ export function useColores() {
     api.setGradient(gradient.map((c) => [c.r, c.g, c.b]));
   };
 
+  const pushGradientSpeed = useThrottle((v: number) => api.setGradientSpeed(v), 60);
+  const setGradientSpeed = (gradientSpeed: number) => {
+    setState((s) => (s ? { ...s, gradientSpeed } : s));
+    pushGradientSpeed(gradientSpeed);
+  };
+
   const setEffectId = (id: EffectId) => {
     setState((s) => (s ? { ...s, effect: { ...s.effect, id } } : s));
     if (state) pushEffect(id, state.effect.speed, state.effect.useGradient);
@@ -123,6 +129,12 @@ export function useColores() {
       .catch((e) => console.error("Colores: setExperiment failed", e));
   };
 
+  const reconnect = () =>
+    api
+      .reconnect()
+      .then(refreshState)
+      .catch((e) => console.error("Colores: reconnect failed", e));
+
   return {
     state,
     setBrightness,
@@ -130,6 +142,7 @@ export function useColores() {
     setMode,
     setColor,
     setGradient,
+    setGradientSpeed,
     setEffectId,
     setEffectSpeed,
     setEffectGradient,
@@ -137,5 +150,6 @@ export function useColores() {
     saveGradient,
     deleteGradient,
     setExperiment,
+    reconnect,
   };
 }

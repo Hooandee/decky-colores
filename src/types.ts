@@ -25,6 +25,7 @@ export interface Capabilities {
   maxBrightness: number;
   layout: ZoneGroup[];
   perZone: boolean;
+  reconnectable: boolean;
   perControllerColor: boolean;
   supportedEffects: string[];
   experimental: string[];
@@ -56,6 +57,7 @@ export interface ColoresState {
   mode: Mode;
   color: RGB;
   gradient: RGB[];
+  gradientSpeed: number;
   effect: EffectState;
   ambilight: AmbilightState;
   savedGradients: GradientPreset[];

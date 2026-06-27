@@ -3,6 +3,7 @@ import {
   PanelSectionRow,
   SliderField,
   ToggleField,
+  ButtonItem,
   Focusable,
   Spinner,
   ErrorBoundary,
@@ -55,6 +56,8 @@ function GradientControls({
   onChange,
   onSave,
   onDelete,
+  speed,
+  onSpeed,
 }: {
   gradient: RGB[];
   layout: ZoneGroup[];
@@ -62,6 +65,8 @@ function GradientControls({
   onChange: (stops: RGB[]) => void;
   onSave: (name: string, stops: RGB[]) => void;
   onDelete: (name: string) => void;
+  speed?: number;
+  onSpeed?: (v: number) => void;
 }) {
   const { t } = useI18n();
   const allPresets = useMemo(
@@ -130,6 +135,59 @@ function GradientControls({
           ))}
         </Focusable>
       </PanelSectionRow>
+      {onSpeed && (
+        <PanelSectionRow>
+          <SliderField
+            label={t("gradient.speed")}
+            value={speed ?? 30}
+            min={0}
+            max={100}
+            step={1}
+            valueSuffix="%"
+            showValue
+            onChange={onSpeed}
+          />
+        </PanelSectionRow>
+      )}
+    </>
+  );
+}
+
+function EffectSource({
+  kind,
+  color,
+  gradient,
+}: {
+  kind: "color" | "gradient";
+  color: RGB;
+  gradient: RGB[];
+}) {
+  const { t } = useI18n();
+  const bg = kind === "gradient" ? gradientCss(gradient) : rgbToCss(color);
+  return (
+    <>
+      <PanelSectionRow>
+        <div
+          style={{
+            height: 34,
+            borderRadius: 10,
+            background: bg,
+            boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
+          }}
+        />
+      </PanelSectionRow>
+      <PanelSectionRow>
+        <div
+          style={{
+            fontSize: 12,
+            color: "rgba(255,255,255,0.55)",
+            padding: "2px 2px 6px",
+            lineHeight: 1.45,
+          }}
+        >
+          {kind === "gradient" ? t("effect.usesGradient") : t("effect.usesColor")}
+        </div>
+      </PanelSectionRow>
     </>
   );
 }
@@ -142,6 +200,7 @@ function Content() {
     setMode,
     setColor,
     setGradient,
+    setGradientSpeed,
     setEffectId,
     setEffectSpeed,
     setEffectGradient,
@@ -149,6 +208,7 @@ function Content() {
     saveGradient,
     deleteGradient,
     setExperiment,
+    reconnect,
   } = useColores();
   const { t } = useI18n();
   const [ambStatus, setAmbStatus] = useState<string>("idle");
@@ -185,6 +245,7 @@ function Content() {
     capabilities: caps,
     color,
     gradient,
+    gradientSpeed,
     effect,
     ambilight,
     brightness,
@@ -196,6 +257,9 @@ function Content() {
   const hasLeds = caps.color || caps.brightness;
 
   const canGradient = (caps.perZone || caps.perControllerColor) && caps.zones > 1;
+  // Devices that can't render a spatial gradient (single-color zones, e.g. Legion
+  // rings) animate a crossfade through the palette, so they expose a speed control.
+  const gradientAnimated = canGradient && !caps.perZone;
 
   const modes: Mode[] = (() => {
     const base: Mode[] = canGradient ? ["solid", "gradient", "effect"] : ["solid", "effect"];
@@ -276,6 +340,8 @@ function Content() {
                   onChange={setGradient}
                   onSave={saveGradient}
                   onDelete={deleteGradient}
+                  speed={gradientSpeed}
+                  onSpeed={gradientAnimated ? setGradientSpeed : undefined}
                 />
               )}
 
@@ -292,37 +358,25 @@ function Content() {
                   </PanelSectionRow>
                   {selectedEffect?.needs === "color" && (
                     <>
-                      <PanelSectionRow>
-                        <ToggleField
-                          label={t("effect.useGradient")}
-                          checked={effect.useGradient}
-                          disabled={!power}
-                          onChange={setEffectGradient}
-                        />
-                      </PanelSectionRow>
-                      {effect.useGradient ? (
-                        <GradientControls
-                          gradient={gradient}
-                          layout={caps.layout}
-                          savedGradients={savedGradients}
-                          onChange={setGradient}
-                          onSave={saveGradient}
-                          onDelete={deleteGradient}
-                        />
-                      ) : (
-                        <ColorEditor color={color} disabled={!power} onChange={setColor} />
+                      {canGradient && (
+                        <PanelSectionRow>
+                          <ToggleField
+                            label={t("effect.useGradient")}
+                            checked={effect.useGradient}
+                            disabled={!power}
+                            onChange={setEffectGradient}
+                          />
+                        </PanelSectionRow>
                       )}
+                      <EffectSource
+                        kind={canGradient && effect.useGradient ? "gradient" : "color"}
+                        color={color}
+                        gradient={gradient}
+                      />
                     </>
                   )}
                   {selectedEffect?.needs === "gradient" && (
-                    <GradientControls
-                      gradient={gradient}
-                      layout={caps.layout}
-                      savedGradients={savedGradients}
-                      onChange={setGradient}
-                      onSave={saveGradient}
-                      onDelete={deleteGradient}
-                    />
+                    <EffectSource kind="gradient" color={color} gradient={gradient} />
                   )}
                   {selectedEffect?.needs === "none" && (
                     <PanelSectionRow>
@@ -434,6 +488,33 @@ function Content() {
                   disabled={!power}
                   onChange={setBrightness}
                 />
+              </PanelSectionRow>
+            </>
+          )}
+
+          {caps.reconnectable && (
+            <>
+              <PanelSectionRow>
+                <div
+                  style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }}
+                />
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <ButtonItem layout="below" onClick={() => reconnect()}>
+                  {t("reconnect.label")}
+                </ButtonItem>
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.55)",
+                    padding: "2px 2px 4px",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {t("reconnect.hint")}
+                </div>
               </PanelSectionRow>
             </>
           )}

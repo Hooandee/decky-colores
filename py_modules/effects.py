@@ -97,6 +97,20 @@ def frame_cycle(zones, t, speed):
     return [hsv_to_rgb((base + (360.0 * i / zones)) % 360.0, 1.0, 1.0) for i in range(zones)]
 
 
+def frame_gradient_sweep(stops, zones, t, speed):
+    # Temporal crossfade through the whole palette for devices that cannot render
+    # a spatial gradient (single-color zones, e.g. Legion rings). All zones share
+    # the same color. A cosine ease maps the looping phase to a 0->1->0 sweep that
+    # accelerates and decelerates smoothly at the palette ends, so the motion feels
+    # graceful and the loop is seamless (no abrupt reversal).
+    if zones <= 0:
+        return []
+    phase = (_freq(speed) * t) % 1.0
+    pos = (1.0 - math.cos(2.0 * math.pi * phase)) / 2.0
+    color = _sample_stops(stops, pos)
+    return [color for _ in range(zones)]
+
+
 class EffectEngine:
     def __init__(self, apply_zones, zones):
         self._apply_zones = apply_zones
@@ -141,6 +155,8 @@ class EffectEngine:
             return frame_wave(params.get("stops", [(255, 0, 0), (0, 0, 255)]), self._zones, t, speed)
         if effect_id == "cycle":
             return frame_cycle(self._zones, t, speed)
+        if effect_id == "gradient_sweep":
+            return frame_gradient_sweep(params.get("stops", [(255, 255, 255)]), self._zones, t, speed)
         return [(0, 0, 0) for _ in range(self._zones)]
 
     async def _run(self, effect_id, speed, params):

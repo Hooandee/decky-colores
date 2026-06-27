@@ -20,6 +20,9 @@ class LedDevice:
     def supports_hardware_effects(self):
         return False
 
+    def reconnect(self):
+        return self.available
+
     def apply_zones(self, zone_colors, brightness, power):
         return False
 
