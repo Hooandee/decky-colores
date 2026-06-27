@@ -10,7 +10,7 @@ import {
   staticClasses,
 } from "@decky/ui";
 import { definePlugin } from "@decky/api";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
@@ -166,17 +166,18 @@ function Content() {
     state;
   const hasLeds = caps.color || caps.brightness;
 
-  const modes = useMemo<Mode[]>(
-    () => (caps.ambilight ? ["solid", "gradient", "effect", "ambient"] : ["solid", "gradient", "effect"]),
-    [caps.ambilight],
-  );
+  const modes: Mode[] = caps.ambilight
+    ? ["solid", "gradient", "effect", "ambient"]
+    : ["solid", "gradient", "effect"];
 
-  const previewColors = useMemo<RGB[]>(() => {
-    if (mode === "gradient") return gradient;
-    if (mode === "effect") return EFFECT_PRESETS.find((e) => e.id === effect.id)?.colors ?? [color];
-    if (mode === "ambient") return AMBIENT_HINT;
-    return [color];
-  }, [mode, gradient, effect.id, color]);
+  const previewColors: RGB[] =
+    mode === "gradient"
+      ? gradient
+      : mode === "effect"
+        ? EFFECT_PRESETS.find((e) => e.id === effect.id)?.colors ?? [color]
+        : mode === "ambient"
+          ? AMBIENT_HINT
+          : [color];
 
   const editHsv = (next: { h: number; s: number; v: number }) => {
     setHsv(next);
