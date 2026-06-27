@@ -64,17 +64,21 @@ const AMBIENT_HINT: RGB[] = [
 
 function GradientControls({
   gradient,
+  zones,
   onChange,
 }: {
   gradient: RGB[];
+  zones: number;
   onChange: (stops: RGB[]) => void;
 }) {
+  const open = () =>
+    showModal(<GradientModal initial={gradient} zones={zones} onApply={onChange} />);
   return (
     <>
       <PanelSectionRow>
         <Focusable
-          onActivate={() => showModal(<GradientModal initial={gradient} onApply={onChange} />)}
-          onClick={() => showModal(<GradientModal initial={gradient} onApply={onChange} />)}
+          onActivate={open}
+          onClick={open}
           style={{
             height: 46,
             borderRadius: 12,
@@ -257,7 +261,9 @@ function Content() {
                 </>
               )}
 
-              {mode === "gradient" && <GradientControls gradient={gradient} onChange={setGradient} />}
+              {mode === "gradient" && (
+                <GradientControls gradient={gradient} zones={caps.zones} onChange={setGradient} />
+              )}
 
               {mode === "effect" && (
                 <PanelSectionRow>

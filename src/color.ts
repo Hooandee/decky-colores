@@ -63,6 +63,25 @@ export function gradientCss(stops: RGB[], angle = 90): string {
   return `linear-gradient(${angle}deg, ${stops.map(rgbToCss).join(", ")})`;
 }
 
+export function expandGradient(stops: RGB[], count: number): RGB[] {
+  const safe = stops.length ? stops : [{ r: 255, g: 255, b: 255 }];
+  if (count <= 1) return [safe[0]];
+  if (safe.length === 1) return Array.from({ length: count }, () => safe[0]);
+  const segments = safe.length - 1;
+  return Array.from({ length: count }, (_, i) => {
+    const pos = (i / (count - 1)) * segments;
+    const idx = Math.min(Math.floor(pos), segments - 1);
+    const f = pos - idx;
+    const a = safe[idx];
+    const b = safe[idx + 1];
+    return {
+      r: Math.round(a.r + (b.r - a.r) * f),
+      g: Math.round(a.g + (b.g - a.g) * f),
+      b: Math.round(a.b + (b.b - a.b) * f),
+    };
+  });
+}
+
 export function dim({ r, g, b }: RGB, percent: number): RGB {
   const factor = clamp(percent, 0, 100) / 100;
   return {

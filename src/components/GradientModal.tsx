@@ -7,11 +7,12 @@ import {
   DialogButton,
 } from "@decky/ui";
 import { RGB, GradientPreset } from "../types";
-import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss } from "../color";
+import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss, expandGradient } from "../color";
 import { GRADIENT_PRESETS, harmoniousGradient, randomGradient } from "../palette";
 
 interface GradientModalProps {
   initial: RGB[];
+  zones: number;
   closeModal?: () => void;
   onApply: (stops: RGB[]) => void;
 }
@@ -19,15 +20,6 @@ interface GradientModalProps {
 const ACCENT = "#7c5cff";
 const PANEL_BG = "rgba(18, 18, 24, 0.6)";
 const BORDER = "rgba(255,255,255,0.08)";
-
-const normalizeStops = (stops: RGB[]): RGB[] => {
-  const safe = stops && stops.length >= 2 ? stops : null;
-  if (safe) return safe.slice(0, 4);
-  return [
-    { r: 124, g: 92, b: 255 },
-    { r: 0, g: 196, b: 255 },
-  ];
-};
 
 const glowFor = (stops: RGB[]): string => {
   const a = stops[0];
@@ -50,10 +42,7 @@ const SectionLabel: FC<{ children: string }> = ({ children }) => (
   </div>
 );
 
-const Card: FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({
-  children,
-  style,
-}) => (
+const Card: FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({ children, style }) => (
   <div
     style={{
       background: PANEL_BG,
@@ -67,15 +56,12 @@ const Card: FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({
   </div>
 );
 
-interface StopEditorProps {
-  label: string;
-  color: RGB;
-  onChange: (color: RGB) => void;
-}
-
-const StopEditor: FC<StopEditorProps> = ({ label, color, onChange }) => {
+const StopEditor: FC<{ label: string; color: RGB; onChange: (color: RGB) => void }> = ({
+  label,
+  color,
+  onChange,
+}) => {
   const hsv = rgbToHsv(color);
-
   const setHue = (h: number) => onChange(hsvToRgb(h, hsv.s, Math.max(hsv.v, 60)));
   const setSat = (s: number) => onChange(hsvToRgb(hsv.h, s, Math.max(hsv.v, 60)));
 
@@ -94,71 +80,51 @@ const StopEditor: FC<StopEditorProps> = ({ label, color, onChange }) => {
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <div
           style={{
-            width: 38,
-            height: 38,
-            borderRadius: 10,
+            width: 32,
+            height: 32,
+            borderRadius: 9,
             flex: "0 0 auto",
             background: rgbToCss(color),
-            boxShadow: `0 0 14px ${rgbToCss(color)}, inset 0 0 0 1px rgba(255,255,255,0.18)`,
+            boxShadow: `0 0 12px ${rgbToCss(color)}, inset 0 0 0 1px rgba(255,255,255,0.18)`,
           }}
         />
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: "rgba(255,255,255,0.85)",
-          }}
-        >
-          {label}
-        </div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>{label}</div>
       </div>
-      <SliderField
-        label="Hue"
-        value={hsv.h}
-        min={0}
-        max={360}
-        step={1}
-        onChange={setHue}
-      />
-      <SliderField
-        label="Saturation"
-        value={hsv.s}
-        min={0}
-        max={100}
-        step={1}
-        onChange={setSat}
-      />
+      <SliderField label="Hue" value={hsv.h} min={0} max={360} step={1} onChange={setHue} />
+      <SliderField label="Saturation" value={hsv.s} min={0} max={100} step={1} onChange={setSat} />
     </Focusable>
   );
 };
 
-export const GradientModal: FC<GradientModalProps> = ({
-  initial,
-  closeModal,
-  onApply,
-}) => {
-  const [stops, setStops] = useState<RGB[]>(() => normalizeStops(initial));
+const StickGroup: FC<{
+  title: string;
+  colors: RGB[];
+  offset: number;
+  onChange: (index: number, color: RGB) => void;
+}> = ({ title, colors, offset, onChange }) => (
+  <div>
+    <SectionLabel>{title}</SectionLabel>
+    <Focusable style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {colors.map((color, i) => (
+        <StopEditor
+          key={i}
+          label={`Color ${i + 1}`}
+          color={color}
+          onChange={(c) => onChange(offset + i, c)}
+        />
+      ))}
+    </Focusable>
+  </div>
+);
 
-  const start = stops[0];
-  const end = stops[stops.length - 1];
+export const GradientModal: FC<GradientModalProps> = ({ initial, zones, closeModal, onApply }) => {
+  const count = Math.max(2, zones);
+  const [stops, setStops] = useState<RGB[]>(() => expandGradient(initial, count));
 
-  const previewGradient = gradientCss(stops);
-  const glow = glowFor(stops);
+  const setStopAt = (index: number, color: RGB) =>
+    setStops((prev) => prev.map((c, i) => (i === index ? color : c)));
 
-  const setStart = (color: RGB) =>
-    setStops((prev) => {
-      const next = [...prev];
-      next[0] = color;
-      return next;
-    });
-
-  const setEnd = (color: RGB) =>
-    setStops((prev) => {
-      const next = [...prev];
-      next[next.length - 1] = color;
-      return next;
-    });
-
+  const half = Math.ceil(count / 2);
   const apply = () => {
     onApply(stops);
     closeModal?.();
@@ -166,33 +132,11 @@ export const GradientModal: FC<GradientModalProps> = ({
 
   return (
     <ModalRoot closeModal={closeModal} onCancel={closeModal} onOK={apply}>
-      <Focusable
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 20,
-          padding: 4,
-        }}
-      >
+      <Focusable style={{ display: "flex", flexDirection: "column", gap: 20, padding: 4 }}>
         <div>
-          <div
-            style={{
-              fontSize: 18,
-              fontWeight: 800,
-              color: "#fff",
-              letterSpacing: "0.01em",
-            }}
-          >
-            Crear degradado
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: "rgba(255,255,255,0.5)",
-              marginTop: 2,
-            }}
-          >
-            Elige un preset o ajusta los colores. Te ayudamos con el resto.
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Crear degradado</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
+            Dos colores por joystick. Empieza con un preset o ajústalos a mano.
           </div>
         </div>
 
@@ -200,8 +144,8 @@ export const GradientModal: FC<GradientModalProps> = ({
           style={{
             height: 84,
             borderRadius: 18,
-            background: previewGradient,
-            boxShadow: `${glow}, inset 0 0 0 1px rgba(255,255,255,0.12)`,
+            background: gradientCss(stops),
+            boxShadow: `${glowFor(stops)}, inset 0 0 0 1px rgba(255,255,255,0.12)`,
             transition: "background 160ms ease, box-shadow 200ms ease",
           }}
         />
@@ -221,14 +165,9 @@ export const GradientModal: FC<GradientModalProps> = ({
             {GRADIENT_PRESETS.map((preset: GradientPreset, i: number) => (
               <Focusable
                 key={i}
-                onActivate={() => setStops(normalizeStops(preset.stops))}
-                onClick={() => setStops(normalizeStops(preset.stops))}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
-                  cursor: "pointer",
-                }}
+                onActivate={() => setStops(expandGradient(preset.stops, count))}
+                onClick={() => setStops(expandGradient(preset.stops, count))}
+                style={{ display: "flex", flexDirection: "column", gap: 6, cursor: "pointer" }}
               >
                 <div
                   style={{
@@ -254,57 +193,41 @@ export const GradientModal: FC<GradientModalProps> = ({
         </Card>
 
         <Card>
-          <SectionLabel>Constructor</SectionLabel>
-          <Focusable
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            <StopEditor label="Color inicial" color={start} onChange={setStart} />
-            <StopEditor label="Color final" color={end} onChange={setEnd} />
+          <Focusable style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <StickGroup
+              title="Left stick"
+              colors={stops.slice(0, half)}
+              offset={0}
+              onChange={setStopAt}
+            />
+            <StickGroup
+              title="Right stick"
+              colors={stops.slice(half)}
+              offset={half}
+              onChange={setStopAt}
+            />
           </Focusable>
         </Card>
 
         <Card>
           <SectionLabel>Asistente</SectionLabel>
-          <Focusable
-            style={{
-              display: "flex",
-              gap: 10,
-            }}
-          >
+          <Focusable style={{ display: "flex", gap: 10 }}>
             <DialogButton
-              onClick={() => setStops(normalizeStops(randomGradient()))}
-              style={{
-                flex: 1,
-                background: `linear-gradient(135deg, ${ACCENT}, #00c4ff)`,
-                border: "none",
-              }}
+              onClick={() => setStops(expandGradient(randomGradient(), count))}
+              style={{ flex: 1, background: `linear-gradient(135deg, ${ACCENT}, #00c4ff)`, border: "none" }}
             >
               Sorpréndeme
             </DialogButton>
             <DialogButton
-              onClick={() => setStops(normalizeStops(harmoniousGradient(start)))}
-              style={{
-                flex: 1,
-                background: "rgba(255,255,255,0.06)",
-                border: `1px solid ${BORDER}`,
-              }}
+              onClick={() => setStops(expandGradient(harmoniousGradient(stops[0]), count))}
+              style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}` }}
             >
               Auto-paleta
             </DialogButton>
           </Focusable>
         </Card>
 
-        <Focusable
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 4,
-          }}
-        >
+        <Focusable style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <ButtonItem layout="below" bottomSeparator="none" onClick={apply}>
             Aplicar
           </ButtonItem>

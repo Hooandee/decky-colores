@@ -44,13 +44,18 @@ export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, powe
   const lit = source.map((c) => dim(softenForDisplay(c), power ? Math.max(brightness, 12) : 100));
   const intensity = power ? brightness / 100 : 0;
 
-  const stops = lit.map((c, i) => (
-    <stop
-      key={i}
-      offset={`${lit.length === 1 ? 50 : (i / (lit.length - 1)) * 100}%`}
-      stopColor={rgbToCss(c)}
-    />
-  ));
+  const half = lit.length > 1 ? Math.ceil(lit.length / 2) : lit.length;
+  const leftColors = lit.length > 1 ? lit.slice(0, half) : lit;
+  const rightColors = lit.length > 1 ? lit.slice(half) : lit;
+
+  const makeStops = (cols: RGB[]) =>
+    cols.map((c, i) => (
+      <stop
+        key={i}
+        offset={`${cols.length === 1 ? 50 : (i / (cols.length - 1)) * 100}%`}
+        stopColor={rgbToCss(c)}
+      />
+    ));
 
   return (
     <div
@@ -67,14 +72,14 @@ export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, powe
       <svg viewBox="0 0 300 140" style={{ width: "100%", display: "block" }}>
         <defs>
           <linearGradient id="ring-left" x1="0%" y1="0%" x2="100%" y2="100%">
-            {stops}
+            {makeStops(leftColors)}
           </linearGradient>
           <linearGradient id="ring-right" x1="100%" y1="0%" x2="0%" y2="100%">
-            {stops}
+            {makeStops(rightColors)}
           </linearGradient>
         </defs>
-        <Ring cx={92} gradId="ring-left" intensity={intensity} lit={lit} />
-        <Ring cx={208} gradId="ring-right" intensity={intensity} lit={lit} />
+        <Ring cx={92} gradId="ring-left" intensity={intensity} lit={leftColors} />
+        <Ring cx={208} gradId="ring-right" intensity={intensity} lit={rightColors} />
       </svg>
       <div
         style={{
