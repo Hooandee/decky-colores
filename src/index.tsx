@@ -626,6 +626,9 @@ export default definePlugin(() => {
       apiReconnect().catch(() => {});
     }, 2000);
   });
+  if (!resumeReg) {
+    console.warn("[Colores] SteamClient unavailable at load; resume LED restore disabled");
+  }
 
   return {
     name: "Colores",
