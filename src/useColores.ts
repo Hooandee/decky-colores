@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ColoresState, EffectId, Mode, RGB } from "./types";
+import { ColoresState, EffectId, EffectState, Mode, RGB } from "./types";
 import * as api from "./api";
 
 function useThrottle<A extends unknown[]>(fn: (...args: A) => void, ms: number) {
@@ -32,16 +32,30 @@ function useThrottle<A extends unknown[]>(fn: (...args: A) => void, ms: number) 
 
 export function useColores() {
   const [state, setState] = useState<ColoresState | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const refreshState = useCallback(() => {
     api.getState()
-      .then(setState)
-      .catch((e) => console.error("Colores: getState failed", e));
+      .then((s) => {
+        setState(s);
+        setLoadError(false);
+      })
+      .catch((e) => {
+        console.error("Colores: getState failed", e);
+        setLoadError(true);
+      });
   }, []);
 
   useEffect(() => {
     refreshState();
   }, [refreshState]);
+
+  // Mirror the live effect so successive setters in the same tick chain off the
+  // latest value instead of a stale render-time snapshot.
+  const effectRef = useRef<EffectState | null>(null);
+  useEffect(() => {
+    if (state) effectRef.current = state.effect;
+  }, [state]);
 
   const pushSolid = useThrottle((c: RGB) => api.setSolid(c.r, c.g, c.b), 60);
   const pushBrightness = useThrottle((v: number) => api.setBrightness(v), 60);
@@ -85,20 +99,17 @@ export function useColores() {
     pushGradientSpeed(gradientSpeed);
   };
 
-  const setEffectId = (id: EffectId) => {
-    setState((s) => (s ? { ...s, effect: { ...s.effect, id } } : s));
-    if (state) pushEffect(id, state.effect.speed, state.effect.useGradient);
+  const updateEffect = (patch: Partial<EffectState>) => {
+    const base = effectRef.current ?? { id: "breathing", speed: 50, useGradient: false };
+    const next: EffectState = { ...base, ...patch };
+    effectRef.current = next;
+    setState((s) => (s ? { ...s, effect: next } : s));
+    pushEffect(next.id, next.speed, next.useGradient);
   };
 
-  const setEffectSpeed = (speed: number) => {
-    setState((s) => (s ? { ...s, effect: { ...s.effect, speed } } : s));
-    if (state) pushEffect(state.effect.id, speed, state.effect.useGradient);
-  };
-
-  const setEffectGradient = (useGradient: boolean) => {
-    setState((s) => (s ? { ...s, effect: { ...s.effect, useGradient } } : s));
-    if (state) pushEffect(state.effect.id, state.effect.speed, useGradient);
-  };
+  const setEffectId = (id: EffectId) => updateEffect({ id });
+  const setEffectSpeed = (speed: number) => updateEffect({ speed });
+  const setEffectGradient = (useGradient: boolean) => updateEffect({ useGradient });
 
   const setAmbilight = (saturation: number, smoothing: number, fps: number) => {
     setState((s) => (s ? { ...s, ambilight: { saturation, smoothing, fps } } : s));
@@ -137,6 +148,8 @@ export function useColores() {
 
   return {
     state,
+    loadError,
+    retry: refreshState,
     setBrightness,
     setPower,
     setMode,

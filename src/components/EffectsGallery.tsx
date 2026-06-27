@@ -8,6 +8,8 @@ interface EffectsGalleryProps {
   effects: EffectMeta[];
   selected: EffectId;
   speed: number;
+  disabled?: boolean;
+  firmwareSpiral?: boolean;
   onSelect: (id: EffectId) => void;
   onSpeed: (v: number) => void;
 }
@@ -131,12 +133,18 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
   effects,
   selected,
   speed,
+  disabled,
+  firmwareSpiral,
   onSelect,
   onSpeed,
 }) => {
   const { t } = useI18n();
+  const labelFor = (id: EffectId) =>
+    id === "spiral" && firmwareSpiral
+      ? t("effect.spiral.legion.label")
+      : t(`effect.${id}.label`);
   return (
-  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+  <div style={{ display: "flex", flexDirection: "column", gap: 12, opacity: disabled ? 0.4 : 1 }}>
     <Keyframes />
     <Focusable
       style={{
@@ -153,8 +161,8 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
         return (
           <Focusable
             key={effect.id}
-            onActivate={() => onSelect(effect.id)}
-            onClick={() => onSelect(effect.id)}
+            onActivate={() => !disabled && onSelect(effect.id)}
+            onClick={() => !disabled && onSelect(effect.id)}
             style={{
               display: "flex",
               flexDirection: "column",
@@ -166,7 +174,7 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
                 ? `1px solid ${glow}`
                 : "1px solid rgba(255,255,255,0.08)",
               boxShadow: active ? `0 0 14px ${glow}55` : "none",
-              cursor: "pointer",
+              cursor: disabled ? "default" : "pointer",
               transition: "border 140ms ease, box-shadow 140ms ease",
             }}
           >
@@ -179,7 +187,7 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
                 textAlign: "center",
               }}
             >
-              {t(`effect.${effect.id}.label`)}
+              {labelFor(effect.id)}
             </div>
           </Focusable>
         );
@@ -193,6 +201,7 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
       step={1}
       valueSuffix="%"
       showValue
+      disabled={disabled}
       onChange={onSpeed}
     />
   </div>

@@ -97,6 +97,29 @@ def frame_cycle(zones, t, speed):
     return [hsv_to_rgb((base + (360.0 * i / zones)) % 360.0, 1.0, 1.0) for i in range(zones)]
 
 
+def frame_spiral(palette, t, speed):
+    # Software spiral for devices that CAN paint multiple zones (e.g. the Ally):
+    # rotate the per-zone palette around the ring as a seamless loop, interpolating
+    # between zones so the motion is smooth. `palette` is built once per run (it
+    # never changes), so the hot path is just the rotation. On single-color
+    # firmware devices (Legion Go) the spiral is rendered natively, not here.
+    zones = len(palette)
+    if zones == 0:
+        return []
+    shift = ((_freq(speed) * t) % 1.0) * zones
+    result = []
+    for i in range(zones):
+        src = (i + shift) % zones
+        lo = int(math.floor(src)) % zones
+        hi = (lo + 1) % zones
+        frac = src - math.floor(src)
+        a, b = palette[lo], palette[hi]
+        result.append(
+            (clamp8(_lerp(a[0], b[0], frac)), clamp8(_lerp(a[1], b[1], frac)), clamp8(_lerp(a[2], b[2], frac)))
+        )
+    return result
+
+
 def frame_gradient_sweep(stops, zones, t, speed):
     # Temporal crossfade through the whole palette for devices that cannot render
     # a spatial gradient (single-color zones, e.g. Legion rings). All zones share
@@ -146,13 +169,15 @@ class EffectEngine:
             return interpolate_gradient(params["stops"], self._zones)
         return [params.get("color", (255, 255, 255))] * self._zones
 
-    def _compute(self, effect_id, t, speed, params):
+    def _compute(self, effect_id, t, speed, params, prepared=None):
         if effect_id == "breathing":
             return frame_breathing(self._palette(params), t, speed)
         if effect_id == "rainbow":
             return frame_rainbow(self._zones, t, speed)
         if effect_id == "wave":
             return frame_wave(params.get("stops", [(255, 0, 0), (0, 0, 255)]), self._zones, t, speed)
+        if effect_id == "spiral":
+            return frame_spiral(prepared or [], t, speed)
         if effect_id == "cycle":
             return frame_cycle(self._zones, t, speed)
         if effect_id == "gradient_sweep":
@@ -162,10 +187,17 @@ class EffectEngine:
     async def _run(self, effect_id, speed, params):
         loop = asyncio.get_event_loop()
         start = loop.time()
+        # Per-run constants computed once (the spiral palette never changes while
+        # the effect runs, so we keep it off the ~30fps hot path).
+        prepared = None
+        if effect_id == "spiral":
+            prepared = interpolate_gradient(
+                params.get("stops", [(255, 0, 0), (0, 0, 255)]), self._zones
+            )
         while True:
             try:
                 t = loop.time() - start
-                frame = self._compute(effect_id, t, speed, params)
+                frame = self._compute(effect_id, t, speed, params, prepared)
                 self._apply_zones(frame)
             except asyncio.CancelledError:
                 raise

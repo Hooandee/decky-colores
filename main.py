@@ -197,12 +197,14 @@ class Plugin:
 
     def _wants_render_loop(self) -> bool:
         # Modes driven by our per-frame render loop (software effect engine or
-        # ambilight capture) instead of firmware. Hardware effects only take a
-        # single color, so anything that must paint the custom gradient (wave, or
-        # any effect with "use gradient" on) and ambient capture run in software.
-        # Gradient mode also runs in software on devices that cannot render a
+        # ambilight capture) instead of firmware. Ambient capture always runs in
+        # software. Gradient mode runs in software on devices that cannot render a
         # spatial gradient (single-color zones, e.g. Legion rings) — there we
         # animate an elegant crossfade through the palette instead.
+        # For effects: the custom-gradient overlay must be painted per-frame, and
+        # so must wave on devices that can show more than one color at once
+        # (per-zone or per-controller). Single-color devices render wave with
+        # their native hardware effect instead of collapsing it to a flat color.
         s = self._settings
         if s["mode"] == "ambient":
             return True
@@ -210,7 +212,17 @@ class Plugin:
             return not self._controller.supports_per_zone()
         if s["mode"] == "effect":
             effect = s["effect"]
-            return effect["id"] == "wave" or effect.get("use_gradient", False)
+            if effect.get("use_gradient", False):
+                return True
+            if effect["id"] == "spiral":
+                # Legion Go renders spiral with its own firmware effect; only
+                # software-painting devices (e.g. the Ally) run the per-frame loop.
+                return not self._controller.supports_hardware_effects()
+            if effect["id"] == "wave":
+                return self._controller.supports_per_zone() or bool(
+                    self._capabilities.get("perControllerColor", False)
+                )
+            return False
         return False
 
     def _apply(self) -> None:

@@ -65,6 +65,7 @@ def _effect_mode(effect_id):
         "breathing": RGBMode.Pulse,
         "rainbow": RGBMode.Rainbow,
         "wave": RGBMode.Spiral,
+        "spiral": RGBMode.Spiral,
         "cycle": RGBMode.Rainbow,
     }
     return mapping.get(effect_id, RGBMode.Solid)

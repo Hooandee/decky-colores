@@ -151,6 +151,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight):
         "zones": zones,
         "maxBrightness": max_brightness,
         "perZone": has_led and zones > 1,
+        "hardwareEffects": False,
         "reconnectable": False,
         "perControllerColor": bool(profile.get("per_controller", False)),
         "supportedEffects": list(profile.get("supported_effects", [])),
@@ -187,6 +188,7 @@ def _build_hid_context(profile, ambilight):
     zones = profile.get("zones") or 1
     capabilities = build_capabilities(profile, True, zones, 100, ambilight)
     capabilities["perZone"] = device.supports_per_zone()
+    capabilities["hardwareEffects"] = device.supports_hardware_effects()
     capabilities["reconnectable"] = True
     return {"device": device, "capabilities": capabilities}
 

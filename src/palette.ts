@@ -141,6 +141,18 @@ export const EFFECT_PRESETS: EffectMeta[] = [
       { r: 41, g: 182, b: 246 },
     ],
   },
+  {
+    id: "spiral",
+    label: "Spiral",
+    needs: "gradient",
+    description: "A gradient that spins around the ring.",
+    colors: [
+      { r: 255, g: 0, b: 128 },
+      { r: 124, g: 92, b: 255 },
+      { r: 0, g: 196, b: 255 },
+      { r: 64, g: 224, b: 120 },
+    ],
+  },
 ];
 
 const NAME_PARTS: Record<"es" | "en", { adjectives: string[]; nouns: string[] }> = {

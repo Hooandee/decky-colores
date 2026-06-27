@@ -15,9 +15,9 @@ import { useEffect, useMemo, useState } from "react";
 import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus } from "./api";
+import { getAmbilightStatus, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss } from "./color";
-import { Mode, RGB, ZoneGroup, GradientPreset } from "./types";
+import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { ColorEditor } from "./components/ColorEditor";
 import { ModeTabs } from "./components/ModeTabs";
@@ -53,6 +53,7 @@ function GradientControls({
   gradient,
   layout,
   savedGradients,
+  disabled,
   onChange,
   onSave,
   onDelete,
@@ -62,6 +63,7 @@ function GradientControls({
   gradient: RGB[];
   layout: ZoneGroup[];
   savedGradients: GradientPreset[];
+  disabled?: boolean;
   onChange: (stops: RGB[]) => void;
   onSave: (name: string, stops: RGB[]) => void;
   onDelete: (name: string) => void;
@@ -73,7 +75,8 @@ function GradientControls({
     () => [...GRADIENT_PRESETS, ...savedGradients],
     [savedGradients],
   );
-  const open = () =>
+  const open = () => {
+    if (disabled) return;
     showModal(
       <GradientModal
         initial={gradient}
@@ -84,8 +87,9 @@ function GradientControls({
         onDelete={onDelete}
       />,
     );
+  };
   return (
-    <>
+    <div style={{ opacity: disabled ? 0.4 : 1 }}>
       <PanelSectionRow>
         <Focusable
           onActivate={open}
@@ -98,7 +102,7 @@ function GradientControls({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            cursor: "pointer",
+            cursor: disabled ? "default" : "pointer",
           }}
         >
           <span
@@ -120,14 +124,14 @@ function GradientControls({
           {allPresets.map((preset) => (
             <Focusable
               key={preset.name}
-              onActivate={() => onChange(preset.stops)}
-              onClick={() => onChange(preset.stops)}
+              onActivate={() => !disabled && onChange(preset.stops)}
+              onClick={() => !disabled && onChange(preset.stops)}
               style={{
                 height: 30,
                 borderRadius: 8,
                 background: gradientCss(preset.stops),
                 boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
-                cursor: "pointer",
+                cursor: disabled ? "default" : "pointer",
               }}
             >
               <div style={{ width: "100%", height: "100%" }} />
@@ -145,11 +149,12 @@ function GradientControls({
             step={1}
             valueSuffix="%"
             showValue
+            disabled={disabled}
             onChange={onSpeed}
           />
         </PanelSectionRow>
       )}
-    </>
+    </div>
   );
 }
 
@@ -195,6 +200,8 @@ function EffectSource({
 function Content() {
   const {
     state,
+    loadError,
+    retry,
     setBrightness,
     setPower,
     setMode,
@@ -232,11 +239,33 @@ function Content() {
   if (!state) {
     return (
       <PanelSection>
-        <PanelSectionRow>
-          <div style={{ display: "flex", justifyContent: "center", padding: 20 }}>
-            <Spinner width={32} height={32} />
-          </div>
-        </PanelSectionRow>
+        {loadError ? (
+          <>
+            <PanelSectionRow>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "rgba(255,255,255,0.7)",
+                  padding: "8px 2px",
+                  lineHeight: 1.45,
+                }}
+              >
+                {t("load.error")}
+              </div>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <ButtonItem layout="below" onClick={() => retry()}>
+                {t("load.retry")}
+              </ButtonItem>
+            </PanelSectionRow>
+          </>
+        ) : (
+          <PanelSectionRow>
+            <div style={{ display: "flex", justifyContent: "center", padding: 20 }}>
+              <Spinner width={32} height={32} />
+            </div>
+          </PanelSectionRow>
+        )}
       </PanelSection>
     );
   }
@@ -256,7 +285,10 @@ function Content() {
   } = state;
   const hasLeds = caps.color || caps.brightness;
 
-  const canGradient = (caps.perZone || caps.perControllerColor) && caps.zones > 1;
+  // Any colour device offers a gradient: per-zone devices render it spatially,
+  // single-colour devices (Legion Go S / Go 2) crossfade through the palette over
+  // time — the same gradient experience on every Legion Go.
+  const canGradient = caps.color && caps.zones >= 1;
   // Devices that can't render a spatial gradient (single-color zones, e.g. Legion
   // rings) animate a crossfade through the palette, so they expose a speed control.
   const gradientAnimated = canGradient && !caps.perZone;
@@ -273,9 +305,20 @@ function Content() {
 
   const selectedEffect = visibleEffects.find((e) => e.id === effect.id) ?? visibleEffects[0];
 
+  // Devices with native firmware effects (Legion Go) run spiral as their own
+  // fixed-palette effect — labelled "Spiral GO", taking no user color. Devices
+  // that paint zones in software (Ally) spin the user's gradient instead.
+  const firmwareSpiral = caps.hardwareEffects;
+  const isFirmwareSpiral = selectedEffect?.id === "spiral" && firmwareSpiral;
+  const effectNeed: EffectColorNeed = isFirmwareSpiral
+    ? "none"
+    : selectedEffect?.needs === "gradient" && !canGradient
+      ? "color"
+      : (selectedEffect?.needs ?? "none");
+
   const effectPreview = (): RGB[] => {
-    if (!selectedEffect || selectedEffect.needs === "none") return selectedEffect?.colors ?? [color];
-    if (selectedEffect.needs === "gradient" || effect.useGradient) return gradient;
+    if (!selectedEffect || effectNeed === "none") return selectedEffect?.colors ?? [color];
+    if (effectNeed === "gradient" || effect.useGradient) return gradient;
     return [color];
   };
 
@@ -337,6 +380,7 @@ function Content() {
                   gradient={gradient}
                   layout={caps.layout}
                   savedGradients={savedGradients}
+                  disabled={!power}
                   onChange={setGradient}
                   onSave={saveGradient}
                   onDelete={deleteGradient}
@@ -352,11 +396,13 @@ function Content() {
                       effects={visibleEffects}
                       selected={effect.id}
                       speed={effect.speed}
+                      disabled={!power}
+                      firmwareSpiral={firmwareSpiral}
                       onSelect={setEffectId}
                       onSpeed={setEffectSpeed}
                     />
                   </PanelSectionRow>
-                  {selectedEffect?.needs === "color" && (
+                  {effectNeed === "color" && (
                     <>
                       {canGradient && (
                         <PanelSectionRow>
@@ -375,10 +421,10 @@ function Content() {
                       />
                     </>
                   )}
-                  {selectedEffect?.needs === "gradient" && (
+                  {effectNeed === "gradient" && (
                     <EffectSource kind="gradient" color={color} gradient={gradient} />
                   )}
-                  {selectedEffect?.needs === "none" && (
+                  {effectNeed === "none" && (
                     <PanelSectionRow>
                       <div
                         style={{
@@ -387,7 +433,9 @@ function Content() {
                           padding: "4px 2px 8px",
                         }}
                       >
-                        {t("effect.spectrumNote")}
+                        {isFirmwareSpiral
+                          ? t("effect.spiral.firmwareNote")
+                          : t("effect.spectrumNote")}
                       </div>
                     </PanelSectionRow>
                   )}
@@ -564,16 +612,38 @@ function Content() {
   );
 }
 
-export default definePlugin(() => ({
-  name: "Colores",
-  titleView: <div className={staticClasses.Title}>Colores</div>,
-  content: (
-    <ErrorBoundary>
-      <I18nProvider>
-        <Content />
-      </I18nProvider>
-    </ErrorBoundary>
-  ),
-  icon: <FaPalette />,
-  onDismount() {},
-}));
+export default definePlugin(() => {
+  // SteamOS restores its own controller lighting on resume from suspend, wiping
+  // whatever the user set. Re-apply the saved settings shortly after waking so
+  // the user's choice survives a sleep/wake cycle. reconnect() reconnects the
+  // controller (which re-enumerates after resume) and re-applies the settings.
+  // The delay lets SteamOS finish writing its color first so we win the race.
+  // Registered at the plugin level so it runs even when the QAM panel is closed.
+  let resumeTimer: ReturnType<typeof setTimeout> | undefined;
+  const resumeReg = SteamClient?.System?.RegisterForOnResumeFromSuspend?.(() => {
+    clearTimeout(resumeTimer);
+    resumeTimer = setTimeout(() => {
+      apiReconnect().catch(() => {});
+    }, 2000);
+  });
+  if (!resumeReg) {
+    console.warn("[Colores] SteamClient unavailable at load; resume LED restore disabled");
+  }
+
+  return {
+    name: "Colores",
+    titleView: <div className={staticClasses.Title}>Colores</div>,
+    content: (
+      <ErrorBoundary>
+        <I18nProvider>
+          <Content />
+        </I18nProvider>
+      </ErrorBoundary>
+    ),
+    icon: <FaPalette />,
+    onDismount() {
+      clearTimeout(resumeTimer);
+      resumeReg?.unregister?.();
+    },
+  };
+});

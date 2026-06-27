@@ -16,18 +16,20 @@ const PRESETS: RGB[] = [
 
 interface SwatchesProps {
   selected: RGB;
+  disabled?: boolean;
   onPick: (color: RGB) => void;
 }
 
 const isSame = (a: RGB, b: RGB) => a.r === b.r && a.g === b.g && a.b === b.b;
 
-export const Swatches: FC<SwatchesProps> = ({ selected, onPick }) => (
+export const Swatches: FC<SwatchesProps> = ({ selected, disabled, onPick }) => (
   <Focusable
     style={{
       display: "grid",
       gridTemplateColumns: "repeat(8, 1fr)",
       gap: 6,
       padding: "2px 0",
+      opacity: disabled ? 0.4 : 1,
     }}
   >
     {PRESETS.map((preset, i) => {
@@ -35,8 +37,8 @@ export const Swatches: FC<SwatchesProps> = ({ selected, onPick }) => (
       return (
         <Focusable
           key={i}
-          onActivate={() => onPick(preset)}
-          onClick={() => onPick(preset)}
+          onActivate={() => !disabled && onPick(preset)}
+          onClick={() => !disabled && onPick(preset)}
           style={{
             aspectRatio: "1 / 1",
             borderRadius: 8,
@@ -44,7 +46,7 @@ export const Swatches: FC<SwatchesProps> = ({ selected, onPick }) => (
             boxShadow: active
               ? `0 0 0 2px #fff, 0 0 10px ${rgbToCss(preset)}`
               : "inset 0 0 0 1px rgba(255,255,255,0.12)",
-            cursor: "pointer",
+            cursor: disabled ? "default" : "pointer",
             transition: "box-shadow 120ms ease, transform 120ms ease",
           }}
         >
