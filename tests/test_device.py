@@ -1,12 +1,23 @@
 import os
 
-from py_modules.device import build_layout, detect_device, detect_capabilities, lookup_name
+from py_modules.device import build_layout, detect_device, detect_capabilities, lookup_name, read_zone_format, build_capabilities, build_device
+import led_device as _led_device_mod
+SysfsRgbDevice = _led_device_mod.SysfsRgbDevice
+NullDevice = _led_device_mod.NullDevice
 
 
 def test_build_layout_splits_into_two_sticks():
     layout = build_layout(4)
     assert [g["name"] for g in layout] == ["Left stick", "Right stick"]
     assert layout[0]["zones"] == [0, 1]
+    assert layout[1]["zones"] == [2, 3]
+
+
+def test_build_layout_swap_sticks_reverses_anchor_groups():
+    layout = build_layout(4, swap_sticks=True)
+    assert layout[0]["name"] == "Right stick"
+    assert layout[0]["zones"] == [0, 1]
+    assert layout[1]["name"] == "Left stick"
     assert layout[1]["zones"] == [2, 3]
 
 
@@ -89,3 +100,81 @@ def test_detect_capabilities_no_leds_dir(tmp_path):
     caps = detect_capabilities(str(tmp_path))
     assert caps["color"] is False
     assert caps["zones"] == 0
+
+
+def test_read_zone_format_hex(tmp_path):
+    led = os.path.join(str(tmp_path), "led")
+    os.makedirs(led)
+    open(os.path.join(led, "multi_index"), "w").write("rgb rgb rgb rgb")
+    zones, fmt = read_zone_format(led)
+    assert zones == 4
+    assert fmt == "hex"
+
+
+def test_read_zone_format_decimal(tmp_path):
+    led = os.path.join(str(tmp_path), "led")
+    os.makedirs(led)
+    open(os.path.join(led, "multi_index"), "w").write("red green blue red green blue")
+    zones, fmt = read_zone_format(led)
+    assert zones == 2
+    assert fmt == "decimal"
+
+
+def test_build_capabilities_supported_when_present():
+    profile = {"name": "ROG Ally X", "driver": "sysfs", "color_order": "rgb",
+               "supported_effects": ["breathing"], "experimental": []}
+    caps = build_capabilities(profile, has_led=True, zones=4, max_brightness=255, ambilight=True)
+    assert caps["color"] is True
+    assert caps["zones"] == 4
+    assert caps["perZone"] is True
+    assert caps["states"]["color"] == "supported"
+    assert caps["supportedEffects"] == ["breathing"]
+
+
+def test_build_capabilities_experimental_features():
+    profile = {"name": "Legion Go 2", "driver": "hid_legion_tablet", "color_order": "rgb",
+               "supported_effects": ["breathing"], "experimental": ["color", "effects"]}
+    caps = build_capabilities(profile, has_led=False, zones=0, max_brightness=255, ambilight=False)
+    assert caps["states"]["color"] == "experimental"
+    assert caps["states"]["effects"] == "experimental"
+    assert caps["states"]["brightness"] == "unsupported"
+
+
+def test_build_capabilities_unsupported_when_absent():
+    profile = {"name": "X", "driver": "sysfs", "color_order": "rgb",
+               "supported_effects": [], "experimental": []}
+    caps = build_capabilities(profile, has_led=False, zones=0, max_brightness=255, ambilight=False)
+    assert caps["states"]["color"] == "unsupported"
+    assert caps["color"] is False
+
+
+def test_build_device_ally_returns_sysfs_writer(tmp_path):
+    _make_dmi(str(tmp_path), "RC72LA", "ROG Ally X RC72LA")
+    _make_led(str(tmp_path), "ally:rgb:joystick_rings",
+              {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb",
+               "max_brightness": "255", "brightness": "0"})
+    ctx = build_device(str(tmp_path))
+    assert ctx["info"]["name"] == "ROG Ally X"
+    assert isinstance(ctx["device"], SysfsRgbDevice)
+    assert ctx["capabilities"]["states"]["color"] == "supported"
+    assert ctx["capabilities"]["zones"] == 4
+
+
+def test_build_device_legion_without_node_is_null_and_experimental(tmp_path):
+    _make_dmi(str(tmp_path), "83N0", "83N0")
+    os.makedirs(os.path.join(str(tmp_path), "sys/class/leds"))
+    ctx = build_device(str(tmp_path))
+    assert ctx["info"]["name"] == "Legion Go 2"
+    assert isinstance(ctx["device"], NullDevice)
+    assert ctx["capabilities"]["states"]["color"] == "experimental"
+
+
+def test_build_device_msi_uses_bgr_on_sysfs_fallback(tmp_path):
+    _make_dmi(str(tmp_path), "", "Claw 8 AI+ A2VM")
+    _make_led(str(tmp_path), "rgb:claw",
+              {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb",
+               "max_brightness": "255", "brightness": "0"})
+    ctx = build_device(str(tmp_path))
+    assert ctx["info"]["name"] == "MSI Claw 8 AI+"
+    assert isinstance(ctx["device"], SysfsRgbDevice)
+    assert ctx["device"]._color_order == "bgr"

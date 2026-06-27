@@ -1,5 +1,9 @@
 import os
 
+from device_profiles import resolve_profile
+from led_device import SysfsRgbDevice, NullDevice
+from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device
+
 DEVICE_REGISTRY = [
     ("board", "Jupiter", "Steam Deck"),
     ("board", "Galileo", "Steam Deck OLED"),
@@ -10,6 +14,8 @@ DEVICE_REGISTRY = [
     ("product", "83E1", "Legion Go"),
     ("product", "83L3", "Legion Go S"),
     ("product", "83Q2", "Legion Go S"),
+    ("product", "83N6", "Legion Go S"),
+    ("product", "83Q3", "Legion Go S"),
     ("product", "83N0", "Legion Go 2"),
     ("product", "83N1", "Legion Go 2"),
 ]
@@ -87,12 +93,12 @@ _STICK_ANCHORS = [
 ]
 
 
-def build_layout(zones):
+def build_layout(zones, swap_sticks=False):
     if zones <= 0:
         return []
     if zones == 1:
         return [{"name": "Lights", "region": [0.0, 0.0, 1.0, 1.0], "zones": [0]}]
-    groups = _STICK_ANCHORS
+    groups = list(reversed(_STICK_ANCHORS)) if swap_sticks else _STICK_ANCHORS
     base, extra = divmod(zones, len(groups))
     layout = []
     index = 0
@@ -103,6 +109,54 @@ def build_layout(zones):
         layout.append({"name": name, "region": list(region), "zones": list(range(index, index + count))})
         index += count
     return layout
+
+
+_CHANNEL_NAMES = {"red", "green", "blue"}
+
+FEATURES = ("color", "brightness", "effects", "ambilight")
+
+
+def read_zone_format(led_path):
+    multi_index = _read(os.path.join(led_path, "multi_index"))
+    tokens = multi_index.split()
+    if tokens and all(token.lower() in _CHANNEL_NAMES for token in tokens):
+        return max(1, len(tokens) // 3), "decimal"
+    return max(1, len(tokens)), "hex"
+
+
+def _all_experimental(profile):
+    return sorted(set(profile.get("experimental", [])) | set(FEATURES))
+
+
+def _feature_state(profile, feature, present):
+    if feature in profile.get("experimental", []):
+        return "experimental"
+    return "supported" if present else "unsupported"
+
+
+def build_capabilities(profile, has_led, zones, max_brightness, ambilight):
+    present = {
+        "color": has_led,
+        "brightness": has_led,
+        "effects": has_led,
+        "ambilight": bool(ambilight),
+    }
+    states = {f: _feature_state(profile, f, present[f]) for f in FEATURES}
+    active = {f: states[f] != "unsupported" for f in FEATURES}
+    return {
+        "color": active["color"],
+        "brightness": active["brightness"],
+        "effects": active["effects"],
+        "ambilight": active["ambilight"],
+        "zones": zones,
+        "maxBrightness": max_brightness,
+        "perZone": has_led and zones > 1,
+        "perControllerColor": bool(profile.get("per_controller", False)),
+        "supportedEffects": list(profile.get("supported_effects", [])),
+        "states": states,
+        "experimental": list(profile.get("experimental", [])),
+        "layout": build_layout(zones, profile.get("swap_sticks", False)),
+    }
 
 
 def _find_rgb_led(leds_dir):
@@ -120,3 +174,59 @@ def _find_rgb_led(leds_dir):
         if os.path.exists(os.path.join(path, "multi_intensity")):
             return path
     return None
+
+
+_IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s"}
+
+
+def _build_hid_context(profile, ambilight):
+    device = build_hid_device(profile["driver"])
+    if device is None or not device.available:
+        return None
+    zones = profile.get("zones") or 1
+    capabilities = build_capabilities(profile, True, zones, 100, ambilight)
+    capabilities["perZone"] = device.supports_per_zone()
+    return {"device": device, "capabilities": capabilities}
+
+
+def build_device(sysfs_root="/", ambilight=False):
+    info = detect_device(sysfs_root)
+    profile = resolve_profile(info["board"], info["product"])
+    info["name"] = profile["name"]
+
+    if profile["driver"] in HID_DRIVERS:
+        if HID_AVAILABLE:
+            hid_ctx = _build_hid_context(profile, ambilight)
+            if hid_ctx is not None:
+                return {
+                    "info": info,
+                    "capabilities": hid_ctx["capabilities"],
+                    "device": hid_ctx["device"],
+                }
+        profile["experimental"] = _all_experimental(profile)
+
+    leds_dir = os.path.join(sysfs_root, "sys/class/leds")
+    led_path = _find_rgb_led(leds_dir)
+
+    if led_path:
+        zones, index_format = read_zone_format(led_path)
+        if profile.get("zones"):
+            zones = profile["zones"]
+        max_brightness = _max_brightness(_read(os.path.join(led_path, "max_brightness")))
+        device = SysfsRgbDevice(
+            led_path, zones, max_brightness, profile["color_order"], index_format,
+            color_correction=profile.get("color_correction", [1.0, 1.0, 1.0]),
+        )
+        has_led = True
+    else:
+        zones, max_brightness, device, has_led = 0, 255, NullDevice(), False
+
+    if profile["driver"] not in _IMPLEMENTED_DRIVERS:
+        profile["experimental"] = _all_experimental(profile)
+
+    capabilities = build_capabilities(profile, has_led, zones, max_brightness, ambilight)
+    return {
+        "info": info,
+        "capabilities": capabilities,
+        "device": device,
+    }

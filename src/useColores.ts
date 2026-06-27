@@ -33,11 +33,15 @@ function useThrottle<A extends unknown[]>(fn: (...args: A) => void, ms: number) 
 export function useColores() {
   const [state, setState] = useState<ColoresState | null>(null);
 
-  useEffect(() => {
+  const refreshState = useCallback(() => {
     api.getState()
       .then(setState)
       .catch((e) => console.error("Colores: getState failed", e));
   }, []);
+
+  useEffect(() => {
+    refreshState();
+  }, [refreshState]);
 
   const pushSolid = useThrottle((c: RGB) => api.setSolid(c.r, c.g, c.b), 60);
   const pushBrightness = useThrottle((v: number) => api.setBrightness(v), 60);
@@ -112,6 +116,13 @@ export function useColores() {
       .catch((e) => console.error("Colores: deleteGradient failed", e));
   };
 
+  const setExperiment = (feature: string, on: boolean) => {
+    api
+      .setExperiment(feature, on)
+      .then(refreshState)
+      .catch((e) => console.error("Colores: setExperiment failed", e));
+  };
+
   return {
     state,
     setBrightness,
@@ -125,5 +136,6 @@ export function useColores() {
     setAmbilight,
     saveGradient,
     deleteGradient,
+    setExperiment,
   };
 }

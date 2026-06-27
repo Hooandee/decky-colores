@@ -148,6 +148,7 @@ function Content() {
     setAmbilight,
     saveGradient,
     deleteGradient,
+    setExperiment,
   } = useColores();
   const { t } = useI18n();
   const [ambStatus, setAmbStatus] = useState<string>("idle");
@@ -194,11 +195,19 @@ function Content() {
   } = state;
   const hasLeds = caps.color || caps.brightness;
 
-  const modes: Mode[] = caps.ambilight
-    ? ["solid", "gradient", "effect", "ambient"]
-    : ["solid", "gradient", "effect"];
+  const canGradient = (caps.perZone || caps.perControllerColor) && caps.zones > 1;
 
-  const selectedEffect = EFFECT_PRESETS.find((e) => e.id === effect.id);
+  const modes: Mode[] = (() => {
+    const base: Mode[] = canGradient ? ["solid", "gradient", "effect"] : ["solid", "effect"];
+    if (caps.ambilight) base.push("ambient");
+    return base;
+  })();
+
+  const visibleEffects = caps.supportedEffects.length > 0
+    ? EFFECT_PRESETS.filter((e) => caps.supportedEffects.includes(e.id))
+    : EFFECT_PRESETS;
+
+  const selectedEffect = visibleEffects.find((e) => e.id === effect.id) ?? visibleEffects[0];
 
   const effectPreview = (): RGB[] => {
     if (!selectedEffect || selectedEffect.needs === "none") return selectedEffect?.colors ?? [color];
@@ -259,7 +268,7 @@ function Content() {
                 <ColorEditor color={color} disabled={!power} onChange={setColor} />
               )}
 
-              {mode === "gradient" && (
+              {mode === "gradient" && canGradient && (
                 <GradientControls
                   gradient={gradient}
                   layout={caps.layout}
@@ -274,7 +283,7 @@ function Content() {
                 <>
                   <PanelSectionRow>
                     <EffectsGallery
-                      effects={EFFECT_PRESETS}
+                      effects={visibleEffects}
                       selected={effect.id}
                       speed={effect.speed}
                       onSelect={setEffectId}
@@ -428,6 +437,42 @@ function Content() {
               </PanelSectionRow>
             </>
           )}
+        </>
+      )}
+
+      {caps.experimental.length > 0 && (
+        <>
+          <PanelSectionRow>
+            <div
+              style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }}
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ fontWeight: 600, fontSize: 13, padding: "2px 2px 6px" }}>
+              {t("experimental.title")}
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div
+              style={{
+                fontSize: 12,
+                color: "rgba(255,255,255,0.55)",
+                padding: "0 2px 10px",
+                lineHeight: 1.45,
+              }}
+            >
+              {t("experimental.description")}
+            </div>
+          </PanelSectionRow>
+          {caps.experimental.map((feature) => (
+            <PanelSectionRow key={feature}>
+              <ToggleField
+                label={t(`experimental.feature.${feature}`)}
+                checked={caps.enabledExperiments.includes(feature)}
+                onChange={(val) => setExperiment(feature, val)}
+              />
+            </PanelSectionRow>
+          ))}
         </>
       )}
 

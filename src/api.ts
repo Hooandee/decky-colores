@@ -13,3 +13,4 @@ export const getAmbilightStatus = callable<[], string>("get_ambilight_status");
 export const saveGradient = callable<[name: string, stops: number[][]], GradientPreset[]>("save_gradient");
 export const deleteGradient = callable<[name: string], GradientPreset[]>("delete_gradient");
 export const getVersion = callable<[], string>("get_version");
+export const setExperiment = callable<[feature: string, on: boolean], void>("set_experiment");

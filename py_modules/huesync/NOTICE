@@ -1,0 +1,27 @@
+Vendored HID transport layer
+=============================
+
+This directory is a vendored snapshot of the HID transport layer from
+HueSync (https://github.com/honjow/HueSync), licensed BSD 3-Clause
+(see LICENSE). Snapshot date: 2026-06-27.
+
+Only the HID transport pieces are vendored:
+  - lib_hid/        pyhidapi ctypes wrapper (https://github.com/apmorton/pyhidapi)
+  - msi_led_device_hid.py
+  - legion_go_tablet_hid.py
+  - legion_led_device_hid.py
+  - hhd_legino_go_s_hid.py
+  - utils.py        trimmed to Color + RGBMode only
+  - config.py       minimal logger shim (NOT HueSync's config)
+
+Device classes, power-LED handling, and software effects from HueSync are
+NOT vendored; decky-colores supplies its own.
+
+The Legion Go S protocol (hhd_legino_go_s_hid.py) is derived from hhd-dev/hhd
+(https://github.com/hhd-dev/hhd); its provenance docstring is preserved.
+
+Credits:
+  - honjow / HueSync (BSD 3-Clause)
+  - Steam Deck Homebrew (original copyright)
+  - hhd-dev / hhd (Legion Go S protocol)
+  - apmorton / pyhidapi (ctypes hidapi wrapper)

@@ -78,6 +78,13 @@ const es: Record<string, string> = {
 
   "lang.spanish": "Español",
   "lang.english": "Inglés",
+
+  "experimental.title": "Funciones experimentales",
+  "experimental.description": "Estas funciones no han sido verificadas en este dispositivo. Puedes probarlas, pero puede que no funcionen bien. Estoy trabajando para darle soporte.",
+  "experimental.feature.color": "Color",
+  "experimental.feature.brightness": "Brillo",
+  "experimental.feature.effects": "Efectos",
+  "experimental.feature.ambilight": "Ambilight",
 };
 
 const en: Record<string, string> = {
@@ -153,6 +160,13 @@ const en: Record<string, string> = {
 
   "lang.spanish": "Spanish",
   "lang.english": "English",
+
+  "experimental.title": "Experimental features",
+  "experimental.description": "These features have not been verified on this device. You can try them, but they may not work correctly. I'm working on support.",
+  "experimental.feature.color": "Color",
+  "experimental.feature.brightness": "Brightness",
+  "experimental.feature.effects": "Effects",
+  "experimental.feature.ambilight": "Ambilight",
 };
 
 const DICTS: Record<Lang, Record<string, string>> = { es, en };
