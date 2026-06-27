@@ -151,6 +151,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight):
         "zones": zones,
         "maxBrightness": max_brightness,
         "perZone": has_led and zones > 1,
+        "perControllerColor": bool(profile.get("per_controller", False)),
         "supportedEffects": list(profile.get("supported_effects", [])),
         "states": states,
         "experimental": list(profile.get("experimental", [])),

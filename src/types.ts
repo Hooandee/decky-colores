@@ -25,6 +25,7 @@ export interface Capabilities {
   maxBrightness: number;
   layout: ZoneGroup[];
   perZone: boolean;
+  perControllerColor: boolean;
   supportedEffects: string[];
   experimental: string[];
   states: Record<string, "supported" | "experimental" | "unsupported">;

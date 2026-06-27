@@ -155,14 +155,27 @@ def test_legion_tablet_solid_sequence(hid_env):
     ]
 
 
-def test_legion_tablet_zones_collapse_to_first(hid_env):
+def test_legion_tablet_zones_map_left_to_first(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
     dev = adapters.LegionTabletHidDevice.create()
     writes.clear()
     dev.apply_zones([(255, 0, 0), (0, 255, 0)], 100, True)
-    first = writes[0]
-    assert first[6:9] == bytes([255, 0, 0])
+    left = next(w for w in writes if len(w) >= 6 and w[2] == 0x72 and w[4] == 0x03)
+    assert left[6:9] == bytes([255, 0, 0])
+
+
+def test_legion_tablet_per_controller_gradient(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
+    dev = adapters.LegionTabletHidDevice.create()
+    writes.clear()
+    assert dev.apply_zones([(255, 0, 0), (0, 0, 255)], 100, True) is True
+    set_profiles = [w for w in writes if len(w) >= 6 and w[2] == 0x72]
+    left = next(w for w in set_profiles if w[4] == 0x03)
+    right = next(w for w in set_profiles if w[4] == 0x04)
+    assert left[6:9] == bytes([255, 0, 0])
+    assert right[6:9] == bytes([0, 0, 255])
 
 
 def test_legion_go_s_solid_bytes(hid_env):
@@ -265,6 +278,22 @@ def test_build_device_legion_hid_available(hid_env, tmp_path):
     assert caps["states"]["ambilight"] == "experimental"
     assert caps["perZone"] is False
     assert caps["color"] is True
+    sys.modules.pop("device", None)
+
+
+def test_per_controller_capability_tablet_vs_go_s(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
+    device = _reload_device()
+    tablet_root = _make_dmi_root(tmp_path / "tab", "83E1")
+    tablet = device.build_device(sysfs_root=tablet_root, ambilight=False)
+    assert tablet["capabilities"]["perControllerColor"] is True
+
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_go_s_entry()]
+    device = _reload_device()
+    go_s_root = _make_dmi_root(tmp_path / "gos", "83L3")
+    go_s = device.build_device(sysfs_root=go_s_root, ambilight=False)
+    assert go_s["capabilities"]["perControllerColor"] is False
     sys.modules.pop("device", None)
 
 

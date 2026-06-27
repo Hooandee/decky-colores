@@ -21,7 +21,12 @@ try:
         normalize_speed,
         RGB_ZONES_PER_FRAME,
     )
-    from legion_go_tablet_hid import LegionGoTabletHID
+    from legion_go_tablet_hid import (
+        LegionGoTabletHID,
+        rgb_set_profile as legion_rgb_set_profile,
+        rgb_load_profile as legion_rgb_load_profile,
+        rgb_enable as legion_rgb_enable,
+    )
     from legion_led_device_hid import LegionGoLEDDeviceHID
     from hhd_legino_go_s_hid import rgb_enable, rgb_multi_load_settings
 
@@ -181,6 +186,40 @@ class LegionTabletHidDevice(_LegionHidDevice):
                 LEGION_TABLET_IDS["usage"],
             )
         )
+
+    def _write(self, reps):
+        if not self._transport.is_ready():
+            return False
+        device = self._transport.hid_device
+        if device is None:
+            return False
+        for rep in reps:
+            device.write(rep)
+        return True
+
+    def apply_zones(self, zone_colors, brightness, power):
+        colors = list(zone_colors) or [(0, 0, 0)]
+        left = colors[0]
+        right = colors[1] if len(colors) > 1 else colors[0]
+        try:
+            if not power:
+                return self._write(
+                    [legion_rgb_enable("left", False), legion_rgb_enable("right", False)]
+                )
+            level = _clamp_pct(brightness) / 100.0
+            lr, lg, lb = (_clamp8(c) for c in left)
+            rr, rg, rb = (_clamp8(c) for c in right)
+            reps = [
+                legion_rgb_set_profile("left", 3, "solid", lr, lg, lb, brightness=level),
+                legion_rgb_set_profile("right", 3, "solid", rr, rg, rb, brightness=level),
+                legion_rgb_load_profile("left", 3),
+                legion_rgb_load_profile("right", 3),
+                legion_rgb_enable("left", True),
+                legion_rgb_enable("right", True),
+            ]
+            return self._write(reps)
+        except Exception:
+            return False
 
     def apply_solid(self, color, brightness, power):
         try:

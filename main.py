@@ -202,9 +202,12 @@ class Plugin:
             self._controller.apply_hardware_effect(
                 effect["id"], tuple(s["color"]), effect["speed"], power
             )
+        elif s["mode"] == "gradient":
+            self._controller.apply_zones(
+                interpolate_gradient([tuple(c) for c in s["gradient"]], 2), brightness, power
+            )
         else:
-            color = tuple(s["gradient"][0]) if s["mode"] == "gradient" else tuple(s["color"])
-            self._controller.apply_solid(color, brightness, power)
+            self._controller.apply_solid(tuple(s["color"]), brightness, power)
 
     def _apply_per_zone(self) -> None:
         s = self._settings

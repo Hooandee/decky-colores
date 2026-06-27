@@ -195,7 +195,7 @@ function Content() {
   } = state;
   const hasLeds = caps.color || caps.brightness;
 
-  const canGradient = caps.perZone && caps.zones > 1;
+  const canGradient = (caps.perZone || caps.perControllerColor) && caps.zones > 1;
 
   const modes: Mode[] = (() => {
     const base: Mode[] = canGradient ? ["solid", "gradient", "effect"] : ["solid", "effect"];

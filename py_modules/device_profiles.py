@@ -21,6 +21,7 @@ LEGION_TABLET_HID = {
     "color_order": "rgb",
     "zones": 2,
     "supported_effects": ["breathing", "rainbow", "wave"],
+    "per_controller": True,
     "experimental": ["ambilight"],
 }
 
