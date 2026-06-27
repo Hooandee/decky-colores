@@ -10,11 +10,11 @@ import {
   staticClasses,
 } from "@decky/ui";
 import { definePlugin } from "@decky/api";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
-import { hsvToRgb, rgbToHsv, rgbToCss } from "./color";
+import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss } from "./color";
 import { Mode, RGB } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { Swatches } from "./components/Swatches";
@@ -57,12 +57,10 @@ function GradientTrack({ background }: { background: string }) {
   );
 }
 
-function gradientCss(stops: RGB[]) {
-  if (stops.length === 1) return rgbToCss(stops[0]);
-  return `linear-gradient(90deg, ${stops
-    .map((c, i) => `${rgbToCss(c)} ${(i / (stops.length - 1)) * 100}%`)
-    .join(", ")})`;
-}
+const AMBIENT_HINT: RGB[] = [
+  { r: 0, g: 196, b: 255 },
+  { r: 124, g: 92, b: 255 },
+];
 
 function GradientControls({
   gradient,
@@ -164,22 +162,17 @@ function Content() {
     state;
   const hasLeds = caps.color || caps.brightness;
 
-  const modes: Mode[] = ["solid", "gradient", "effect"];
-  if (caps.ambilight) modes.push("ambient");
+  const modes = useMemo<Mode[]>(
+    () => (caps.ambilight ? ["solid", "gradient", "effect", "ambient"] : ["solid", "gradient", "effect"]),
+    [caps.ambilight],
+  );
 
-  const AMBIENT_HINT: RGB[] = [
-    { r: 0, g: 196, b: 255 },
-    { r: 124, g: 92, b: 255 },
-  ];
-
-  const previewColors: RGB[] =
-    mode === "gradient"
-      ? gradient
-      : mode === "effect"
-        ? EFFECT_PRESETS.find((e) => e.id === effect.id)?.colors ?? [color]
-        : mode === "ambient"
-          ? AMBIENT_HINT
-          : [color];
+  const previewColors = useMemo<RGB[]>(() => {
+    if (mode === "gradient") return gradient;
+    if (mode === "effect") return EFFECT_PRESETS.find((e) => e.id === effect.id)?.colors ?? [color];
+    if (mode === "ambient") return AMBIENT_HINT;
+    return [color];
+  }, [mode, gradient, effect.id, color]);
 
   const editHsv = (next: { h: number; s: number; v: number }) => {
     setHsv(next);

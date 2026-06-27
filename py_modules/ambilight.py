@@ -104,8 +104,11 @@ class Ambilight:
         return None
 
     def start(self, options):
+        options = options or {}
+        if self.running and options == self._options:
+            return
         self.stop()
-        self._options = options or {}
+        self._options = options
         self._task = asyncio.get_event_loop().create_task(self._run())
 
     def stop(self):
@@ -143,9 +146,9 @@ class Ambilight:
             )
             while True:
                 frame = await self._proc.stdout.readexactly(frame_bytes)
-                self._update_targets(frame)
                 now = loop.time()
                 if now - last >= interval:
+                    self._update_targets(frame)
                     self._tick()
                     last = now
         except asyncio.IncompleteReadError:

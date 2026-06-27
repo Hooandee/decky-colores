@@ -56,7 +56,6 @@ class Plugin:
         )
         self._engine = EffectEngine(self._render, self._zones)
         self._ambilight = Ambilight(self._render, self._zones, _user_runtime_dir())
-        self._running_sig = None
         self._ready = True
 
     async def get_version(self) -> str:
@@ -126,44 +125,31 @@ class Plugin:
         if not s["power"]:
             self._ambilight.stop()
             self._engine.set_static([(0, 0, 0)] * self._zones)
-            self._running_sig = None
             return
 
         if s["mode"] == "ambient":
             self._engine.stop()
             amb = s["ambilight"]
-            sig = ("ambient", amb["saturation"], amb["smoothing"])
-            if sig != self._running_sig or not self._ambilight.running:
-                self._ambilight.start(
-                    {
-                        "saturation": amb["saturation"] / 100.0,
-                        "smoothing": amb["smoothing"],
-                        "fps": 12,
-                    }
-                )
-                self._running_sig = sig
+            self._ambilight.start(
+                {"saturation": amb["saturation"] / 100.0, "smoothing": amb["smoothing"], "fps": 15}
+            )
             return
 
         self._ambilight.stop()
 
         if s["mode"] == "effect":
             effect = s["effect"]
-            color = tuple(s["color"])
-            stops = [tuple(c) for c in s["gradient"]]
-            sig = ("effect", effect["id"], effect["speed"], color, tuple(stops))
-            if sig != self._running_sig:
-                self._engine.start_effect(
-                    effect["id"], effect["speed"], {"color": color, "stops": stops}
-                )
-                self._running_sig = sig
-            return
-
-        if s["mode"] == "gradient":
-            stops = [tuple(c) for c in s["gradient"]]
-            self._engine.set_static(interpolate_gradient(stops, self._zones))
+            self._engine.start_effect(
+                effect["id"],
+                effect["speed"],
+                {"color": tuple(s["color"]), "stops": [tuple(c) for c in s["gradient"]]},
+            )
+        elif s["mode"] == "gradient":
+            self._engine.set_static(
+                interpolate_gradient([tuple(c) for c in s["gradient"]], self._zones)
+            )
         else:
             self._engine.set_static([tuple(s["color"])] * self._zones)
-        self._running_sig = None
 
     async def _main(self):
         self._init()

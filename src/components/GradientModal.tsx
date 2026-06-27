@@ -1,4 +1,4 @@
-import { FC, useMemo, useState } from "react";
+import { FC, useState } from "react";
 import {
   ModalRoot,
   Focusable,
@@ -7,7 +7,7 @@ import {
   DialogButton,
 } from "@decky/ui";
 import { RGB, GradientPreset } from "../types";
-import { hsvToRgb, rgbToHsv, rgbToCss } from "../color";
+import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss } from "../color";
 import { GRADIENT_PRESETS, harmoniousGradient, randomGradient } from "../palette";
 
 interface GradientModalProps {
@@ -27,12 +27,6 @@ const normalizeStops = (stops: RGB[]): RGB[] => {
     { r: 124, g: 92, b: 255 },
     { r: 0, g: 196, b: 255 },
   ];
-};
-
-const cssGradient = (stops: RGB[], angle = 90): string => {
-  if (stops.length === 1) return rgbToCss(stops[0]);
-  const segments = stops.map(rgbToCss).join(", ");
-  return `linear-gradient(${angle}deg, ${segments})`;
 };
 
 const glowFor = (stops: RGB[]): string => {
@@ -148,8 +142,8 @@ export const GradientModal: FC<GradientModalProps> = ({
   const start = stops[0];
   const end = stops[stops.length - 1];
 
-  const previewGradient = useMemo(() => cssGradient(stops), [stops]);
-  const glow = useMemo(() => glowFor(stops), [stops]);
+  const previewGradient = gradientCss(stops);
+  const glow = glowFor(stops);
 
   const setStart = (color: RGB) =>
     setStops((prev) => {
@@ -240,7 +234,7 @@ export const GradientModal: FC<GradientModalProps> = ({
                   style={{
                     height: 40,
                     borderRadius: 12,
-                    background: cssGradient(preset.stops),
+                    background: gradientCss(preset.stops),
                     boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
                   }}
                 />

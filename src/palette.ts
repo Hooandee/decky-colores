@@ -139,11 +139,6 @@ export const EFFECT_PRESETS: EffectMeta[] = [
   },
 ];
 
-export function complementary(base: RGB): RGB {
-  const { h, s, v } = rgbToHsv(base);
-  return hsvToRgb(h + 180, s, v);
-}
-
 export function harmoniousGradient(base: RGB): RGB[] {
   const { h } = rgbToHsv(base);
   const s = 85;

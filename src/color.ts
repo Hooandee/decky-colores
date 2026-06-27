@@ -58,6 +58,11 @@ export function rgbToHsv({ r, g, b }: RGB): HSV {
 
 export const rgbToCss = ({ r, g, b }: RGB) => `rgb(${r}, ${g}, ${b})`;
 
+export function gradientCss(stops: RGB[], angle = 90): string {
+  if (stops.length <= 1) return rgbToCss(stops[0] ?? { r: 0, g: 0, b: 0 });
+  return `linear-gradient(${angle}deg, ${stops.map(rgbToCss).join(", ")})`;
+}
+
 export function dim({ r, g, b }: RGB, percent: number): RGB {
   const factor = clamp(percent, 0, 100) / 100;
   return {

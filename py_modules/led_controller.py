@@ -16,6 +16,10 @@ class LedController:
         self._zones = max(1, zones)
         self._max_brightness = max_brightness or 255
         self.last_error = None
+        self._intensity_path = os.path.join(led_path, "multi_intensity") if led_path else None
+        self._brightness_path = os.path.join(led_path, "brightness") if led_path else None
+        self._has_intensity = bool(self._intensity_path) and os.path.exists(self._intensity_path)
+        self._has_brightness = bool(self._brightness_path) and os.path.exists(self._brightness_path)
 
     @property
     def available(self):
@@ -37,15 +41,13 @@ class LedController:
             self.last_error = "no led path"
             return False
         try:
-            intensity_path = os.path.join(self._led_path, "multi_intensity")
-            if os.path.exists(intensity_path):
+            if self._has_intensity:
                 values = " ".join(_packed(c) for c in self._fit(zone_colors))
-                with open(intensity_path, "w") as handle:
+                with open(self._intensity_path, "w") as handle:
                     handle.write(values)
 
-            brightness_path = os.path.join(self._led_path, "brightness")
-            if os.path.exists(brightness_path):
-                with open(brightness_path, "w") as handle:
+            if self._has_brightness:
+                with open(self._brightness_path, "w") as handle:
                     handle.write(str(level))
             return True
         except OSError as error:

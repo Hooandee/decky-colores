@@ -103,14 +103,23 @@ class EffectEngine:
         self._apply_zones = apply_zones
         self._zones = zones
         self._task = None
+        self._sig = None
+
+    @property
+    def running(self):
+        return self._task is not None and not self._task.done()
 
     def set_static(self, zone_colors):
         self.stop()
         self._apply_zones(zone_colors)
 
     def start_effect(self, effect_id, speed, params):
-        self.stop()
         params = params or {}
+        sig = (effect_id, speed, repr(params))
+        if self.running and sig == self._sig:
+            return
+        self.stop()
+        self._sig = sig
         loop = asyncio.get_event_loop()
         self._task = loop.create_task(self._run(effect_id, speed, params))
 
