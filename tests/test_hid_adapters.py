@@ -262,6 +262,7 @@ def test_build_device_legion_hid_available(hid_env, tmp_path):
     caps = ctx["capabilities"]
     assert caps["states"]["color"] == "supported"
     assert caps["states"]["effects"] == "supported"
+    assert caps["states"]["ambilight"] == "experimental"
     assert caps["perZone"] is False
     assert caps["color"] is True
     sys.modules.pop("device", None)

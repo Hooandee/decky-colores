@@ -19,7 +19,7 @@ LEGION_TABLET_HID = {
     "color_order": "rgb",
     "zones": 2,
     "supported_effects": ["breathing", "rainbow"],
-    "experimental": ["color", "brightness", "effects", "ambilight"],
+    "experimental": ["ambilight"],
 }
 
 LEGION_GO_S_HID = {
@@ -27,7 +27,7 @@ LEGION_GO_S_HID = {
     "color_order": "rgb",
     "zones": 2,
     "supported_effects": ["breathing", "rainbow"],
-    "experimental": ["color", "brightness", "effects", "ambilight"],
+    "experimental": ["ambilight"],
 }
 
 GENERIC = {
@@ -39,8 +39,14 @@ GENERIC = {
 }
 
 
-def _profile(base, name):
+def _copy_profile(base):
     merged = dict(base)
+    merged["experimental"] = list(base.get("experimental", []))
+    return merged
+
+
+def _profile(base, name):
+    merged = _copy_profile(base)
     merged["name"] = name
     return merged
 
@@ -60,12 +66,6 @@ PROFILES = [
     ("product_contains", "Claw 8 AI+", _profile(MSI_HID, "MSI Claw 8 AI+")),
     ("product_contains", "Claw A1M", _profile(MSI_HID, "MSI Claw")),
 ]
-
-
-def _copy_profile(profile):
-    merged = dict(profile)
-    merged["experimental"] = list(profile.get("experimental", []))
-    return merged
 
 
 def resolve_profile(board, product):

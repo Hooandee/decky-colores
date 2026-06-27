@@ -124,6 +124,10 @@ def read_zone_format(led_path):
     return max(1, len(tokens)), "hex"
 
 
+def _all_experimental(profile):
+    return sorted(set(profile.get("experimental", [])) | set(FEATURES))
+
+
 def _feature_state(profile, feature, present):
     if feature in profile.get("experimental", []):
         return "experimental"
@@ -138,7 +142,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight):
         "ambilight": bool(ambilight),
     }
     states = {f: _feature_state(profile, f, present[f]) for f in FEATURES}
-    active = {f: states[f] in ("supported", "experimental") for f in FEATURES}
+    active = {f: states[f] != "unsupported" for f in FEATURES}
     return {
         "color": active["color"],
         "brightness": active["brightness"],
@@ -178,10 +182,6 @@ def _build_hid_context(profile, ambilight):
     device = build_hid_device(profile["driver"])
     if device is None or not device.available:
         return None
-    profile = dict(profile)
-    profile["experimental"] = [
-        f for f in profile.get("experimental", []) if f not in ("color", "brightness", "effects")
-    ]
     zones = profile.get("zones") or 1
     capabilities = build_capabilities(profile, True, zones, 100, ambilight)
     capabilities["perZone"] = device.supports_per_zone()
@@ -200,12 +200,9 @@ def build_device(sysfs_root="/", ambilight=False):
                 return {
                     "info": info,
                     "capabilities": hid_ctx["capabilities"],
-                    "layout": hid_ctx["capabilities"]["layout"],
                     "device": hid_ctx["device"],
                 }
-        for feature in ("color", "brightness", "effects", "ambilight"):
-            if feature not in profile["experimental"]:
-                profile["experimental"].append(feature)
+        profile["experimental"] = _all_experimental(profile)
 
     leds_dir = os.path.join(sysfs_root, "sys/class/leds")
     led_path = _find_rgb_led(leds_dir)
@@ -223,14 +220,11 @@ def build_device(sysfs_root="/", ambilight=False):
         zones, max_brightness, device, has_led = 0, 255, NullDevice(), False
 
     if profile["driver"] not in _IMPLEMENTED_DRIVERS:
-        for feature in ("color", "brightness", "effects", "ambilight"):
-            if feature not in profile["experimental"]:
-                profile["experimental"].append(feature)
+        profile["experimental"] = _all_experimental(profile)
 
     capabilities = build_capabilities(profile, has_led, zones, max_brightness, ambilight)
     return {
         "info": info,
         "capabilities": capabilities,
-        "layout": capabilities["layout"],
         "device": device,
     }
