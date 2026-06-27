@@ -6,6 +6,7 @@ import decky
 
 from version import read_version
 from device import build_device
+from hid_adapters import _BaseHidDevice
 from settings_store import SettingsStore
 from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
@@ -183,9 +184,7 @@ class Plugin:
         self._apply()
 
     def _apply(self) -> None:
-        if not self._controller.supports_per_zone() and getattr(
-            self._controller, "apply_solid", None
-        ):
+        if isinstance(self._controller, _BaseHidDevice) and not self._controller.supports_per_zone():
             self._apply_hardware()
             return
         self._apply_per_zone()
