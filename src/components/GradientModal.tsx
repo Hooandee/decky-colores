@@ -123,10 +123,9 @@ const PresetTile: FC<{
 const StopEditor: FC<{
   label: string;
   color: RGB;
-  hueLabel: string;
-  satLabel: string;
   onChange: (color: RGB) => void;
-}> = ({ label, color, hueLabel, satLabel, onChange }) => {
+}> = ({ label, color, onChange }) => {
+  const { t } = useI18n();
   const hsv = rgbToHsv(color);
   const setHue = (h: number) => onChange(hsvToRgb(h, hsv.s, Math.max(hsv.v, 60)));
   const setSat = (s: number) => onChange(hsvToRgb(hsv.h, s, Math.max(hsv.v, 60)));
@@ -156,8 +155,8 @@ const StopEditor: FC<{
         />
         <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>{label}</div>
       </div>
-      <SliderField label={hueLabel} value={hsv.h} min={0} max={360} step={1} onChange={setHue} />
-      <SliderField label={satLabel} value={hsv.s} min={0} max={100} step={1} onChange={setSat} />
+      <SliderField label={t("color.hue")} value={hsv.h} min={0} max={360} step={1} onChange={setHue} />
+      <SliderField label={t("color.saturation")} value={hsv.s} min={0} max={100} step={1} onChange={setSat} />
     </Focusable>
   );
 };
@@ -166,27 +165,27 @@ const StickGroup: FC<{
   title: string;
   indices: number[];
   stops: RGB[];
-  hueLabel: string;
-  satLabel: string;
-  colorLabel: (i: number, total: number) => string;
   onChange: (index: number, color: RGB) => void;
-}> = ({ title, indices, stops, hueLabel, satLabel, colorLabel, onChange }) => (
-  <div>
-    <SectionLabel>{title}</SectionLabel>
-    <Focusable style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      {indices.map((zone, i) => (
-        <StopEditor
-          key={zone}
-          label={colorLabel(i, indices.length)}
-          hueLabel={hueLabel}
-          satLabel={satLabel}
-          color={stops[zone] ?? { r: 255, g: 255, b: 255 }}
-          onChange={(c) => onChange(zone, c)}
-        />
-      ))}
-    </Focusable>
-  </div>
-);
+}> = ({ title, indices, stops, onChange }) => {
+  const { t } = useI18n();
+  const colorLabel = (i: number, total: number) =>
+    total > 1 ? t("gradient.colorN", { n: i + 1 }) : t("gradient.color");
+  return (
+    <div>
+      <SectionLabel>{title}</SectionLabel>
+      <Focusable style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {indices.map((zone, i) => (
+          <StopEditor
+            key={zone}
+            label={colorLabel(i, indices.length)}
+            color={stops[zone] ?? { r: 255, g: 255, b: 255 }}
+            onChange={(c) => onChange(zone, c)}
+          />
+        ))}
+      </Focusable>
+    </div>
+  );
+};
 
 export const GradientModal: FC<GradientModalProps> = ({
   initial,
@@ -203,10 +202,6 @@ export const GradientModal: FC<GradientModalProps> = ({
   const count = Math.max(2, groups.reduce((n, g) => n + g.zones.length, 0));
   const [stops, setStops] = useState<RGB[]>(() => expandGradient(initial, count));
   const [name, setName] = useState<string>(() => suggestGradientName(lang));
-  const hueLabel = t("color.hue");
-  const satLabel = t("color.saturation");
-  const colorLabel = (i: number, total: number) =>
-    total > 1 ? t("gradient.colorN").replace("{n}", String(i + 1)) : t("gradient.color");
   const presetName = (preset: GradientPreset) =>
     t(`gradient.preset.${preset.name.toLowerCase()}`);
 
@@ -312,9 +307,6 @@ export const GradientModal: FC<GradientModalProps> = ({
                 title={group.name}
                 indices={group.zones}
                 stops={stops}
-                hueLabel={hueLabel}
-                satLabel={satLabel}
-                colorLabel={colorLabel}
                 onChange={setStopAt}
               />
             ))}
