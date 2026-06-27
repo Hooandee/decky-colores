@@ -28,7 +28,7 @@ const HUE_BAR =
 
 function DeviceHeader({ name, color }: { name: string; color: RGB }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 2px 10px" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 2px 16px" }}>
       <div
         style={{
           width: 12,
@@ -50,7 +50,7 @@ function GradientTrack({ background }: { background: string }) {
         height: 6,
         borderRadius: 3,
         background,
-        margin: "0 16px -6px",
+        margin: "10px 16px 2px",
         boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.1)",
       }}
     />
@@ -222,13 +222,15 @@ function Content() {
           {caps.color && (
             <>
               <PanelSectionRow>
-                <ModeTabs value={mode} modes={modes} onChange={setMode} />
+                <div style={{ margin: "8px 0 14px" }}>
+                  <ModeTabs value={mode} modes={modes} onChange={setMode} />
+                </div>
               </PanelSectionRow>
 
               {mode === "solid" && (
                 <>
                   <PanelSectionRow>
-                    <Focusable style={{ paddingTop: 4 }}>
+                    <Focusable style={{ padding: "6px 0 10px" }}>
                       <Swatches selected={color} onPick={pickPreset} />
                     </Focusable>
                   </PanelSectionRow>
@@ -284,8 +286,8 @@ function Content() {
                       style={{
                         fontSize: 12,
                         color: "rgba(255,255,255,0.55)",
-                        padding: "2px 2px 6px",
-                        lineHeight: 1.4,
+                        padding: "4px 2px 12px",
+                        lineHeight: 1.45,
                       }}
                     >
                       Lights follow the screen near each stick — left from the top-left, right from
@@ -324,19 +326,26 @@ function Content() {
           )}
 
           {caps.brightness && (
-            <PanelSectionRow>
-              <SliderField
-                label="Brightness"
-                value={brightness}
-                min={0}
-                max={100}
-                step={1}
-                valueSuffix="%"
-                showValue
-                disabled={!power}
-                onChange={setBrightness}
-              />
-            </PanelSectionRow>
+            <>
+              <PanelSectionRow>
+                <div
+                  style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }}
+                />
+              </PanelSectionRow>
+              <PanelSectionRow>
+                <SliderField
+                  label="Brightness"
+                  value={brightness}
+                  min={0}
+                  max={100}
+                  step={1}
+                  valueSuffix="%"
+                  showValue
+                  disabled={!power}
+                  onChange={setBrightness}
+                />
+              </PanelSectionRow>
+            </>
           )}
         </>
       )}
