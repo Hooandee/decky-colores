@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.5.0...decky-colores-v0.6.0) (2026-06-27)
+
+
+### Features
+
+* **legion:** elegant gradient crossfade, gradient-aware effects, resume recovery ([962d9e5](https://github.com/Hooandee/decky-colores/commit/962d9e5abd68f91f6bff51b748b025f4407b0a66))
+
+
+### Bug Fixes
+
+* **ux:** show Ambilight only as its own tab, not duplicated as experimental ([6ed1cb6](https://github.com/Hooandee/decky-colores/commit/6ed1cb67799376691da3b3c5b6d0676bf3c2a418))
+
 ## [0.5.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.4.0...decky-colores-v0.5.0) (2026-06-27)
 
 
