@@ -22,6 +22,7 @@ import { ColorEditor } from "./components/ColorEditor";
 import { ModeTabs } from "./components/ModeTabs";
 import { EffectsGallery } from "./components/EffectsGallery";
 import { GradientModal } from "./components/GradientModal";
+import { About } from "./components/About";
 import { GRADIENT_PRESETS, EFFECT_PRESETS } from "./palette";
 import { I18nProvider, LangToggle, useI18n } from "./i18n";
 
@@ -429,6 +430,10 @@ function Content() {
           )}
         </>
       )}
+
+      <PanelSectionRow>
+        <About />
+      </PanelSectionRow>
     </PanelSection>
   );
 }

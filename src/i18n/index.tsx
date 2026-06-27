@@ -71,6 +71,11 @@ const es: Record<string, string> = {
 
   "brightness.label": "Brillo",
 
+  "about.title": "Acerca de",
+  "about.version": "Versión {v}",
+  "about.madeBy": "Hecho por {name}",
+  "about.basedOn": "Motor de luces basado en HueSync.",
+
   "lang.spanish": "Español",
   "lang.english": "Inglés",
 };
@@ -140,6 +145,11 @@ const en: Record<string, string> = {
   "ambient.captureRate": "Capture rate",
 
   "brightness.label": "Brightness",
+
+  "about.title": "About",
+  "about.version": "Version {v}",
+  "about.madeBy": "Made by {name}",
+  "about.basedOn": "Lighting engine based on HueSync.",
 
   "lang.spanish": "Spanish",
   "lang.english": "English",
