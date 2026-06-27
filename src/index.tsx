@@ -52,6 +52,7 @@ const AMBIENT_HINT: RGB[] = [
 function GradientControls({
   gradient,
   layout,
+  crossfade,
   savedGradients,
   disabled,
   onChange,
@@ -62,6 +63,7 @@ function GradientControls({
 }: {
   gradient: RGB[];
   layout: ZoneGroup[];
+  crossfade?: boolean;
   savedGradients: GradientPreset[];
   disabled?: boolean;
   onChange: (stops: RGB[]) => void;
@@ -81,6 +83,7 @@ function GradientControls({
       <GradientModal
         initial={gradient}
         layout={layout}
+        crossfade={crossfade}
         savedGradients={savedGradients}
         onApply={onChange}
         onSave={onSave}
@@ -379,6 +382,7 @@ function Content() {
                 <GradientControls
                   gradient={gradient}
                   layout={caps.layout}
+                  crossfade={caps.gradientCrossfade}
                   savedGradients={savedGradients}
                   disabled={!power}
                   onChange={setGradient}

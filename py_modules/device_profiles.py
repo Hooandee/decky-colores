@@ -22,6 +22,7 @@ LEGION_TABLET_HID = {
     "zones": 2,
     "supported_effects": ["breathing", "rainbow", "spiral"],
     "per_controller": True,
+    "gradient_crossfade": True,
     "experimental": [],
 }
 
@@ -30,6 +31,7 @@ LEGION_GO_S_HID = {
     "color_order": "rgb",
     "zones": 2,
     "supported_effects": ["breathing", "rainbow", "spiral"],
+    "gradient_crossfade": True,
     "experimental": [],
 }
 

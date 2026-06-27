@@ -3,7 +3,6 @@ import {
   ModalRoot,
   Focusable,
   SliderField,
-  ButtonItem,
   DialogButton,
   TextField,
 } from "@decky/ui";
@@ -11,10 +10,12 @@ import { RGB, GradientPreset, ZoneGroup } from "../types";
 import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss, expandGradient } from "../color";
 import { GRADIENT_PRESETS, harmoniousGradient, randomGradient, suggestGradientName } from "../palette";
 import { useI18n } from "../i18n";
+import { Tabs } from "./Tabs";
 
 interface GradientModalProps {
   initial: RGB[];
   layout: ZoneGroup[];
+  crossfade?: boolean;
   savedGradients: GradientPreset[];
   closeModal?: () => void;
   onApply: (stops: RGB[]) => void;
@@ -22,30 +23,36 @@ interface GradientModalProps {
   onDelete: (name: string) => void;
 }
 
+type Tab = "presets" | "tune" | "save";
+
+const TAB_ORDER: Tab[] = ["presets", "tune", "save"];
+
+const LAYOUT_NAME_KEYS: Record<string, string> = {
+  "Left stick": "layout.leftStick",
+  "Right stick": "layout.rightStick",
+  Lights: "layout.lights",
+};
+
 const ACCENT = "#7c5cff";
 const PANEL_BG = "rgba(18, 18, 24, 0.6)";
 const BORDER = "rgba(255,255,255,0.08)";
 
+const ACCENT_BTN: React.CSSProperties = {
+  flex: 1,
+  background: `linear-gradient(135deg, ${ACCENT}, #00c4ff)`,
+  border: "none",
+};
+const SUBTLE_BTN: React.CSSProperties = {
+  flex: 1,
+  background: "rgba(255,255,255,0.06)",
+  border: `1px solid ${BORDER}`,
+};
+
 const glowFor = (stops: RGB[]): string => {
   const a = stops[0];
   const b = stops[stops.length - 1];
-  return `0 12px 40px -8px ${rgbToCss(a)}, 0 12px 40px -8px ${rgbToCss(b)}`;
+  return `0 3px 16px -10px ${rgbToCss(a)}, 0 3px 16px -10px ${rgbToCss(b)}`;
 };
-
-const SectionLabel: FC<{ children: string }> = ({ children }) => (
-  <div
-    style={{
-      fontSize: 11,
-      fontWeight: 700,
-      letterSpacing: "0.14em",
-      textTransform: "uppercase",
-      color: "rgba(255,255,255,0.5)",
-      marginBottom: 10,
-    }}
-  >
-    {children}
-  </div>
-);
 
 const Card: FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({ children, style }) => (
   <div
@@ -135,25 +142,25 @@ const StopEditor: FC<{
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 4,
-        padding: 12,
+        gap: 2,
+        padding: "10px 18px 12px",
         borderRadius: 14,
         background: "rgba(255,255,255,0.03)",
         border: `1px solid ${BORDER}`,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 2 }}>
         <div
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 9,
+            width: 26,
+            height: 26,
+            borderRadius: 8,
             flex: "0 0 auto",
             background: rgbToCss(color),
-            boxShadow: `0 0 12px ${rgbToCss(color)}, inset 0 0 0 1px rgba(255,255,255,0.18)`,
+            boxShadow: `0 0 10px ${rgbToCss(color)}, inset 0 0 0 1px rgba(255,255,255,0.18)`,
           }}
         />
-        <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>{label}</div>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>{label}</div>
       </div>
       <SliderField label={t("color.hue")} value={hsv.h} min={0} max={360} step={1} onChange={setHue} />
       <SliderField label={t("color.saturation")} value={hsv.s} min={0} max={100} step={1} onChange={setSat} />
@@ -161,35 +168,10 @@ const StopEditor: FC<{
   );
 };
 
-const StickGroup: FC<{
-  title: string;
-  indices: number[];
-  stops: RGB[];
-  onChange: (index: number, color: RGB) => void;
-}> = ({ title, indices, stops, onChange }) => {
-  const { t } = useI18n();
-  const colorLabel = (i: number, total: number) =>
-    total > 1 ? t("gradient.colorN", { n: i + 1 }) : t("gradient.color");
-  return (
-    <div>
-      <SectionLabel>{title}</SectionLabel>
-      <Focusable style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {indices.map((zone, i) => (
-          <StopEditor
-            key={zone}
-            label={colorLabel(i, indices.length)}
-            color={stops[zone] ?? { r: 255, g: 255, b: 255 }}
-            onChange={(c) => onChange(zone, c)}
-          />
-        ))}
-      </Focusable>
-    </div>
-  );
-};
-
 export const GradientModal: FC<GradientModalProps> = ({
   initial,
   layout,
+  crossfade,
   savedGradients,
   closeModal,
   onApply,
@@ -202,8 +184,36 @@ export const GradientModal: FC<GradientModalProps> = ({
   const count = Math.max(2, groups.reduce((n, g) => n + g.zones.length, 0));
   const [stops, setStops] = useState<RGB[]>(() => expandGradient(initial, count));
   const [name, setName] = useState<string>(() => suggestGradientName(lang));
+  const [tab, setTab] = useState<Tab>("presets");
+  const [localSaved, setLocalSaved] = useState<GradientPreset[]>(savedGradients);
   const presetName = (preset: GradientPreset) =>
     t(`gradient.preset.${preset.name.toLowerCase()}`);
+  const tabLabels: Record<Tab, string> = {
+    presets: t("gradient.tab.presets"),
+    tune: t("gradient.tab.tune"),
+    save: t("gradient.tab.save"),
+  };
+
+  const crossfadeLabel = (i: number, total: number) =>
+    i === 0
+      ? t("gradient.colorStart")
+      : i === total - 1
+        ? t("gradient.colorEnd")
+        : t("gradient.colorN", { n: i + 1 });
+  const groupName = (name: string) =>
+    LAYOUT_NAME_KEYS[name] ? t(LAYOUT_NAME_KEYS[name]) : name;
+  const cells = crossfade
+    ? groups.flatMap((group) => group.zones).map((zone, i, all) => ({
+        zone,
+        label: crossfadeLabel(i, all.length),
+      }))
+    : groups.flatMap((group) =>
+        group.zones.map((zone, i) => ({
+          zone,
+          label: group.zones.length > 1 ? `${groupName(group.name)} · ${i + 1}` : groupName(group.name),
+        })),
+      );
+  const tuneColumns = cells.length <= 1 ? 1 : 2;
 
   const setStopAt = (index: number, color: RGB) =>
     setStops((prev) => prev.map((c, i) => (i === index ? color : c)));
@@ -216,23 +226,31 @@ export const GradientModal: FC<GradientModalProps> = ({
   const save = () => {
     const trimmed = name.trim();
     if (!trimmed) return;
-    onSave(trimmed, stops);
+    const saved = { name: trimmed, stops: [...stops] };
+    onSave(trimmed, saved.stops);
+    setLocalSaved((prev) => [...prev.filter((p) => p.name !== trimmed), saved]);
     setName(suggestGradientName(lang));
+    setTab("presets");
+  };
+
+  const remove = (target: string) => {
+    onDelete(target);
+    setLocalSaved((prev) => prev.filter((p) => p.name !== target));
   };
 
   return (
     <ModalRoot closeModal={closeModal} onCancel={closeModal} onOK={apply}>
-      <Focusable style={{ display: "flex", flexDirection: "column", gap: 20, padding: 4 }}>
+      <Focusable style={{ display: "flex", flexDirection: "column", gap: 14, padding: 4 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{t("gradient.title")}</div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
-            {t("gradient.subtitle")}
+            {t("gradient.zonesCaption", { n: count })}
           </div>
         </div>
 
         <div
           style={{
-            height: 84,
+            height: 72,
             borderRadius: 18,
             background: gradientCss(stops),
             boxShadow: `${glowFor(stops)}, inset 0 0 0 1px rgba(255,255,255,0.12)`,
@@ -240,105 +258,107 @@ export const GradientModal: FC<GradientModalProps> = ({
           }}
         />
 
-        <Card>
-          <SectionLabel>{t("gradient.presets")}</SectionLabel>
-          <Focusable
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: 10,
-              maxHeight: 168,
-              overflowY: "auto",
-              paddingRight: 2,
-            }}
-          >
-            {GRADIENT_PRESETS.map((preset: GradientPreset, i: number) => (
-              <PresetTile
-                key={`builtin-${i}`}
-                label={presetName(preset)}
-                stops={preset.stops}
-                onSelect={() => setStops(expandGradient(preset.stops, count))}
-              />
-            ))}
-            {savedGradients.map((preset) => (
-              <PresetTile
-                key={`saved-${preset.name}`}
-                label={preset.name}
-                stops={preset.stops}
-                onSelect={() => setStops(expandGradient(preset.stops, count))}
-                onDelete={() => onDelete(preset.name)}
-                deleteLabel={t("saved.delete")}
-              />
-            ))}
-          </Focusable>
-        </Card>
+        <Tabs value={tab} tabs={TAB_ORDER} onChange={setTab} label={(x) => tabLabels[x]} />
 
-        <Card>
-          <SectionLabel>{t("saved.save")}</SectionLabel>
-          <Focusable style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <TextField
-              value={name}
-              label={t("saved.namePlaceholder")}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <Focusable style={{ display: "flex", gap: 10 }}>
+        {tab === "presets" && (
+          <Card>
+            <Focusable
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, 1fr)",
+                gap: 10,
+                maxHeight: 232,
+                overflowY: "auto",
+                paddingRight: 2,
+              }}
+            >
+              {GRADIENT_PRESETS.map((preset: GradientPreset, i: number) => (
+                <PresetTile
+                  key={`builtin-${i}`}
+                  label={presetName(preset)}
+                  stops={preset.stops}
+                  onSelect={() => setStops(expandGradient(preset.stops, count))}
+                />
+              ))}
+              {localSaved.map((preset) => (
+                <PresetTile
+                  key={`saved-${preset.name}`}
+                  label={preset.name}
+                  stops={preset.stops}
+                  onSelect={() => setStops(expandGradient(preset.stops, count))}
+                  onDelete={() => remove(preset.name)}
+                  deleteLabel={t("saved.delete")}
+                />
+              ))}
+            </Focusable>
+            <Focusable style={{ display: "flex", gap: 10, marginTop: 14 }}>
               <DialogButton
-                onClick={() => setName(suggestGradientName(lang))}
-                style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}` }}
+                onClick={() => setStops(expandGradient(randomGradient(), count))}
+                style={ACCENT_BTN}
               >
-                {t("saved.suggest")}
+                {t("gradient.surprise")}
               </DialogButton>
               <DialogButton
-                onClick={save}
-                disabled={!name.trim()}
-                style={{ flex: 1, background: `linear-gradient(135deg, ${ACCENT}, #00c4ff)`, border: "none" }}
+                onClick={() => setStops(expandGradient(harmoniousGradient(stops[0]), count))}
+                style={SUBTLE_BTN}
               >
-                {t("saved.confirm")}
+                {t("gradient.autoPalette")}
               </DialogButton>
             </Focusable>
-          </Focusable>
-        </Card>
+          </Card>
+        )}
 
-        <Card>
-          <Focusable style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {groups.map((group, i) => (
-              <StickGroup
-                key={i}
-                title={group.name}
-                indices={group.zones}
-                stops={stops}
-                onChange={setStopAt}
+        {tab === "tune" && (
+          <Card>
+            <Focusable
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${tuneColumns}, minmax(0, 1fr))`,
+                gap: 10,
+              }}
+            >
+              {cells.map((cell) => (
+                <StopEditor
+                  key={cell.zone}
+                  label={cell.label}
+                  color={stops[cell.zone] ?? { r: 255, g: 255, b: 255 }}
+                  onChange={(c) => setStopAt(cell.zone, c)}
+                />
+              ))}
+            </Focusable>
+          </Card>
+        )}
+
+        {tab === "save" && (
+          <Card>
+            <Focusable style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <TextField
+                value={name}
+                label={t("saved.namePlaceholder")}
+                onChange={(e) => setName(e.target.value)}
               />
-            ))}
-          </Focusable>
-        </Card>
+              <Focusable style={{ display: "flex", gap: 10 }}>
+                <DialogButton onClick={() => setName(suggestGradientName(lang))} style={SUBTLE_BTN}>
+                  {t("saved.suggest")}
+                </DialogButton>
+                <DialogButton onClick={save} disabled={!name.trim()} style={ACCENT_BTN}>
+                  {t("saved.confirm")}
+                </DialogButton>
+              </Focusable>
+            </Focusable>
+          </Card>
+        )}
 
-        <Card>
-          <SectionLabel>{t("gradient.wizard")}</SectionLabel>
+        {tab !== "save" && (
           <Focusable style={{ display: "flex", gap: 10 }}>
-            <DialogButton
-              onClick={() => setStops(expandGradient(randomGradient(), count))}
-              style={{ flex: 1, background: `linear-gradient(135deg, ${ACCENT}, #00c4ff)`, border: "none" }}
-            >
-              {t("gradient.surprise")}
+            <DialogButton onClick={apply} style={ACCENT_BTN}>
+              {t("gradient.apply")}
             </DialogButton>
-            <DialogButton
-              onClick={() => setStops(expandGradient(harmoniousGradient(stops[0]), count))}
-              style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}` }}
-            >
-              {t("gradient.autoPalette")}
+            <DialogButton onClick={() => closeModal?.()} style={SUBTLE_BTN}>
+              {t("gradient.cancel")}
             </DialogButton>
           </Focusable>
-        </Card>
-
-        <Focusable style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <ButtonItem layout="below" bottomSeparator="none" onClick={apply}>
-            {t("gradient.apply")}
-          </ButtonItem>
-          <ButtonItem layout="below" bottomSeparator="none" onClick={() => closeModal?.()}>
-            {t("gradient.cancel")}
-          </ButtonItem>
-        </Focusable>
+        )}
       </Focusable>
     </ModalRoot>
   );
