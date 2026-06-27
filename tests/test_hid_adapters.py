@@ -178,6 +178,49 @@ def test_legion_tablet_per_controller_gradient(hid_env):
     assert right[6:9] == bytes([0, 0, 255])
 
 
+def test_legion_tablet_reconnects_after_stale_handle(hid_env):
+    adapters, writes = hid_env
+    entry = _legion_tablet_entry()
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [entry]
+    dev = adapters.LegionTabletHidDevice.create()
+    assert dev.available is True
+    stale = dev._transport.hid_device
+
+    def boom(_data):
+        raise OSError("stale handle after resume")
+
+    stale.write = boom
+    writes.clear()
+    # apply_zones drives the per-controller path; first write raises, heal re-enumerates
+    assert dev.apply_zones([(255, 0, 0), (0, 0, 255)], 100, True) is True
+    assert dev._transport.hid_device is not stale
+    assert len(writes) == 6
+
+
+def test_legion_tablet_solid_self_heals(hid_env):
+    adapters, writes = hid_env
+    entry = _legion_tablet_entry()
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [entry]
+    dev = adapters.LegionTabletHidDevice.create()
+    assert dev.available is True
+    stale = dev._transport.hid_device
+    stale.write = lambda _data: (_ for _ in ()).throw(OSError("stale"))
+    writes.clear()
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    assert dev._transport.hid_device is not stale
+
+
+def test_reconnect_drops_handle(hid_env):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
+    dev = adapters.LegionTabletHidDevice.create()
+    assert dev.available is True
+    first = dev._transport.hid_device
+    assert dev.reconnect() is True
+    assert dev._transport.hid_device is not first
+    assert dev._transport.prev_mode is None
+
+
 def test_legion_go_s_solid_bytes(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_go_s_entry()]
@@ -275,9 +318,23 @@ def test_build_device_legion_hid_available(hid_env, tmp_path):
     caps = ctx["capabilities"]
     assert caps["states"]["color"] == "supported"
     assert caps["states"]["effects"] == "supported"
-    assert caps["states"]["ambilight"] == "experimental"
+    assert caps["states"]["ambilight"] == "unsupported"
+    assert caps["experimental"] == []
     assert caps["perZone"] is False
     assert caps["color"] is True
+    sys.modules.pop("device", None)
+
+
+def test_legion_ambilight_is_supported_when_capture_available(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_go_s_entry()]
+    device = _reload_device()
+    root = _make_dmi_root(tmp_path, "83L3")
+    ctx = device.build_device(sysfs_root=root, ambilight=True)
+    caps = ctx["capabilities"]
+    assert caps["states"]["ambilight"] == "supported"
+    assert caps["ambilight"] is True
+    assert "ambilight" not in caps["experimental"]
     sys.modules.pop("device", None)
 
 

@@ -1,6 +1,7 @@
 from py_modules.effects import (
     frame_breathing,
     frame_cycle,
+    frame_gradient_sweep,
     frame_rainbow,
     hsv_to_rgb,
     interpolate_gradient,
@@ -64,6 +65,25 @@ def test_frame_rainbow_valid():
         frame = frame_rainbow(4, t / 5.0, 50)
         assert len(frame) == 4
         assert all(_valid(c) for c in frame)
+
+
+def test_frame_gradient_sweep_all_zones_equal_and_valid():
+    stops = [(0, 196, 255), (136, 86, 255)]
+    frame = frame_gradient_sweep(stops, 2, 0.7, 14)
+    assert len(frame) == 2
+    assert frame[0] == frame[1]  # replicated: every zone shares one color
+    assert _valid(frame[0])
+
+
+def test_frame_gradient_sweep_starts_and_turns_at_palette_ends():
+    stops = [(0, 0, 0), (255, 255, 255)]
+    # phase 0 -> pos 0 -> first stop
+    assert frame_gradient_sweep(stops, 1, 0.0, 14)[0] == (0, 0, 0)
+    # half phase -> pos 1 -> last stop (freq*t = 0.5 when t chosen so phase=0.5)
+    from py_modules.effects import _freq
+
+    t_half = 0.5 / _freq(14)
+    assert frame_gradient_sweep(stops, 1, t_half, 14)[0] == (255, 255, 255)
 
 
 def test_frame_cycle_valid():

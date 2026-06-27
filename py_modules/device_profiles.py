@@ -13,7 +13,7 @@ MSI_HID = {
     "zones": 9,
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
     "swap_sticks": True,
-    "experimental": ["ambilight"],
+    "experimental": [],
 }
 
 LEGION_TABLET_HID = {
@@ -22,7 +22,7 @@ LEGION_TABLET_HID = {
     "zones": 2,
     "supported_effects": ["breathing", "rainbow", "wave"],
     "per_controller": True,
-    "experimental": ["ambilight"],
+    "experimental": [],
 }
 
 LEGION_GO_S_HID = {
@@ -30,7 +30,7 @@ LEGION_GO_S_HID = {
     "color_order": "rgb",
     "zones": 2,
     "supported_effects": ["breathing", "rainbow", "wave"],
-    "experimental": ["ambilight"],
+    "experimental": [],
 }
 
 GENERIC = {

@@ -22,6 +22,12 @@ def test_msi_claw_8_profile_is_bgr_hid():
     assert p["color_order"] == "bgr"
 
 
+def test_ambilight_is_not_experimental_on_hid_profiles():
+    for product in ("Claw 8 AI+ A2VM", "83N0", "83L3"):
+        p = resolve_profile("", product)
+        assert "ambilight" not in p["experimental"]
+
+
 def test_legion_go_2_profile_is_hid_tablet():
     p = resolve_profile("", "83N0")
     assert p["name"] == "Legion Go 2"

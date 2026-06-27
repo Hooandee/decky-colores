@@ -17,6 +17,7 @@ DEFAULTS = {
     "mode": "solid",
     "color": [255, 255, 255],
     "gradient": [[0, 196, 255], [136, 86, 255]],
+    "gradient_speed": 30,
     "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
     "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
     "saved_gradients": [],
@@ -99,6 +100,7 @@ class Plugin:
             "mode": s["mode"],
             "color": _rgb(s["color"]),
             "gradient": [_rgb(c) for c in s["gradient"]],
+            "gradientSpeed": s.get("gradient_speed", DEFAULTS["gradient_speed"]),
             "effect": {
                 "id": s["effect"]["id"],
                 "speed": s["effect"]["speed"],
@@ -133,6 +135,11 @@ class Plugin:
         self._settings["gradient"] = [list(stop) for stop in stops]
         self._save_and_apply()
 
+    async def set_gradient_speed(self, speed: int) -> None:
+        self._init()
+        self._settings["gradient_speed"] = speed
+        self._save_and_apply()
+
     async def set_effect(self, effect_id: str, speed: int, use_gradient: bool) -> None:
         self._init()
         self._settings["effect"] = {"id": effect_id, "speed": speed, "use_gradient": use_gradient}
@@ -153,6 +160,12 @@ class Plugin:
         )
         self._store.save(self._settings)
         return self._serialized_saved()
+
+    async def reconnect(self) -> bool:
+        self._init()
+        ok = self._controller.reconnect()
+        self._apply()
+        return bool(ok)
 
     async def get_ambilight_status(self) -> str:
         self._init()
@@ -182,8 +195,26 @@ class Plugin:
         self._store.save(self._settings)
         self._apply()
 
+    def _wants_render_loop(self) -> bool:
+        # Modes driven by our per-frame render loop (software effect engine or
+        # ambilight capture) instead of firmware. Hardware effects only take a
+        # single color, so anything that must paint the custom gradient (wave, or
+        # any effect with "use gradient" on) and ambient capture run in software.
+        # Gradient mode also runs in software on devices that cannot render a
+        # spatial gradient (single-color zones, e.g. Legion rings) — there we
+        # animate an elegant crossfade through the palette instead.
+        s = self._settings
+        if s["mode"] == "ambient":
+            return True
+        if s["mode"] == "gradient":
+            return not self._controller.supports_per_zone()
+        if s["mode"] == "effect":
+            effect = s["effect"]
+            return effect["id"] == "wave" or effect.get("use_gradient", False)
+        return False
+
     def _apply(self) -> None:
-        if self._controller.supports_hardware_effects():
+        if self._controller.supports_hardware_effects() and not self._wants_render_loop():
             self._apply_hardware()
             return
         self._apply_per_zone()
@@ -242,9 +273,15 @@ class Plugin:
                 },
             )
         elif s["mode"] == "gradient":
-            self._engine.set_static(
-                interpolate_gradient([tuple(c) for c in s["gradient"]], self._zones)
-            )
+            stops = [tuple(c) for c in s["gradient"]]
+            if self._controller.supports_per_zone():
+                self._engine.set_static(interpolate_gradient(stops, self._zones))
+            else:
+                # single-color zones can't show a spatial gradient: animate an
+                # elegant crossfade through the whole palette instead
+                self._engine.start_effect(
+                    "gradient_sweep", s["gradient_speed"], {"stops": stops}
+                )
         else:
             self._engine.set_static([tuple(s["color"])] * self._zones)
 

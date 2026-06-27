@@ -12,6 +12,8 @@ const es: Record<string, string> = {
   "device.preview.ambient": "Siguiendo la pantalla",
 
   "power.label": "Encendido",
+  "reconnect.label": "Reconectar mandos",
+  "reconnect.hint": "¿Las luces no responden tras suspender? Reinicia la conexión con los mandos.",
 
   "mode.solid": "Fijo",
   "mode.gradient": "Degradado",
@@ -33,6 +35,7 @@ const es: Record<string, string> = {
   "gradient.colorN": "Color {n}",
   "gradient.color": "Color",
   "gradient.defaultGroup": "Luces",
+  "gradient.speed": "Velocidad",
 
   "gradient.preset.sunset": "Atardecer",
   "gradient.preset.ocean": "Océano",
@@ -57,6 +60,8 @@ const es: Record<string, string> = {
   "effect.speed": "Velocidad",
   "effect.useGradient": "Usar degradado personalizado",
   "effect.spectrumNote": "Este efecto usa todo el espectro de color.",
+  "effect.usesColor": "Usa tu color. Edítalo en la pestaña Fijo.",
+  "effect.usesGradient": "Usa tu degradado. Edítalo en la pestaña Degradado.",
 
   "effect.breathing.label": "Respiración",
   "effect.rainbow.label": "Arcoíris",
@@ -94,6 +99,8 @@ const en: Record<string, string> = {
   "device.preview.ambient": "Reacting to screen",
 
   "power.label": "Power",
+  "reconnect.label": "Reconnect controllers",
+  "reconnect.hint": "Lights not responding after sleep? Restart the connection to the controllers.",
 
   "mode.solid": "Solid",
   "mode.gradient": "Gradient",
@@ -115,6 +122,7 @@ const en: Record<string, string> = {
   "gradient.colorN": "Color {n}",
   "gradient.color": "Color",
   "gradient.defaultGroup": "Lights",
+  "gradient.speed": "Speed",
 
   "gradient.preset.sunset": "Sunset",
   "gradient.preset.ocean": "Ocean",
@@ -139,6 +147,8 @@ const en: Record<string, string> = {
   "effect.speed": "Speed",
   "effect.useGradient": "Use custom gradient",
   "effect.spectrumNote": "This effect uses the full color spectrum.",
+  "effect.usesColor": "Uses your color. Edit it in the Solid tab.",
+  "effect.usesGradient": "Uses your gradient. Edit it in the Gradient tab.",
 
   "effect.breathing.label": "Breathing",
   "effect.rainbow.label": "Rainbow",

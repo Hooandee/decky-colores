@@ -94,6 +94,31 @@ class _BaseHidDevice(LedDevice):
         except Exception:
             return False
 
+    def reconnect(self):
+        device = getattr(self._transport, "hid_device", None)
+        if device is not None:
+            try:
+                device.close()
+            except Exception:
+                pass
+        self._transport.hid_device = None
+        if hasattr(self._transport, "prev_mode"):
+            self._transport.prev_mode = None
+        return self.available
+
+    def _heal(self, action):
+        try:
+            if action():
+                return True
+        except Exception:
+            pass
+        if not self.reconnect():
+            return False
+        try:
+            return bool(action())
+        except Exception:
+            return False
+
 
 class MsiHidDevice(_BaseHidDevice):
     @classmethod
@@ -132,24 +157,22 @@ class MsiHidDevice(_BaseHidDevice):
     def apply_zones(self, zone_colors, brightness, power):
         if not power:
             return self.apply_solid((0, 0, 0), 0, False)
-        try:
-            return bool(self._transport.send_rgb_config(self._zone_config(zone_colors, brightness)))
-        except Exception:
-            return False
+        return self._heal(
+            lambda: bool(self._transport.send_rgb_config(self._zone_config(zone_colors, brightness)))
+        )
 
     def apply_solid(self, color, brightness, power):
-        try:
-            if not power:
-                return bool(self._transport.set_led_color(Color(0, 0, 0), RGBMode.Disabled))
-            return bool(self._transport.send_rgb_config(self._solid_config(color, brightness)))
-        except Exception:
-            return False
+        if not power:
+            return self._heal(lambda: bool(self._transport.set_led_color(Color(0, 0, 0), RGBMode.Disabled)))
+        return self._heal(
+            lambda: bool(self._transport.send_rgb_config(self._solid_config(color, brightness)))
+        )
 
     def apply_hardware_effect(self, effect_id, color, speed, power):
-        try:
-            if not power:
-                return bool(self._transport.set_led_color(Color(0, 0, 0), RGBMode.Disabled))
-            return bool(
+        if not power:
+            return self._heal(lambda: bool(self._transport.set_led_color(Color(0, 0, 0), RGBMode.Disabled)))
+        return self._heal(
+            lambda: bool(
                 self._transport.set_led_color(
                     Color(*[_clamp8(c) for c in color]),
                     _effect_mode(effect_id),
@@ -157,8 +180,7 @@ class MsiHidDevice(_BaseHidDevice):
                     speed=_msi_speed(speed),
                 )
             )
-        except Exception:
-            return False
+        )
 
 
 class _LegionHidDevice(_BaseHidDevice):
@@ -188,11 +210,11 @@ class LegionTabletHidDevice(_LegionHidDevice):
         )
 
     def _write(self, reps):
-        if not self._transport.is_ready():
-            return False
         device = self._transport.hid_device
         if device is None:
-            return False
+            if not self._transport.is_ready():
+                return False
+            device = self._transport.hid_device
         for rep in reps:
             device.write(rep)
         return True
@@ -201,45 +223,43 @@ class LegionTabletHidDevice(_LegionHidDevice):
         colors = list(zone_colors) or [(0, 0, 0)]
         left = colors[0]
         right = colors[1] if len(colors) > 1 else colors[0]
-        try:
-            if not power:
-                return self._write(
+        if not power:
+            return self._heal(
+                lambda: self._write(
                     [legion_rgb_enable("left", False), legion_rgb_enable("right", False)]
                 )
-            level = _clamp_pct(brightness) / 100.0
-            lr, lg, lb = (_clamp8(c) for c in left)
-            rr, rg, rb = (_clamp8(c) for c in right)
-            reps = [
-                legion_rgb_set_profile("left", 3, "solid", lr, lg, lb, brightness=level),
-                legion_rgb_set_profile("right", 3, "solid", rr, rg, rb, brightness=level),
-                legion_rgb_load_profile("left", 3),
-                legion_rgb_load_profile("right", 3),
-                legion_rgb_enable("left", True),
-                legion_rgb_enable("right", True),
-            ]
-            return self._write(reps)
-        except Exception:
-            return False
+            )
+        level = _clamp_pct(brightness) / 100.0
+        lr, lg, lb = (_clamp8(c) for c in left)
+        rr, rg, rb = (_clamp8(c) for c in right)
+        reps = [
+            legion_rgb_set_profile("left", 3, "solid", lr, lg, lb, brightness=level),
+            legion_rgb_set_profile("right", 3, "solid", rr, rg, rb, brightness=level),
+            legion_rgb_load_profile("left", 3),
+            legion_rgb_load_profile("right", 3),
+            legion_rgb_enable("left", True),
+            legion_rgb_enable("right", True),
+        ]
+        return self._heal(lambda: self._write(reps))
 
     def apply_solid(self, color, brightness, power):
-        try:
-            if not power:
-                return bool(self._transport.set_led_color(RGBMode.Disabled, Color(0, 0, 0)))
-            return bool(
+        if not power:
+            return self._heal(lambda: bool(self._transport.set_led_color(RGBMode.Disabled, Color(0, 0, 0))))
+        return self._heal(
+            lambda: bool(
                 self._transport.set_led_color(
                     RGBMode.Solid,
                     Color(*[_clamp8(c) for c in color]),
                     brightness=_clamp_pct(brightness),
                 )
             )
-        except Exception:
-            return False
+        )
 
     def apply_hardware_effect(self, effect_id, color, speed, power):
-        try:
-            if not power:
-                return bool(self._transport.set_led_color(RGBMode.Disabled, Color(0, 0, 0)))
-            return bool(
+        if not power:
+            return self._heal(lambda: bool(self._transport.set_led_color(RGBMode.Disabled, Color(0, 0, 0))))
+        return self._heal(
+            lambda: bool(
                 self._transport.set_led_color(
                     _effect_mode(effect_id),
                     Color(*[_clamp8(c) for c in color]),
@@ -247,8 +267,7 @@ class LegionTabletHidDevice(_LegionHidDevice):
                     speed=_legion_speed(speed),
                 )
             )
-        except Exception:
-            return False
+        )
 
 
 class LegionGoSHidDevice(_LegionHidDevice):
@@ -267,21 +286,22 @@ class LegionGoSHidDevice(_LegionHidDevice):
         )
 
     def _write(self, reps):
-        if not self._transport.is_ready():
-            return False
         device = self._transport.hid_device
         if device is None:
-            return False
+            if not self._transport.is_ready():
+                return False
+            device = self._transport.hid_device
         for rep in reps:
             device.write(rep)
         return True
 
     def apply_solid(self, color, brightness, power):
-        try:
-            r, g, b = (_clamp8(c) for c in color)
-            if not power or (r == 0 and g == 0 and b == 0):
-                self._transport.prev_mode = None
-                return self._write([rgb_enable(False)])
+        r, g, b = (_clamp8(c) for c in color)
+        if not power or (r == 0 and g == 0 and b == 0):
+            self._transport.prev_mode = None
+            return self._heal(lambda: self._write([rgb_enable(False)]))
+
+        def _do():
             init = self._transport.prev_mode != "solid"
             reps = rgb_multi_load_settings(
                 "solid", 0x03, r, g, b, brightness=_clamp_pct(brightness) / 100.0,
@@ -291,21 +311,20 @@ class LegionGoSHidDevice(_LegionHidDevice):
             if ok:
                 self._transport.prev_mode = "solid"
             return ok
-        except Exception:
-            return False
+
+        return self._heal(_do)
 
     def apply_hardware_effect(self, effect_id, color, speed, power):
-        try:
-            if not power:
-                return bool(self._transport.set_led_color(Color(0, 0, 0), RGBMode.Disabled))
-            return bool(
+        if not power:
+            return self._heal(lambda: bool(self._transport.set_led_color(Color(0, 0, 0), RGBMode.Disabled)))
+        return self._heal(
+            lambda: bool(
                 self._transport.set_led_color(
                     Color(*[_clamp8(c) for c in color]),
                     _effect_mode(effect_id),
                 )
             )
-        except Exception:
-            return False
+        )
 
 
 HID_DRIVERS = {
