@@ -46,7 +46,7 @@ export const ColorEditor: FC<ColorEditorProps> = ({ color, disabled, onChange })
     <>
       <PanelSectionRow>
         <Focusable style={{ padding: "6px 0 10px" }}>
-          <Swatches selected={color} onPick={pick} />
+          <Swatches selected={color} disabled={disabled} onPick={pick} />
         </Focusable>
       </PanelSectionRow>
       <PanelSectionRow>

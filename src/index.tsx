@@ -53,6 +53,7 @@ function GradientControls({
   gradient,
   layout,
   savedGradients,
+  disabled,
   onChange,
   onSave,
   onDelete,
@@ -62,6 +63,7 @@ function GradientControls({
   gradient: RGB[];
   layout: ZoneGroup[];
   savedGradients: GradientPreset[];
+  disabled?: boolean;
   onChange: (stops: RGB[]) => void;
   onSave: (name: string, stops: RGB[]) => void;
   onDelete: (name: string) => void;
@@ -73,7 +75,8 @@ function GradientControls({
     () => [...GRADIENT_PRESETS, ...savedGradients],
     [savedGradients],
   );
-  const open = () =>
+  const open = () => {
+    if (disabled) return;
     showModal(
       <GradientModal
         initial={gradient}
@@ -84,8 +87,9 @@ function GradientControls({
         onDelete={onDelete}
       />,
     );
+  };
   return (
-    <>
+    <div style={{ opacity: disabled ? 0.4 : 1 }}>
       <PanelSectionRow>
         <Focusable
           onActivate={open}
@@ -98,7 +102,7 @@ function GradientControls({
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            cursor: "pointer",
+            cursor: disabled ? "default" : "pointer",
           }}
         >
           <span
@@ -120,14 +124,14 @@ function GradientControls({
           {allPresets.map((preset) => (
             <Focusable
               key={preset.name}
-              onActivate={() => onChange(preset.stops)}
-              onClick={() => onChange(preset.stops)}
+              onActivate={() => !disabled && onChange(preset.stops)}
+              onClick={() => !disabled && onChange(preset.stops)}
               style={{
                 height: 30,
                 borderRadius: 8,
                 background: gradientCss(preset.stops),
                 boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
-                cursor: "pointer",
+                cursor: disabled ? "default" : "pointer",
               }}
             >
               <div style={{ width: "100%", height: "100%" }} />
@@ -145,11 +149,12 @@ function GradientControls({
             step={1}
             valueSuffix="%"
             showValue
+            disabled={disabled}
             onChange={onSpeed}
           />
         </PanelSectionRow>
       )}
-    </>
+    </div>
   );
 }
 
@@ -195,6 +200,8 @@ function EffectSource({
 function Content() {
   const {
     state,
+    loadError,
+    retry,
     setBrightness,
     setPower,
     setMode,
@@ -232,11 +239,33 @@ function Content() {
   if (!state) {
     return (
       <PanelSection>
-        <PanelSectionRow>
-          <div style={{ display: "flex", justifyContent: "center", padding: 20 }}>
-            <Spinner width={32} height={32} />
-          </div>
-        </PanelSectionRow>
+        {loadError ? (
+          <>
+            <PanelSectionRow>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "rgba(255,255,255,0.7)",
+                  padding: "8px 2px",
+                  lineHeight: 1.45,
+                }}
+              >
+                {t("load.error")}
+              </div>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <ButtonItem layout="below" onClick={() => retry()}>
+                {t("load.retry")}
+              </ButtonItem>
+            </PanelSectionRow>
+          </>
+        ) : (
+          <PanelSectionRow>
+            <div style={{ display: "flex", justifyContent: "center", padding: 20 }}>
+              <Spinner width={32} height={32} />
+            </div>
+          </PanelSectionRow>
+        )}
       </PanelSection>
     );
   }
@@ -337,6 +366,7 @@ function Content() {
                   gradient={gradient}
                   layout={caps.layout}
                   savedGradients={savedGradients}
+                  disabled={!power}
                   onChange={setGradient}
                   onSave={saveGradient}
                   onDelete={deleteGradient}
@@ -352,6 +382,7 @@ function Content() {
                       effects={visibleEffects}
                       selected={effect.id}
                       speed={effect.speed}
+                      disabled={!power}
                       onSelect={setEffectId}
                       onSpeed={setEffectSpeed}
                     />

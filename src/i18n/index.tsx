@@ -6,6 +6,9 @@ export type Lang = "es" | "en";
 const STORAGE_KEY = "colores-lang";
 
 const es: Record<string, string> = {
+  "load.error": "No se pudo cargar el estado del plugin. Vuelve a intentarlo en un momento.",
+  "load.retry": "Reintentar",
+
   "device.noLeds": "No se detectaron LEDs controlables en este dispositivo.",
   "device.preview.rings": "Anillos del joystick",
   "device.preview.off": "Apagado",
@@ -93,6 +96,9 @@ const es: Record<string, string> = {
 };
 
 const en: Record<string, string> = {
+  "load.error": "Couldn't load the plugin state. Please try again in a moment.",
+  "load.retry": "Retry",
+
   "device.noLeds": "No controllable LEDs detected on this device.",
   "device.preview.rings": "Joystick rings",
   "device.preview.off": "Off",
