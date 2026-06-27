@@ -28,6 +28,7 @@ export interface Capabilities {
   hardwareEffects: boolean;
   reconnectable: boolean;
   perControllerColor: boolean;
+  gradientCrossfade: boolean;
   supportedEffects: string[];
   experimental: string[];
   states: Record<string, "supported" | "experimental" | "unsupported">;

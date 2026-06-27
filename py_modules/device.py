@@ -154,6 +154,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight):
         "hardwareEffects": False,
         "reconnectable": False,
         "perControllerColor": bool(profile.get("per_controller", False)),
+        "gradientCrossfade": bool(profile.get("gradient_crossfade", False)),
         "supportedEffects": list(profile.get("supported_effects", [])),
         "states": states,
         "experimental": list(profile.get("experimental", [])),

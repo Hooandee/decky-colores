@@ -140,6 +140,17 @@ def test_build_capabilities_experimental_features():
     assert caps["states"]["brightness"] == "unsupported"
 
 
+def test_build_capabilities_gradient_crossfade_flag():
+    legion = {"name": "Legion Go S", "driver": "hid_legion_go_s", "color_order": "rgb",
+              "supported_effects": [], "experimental": [], "gradient_crossfade": True}
+    ally = {"name": "ROG Ally X", "driver": "sysfs", "color_order": "rgb",
+            "supported_effects": [], "experimental": []}
+    legion_caps = build_capabilities(legion, has_led=True, zones=2, max_brightness=255, ambilight=False)
+    ally_caps = build_capabilities(ally, has_led=True, zones=4, max_brightness=255, ambilight=False)
+    assert legion_caps["gradientCrossfade"] is True
+    assert ally_caps["gradientCrossfade"] is False
+
+
 def test_build_capabilities_unsupported_when_absent():
     profile = {"name": "X", "driver": "sysfs", "color_order": "rgb",
                "supported_effects": [], "experimental": []}
