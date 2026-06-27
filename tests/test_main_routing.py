@@ -84,13 +84,26 @@ class FakeAmbilight:
         self.events.append(("start", cfg))
 
 
-def _plugin(main_module, mode, effect=None, hw=True, power=True, per_zone=False):
+def _plugin(
+    main_module,
+    mode,
+    effect=None,
+    hw=True,
+    power=True,
+    per_zone=False,
+    per_controller=False,
+):
     p = main_module.Plugin()
     p._ready = True
     p._controller = FakeController(hw, per_zone)
     p._engine = FakeEngine()
     p._ambilight = FakeAmbilight()
     p._zones = 2
+    p._capabilities = {
+        "zones": 2,
+        "perControllerColor": per_controller,
+        "perZone": per_zone,
+    }
     p._settings = {
         "power": power,
         "brightness": 80,
@@ -104,14 +117,53 @@ def _plugin(main_module, mode, effect=None, hw=True, power=True, per_zone=False)
     return p
 
 
-def test_wave_effect_runs_in_software_on_hardware_device(main_module):
-    p = _plugin(main_module, "effect", {"id": "wave", "speed": 50, "use_gradient": False})
+def test_wave_on_single_color_device_uses_hardware_effect(main_module):
+    # Legion Go S-like: hardware effects, single-color zones, no per-controller.
+    # Wave must use the native firmware effect (a single solid color), not the
+    # software loop that would collapse to a flat color — and the UI has no
+    # gradient tab to point at.
+    p = _plugin(
+        main_module,
+        "effect",
+        {"id": "wave", "speed": 50, "use_gradient": False},
+        hw=True,
+        per_zone=False,
+        per_controller=False,
+    )
     p._apply()
-    kinds = [e[0] for e in p._engine.events]
-    assert "effect" in kinds
+    assert any(c[0] == "hw_effect" and c[1] == "wave" for c in p._controller.calls)
+    assert not any(e[0] == "effect" for e in p._engine.events)
+
+
+def test_wave_on_per_zone_device_runs_in_software(main_module):
+    # Ally/MSI-like: per-zone capable -> software paints the spatial gradient wave.
+    p = _plugin(
+        main_module,
+        "effect",
+        {"id": "wave", "speed": 50, "use_gradient": False},
+        hw=False,
+        per_zone=True,
+    )
+    p._apply()
     effect_event = next(e for e in p._engine.events if e[0] == "effect")
     assert effect_event[1] == "wave"
     assert effect_event[2]["stops"] == [(0, 196, 255), (136, 86, 255)]
+    assert not any(c[0] == "hw_effect" for c in p._controller.calls)
+
+
+def test_wave_on_per_controller_device_runs_in_software(main_module):
+    # Legion Go/Go 2-like: per-controller color -> software paints a two-color
+    # wave across the left/right controllers using the gradient stops.
+    p = _plugin(
+        main_module,
+        "effect",
+        {"id": "wave", "speed": 50, "use_gradient": False},
+        hw=True,
+        per_zone=False,
+        per_controller=True,
+    )
+    p._apply()
+    assert any(e[0] == "effect" and e[1] == "wave" for e in p._engine.events)
     assert not any(c[0] == "hw_effect" for c in p._controller.calls)
 
 

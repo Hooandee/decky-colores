@@ -17,7 +17,7 @@ import { FaPalette } from "react-icons/fa";
 import { useColores } from "./useColores";
 import { getAmbilightStatus } from "./api";
 import { rgbToCss, gradientCss } from "./color";
-import { Mode, RGB, ZoneGroup, GradientPreset } from "./types";
+import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { ColorEditor } from "./components/ColorEditor";
 import { ModeTabs } from "./components/ModeTabs";
@@ -302,9 +302,17 @@ function Content() {
 
   const selectedEffect = visibleEffects.find((e) => e.id === effect.id) ?? visibleEffects[0];
 
+  // A gradient-based effect only points at the gradient editor when the device
+  // actually exposes one. On single-color devices (no gradient tab) it falls back
+  // to the shared solid color, which the firmware wave uses.
+  const effectNeed: EffectColorNeed =
+    selectedEffect?.needs === "gradient" && !canGradient
+      ? "color"
+      : (selectedEffect?.needs ?? "none");
+
   const effectPreview = (): RGB[] => {
-    if (!selectedEffect || selectedEffect.needs === "none") return selectedEffect?.colors ?? [color];
-    if (selectedEffect.needs === "gradient" || effect.useGradient) return gradient;
+    if (!selectedEffect || effectNeed === "none") return selectedEffect?.colors ?? [color];
+    if (effectNeed === "gradient" || effect.useGradient) return gradient;
     return [color];
   };
 
@@ -387,7 +395,7 @@ function Content() {
                       onSpeed={setEffectSpeed}
                     />
                   </PanelSectionRow>
-                  {selectedEffect?.needs === "color" && (
+                  {effectNeed === "color" && (
                     <>
                       {canGradient && (
                         <PanelSectionRow>
@@ -406,10 +414,10 @@ function Content() {
                       />
                     </>
                   )}
-                  {selectedEffect?.needs === "gradient" && (
+                  {effectNeed === "gradient" && (
                     <EffectSource kind="gradient" color={color} gradient={gradient} />
                   )}
-                  {selectedEffect?.needs === "none" && (
+                  {effectNeed === "none" && (
                     <PanelSectionRow>
                       <div
                         style={{
