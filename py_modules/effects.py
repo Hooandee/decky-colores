@@ -67,11 +67,10 @@ def _freq(speed):
     return 0.1 + (max(0.0, min(100.0, speed)) / 100.0) * 1.9
 
 
-def frame_breathing(color, zones, t, speed):
+def frame_breathing(base, t, speed):
     phase = math.sin(2 * math.pi * _freq(speed) * t)
     factor = 0.575 + 0.425 * phase
-    scaled = (clamp8(color[0] * factor), clamp8(color[1] * factor), clamp8(color[2] * factor))
-    return [scaled for _ in range(zones)]
+    return [(clamp8(c[0] * factor), clamp8(c[1] * factor), clamp8(c[2] * factor)) for c in base]
 
 
 def frame_rainbow(zones, t, speed):
@@ -128,9 +127,14 @@ class EffectEngine:
             self._task.cancel()
             self._task = None
 
+    def _palette(self, params):
+        if params.get("use_gradient") and params.get("stops"):
+            return interpolate_gradient(params["stops"], self._zones)
+        return [params.get("color", (255, 255, 255))] * self._zones
+
     def _compute(self, effect_id, t, speed, params):
         if effect_id == "breathing":
-            return frame_breathing(params.get("color", (255, 255, 255)), self._zones, t, speed)
+            return frame_breathing(self._palette(params), t, speed)
         if effect_id == "rainbow":
             return frame_rainbow(self._zones, t, speed)
         if effect_id == "wave":

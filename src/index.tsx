@@ -122,6 +122,7 @@ function Content() {
     setGradient,
     setEffectId,
     setEffectSpeed,
+    setEffectGradient,
     setAmbilight,
   } = useColores();
   const [ambStatus, setAmbStatus] = useState<string>("idle");
@@ -164,11 +165,17 @@ function Content() {
 
   const selectedEffect = EFFECT_PRESETS.find((e) => e.id === effect.id);
 
+  const effectPreview = (): RGB[] => {
+    if (!selectedEffect || selectedEffect.needs === "none") return selectedEffect?.colors ?? [color];
+    if (selectedEffect.needs === "gradient" || effect.useGradient) return gradient;
+    return [color];
+  };
+
   const previewColors: RGB[] =
     mode === "gradient"
       ? gradient
       : mode === "effect"
-        ? selectedEffect?.colors ?? [color]
+        ? effectPreview()
         : mode === "ambient"
           ? AMBIENT_HINT
           : [color];
@@ -230,7 +237,25 @@ function Content() {
                     />
                   </PanelSectionRow>
                   {selectedEffect?.needs === "color" && (
-                    <ColorEditor color={color} disabled={!power} onChange={setColor} />
+                    <>
+                      <PanelSectionRow>
+                        <ToggleField
+                          label="Use custom gradient"
+                          checked={effect.useGradient}
+                          disabled={!power}
+                          onChange={setEffectGradient}
+                        />
+                      </PanelSectionRow>
+                      {effect.useGradient ? (
+                        <GradientControls
+                          gradient={gradient}
+                          layout={caps.layout}
+                          onChange={setGradient}
+                        />
+                      ) : (
+                        <ColorEditor color={color} disabled={!power} onChange={setColor} />
+                      )}
+                    </>
                   )}
                   {selectedEffect?.needs === "gradient" && (
                     <GradientControls

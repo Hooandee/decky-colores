@@ -39,6 +39,7 @@ export type EffectId = "breathing" | "rainbow" | "wave" | "cycle";
 export interface EffectState {
   id: EffectId;
   speed: number;
+  useGradient: boolean;
 }
 
 export interface ColoresState {

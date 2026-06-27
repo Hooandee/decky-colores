@@ -17,7 +17,7 @@ DEFAULTS = {
     "mode": "solid",
     "color": [255, 255, 255],
     "gradient": [[0, 196, 255], [136, 86, 255]],
-    "effect": {"id": "breathing", "speed": 50},
+    "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
     "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
 }
 
@@ -50,6 +50,7 @@ class Plugin:
         )
         self._settings = self._store.load(DEFAULTS)
         self._settings["ambilight"] = {**DEFAULTS["ambilight"], **self._settings["ambilight"]}
+        self._settings["effect"] = {**DEFAULTS["effect"], **self._settings["effect"]}
         self._controller = LedController(
             self._capabilities.get("ledPath"),
             self._zones,
@@ -81,7 +82,11 @@ class Plugin:
             "mode": s["mode"],
             "color": _rgb(s["color"]),
             "gradient": [_rgb(c) for c in s["gradient"]],
-            "effect": s["effect"],
+            "effect": {
+                "id": s["effect"]["id"],
+                "speed": s["effect"]["speed"],
+                "useGradient": s["effect"].get("use_gradient", False),
+            },
             "ambilight": s["ambilight"],
         }
 
@@ -110,9 +115,9 @@ class Plugin:
         self._settings["gradient"] = [list(stop) for stop in stops]
         self._save_and_apply()
 
-    async def set_effect(self, effect_id: str, speed: int) -> None:
+    async def set_effect(self, effect_id: str, speed: int, use_gradient: bool) -> None:
         self._init()
-        self._settings["effect"] = {"id": effect_id, "speed": speed}
+        self._settings["effect"] = {"id": effect_id, "speed": speed, "use_gradient": use_gradient}
         self._save_and_apply()
 
     async def get_ambilight_status(self) -> str:
@@ -159,7 +164,11 @@ class Plugin:
             self._engine.start_effect(
                 effect["id"],
                 effect["speed"],
-                {"color": tuple(s["color"]), "stops": [tuple(c) for c in s["gradient"]]},
+                {
+                    "color": tuple(s["color"]),
+                    "stops": [tuple(c) for c in s["gradient"]],
+                    "use_gradient": effect.get("use_gradient", False),
+                },
             )
         elif s["mode"] == "gradient":
             self._engine.set_static(

@@ -42,14 +42,21 @@ def test_hsv_primaries():
 
 
 def test_frame_breathing_shape_and_variation():
-    color = (200, 100, 50)
+    base = [(200, 100, 50)] * 4
     speed = 50
-    samples = [frame_breathing(color, 4, t / 10.0, speed) for t in range(40)]
+    samples = [frame_breathing(base, t / 10.0, speed) for t in range(40)]
     for frame in samples:
         assert len(frame) == 4
         assert all(_valid(c) for c in frame)
     brightnesses = [f[0][0] for f in samples]
     assert min(brightnesses) < max(brightnesses)
+
+
+def test_frame_breathing_preserves_per_zone_palette():
+    base = [(200, 0, 0), (0, 200, 0)]
+    frame = frame_breathing(base, 0.0, 50)
+    assert frame[0][0] >= frame[0][1] and frame[0][0] >= frame[0][2]
+    assert frame[1][1] >= frame[1][0] and frame[1][1] >= frame[1][2]
 
 
 def test_frame_rainbow_valid():

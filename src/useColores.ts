@@ -41,7 +41,10 @@ export function useColores() {
 
   const pushSolid = useThrottle((c: RGB) => api.setSolid(c.r, c.g, c.b), 60);
   const pushBrightness = useThrottle((v: number) => api.setBrightness(v), 60);
-  const pushEffect = useThrottle((id: EffectId, speed: number) => api.setEffect(id, speed), 60);
+  const pushEffect = useThrottle(
+    (id: EffectId, speed: number, useGradient: boolean) => api.setEffect(id, speed, useGradient),
+    60,
+  );
   const pushAmbilight = useThrottle(
     (sat: number, sm: number, fps: number) => api.setAmbilight(sat, sm, fps),
     80,
@@ -74,12 +77,17 @@ export function useColores() {
 
   const setEffectId = (id: EffectId) => {
     setState((s) => (s ? { ...s, effect: { ...s.effect, id } } : s));
-    if (state) pushEffect(id, state.effect.speed);
+    if (state) pushEffect(id, state.effect.speed, state.effect.useGradient);
   };
 
   const setEffectSpeed = (speed: number) => {
     setState((s) => (s ? { ...s, effect: { ...s.effect, speed } } : s));
-    if (state) pushEffect(state.effect.id, speed);
+    if (state) pushEffect(state.effect.id, speed, state.effect.useGradient);
+  };
+
+  const setEffectGradient = (useGradient: boolean) => {
+    setState((s) => (s ? { ...s, effect: { ...s.effect, useGradient } } : s));
+    if (state) pushEffect(state.effect.id, state.effect.speed, useGradient);
   };
 
   const setAmbilight = (saturation: number, smoothing: number, fps: number) => {
@@ -96,6 +104,7 @@ export function useColores() {
     setGradient,
     setEffectId,
     setEffectSpeed,
+    setEffectGradient,
     setAmbilight,
   };
 }
