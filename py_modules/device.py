@@ -105,6 +105,49 @@ def build_layout(zones):
     return layout
 
 
+_CHANNEL_NAMES = {"red", "green", "blue"}
+
+FEATURES = ("color", "brightness", "effects", "ambilight")
+
+
+def read_zone_format(led_path):
+    multi_index = _read(os.path.join(led_path, "multi_index"))
+    tokens = multi_index.split()
+    if tokens and all(token.lower() in _CHANNEL_NAMES for token in tokens):
+        return max(1, len(tokens) // 3), "decimal"
+    return max(1, len(tokens)), "hex"
+
+
+def _feature_state(profile, feature, present):
+    if feature in profile.get("experimental", []):
+        return "experimental"
+    return "supported" if present else "unsupported"
+
+
+def build_capabilities(profile, has_led, zones, max_brightness, ambilight):
+    present = {
+        "color": has_led,
+        "brightness": has_led,
+        "effects": has_led,
+        "ambilight": bool(ambilight),
+    }
+    states = {f: _feature_state(profile, f, present[f]) for f in FEATURES}
+    active = {f: states[f] in ("supported", "experimental") for f in FEATURES}
+    return {
+        "color": active["color"],
+        "brightness": active["brightness"],
+        "effects": active["effects"],
+        "ambilight": active["ambilight"],
+        "zones": zones,
+        "maxBrightness": max_brightness,
+        "perZone": has_led and zones > 1,
+        "supportedEffects": list(profile.get("supported_effects", [])),
+        "states": states,
+        "experimental": list(profile.get("experimental", [])),
+        "layout": build_layout(zones),
+    }
+
+
 def _find_rgb_led(leds_dir):
     if not os.path.isdir(leds_dir):
         return None
