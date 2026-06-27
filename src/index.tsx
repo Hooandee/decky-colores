@@ -285,7 +285,10 @@ function Content() {
   } = state;
   const hasLeds = caps.color || caps.brightness;
 
-  const canGradient = (caps.perZone || caps.perControllerColor) && caps.zones > 1;
+  // Any colour device offers a gradient: per-zone devices render it spatially,
+  // single-colour devices (Legion Go S / Go 2) crossfade through the palette over
+  // time — the same gradient experience on every Legion Go.
+  const canGradient = caps.color && caps.zones >= 1;
   // Devices that can't render a spatial gradient (single-color zones, e.g. Legion
   // rings) animate a crossfade through the palette, so they expose a speed control.
   const gradientAnimated = canGradient && !caps.perZone;
