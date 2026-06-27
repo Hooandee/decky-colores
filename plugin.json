@@ -1,0 +1,11 @@
+{
+  "name": "Colores",
+  "author": "Hooandee",
+  "flags": ["root", "_root"],
+  "api_version": 1,
+  "publish": {
+    "tags": ["root", "rgb", "led"],
+    "description": "Beautiful RGB LED control for handheld gaming PCs.",
+    "image": "https://opengraph.githubassets.com/1/Hooandee/decky-colores"
+  }
+}

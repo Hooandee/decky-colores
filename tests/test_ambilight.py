@@ -1,0 +1,67 @@
+from py_modules.ambilight import (
+    _gst_command,
+    alpha_for,
+    avg_region,
+    boost_saturation,
+    lerp,
+    subdivide,
+)
+
+
+def test_gst_command_uses_leaky_queue_before_scaling():
+    cmd = _gst_command(68, 24, 14)
+    assert "queue" in cmd
+    assert "leaky=downstream" in cmd
+    assert cmd.index("queue") < cmd.index("videoscale")
+    assert "path=68" in cmd
+
+
+def _solid_frame(width, height, color):
+    return bytes(list(color) * (width * height))
+
+
+def test_avg_region_solid_frame():
+    frame = _solid_frame(4, 4, (10, 20, 30))
+    assert avg_region(frame, 4, 4, (0.0, 0.0, 1.0, 1.0)) == (10, 20, 30)
+
+
+def test_avg_region_isolates_corner():
+    frame = bytearray(_solid_frame(4, 4, (0, 0, 0)))
+    top_left = (1 * 4 + 1) * 3
+    frame[top_left] = 200
+    frame[top_left + 1] = 100
+    frame[top_left + 2] = 50
+    avg = avg_region(frame, 4, 4, (0.0, 0.0, 0.5, 0.5))
+    assert avg[0] > 0 and avg[1] > 0
+
+
+def test_boost_saturation_increases_spread():
+    base = (140, 120, 100)
+    boosted = boost_saturation(base, 1.6)
+    assert max(boosted) - min(boosted) > max(base) - min(base)
+
+
+def test_boost_saturation_identity():
+    assert boost_saturation((100, 100, 100), 1.5) == (100, 100, 100)
+
+
+def test_lerp_moves_toward_target():
+    assert lerp((0, 0, 0), (100, 100, 100), 0.5) == (50, 50, 50)
+    assert lerp((0, 0, 0), (100, 0, 0), 1.0) == (100, 0, 0)
+
+
+def test_alpha_for_mapping():
+    assert alpha_for(0) == 1.0
+    assert alpha_for(100) == 0.04
+    assert 0.2 < alpha_for(75) < 0.3
+
+
+def test_subdivide_splits_region_horizontally():
+    subs = subdivide([0.0, 0.0, 1.0, 1.0], 2)
+    assert len(subs) == 2
+    assert subs[0] == (0.0, 0.0, 0.5, 1.0)
+    assert subs[1] == (0.5, 0.0, 1.0, 1.0)
+
+
+def test_subdivide_single_returns_region():
+    assert subdivide([0.1, 0.2, 0.3, 0.4], 1) == [(0.1, 0.2, 0.3, 0.4)]
