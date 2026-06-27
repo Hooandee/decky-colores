@@ -95,16 +95,16 @@ def test_frame_cycle_valid():
 
 
 def test_frame_spiral_at_t0_matches_palette():
-    stops = [(255, 0, 0), (0, 0, 255)]
-    assert frame_spiral(stops, 4, 0.0, 50) == interpolate_gradient(stops, 4)
+    palette = interpolate_gradient([(255, 0, 0), (0, 0, 255)], 4)
+    assert frame_spiral(palette, 0.0, 50) == palette
 
 
 def test_frame_spiral_rotates_and_stays_valid():
-    stops = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
-    start = frame_spiral(stops, 4, 0.0, 60)
+    palette = interpolate_gradient([(255, 0, 0), (0, 255, 0), (0, 0, 255)], 4)
+    start = frame_spiral(palette, 0.0, 60)
     moved = False
     for t in range(1, 30):
-        frame = frame_spiral(stops, 4, t / 10.0, 60)
+        frame = frame_spiral(palette, t / 10.0, 60)
         assert len(frame) == 4
         assert all(_valid(c) for c in frame)
         if frame != start:

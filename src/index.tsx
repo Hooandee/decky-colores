@@ -309,12 +309,12 @@ function Content() {
   // fixed-palette effect — labelled "Spiral GO", taking no user color. Devices
   // that paint zones in software (Ally) spin the user's gradient instead.
   const firmwareSpiral = caps.hardwareEffects;
-  const effectNeed: EffectColorNeed =
-    selectedEffect?.id === "spiral" && firmwareSpiral
-      ? "none"
-      : selectedEffect?.needs === "gradient" && !canGradient
-        ? "color"
-        : (selectedEffect?.needs ?? "none");
+  const isFirmwareSpiral = selectedEffect?.id === "spiral" && firmwareSpiral;
+  const effectNeed: EffectColorNeed = isFirmwareSpiral
+    ? "none"
+    : selectedEffect?.needs === "gradient" && !canGradient
+      ? "color"
+      : (selectedEffect?.needs ?? "none");
 
   const effectPreview = (): RGB[] => {
     if (!selectedEffect || effectNeed === "none") return selectedEffect?.colors ?? [color];
@@ -433,7 +433,7 @@ function Content() {
                           padding: "4px 2px 8px",
                         }}
                       >
-                        {selectedEffect?.id === "spiral" && firmwareSpiral
+                        {isFirmwareSpiral
                           ? t("effect.spiral.firmwareNote")
                           : t("effect.spectrumNote")}
                       </div>
