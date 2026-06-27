@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.6.0...decky-colores-v0.7.0) (2026-06-27)
+
+
+### Features
+
+* **effects:** add Spiral effect — firmware "Spiral GO" on Legion, software on Ally ([5682a32](https://github.com/Hooandee/decky-colores/commit/5682a3294a32ac2f92fa01bd991a511da481bdeb))
+* **resume:** restore user lighting after suspend on SteamOS ([5c44e9c](https://github.com/Hooandee/decky-colores/commit/5c44e9c5170fd5191bad90f9bee7f275f24f5c5e))
+
+
+### Bug Fixes
+
+* **legion:** coherent wave effect on single-color-zone devices ([8388a17](https://github.com/Hooandee/decky-colores/commit/8388a17ba8e2cb9d662338423351d5b444516243))
+* **resume:** warn when SteamClient is unavailable at load ([08b943c](https://github.com/Hooandee/decky-colores/commit/08b943c21e02284a038b362cfd6a2b16ca978848))
+* **ux:** consistent disabled states, effect-setter desync, load-error recovery ([bf3ece6](https://github.com/Hooandee/decky-colores/commit/bf3ece6231a7e8381128487aebd720d281f8a86b))
+* **ux:** show the gradient section on single-color devices (Legion Go S) ([7fe3eca](https://github.com/Hooandee/decky-colores/commit/7fe3ecaee75a2c7aa33da6521e6a1b0b53e76a7c))
+
 ## [0.6.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.5.0...decky-colores-v0.6.0) (2026-06-27)
 
 
