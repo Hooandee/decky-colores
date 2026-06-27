@@ -26,12 +26,12 @@ def _rgb(values):
     return {"r": values[0], "g": values[1], "b": values[2]}
 
 
-def _user_runtime_dir():
+def _user_creds():
     try:
-        uid = pwd.getpwnam(decky.DECKY_USER).pw_uid
+        entry = pwd.getpwnam(decky.DECKY_USER)
+        return f"/run/user/{entry.pw_uid}", entry.pw_uid, entry.pw_gid
     except (KeyError, AttributeError):
-        uid = 1000
-    return f"/run/user/{uid}"
+        return "/run/user/1000", 1000, 1000
 
 
 class Plugin:
@@ -55,7 +55,8 @@ class Plugin:
             self._capabilities.get("maxBrightness", 255),
         )
         self._engine = EffectEngine(self._render, self._zones)
-        self._ambilight = Ambilight(self._render, self._zones, _user_runtime_dir())
+        runtime_dir, uid, gid = _user_creds()
+        self._ambilight = Ambilight(self._render, self._zones, runtime_dir, uid, gid)
         self._ready = True
 
     async def get_version(self) -> str:

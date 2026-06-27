@@ -64,10 +64,12 @@ def _gst_command(node, width, height):
 
 
 class Ambilight:
-    def __init__(self, apply_zones, zones, runtime_dir):
+    def __init__(self, apply_zones, zones, runtime_dir, uid=None, gid=None):
         self._apply = apply_zones
         self._zones = max(1, zones)
         self._runtime_dir = runtime_dir
+        self._uid = uid
+        self._gid = gid
         self._task = None
         self._proc = None
         self._options = {}
@@ -86,10 +88,16 @@ class Ambilight:
             env["XDG_RUNTIME_DIR"] = self._runtime_dir
         return env
 
+    def _cred(self):
+        if self._uid is None:
+            return {}
+        return {"user": self._uid, "group": self._gid}
+
     def _find_node(self):
         try:
             result = subprocess.run(
-                ["pw-dump"], capture_output=True, text=True, env=self._env(), timeout=5
+                ["pw-dump"], capture_output=True, text=True, env=self._env(), timeout=5,
+                **self._cred(),
             )
             data = json.loads(result.stdout)
         except (OSError, ValueError, subprocess.SubprocessError) as error:
@@ -144,6 +152,7 @@ class Ambilight:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env=self._env(),
+                **self._cred(),
             )
             self._proc = proc
             while True:
