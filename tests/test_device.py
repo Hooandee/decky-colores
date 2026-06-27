@@ -13,6 +13,14 @@ def test_build_layout_splits_into_two_sticks():
     assert layout[1]["zones"] == [2, 3]
 
 
+def test_build_layout_swap_sticks_reverses_anchor_groups():
+    layout = build_layout(4, swap_sticks=True)
+    assert layout[0]["name"] == "Right stick"
+    assert layout[0]["zones"] == [0, 1]
+    assert layout[1]["name"] == "Left stick"
+    assert layout[1]["zones"] == [2, 3]
+
+
 def test_build_layout_single_zone():
     layout = build_layout(1)
     assert len(layout) == 1

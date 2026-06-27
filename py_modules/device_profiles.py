@@ -11,6 +11,7 @@ MSI_HID = {
     "color_order": "bgr",
     "zones": 9,
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "swap_sticks": True,
     "experimental": ["ambilight"],
 }
 

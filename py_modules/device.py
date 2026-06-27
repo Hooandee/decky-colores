@@ -93,12 +93,12 @@ _STICK_ANCHORS = [
 ]
 
 
-def build_layout(zones):
+def build_layout(zones, swap_sticks=False):
     if zones <= 0:
         return []
     if zones == 1:
         return [{"name": "Lights", "region": [0.0, 0.0, 1.0, 1.0], "zones": [0]}]
-    groups = _STICK_ANCHORS
+    groups = list(reversed(_STICK_ANCHORS)) if swap_sticks else _STICK_ANCHORS
     base, extra = divmod(zones, len(groups))
     layout = []
     index = 0
@@ -154,7 +154,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight):
         "supportedEffects": list(profile.get("supported_effects", [])),
         "states": states,
         "experimental": list(profile.get("experimental", [])),
-        "layout": build_layout(zones),
+        "layout": build_layout(zones, profile.get("swap_sticks", False)),
     }
 
 
