@@ -183,6 +183,33 @@ class Plugin:
         self._apply()
 
     def _apply(self) -> None:
+        if not self._controller.supports_per_zone() and getattr(
+            self._controller, "apply_solid", None
+        ):
+            self._apply_hardware()
+            return
+        self._apply_per_zone()
+
+    def _apply_hardware(self) -> None:
+        s = self._settings
+        self._ambilight.stop()
+        self._engine.stop()
+        brightness = s["brightness"]
+        power = s["power"]
+        if not power:
+            self._controller.apply_solid((0, 0, 0), 0, False)
+            return
+        if s["mode"] == "effect":
+            effect = s["effect"]
+            self._controller.apply_hardware_effect(
+                effect["id"], tuple(s["color"]), effect["speed"], power
+            )
+        elif s["mode"] == "gradient":
+            self._controller.apply_solid(tuple(s["gradient"][0]), brightness, power)
+        else:
+            self._controller.apply_solid(tuple(s["color"]), brightness, power)
+
+    def _apply_per_zone(self) -> None:
         s = self._settings
         if not s["power"]:
             self._ambilight.stop()
