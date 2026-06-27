@@ -5,9 +5,8 @@ import shutil
 import decky
 
 from version import read_version
-from device import detect_device, detect_capabilities
+from device import build_device
 from settings_store import SettingsStore
-from led_controller import LedController
 from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
 from saved_gradients import upsert_gradient, remove_gradient
@@ -21,6 +20,7 @@ DEFAULTS = {
     "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
     "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
     "saved_gradients": [],
+    "enabled_experiments": [],
 }
 
 
@@ -44,24 +44,18 @@ class Plugin:
     def _init(self) -> None:
         if getattr(self, "_ready", False):
             return
-        self._device = detect_device()
-        self._capabilities = detect_capabilities()
-        self._capabilities["effects"] = self._capabilities["color"]
-        self._capabilities["ambilight"] = bool(self._capabilities["color"]) and (
-            shutil.which("gst-launch-1.0") is not None
-        )
+        ambilight_available = shutil.which("gst-launch-1.0") is not None
+        ctx = build_device(ambilight=ambilight_available)
+        self._device = ctx["info"]
+        self._capabilities = ctx["capabilities"]
         self._zones = self._capabilities.get("zones", 1) or 1
+        self._controller = ctx["device"]
         self._store = SettingsStore(
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
         )
         self._settings = self._store.load(DEFAULTS)
         self._settings["ambilight"] = {**DEFAULTS["ambilight"], **self._settings["ambilight"]}
         self._settings["effect"] = {**DEFAULTS["effect"], **self._settings["effect"]}
-        self._controller = LedController(
-            self._capabilities.get("ledPath"),
-            self._zones,
-            self._capabilities.get("maxBrightness", 255),
-        )
         self._engine = EffectEngine(self._render, self._zones)
         runtime_dir, uid, gid = _user_creds()
         self._ambilight = Ambilight(
@@ -80,12 +74,26 @@ class Plugin:
     def _serialized_saved(self) -> list:
         return [_saved(g) for g in self._settings["saved_gradients"]]
 
+    def _merged_capabilities(self) -> dict:
+        caps = dict(self._capabilities)
+        states = dict(caps.get("states", {}))
+        enabled = set(self._settings.get("enabled_experiments", []))
+        for feature, state in states.items():
+            if state == "experimental":
+                caps[feature] = feature in enabled
+            elif state == "supported":
+                caps[feature] = True
+            else:
+                caps[feature] = False
+        caps["enabledExperiments"] = sorted(enabled)
+        return caps
+
     async def get_state(self) -> dict:
         self._init()
         s = self._settings
         return {
             "device": self._device,
-            "capabilities": self._capabilities,
+            "capabilities": self._merged_capabilities(),
             "power": s["power"],
             "brightness": s["brightness"],
             "mode": s["mode"],
@@ -154,6 +162,16 @@ class Plugin:
         self._init()
         self._settings["ambilight"] = {"saturation": saturation, "smoothing": smoothing, "fps": fps}
         self._save_and_apply()
+
+    async def set_experiment(self, feature: str, on: bool) -> None:
+        self._init()
+        enabled = set(self._settings.get("enabled_experiments", []))
+        if on:
+            enabled.add(feature)
+        else:
+            enabled.discard(feature)
+        self._settings["enabled_experiments"] = sorted(enabled)
+        self._store.save(self._settings)
 
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(
