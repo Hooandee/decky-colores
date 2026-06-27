@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
+import { getAmbilightStatus } from "./api";
 import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss } from "./color";
 import { Mode, RGB } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -141,6 +142,7 @@ function Content() {
     setAmbilight,
   } = useColores();
   const [hsv, setHsv] = useState({ h: 0, s: 100, v: 100 });
+  const [ambStatus, setAmbStatus] = useState<string>("idle");
   const init = useRef(false);
 
   useEffect(() => {
@@ -149,6 +151,22 @@ function Content() {
       init.current = true;
     }
   }, [state]);
+
+  const ambientActive = state?.mode === "ambient" && state?.power;
+  useEffect(() => {
+    if (!ambientActive) return;
+    let alive = true;
+    const poll = () =>
+      getAmbilightStatus()
+        .then((s) => alive && setAmbStatus(s))
+        .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [ambientActive]);
 
   if (!state) {
     return (
@@ -282,6 +300,24 @@ function Content() {
 
               {mode === "ambient" && (
                 <>
+                  {power && ambStatus === "no_source" && (
+                    <PanelSectionRow>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: "#ffcf66",
+                          background: "rgba(255, 184, 0, 0.1)",
+                          border: "1px solid rgba(255, 184, 0, 0.3)",
+                          borderRadius: 10,
+                          padding: "10px 12px",
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        No screen to read yet. Ambient works in <b>Game Mode</b> with a game running
+                        (not in Desktop / Big Picture).
+                      </div>
+                    </PanelSectionRow>
+                  )}
                   <PanelSectionRow>
                     <div
                       style={{

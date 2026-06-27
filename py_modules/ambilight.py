@@ -73,6 +73,7 @@ class Ambilight:
         self._task = None
         self._proc = None
         self._options = {}
+        self.status = "idle"
         self._left = (0, 0, 0)
         self._right = (0, 0, 0)
         self._target_left = (0, 0, 0)
@@ -119,6 +120,7 @@ class Ambilight:
         self._task = asyncio.get_event_loop().create_task(self._run())
 
     def stop(self):
+        self.status = "idle"
         if self._task is not None:
             self._task.cancel()
             self._task = None
@@ -136,6 +138,7 @@ class Ambilight:
         node = self._find_node()
         if node is None:
             logger.warning("gamescope PipeWire node not found; ambilight idle")
+            self.status = "no_source"
             self._apply([(0, 0, 0)] * self._zones)
             return
 
@@ -155,6 +158,7 @@ class Ambilight:
                 **self._cred(),
             )
             self._proc = proc
+            self.status = "running"
             while True:
                 frame = await proc.stdout.readexactly(frame_bytes)
                 now = loop.time()
@@ -163,6 +167,7 @@ class Ambilight:
                     self._tick()
                     last = now
         except asyncio.IncompleteReadError:
+            self.status = "no_source"
             await self._log_exit(proc)
             self._apply([(0, 0, 0)] * self._zones)
         except asyncio.CancelledError:

@@ -107,6 +107,10 @@ class Plugin:
         self._settings["effect"] = {"id": effect_id, "speed": speed}
         self._save_and_apply()
 
+    async def get_ambilight_status(self) -> str:
+        self._init()
+        return self._ambilight.status
+
     async def set_ambilight(self, saturation: int, smoothing: int) -> None:
         self._init()
         self._settings["ambilight"] = {"saturation": saturation, "smoothing": smoothing}

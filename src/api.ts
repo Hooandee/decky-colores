@@ -9,3 +9,4 @@ export const setSolid = callable<[r: number, g: number, b: number], void>("set_s
 export const setGradient = callable<[stops: number[][]], void>("set_gradient");
 export const setEffect = callable<[id: string, speed: number], void>("set_effect");
 export const setAmbilight = callable<[saturation: number, smoothing: number], void>("set_ambilight");
+export const getAmbilightStatus = callable<[], string>("get_ambilight_status");
