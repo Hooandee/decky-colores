@@ -34,12 +34,18 @@ function average(colors: RGB[]): RGB {
 }
 
 const RING_MASK =
-  "radial-gradient(closest-side, rgba(0,0,0,0) 56%, #000 60%, #000 100%)";
+  "radial-gradient(closest-side, rgba(0,0,0,0) 70%, #000 74%, #000 100%)";
 
-const Ring: FC<{ colors: RGB[]; intensity: number }> = ({ colors, intensity }) => {
+const Ring: FC<{ colors: RGB[]; intensity: number; mirror?: boolean }> = ({
+  colors,
+  intensity,
+  mirror,
+}) => {
   const glow = rgbToCss(average(colors));
   return (
-    <div style={{ position: "relative", width: 92, height: 92 }}>
+    <div
+      style={{ position: "relative", width: 92, height: 92, transform: mirror ? "scaleX(-1)" : undefined }}
+    >
       <div
         style={{
           position: "absolute",
@@ -58,8 +64,8 @@ const Ring: FC<{ colors: RGB[]; intensity: number }> = ({ colors, intensity }) =
           background: conic(colors),
           WebkitMask: RING_MASK,
           mask: RING_MASK,
-          filter: `drop-shadow(0 0 ${4 + intensity * 9}px ${glow}) blur(0.6px)`,
-          opacity: 0.45 + intensity * 0.55,
+          filter: `drop-shadow(0 0 ${5 + intensity * 11}px ${glow}) blur(0.5px)`,
+          opacity: 0.5 + intensity * 0.5,
           transition: "opacity 140ms ease, filter 140ms ease",
         }}
       />
@@ -69,7 +75,9 @@ const Ring: FC<{ colors: RGB[]; intensity: number }> = ({ colors, intensity }) =
 
 export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, power, label }) => {
   const source = power && colors.length ? colors : [OFF];
-  const lit = source.map((c) => dim(softenForDisplay(c), power ? Math.max(brightness, 12) : 100));
+  const lit = source.map((c) =>
+    dim(softenForDisplay(c, 0.05), power ? Math.max(brightness, 18) : 100),
+  );
   const half = lit.length > 1 ? Math.ceil(lit.length / 2) : lit.length;
   const leftColors = lit.length > 1 ? lit.slice(0, half) : lit;
   const rightColors = lit.length > 1 ? lit.slice(half) : lit;
@@ -86,7 +94,7 @@ export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, powe
       }}
     >
       <div style={{ display: "flex", justifyContent: "center", gap: 34 }}>
-        <Ring colors={leftColors} intensity={intensity} />
+        <Ring colors={leftColors} intensity={intensity} mirror />
         <Ring colors={rightColors} intensity={intensity} />
       </div>
       <div
