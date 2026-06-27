@@ -1,6 +1,7 @@
 import { FC } from "react";
 import { Focusable } from "@decky/ui";
 import { Mode } from "../types";
+import { useI18n } from "../i18n";
 
 interface ModeTabsProps {
   value: Mode;
@@ -8,16 +9,18 @@ interface ModeTabsProps {
   onChange: (m: Mode) => void;
 }
 
-const LABELS: Record<Mode, string> = {
-  solid: "Solid",
-  gradient: "Gradient",
-  effect: "Effect",
-  ambient: "Ambient",
+const LABEL_KEYS: Record<Mode, string> = {
+  solid: "mode.solid",
+  gradient: "mode.gradient",
+  effect: "mode.effect",
+  ambient: "mode.ambient",
 };
 
 const ACCENT = "#5b8cff";
 
-export const ModeTabs: FC<ModeTabsProps> = ({ value, modes, onChange }) => (
+export const ModeTabs: FC<ModeTabsProps> = ({ value, modes, onChange }) => {
+  const { t } = useI18n();
+  return (
   <Focusable
     style={{
       display: "grid",
@@ -53,9 +56,10 @@ export const ModeTabs: FC<ModeTabsProps> = ({ value, modes, onChange }) => (
             transition: "background 140ms ease, box-shadow 140ms ease, color 140ms ease",
           }}
         >
-          {LABELS[mode]}
+          {t(LABEL_KEYS[mode])}
         </Focusable>
       );
     })}
-  </Focusable>
-);
+    </Focusable>
+  );
+};

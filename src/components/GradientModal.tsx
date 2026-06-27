@@ -9,6 +9,7 @@ import {
 import { RGB, GradientPreset, ZoneGroup } from "../types";
 import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss, expandGradient } from "../color";
 import { GRADIENT_PRESETS, harmoniousGradient, randomGradient } from "../palette";
+import { useI18n } from "../i18n";
 
 interface GradientModalProps {
   initial: RGB[];
@@ -56,11 +57,13 @@ const Card: FC<{ children: React.ReactNode; style?: React.CSSProperties }> = ({ 
   </div>
 );
 
-const StopEditor: FC<{ label: string; color: RGB; onChange: (color: RGB) => void }> = ({
-  label,
-  color,
-  onChange,
-}) => {
+const StopEditor: FC<{
+  label: string;
+  color: RGB;
+  hueLabel: string;
+  satLabel: string;
+  onChange: (color: RGB) => void;
+}> = ({ label, color, hueLabel, satLabel, onChange }) => {
   const hsv = rgbToHsv(color);
   const setHue = (h: number) => onChange(hsvToRgb(h, hsv.s, Math.max(hsv.v, 60)));
   const setSat = (s: number) => onChange(hsvToRgb(hsv.h, s, Math.max(hsv.v, 60)));
@@ -90,8 +93,8 @@ const StopEditor: FC<{ label: string; color: RGB; onChange: (color: RGB) => void
         />
         <div style={{ fontSize: 13, fontWeight: 600, color: "rgba(255,255,255,0.85)" }}>{label}</div>
       </div>
-      <SliderField label="Hue" value={hsv.h} min={0} max={360} step={1} onChange={setHue} />
-      <SliderField label="Saturation" value={hsv.s} min={0} max={100} step={1} onChange={setSat} />
+      <SliderField label={hueLabel} value={hsv.h} min={0} max={360} step={1} onChange={setHue} />
+      <SliderField label={satLabel} value={hsv.s} min={0} max={100} step={1} onChange={setSat} />
     </Focusable>
   );
 };
@@ -100,15 +103,20 @@ const StickGroup: FC<{
   title: string;
   indices: number[];
   stops: RGB[];
+  hueLabel: string;
+  satLabel: string;
+  colorLabel: (i: number, total: number) => string;
   onChange: (index: number, color: RGB) => void;
-}> = ({ title, indices, stops, onChange }) => (
+}> = ({ title, indices, stops, hueLabel, satLabel, colorLabel, onChange }) => (
   <div>
     <SectionLabel>{title}</SectionLabel>
     <Focusable style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {indices.map((zone, i) => (
         <StopEditor
           key={zone}
-          label={indices.length > 1 ? `Color ${i + 1}` : "Color"}
+          label={colorLabel(i, indices.length)}
+          hueLabel={hueLabel}
+          satLabel={satLabel}
           color={stops[zone] ?? { r: 255, g: 255, b: 255 }}
           onChange={(c) => onChange(zone, c)}
         />
@@ -118,10 +126,17 @@ const StickGroup: FC<{
 );
 
 export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeModal, onApply }) => {
+  const { t } = useI18n();
   const groups =
-    layout.length > 0 ? layout : [{ name: "Lights", region: [], zones: [0, 1] }];
+    layout.length > 0 ? layout : [{ name: t("gradient.defaultGroup"), region: [], zones: [0, 1] }];
   const count = Math.max(2, groups.reduce((n, g) => n + g.zones.length, 0));
   const [stops, setStops] = useState<RGB[]>(() => expandGradient(initial, count));
+  const hueLabel = t("color.hue");
+  const satLabel = t("color.saturation");
+  const colorLabel = (i: number, total: number) =>
+    total > 1 ? t("gradient.colorN").replace("{n}", String(i + 1)) : t("gradient.color");
+  const presetName = (preset: GradientPreset) =>
+    t(`gradient.preset.${preset.name.toLowerCase()}`);
 
   const setStopAt = (index: number, color: RGB) =>
     setStops((prev) => prev.map((c, i) => (i === index ? color : c)));
@@ -135,9 +150,9 @@ export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeMo
     <ModalRoot closeModal={closeModal} onCancel={closeModal} onOK={apply}>
       <Focusable style={{ display: "flex", flexDirection: "column", gap: 20, padding: 4 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>Crear degradado</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{t("gradient.title")}</div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
-            Dos colores por joystick. Empieza con un preset o ajústalos a mano.
+            {t("gradient.subtitle")}
           </div>
         </div>
 
@@ -152,7 +167,7 @@ export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeMo
         />
 
         <Card>
-          <SectionLabel>Presets</SectionLabel>
+          <SectionLabel>{t("gradient.presets")}</SectionLabel>
           <Focusable
             style={{
               display: "grid",
@@ -186,7 +201,7 @@ export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeMo
                     textAlign: "center",
                   }}
                 >
-                  {preset.name}
+                  {presetName(preset)}
                 </div>
               </Focusable>
             ))}
@@ -201,6 +216,9 @@ export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeMo
                 title={group.name}
                 indices={group.zones}
                 stops={stops}
+                hueLabel={hueLabel}
+                satLabel={satLabel}
+                colorLabel={colorLabel}
                 onChange={setStopAt}
               />
             ))}
@@ -208,29 +226,29 @@ export const GradientModal: FC<GradientModalProps> = ({ initial, layout, closeMo
         </Card>
 
         <Card>
-          <SectionLabel>Asistente</SectionLabel>
+          <SectionLabel>{t("gradient.wizard")}</SectionLabel>
           <Focusable style={{ display: "flex", gap: 10 }}>
             <DialogButton
               onClick={() => setStops(expandGradient(randomGradient(), count))}
               style={{ flex: 1, background: `linear-gradient(135deg, ${ACCENT}, #00c4ff)`, border: "none" }}
             >
-              Sorpréndeme
+              {t("gradient.surprise")}
             </DialogButton>
             <DialogButton
               onClick={() => setStops(expandGradient(harmoniousGradient(stops[0]), count))}
               style={{ flex: 1, background: "rgba(255,255,255,0.06)", border: `1px solid ${BORDER}` }}
             >
-              Auto-paleta
+              {t("gradient.autoPalette")}
             </DialogButton>
           </Focusable>
         </Card>
 
         <Focusable style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <ButtonItem layout="below" bottomSeparator="none" onClick={apply}>
-            Aplicar
+            {t("gradient.apply")}
           </ButtonItem>
           <ButtonItem layout="below" bottomSeparator="none" onClick={() => closeModal?.()}>
-            Cancelar
+            {t("gradient.cancel")}
           </ButtonItem>
         </Focusable>
       </Focusable>

@@ -23,6 +23,7 @@ import { ModeTabs } from "./components/ModeTabs";
 import { EffectsGallery } from "./components/EffectsGallery";
 import { GradientModal } from "./components/GradientModal";
 import { GRADIENT_PRESETS, EFFECT_PRESETS } from "./palette";
+import { I18nProvider, LangToggle, useI18n } from "./i18n";
 
 function DeviceHeader({ name, color }: { name: string; color: RGB }) {
   return (
@@ -55,6 +56,7 @@ function GradientControls({
   layout: ZoneGroup[];
   onChange: (stops: RGB[]) => void;
 }) {
+  const { t } = useI18n();
   const open = () =>
     showModal(<GradientModal initial={gradient} layout={layout} onApply={onChange} />);
   return (
@@ -82,7 +84,7 @@ function GradientControls({
               textShadow: "0 1px 3px rgba(0,0,0,0.6)",
             }}
           >
-            Edit gradient
+            {t("gradient.edit")}
           </span>
         </Focusable>
       </PanelSectionRow>
@@ -125,6 +127,7 @@ function Content() {
     setEffectGradient,
     setAmbilight,
   } = useColores();
+  const { t } = useI18n();
   const [ambStatus, setAmbStatus] = useState<string>("idle");
 
   const ambientActive = state?.mode === "ambient" && state?.power;
@@ -183,13 +186,16 @@ function Content() {
   return (
     <PanelSection>
       <PanelSectionRow>
+        <LangToggle />
+      </PanelSectionRow>
+      <PanelSectionRow>
         <DeviceHeader name={device.name} color={previewColors[0]} />
       </PanelSectionRow>
 
       {!hasLeds && (
         <PanelSectionRow>
           <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", padding: "4px 2px" }}>
-            No controllable LEDs detected on this device.
+            {t("device.noLeds")}
           </div>
         </PanelSectionRow>
       )}
@@ -201,12 +207,12 @@ function Content() {
               colors={previewColors}
               brightness={brightness}
               power={power}
-              label={mode === "ambient" ? "Reacting to screen" : undefined}
+              label={mode === "ambient" ? t("device.preview.ambient") : undefined}
             />
           </PanelSectionRow>
 
           <PanelSectionRow>
-            <ToggleField label="Power" checked={power} onChange={setPower} bottomSeparator="thick" />
+            <ToggleField label={t("power.label")} checked={power} onChange={setPower} bottomSeparator="thick" />
           </PanelSectionRow>
 
           {caps.color && (
@@ -240,7 +246,7 @@ function Content() {
                     <>
                       <PanelSectionRow>
                         <ToggleField
-                          label="Use custom gradient"
+                          label={t("effect.useGradient")}
                           checked={effect.useGradient}
                           disabled={!power}
                           onChange={setEffectGradient}
@@ -273,7 +279,7 @@ function Content() {
                           padding: "4px 2px 8px",
                         }}
                       >
-                        This effect uses the full color spectrum.
+                        {t("effect.spectrumNote")}
                       </div>
                     </PanelSectionRow>
                   )}
@@ -295,8 +301,7 @@ function Content() {
                           lineHeight: 1.45,
                         }}
                       >
-                        No screen to read yet. Ambient works in <b>Game Mode</b> with a game running
-                        (not in Desktop / Big Picture).
+                        {t("ambient.gameModeBanner")}
                       </div>
                     </PanelSectionRow>
                   )}
@@ -309,13 +314,12 @@ function Content() {
                         lineHeight: 1.45,
                       }}
                     >
-                      Lights follow the screen near each stick — left from the top-left, right from
-                      the mid-right.
+                      {t("ambient.stickHint")}
                     </div>
                   </PanelSectionRow>
                   <PanelSectionRow>
                     <SliderField
-                      label="Vividness"
+                      label={t("ambient.vividness")}
                       value={ambilight.saturation}
                       min={100}
                       max={250}
@@ -328,7 +332,7 @@ function Content() {
                   </PanelSectionRow>
                   <PanelSectionRow>
                     <SliderField
-                      label="Smoothing"
+                      label={t("ambient.smoothing")}
                       value={ambilight.smoothing}
                       min={0}
                       max={100}
@@ -341,7 +345,7 @@ function Content() {
                   </PanelSectionRow>
                   <PanelSectionRow>
                     <SliderField
-                      label="Capture rate"
+                      label={t("ambient.captureRate")}
                       value={ambilight.fps}
                       min={5}
                       max={30}
@@ -366,7 +370,7 @@ function Content() {
               </PanelSectionRow>
               <PanelSectionRow>
                 <SliderField
-                  label="Brightness"
+                  label={t("brightness.label")}
                   value={brightness}
                   min={0}
                   max={100}
@@ -390,7 +394,9 @@ export default definePlugin(() => ({
   titleView: <div className={staticClasses.Title}>Colores</div>,
   content: (
     <ErrorBoundary>
-      <Content />
+      <I18nProvider>
+        <Content />
+      </I18nProvider>
     </ErrorBoundary>
   ),
   icon: <FaPalette />,

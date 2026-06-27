@@ -3,6 +3,7 @@ import { PanelSectionRow, SliderField, Focusable } from "@decky/ui";
 import { RGB } from "../types";
 import { hsvToRgb, rgbToHsv, rgbToCss } from "../color";
 import { Swatches } from "./Swatches";
+import { useI18n } from "../i18n";
 
 const HUE_BAR =
   "linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)";
@@ -26,6 +27,7 @@ interface ColorEditorProps {
 }
 
 export const ColorEditor: FC<ColorEditorProps> = ({ color, disabled, onChange }) => {
+  const { t } = useI18n();
   const [hsv, setHsv] = useState(() => ({ ...rgbToHsv(color), v: 100 }));
 
   const edit = (next: { h: number; s: number; v: number }) => {
@@ -50,7 +52,7 @@ export const ColorEditor: FC<ColorEditorProps> = ({ color, disabled, onChange })
       <PanelSectionRow>
         <Track background={HUE_BAR} />
         <SliderField
-          label="Hue"
+          label={t("color.hue")}
           value={hsv.h}
           min={0}
           max={360}
@@ -62,7 +64,7 @@ export const ColorEditor: FC<ColorEditorProps> = ({ color, disabled, onChange })
       <PanelSectionRow>
         <Track background={satTrack} />
         <SliderField
-          label="Saturation"
+          label={t("color.saturation")}
           value={hsv.s}
           min={0}
           max={100}

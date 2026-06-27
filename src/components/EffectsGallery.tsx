@@ -2,6 +2,7 @@ import { FC } from "react";
 import { Focusable, SliderField } from "@decky/ui";
 import { EffectId, EffectMeta, RGB } from "../types";
 import { rgbToCss } from "../color";
+import { useI18n } from "../i18n";
 
 interface EffectsGalleryProps {
   effects: EffectMeta[];
@@ -132,7 +133,9 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
   speed,
   onSelect,
   onSpeed,
-}) => (
+}) => {
+  const { t } = useI18n();
+  return (
   <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
     <Keyframes />
     <Focusable
@@ -176,14 +179,14 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
                 textAlign: "center",
               }}
             >
-              {effect.label}
+              {t(`effect.${effect.id}.label`)}
             </div>
           </Focusable>
         );
       })}
     </Focusable>
     <SliderField
-      label="Speed"
+      label={t("effect.speed")}
       value={speed}
       min={0}
       max={100}
@@ -193,4 +196,5 @@ export const EffectsGallery: FC<EffectsGalleryProps> = ({
       onChange={onSpeed}
     />
   </div>
-);
+  );
+};

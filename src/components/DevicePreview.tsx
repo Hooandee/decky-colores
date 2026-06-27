@@ -1,6 +1,7 @@
 import { FC } from "react";
 import { RGB } from "../types";
 import { dim, rgbToCss, softenForDisplay } from "../color";
+import { useI18n } from "../i18n";
 
 interface DevicePreviewProps {
   colors: RGB[];
@@ -68,6 +69,7 @@ const Ring: FC<{ colors: RGB[]; intensity: number }> = ({ colors, intensity }) =
 };
 
 export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, power, label }) => {
+  const { t } = useI18n();
   const source = power && colors.length ? colors : [OFF];
   const lit = source.map((c) => dim(softenForDisplay(c), power ? Math.max(brightness, 12) : 100));
   const half = lit.length > 1 ? Math.ceil(lit.length / 2) : lit.length;
@@ -99,7 +101,7 @@ export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, powe
           marginTop: 8,
         }}
       >
-        {power ? (label ?? "Joystick rings") : "Off"}
+        {power ? (label ?? t("device.preview.rings")) : t("device.preview.off")}
       </div>
     </div>
   );
