@@ -41,7 +41,7 @@ export const About: FC = () => {
       </div>
       {version && (
         <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginBottom: 4 }}>
-          {t("about.version").replace("{v}", version)}
+          {t("about.version", { v: version })}
         </div>
       )}
       <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
