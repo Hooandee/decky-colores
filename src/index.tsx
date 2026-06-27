@@ -5,6 +5,7 @@ import {
   ToggleField,
   Focusable,
   Spinner,
+  ErrorBoundary,
   showModal,
   staticClasses,
 } from "@decky/ui";
@@ -14,7 +15,7 @@ import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
 import { hsvToRgb, rgbToHsv, rgbToCss } from "./color";
-import { RGB } from "./types";
+import { Mode, RGB } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { Swatches } from "./components/Swatches";
 import { ModeTabs } from "./components/ModeTabs";
@@ -135,6 +136,7 @@ function Content() {
     setGradient,
     setEffectId,
     setEffectSpeed,
+    setAmbilight,
   } = useColores();
   const [hsv, setHsv] = useState({ h: 0, s: 100, v: 100 });
   const init = useRef(false);
@@ -158,15 +160,26 @@ function Content() {
     );
   }
 
-  const { capabilities: caps, color, gradient, effect, brightness, power, mode, device } = state;
+  const { capabilities: caps, color, gradient, effect, ambilight, brightness, power, mode, device } =
+    state;
   const hasLeds = caps.color || caps.brightness;
+
+  const modes: Mode[] = ["solid", "gradient", "effect"];
+  if (caps.ambilight) modes.push("ambient");
+
+  const AMBIENT_HINT: RGB[] = [
+    { r: 0, g: 196, b: 255 },
+    { r: 124, g: 92, b: 255 },
+  ];
 
   const previewColors: RGB[] =
     mode === "gradient"
       ? gradient
       : mode === "effect"
         ? EFFECT_PRESETS.find((e) => e.id === effect.id)?.colors ?? [color]
-        : [color];
+        : mode === "ambient"
+          ? AMBIENT_HINT
+          : [color];
 
   const editHsv = (next: { h: number; s: number; v: number }) => {
     setHsv(next);
@@ -197,7 +210,12 @@ function Content() {
       {hasLeds && (
         <>
           <PanelSectionRow>
-            <DevicePreview colors={previewColors} brightness={brightness} power={power} />
+            <DevicePreview
+              colors={previewColors}
+              brightness={brightness}
+              power={power}
+              label={mode === "ambient" ? "Reacting to screen" : undefined}
+            />
           </PanelSectionRow>
 
           <PanelSectionRow>
@@ -207,7 +225,7 @@ function Content() {
           {caps.color && (
             <>
               <PanelSectionRow>
-                <ModeTabs value={mode} onChange={setMode} />
+                <ModeTabs value={mode} modes={modes} onChange={setMode} />
               </PanelSectionRow>
 
               {mode === "solid" && (
@@ -259,6 +277,50 @@ function Content() {
                   />
                 </PanelSectionRow>
               )}
+
+              {mode === "ambient" && (
+                <>
+                  <PanelSectionRow>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "rgba(255,255,255,0.55)",
+                        padding: "2px 2px 6px",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      Lights follow the screen near each stick — left from the top-left, right from
+                      the mid-right.
+                    </div>
+                  </PanelSectionRow>
+                  <PanelSectionRow>
+                    <SliderField
+                      label="Vividness"
+                      value={ambilight.saturation}
+                      min={100}
+                      max={250}
+                      step={5}
+                      valueSuffix="%"
+                      showValue
+                      disabled={!power}
+                      onChange={(v) => setAmbilight(v, ambilight.smoothing)}
+                    />
+                  </PanelSectionRow>
+                  <PanelSectionRow>
+                    <SliderField
+                      label="Smoothing"
+                      value={ambilight.smoothing}
+                      min={0}
+                      max={100}
+                      step={1}
+                      valueSuffix="%"
+                      showValue
+                      disabled={!power}
+                      onChange={(v) => setAmbilight(ambilight.saturation, v)}
+                    />
+                  </PanelSectionRow>
+                </>
+              )}
             </>
           )}
 
@@ -286,7 +348,11 @@ function Content() {
 export default definePlugin(() => ({
   name: "Colores",
   titleView: <div className={staticClasses.Title}>Colores</div>,
-  content: <Content />,
+  content: (
+    <ErrorBoundary>
+      <Content />
+    </ErrorBoundary>
+  ),
   icon: <FaPalette />,
   onDismount() {},
 }));

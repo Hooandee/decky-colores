@@ -1,4 +1,6 @@
 import os
+import pwd
+import shutil
 
 import decky
 
@@ -7,6 +9,7 @@ from device import detect_device, detect_capabilities
 from settings_store import SettingsStore
 from led_controller import LedController
 from effects import EffectEngine, interpolate_gradient
+from ambilight import Ambilight
 
 DEFAULTS = {
     "power": True,
@@ -15,11 +18,20 @@ DEFAULTS = {
     "color": [255, 255, 255],
     "gradient": [[0, 196, 255], [136, 86, 255]],
     "effect": {"id": "breathing", "speed": 50},
+    "ambilight": {"saturation": 140, "smoothing": 75},
 }
 
 
 def _rgb(values):
     return {"r": values[0], "g": values[1], "b": values[2]}
+
+
+def _user_runtime_dir():
+    try:
+        uid = pwd.getpwnam(decky.DECKY_USER).pw_uid
+    except (KeyError, AttributeError):
+        uid = 1000
+    return f"/run/user/{uid}"
 
 
 class Plugin:
@@ -29,6 +41,9 @@ class Plugin:
         self._device = detect_device()
         self._capabilities = detect_capabilities()
         self._capabilities["effects"] = self._capabilities["color"]
+        self._capabilities["ambilight"] = bool(self._capabilities["color"]) and (
+            shutil.which("gst-launch-1.0") is not None
+        )
         self._zones = self._capabilities.get("zones", 1) or 1
         self._store = SettingsStore(
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
@@ -40,6 +55,7 @@ class Plugin:
             self._capabilities.get("maxBrightness", 255),
         )
         self._engine = EffectEngine(self._render, self._zones)
+        self._ambilight = Ambilight(self._render, self._zones, _user_runtime_dir())
         self._running_sig = None
         self._ready = True
 
@@ -58,6 +74,7 @@ class Plugin:
             "color": _rgb(s["color"]),
             "gradient": [_rgb(c) for c in s["gradient"]],
             "effect": s["effect"],
+            "ambilight": s["ambilight"],
         }
 
     async def set_power(self, on: bool) -> None:
@@ -90,6 +107,11 @@ class Plugin:
         self._settings["effect"] = {"id": effect_id, "speed": speed}
         self._save_and_apply()
 
+    async def set_ambilight(self, saturation: int, smoothing: int) -> None:
+        self._init()
+        self._settings["ambilight"] = {"saturation": saturation, "smoothing": smoothing}
+        self._save_and_apply()
+
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(
             zone_colors, self._settings["brightness"], self._settings["power"]
@@ -102,12 +124,29 @@ class Plugin:
     def _apply(self) -> None:
         s = self._settings
         if not s["power"]:
+            self._ambilight.stop()
             self._engine.set_static([(0, 0, 0)] * self._zones)
             self._running_sig = None
             return
 
-        mode = s["mode"]
-        if mode == "effect":
+        if s["mode"] == "ambient":
+            self._engine.stop()
+            amb = s["ambilight"]
+            sig = ("ambient", amb["saturation"], amb["smoothing"])
+            if sig != self._running_sig or not self._ambilight.running:
+                self._ambilight.start(
+                    {
+                        "saturation": amb["saturation"] / 100.0,
+                        "smoothing": amb["smoothing"],
+                        "fps": 12,
+                    }
+                )
+                self._running_sig = sig
+            return
+
+        self._ambilight.stop()
+
+        if s["mode"] == "effect":
             effect = s["effect"]
             color = tuple(s["color"])
             stops = [tuple(c) for c in s["gradient"]]
@@ -119,7 +158,7 @@ class Plugin:
                 self._running_sig = sig
             return
 
-        if mode == "gradient":
+        if s["mode"] == "gradient":
             stops = [tuple(c) for c in s["gradient"]]
             self._engine.set_static(interpolate_gradient(stops, self._zones))
         else:
@@ -129,17 +168,20 @@ class Plugin:
     async def _main(self):
         self._init()
         decky.logger.info(
-            "Colores v%s on %s (euid=%s color=%s zones=%s ledPath=%s)",
+            "Colores v%s on %s (euid=%s color=%s zones=%s ambilight=%s ledPath=%s)",
             read_version(),
             self._device["name"],
             os.geteuid(),
             self._capabilities["color"],
             self._capabilities["zones"],
+            self._capabilities["ambilight"],
             self._capabilities.get("ledPath"),
         )
         self._apply()
 
     async def _unload(self):
+        if getattr(self, "_ambilight", None):
+            self._ambilight.stop()
         if getattr(self, "_engine", None):
             self._engine.stop()
         decky.logger.info("Colores unloaded")

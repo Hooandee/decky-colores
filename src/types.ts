@@ -14,11 +14,17 @@ export interface Capabilities {
   color: boolean;
   brightness: boolean;
   effects: boolean;
+  ambilight: boolean;
   zones: number;
   maxBrightness: number;
 }
 
-export type Mode = "solid" | "gradient" | "effect";
+export type Mode = "solid" | "gradient" | "effect" | "ambient";
+
+export interface AmbilightState {
+  saturation: number;
+  smoothing: number;
+}
 
 export type EffectId = "breathing" | "rainbow" | "wave" | "cycle";
 
@@ -36,6 +42,7 @@ export interface ColoresState {
   color: RGB;
   gradient: RGB[];
   effect: EffectState;
+  ambilight: AmbilightState;
 }
 
 export interface GradientPreset {
