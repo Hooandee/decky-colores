@@ -1,5 +1,8 @@
 import os
 
+from device_profiles import resolve_profile
+from led_device import SysfsRgbDevice, NullDevice
+
 DEVICE_REGISTRY = [
     ("board", "Jupiter", "Steam Deck"),
     ("board", "Galileo", "Steam Deck OLED"),
@@ -163,3 +166,40 @@ def _find_rgb_led(leds_dir):
         if os.path.exists(os.path.join(path, "multi_intensity")):
             return path
     return None
+
+
+_IMPLEMENTED_DRIVERS = {"sysfs"}
+
+
+def build_device(sysfs_root="/", ambilight=False):
+    info = detect_device(sysfs_root)
+    profile = resolve_profile(info["board"], info["product"])
+    info["name"] = profile["name"]
+
+    leds_dir = os.path.join(sysfs_root, "sys/class/leds")
+    led_path = _find_rgb_led(leds_dir)
+
+    if led_path:
+        zones, index_format = read_zone_format(led_path)
+        if profile.get("zones"):
+            zones = profile["zones"]
+        max_brightness = _max_brightness(_read(os.path.join(led_path, "max_brightness")))
+        device = SysfsRgbDevice(
+            led_path, zones, max_brightness, profile["color_order"], index_format
+        )
+        has_led = True
+    else:
+        zones, max_brightness, device, has_led = 0, 255, NullDevice(), False
+
+    if profile["driver"] not in _IMPLEMENTED_DRIVERS:
+        for feature in ("color", "brightness", "effects", "ambilight"):
+            if feature not in profile["experimental"]:
+                profile["experimental"].append(feature)
+
+    capabilities = build_capabilities(profile, has_led, zones, max_brightness, ambilight)
+    return {
+        "info": info,
+        "capabilities": capabilities,
+        "layout": capabilities["layout"],
+        "device": device,
+    }

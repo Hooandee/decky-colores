@@ -1,6 +1,9 @@
 import os
 
-from py_modules.device import build_layout, detect_device, detect_capabilities, lookup_name, read_zone_format, build_capabilities
+from py_modules.device import build_layout, detect_device, detect_capabilities, lookup_name, read_zone_format, build_capabilities, build_device
+import led_device as _led_device_mod
+SysfsRgbDevice = _led_device_mod.SysfsRgbDevice
+NullDevice = _led_device_mod.NullDevice
 
 
 def test_build_layout_splits_into_two_sticks():
@@ -135,3 +138,35 @@ def test_build_capabilities_unsupported_when_absent():
     caps = build_capabilities(profile, has_led=False, zones=0, max_brightness=255, ambilight=False)
     assert caps["states"]["color"] == "unsupported"
     assert caps["color"] is False
+
+
+def test_build_device_ally_returns_sysfs_writer(tmp_path):
+    _make_dmi(str(tmp_path), "RC72LA", "ROG Ally X RC72LA")
+    _make_led(str(tmp_path), "ally:rgb:joystick_rings",
+              {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb",
+               "max_brightness": "255", "brightness": "0"})
+    ctx = build_device(str(tmp_path))
+    assert ctx["info"]["name"] == "ROG Ally X"
+    assert isinstance(ctx["device"], SysfsRgbDevice)
+    assert ctx["capabilities"]["states"]["color"] == "supported"
+    assert ctx["capabilities"]["zones"] == 4
+
+
+def test_build_device_legion_without_node_is_null_and_experimental(tmp_path):
+    _make_dmi(str(tmp_path), "83N0", "83N0")
+    os.makedirs(os.path.join(str(tmp_path), "sys/class/leds"))
+    ctx = build_device(str(tmp_path))
+    assert ctx["info"]["name"] == "Legion Go 2"
+    assert isinstance(ctx["device"], NullDevice)
+    assert ctx["capabilities"]["states"]["color"] == "experimental"
+
+
+def test_build_device_msi_uses_bgr_on_sysfs_fallback(tmp_path):
+    _make_dmi(str(tmp_path), "", "Claw 8 AI+ A2VM")
+    _make_led(str(tmp_path), "rgb:claw",
+              {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb",
+               "max_brightness": "255", "brightness": "0"})
+    ctx = build_device(str(tmp_path))
+    assert ctx["info"]["name"] == "MSI Claw 8 AI+"
+    assert isinstance(ctx["device"], SysfsRgbDevice)
+    assert ctx["device"]._color_order == "bgr"
