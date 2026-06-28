@@ -3,6 +3,7 @@ import os
 from device_profiles import resolve_profile
 from led_device import SysfsRgbDevice, NullDevice
 from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device
+from power_led import PowerLedController
 
 DEVICE_REGISTRY = [
     ("board", "Jupiter", "Steam Deck"),
@@ -134,7 +135,7 @@ def _feature_state(profile, feature, present):
     return "supported" if present else "unsupported"
 
 
-def build_capabilities(profile, has_led, zones, max_brightness, ambilight):
+def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power_led=None):
     present = {
         "color": has_led,
         "brightness": has_led,
@@ -158,6 +159,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight):
         "supportedEffects": list(profile.get("supported_effects", [])),
         "states": states,
         "experimental": list(profile.get("experimental", [])),
+        "powerLed": bool(power_led and power_led.available()),
         "layout": build_layout(zones, profile.get("swap_sticks", False)),
     }
 
@@ -182,12 +184,12 @@ def _find_rgb_led(leds_dir):
 _IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s"}
 
 
-def _build_hid_context(profile, ambilight):
+def _build_hid_context(profile, ambilight, power_led=None):
     device = build_hid_device(profile["driver"])
     if device is None or not device.available:
         return None
     zones = profile.get("zones") or 1
-    capabilities = build_capabilities(profile, True, zones, 100, ambilight)
+    capabilities = build_capabilities(profile, True, zones, 100, ambilight, power_led)
     capabilities["perZone"] = device.supports_per_zone()
     capabilities["hardwareEffects"] = device.supports_hardware_effects()
     capabilities["reconnectable"] = True
@@ -198,15 +200,17 @@ def build_device(sysfs_root="/", ambilight=False):
     info = detect_device(sysfs_root)
     profile = resolve_profile(info["board"], info["product"])
     info["name"] = profile["name"]
+    power_led = PowerLedController(profile.get("power_led"))
 
     if profile["driver"] in HID_DRIVERS:
         if HID_AVAILABLE:
-            hid_ctx = _build_hid_context(profile, ambilight)
+            hid_ctx = _build_hid_context(profile, ambilight, power_led)
             if hid_ctx is not None:
                 return {
                     "info": info,
                     "capabilities": hid_ctx["capabilities"],
                     "device": hid_ctx["device"],
+                    "power_led": power_led,
                 }
         profile["experimental"] = _all_experimental(profile)
 
@@ -229,9 +233,10 @@ def build_device(sysfs_root="/", ambilight=False):
     if profile["driver"] not in _IMPLEMENTED_DRIVERS:
         profile["experimental"] = _all_experimental(profile)
 
-    capabilities = build_capabilities(profile, has_led, zones, max_brightness, ambilight)
+    capabilities = build_capabilities(profile, has_led, zones, max_brightness, ambilight, power_led)
     return {
         "info": info,
         "capabilities": capabilities,
         "device": device,
+        "power_led": power_led,
     }

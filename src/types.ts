@@ -33,6 +33,7 @@ export interface Capabilities {
   experimental: string[];
   states: Record<string, "supported" | "experimental" | "unsupported">;
   enabledExperiments: string[];
+  powerLed: boolean;
 }
 
 export type Mode = "solid" | "gradient" | "effect" | "ambient";
@@ -63,6 +64,7 @@ export interface ColoresState {
   effect: EffectState;
   ambilight: AmbilightState;
   savedGradients: GradientPreset[];
+  powerLedOff: boolean;
 }
 
 export interface GradientPreset {

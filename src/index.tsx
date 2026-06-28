@@ -218,6 +218,7 @@ function Content() {
     saveGradient,
     deleteGradient,
     setExperiment,
+    setPowerLed,
     reconnect,
   } = useColores();
   const { t } = useI18n();
@@ -285,6 +286,7 @@ function Content() {
     mode,
     device,
     savedGradients,
+    powerLedOff,
   } = state;
   const hasLeds = caps.color || caps.brightness;
 
@@ -570,6 +572,40 @@ function Content() {
               </PanelSectionRow>
             </>
           )}
+        </>
+      )}
+
+      {caps.powerLed && (
+        <>
+          <PanelSectionRow>
+            <div
+              style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }}
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div style={{ fontWeight: 600, fontSize: 13, padding: "2px 2px 6px" }}>
+              {t("powerLed.section")}
+            </div>
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <ToggleField
+              label={t("powerLed.label")}
+              checked={powerLedOff}
+              onChange={setPowerLed}
+            />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <div
+              style={{
+                fontSize: 12,
+                color: "rgba(255,255,255,0.55)",
+                padding: "0 2px 4px",
+                lineHeight: 1.45,
+              }}
+            >
+              {t("powerLed.warning")}
+            </div>
+          </PanelSectionRow>
         </>
       )}
 

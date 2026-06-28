@@ -133,6 +133,11 @@ export function useColores() {
       .catch((e) => console.error("Colores: deleteGradient failed", e));
   };
 
+  const setPowerLed = (off: boolean) => {
+    setState((s) => (s ? { ...s, powerLedOff: off } : s));
+    api.setPowerLed(off).catch((e) => console.error("Colores: setPowerLed failed", e));
+  };
+
   const setExperiment = (feature: string, on: boolean) => {
     api
       .setExperiment(feature, on)
@@ -163,6 +168,7 @@ export function useColores() {
     saveGradient,
     deleteGradient,
     setExperiment,
+    setPowerLed,
     reconnect,
   };
 }
