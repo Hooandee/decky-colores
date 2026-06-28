@@ -6,6 +6,8 @@ RGB lighting control for handheld PCs, as a [Decky Loader](https://github.com/St
 
 Colores detects your handheld at startup and shows you only what your machine can actually do. No config, no editing files, no picking your model from a list. Open it from the quick access menu and you're set.
 
+https://youtu.be/ug5Nh0YtadE
+
 ## Supported devices
 
 | Brand | Models | Notes |
