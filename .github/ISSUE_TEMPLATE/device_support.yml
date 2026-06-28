@@ -1,0 +1,52 @@
+name: "Soporte de dispositivo / Device support"
+description: "Pedir soporte para una consola que no está en la lista / Request support for an unlisted handheld"
+labels: ["device-support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Para añadir una consola necesito unos pocos datos del sistema. Mejor aún
+        si tienes el hardware y puedes ayudar a calibrar los LEDs.
+        To add a handheld I need a few system details. Even better if you have
+        the hardware and can help calibrate the LEDs.
+
+  - type: input
+    id: device
+    attributes:
+      label: "Consola / Handheld"
+      placeholder: "Marca y modelo / Brand and model"
+    validations:
+      required: true
+
+  - type: textarea
+    id: dmi
+    attributes:
+      label: "Identidad DMI / DMI identity"
+      description: "Pega la salida / Paste the output of:"
+      value: |
+        cat /sys/class/dmi/id/board_name
+        cat /sys/class/dmi/id/product_name
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: leds
+    attributes:
+      label: "LEDs"
+      description: "Si puedes, pega la salida / If you can, paste the output of:"
+      value: |
+        ls /sys/class/leds/
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: help
+    attributes:
+      label: "¿Puedes ayudar a probar? / Can you help test?"
+      options:
+        - "Sí, tengo el hardware y puedo probar / Yes, I have it and can test"
+        - "No, solo aporto los datos / No, just providing the info"
+    validations:
+      required: true
