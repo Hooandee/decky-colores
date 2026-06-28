@@ -1,4 +1,4 @@
-# Colores
+# Colores ✨
 
 Control de luces RGB para PCs portátiles, como plugin de [Decky Loader](https://github.com/SteamDeckHomebrew/decky-loader).
 
