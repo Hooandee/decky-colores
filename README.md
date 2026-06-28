@@ -56,7 +56,7 @@ El motor de control de luces por dispositivo está adaptado de [HueSync](https:/
 
 Colores también se apoya en la [plantilla de plugins de Decky](https://github.com/SteamDeckHomebrew/decky-plugin-template) de Steam Deck Homebrew.
 
-Hecho con todo el cariño por las portátiles.
+Hecho con todo el cariño por las portátiles ❤️.
 
 ## Desarrollo
 
