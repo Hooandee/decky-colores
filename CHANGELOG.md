@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.8.0...decky-colores-v0.9.0) (2026-06-28)
+
+
+### Features
+
+* **ux:** replace plugin icon with a color wheel ([98b3360](https://github.com/Hooandee/decky-colores/commit/98b3360c1f0e56ae38daf010b3579b50c2b345b4))
+
 ## [0.8.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.7.0...decky-colores-v0.8.0) (2026-06-27)
 
 
