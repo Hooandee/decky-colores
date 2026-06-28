@@ -35,7 +35,7 @@ Todo se adapta a tu consola. Si tu máquina solo tiene un color global, no te mu
 
 - **Legion Go: un solo color por mando.** El firmware de estas consolas no permite varios colores a la vez en un mismo mando, así que el degradado se ve como un fundido suave entre colores en lugar de zonas separadas. La espiral, además, es el efecto giratorio propio del firmware ("Espiral GO").
 
-- **Consolas no listadas.** Las funciones experimentales son justo eso, experimentales. Si tienes una máquina que no aparece arriba y quieres ayudar a darle soporte, abre un issue.
+- **Consolas no listadas.** Las funciones experimentales son justo eso, experimentales. Si tienes una máquina que no aparece arriba y quieres ayudar a darle soporte, abre un issue y lo veo 🙌.
 
 ## Instalación
 
@@ -48,7 +48,7 @@ Colores necesita permisos de root para escribir en los LEDs del sistema. Decky t
 
 ## Saca más partido a tu consola
 
-Hago vídeos sobre PCs portátiles, trucos, ajustes y cómo exprimir estas máquinas. Si Colores te ha gustado, pásate por el canal: [youtube.com/@Hooandee](https://www.youtube.com/@Hooandee).
+Hago vídeos sobre Handheld PCs, trucos, ajustes y cómo exprimir estas pequeñajas. Si Colores te ha gustado, pásate por mi canal: [youtube.com/@Hooandee](https://www.youtube.com/@Hooandee).
 
 ## Agradecimientos
 
