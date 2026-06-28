@@ -6,6 +6,8 @@ Español · [English](README.en.md)
 
 Colores detecta tu consola al arrancar y te muestra solo lo que tu máquina puede hacer de verdad. Sin configuración, sin tocar archivos, sin elegir tu modelo en una lista. Lo abres desde el menú de acceso rápido y ya está.
 
+https://youtu.be/ug5Nh0YtadE
+
 ## Dispositivos compatibles
 
 | Marca | Modelos | Detalles |
