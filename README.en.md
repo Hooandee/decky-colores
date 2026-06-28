@@ -35,7 +35,7 @@ Everything adapts to your handheld. If your machine only has a single global col
 
 - **Legion Go: one color per controller.** The firmware on these machines doesn't allow multiple colors at once on a single controller, so a gradient shows as a smooth crossfade between colors rather than separate zones. The spiral is also the controller's own firmware rotating effect ("Spiral GO").
 
-- **Unlisted devices.** Experimental features are exactly that, experimental. If you have a machine that isn't above and want to help add support, open an issue.
+- **Unlisted devices.** Experimental features are exactly that, experimental. If you have a machine that isn't above and want to help add support, open an issue and I will take a look 🙌.
 
 ## Installation
 
