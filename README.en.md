@@ -56,7 +56,7 @@ The per-device lighting engine is adapted from [HueSync](https://github.com/honj
 
 Colores also builds on the [Decky plugin template](https://github.com/SteamDeckHomebrew/decky-plugin-template) by Steam Deck Homebrew.
 
-Made with a lot of love for handhelds.
+Made with a lot of love for handhelds ❤️.
 
 ## Development
 
