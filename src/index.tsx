@@ -12,7 +12,6 @@ import {
 } from "@decky/ui";
 import { definePlugin } from "@decky/api";
 import { useEffect, useMemo, useState } from "react";
-import { FaPalette } from "react-icons/fa";
 
 import { useColores } from "./useColores";
 import { getAmbilightStatus, reconnect as apiReconnect } from "./api";
@@ -24,6 +23,7 @@ import { ModeTabs } from "./components/ModeTabs";
 import { EffectsGallery } from "./components/EffectsGallery";
 import { GradientModal } from "./components/GradientModal";
 import { About } from "./components/About";
+import { ColorWheelIcon } from "./components/ColorWheelIcon";
 import { GRADIENT_PRESETS, EFFECT_PRESETS } from "./palette";
 import { I18nProvider, LangToggle, useI18n } from "./i18n";
 
@@ -644,7 +644,7 @@ export default definePlugin(() => {
         </I18nProvider>
       </ErrorBoundary>
     ),
-    icon: <FaPalette />,
+    icon: <ColorWheelIcon />,
     onDismount() {
       clearTimeout(resumeTimer);
       resumeReg?.unregister?.();
