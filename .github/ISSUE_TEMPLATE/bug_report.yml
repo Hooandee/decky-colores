@@ -1,0 +1,63 @@
+name: "Reportar un fallo / Bug report"
+description: "Algo no funciona como debería / Something isn't working right"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportarlo. Cuanto más concreto, antes lo arreglo.
+        Thanks for reporting. The more specific, the faster I can fix it.
+
+  - type: input
+    id: device
+    attributes:
+      label: "Consola / Handheld"
+      description: "Modelo exacto. / Exact model."
+      placeholder: "ROG Xbox Ally X, Legion Go 2, MSI Claw 8 AI+..."
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "Versión de Colores / Colores version"
+      description: "La ves en la sección 'Acerca de'. / Shown in the About section."
+      placeholder: "0.9.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: "Sistema / OS"
+      placeholder: "Bazzite, SteamOS, ..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: what
+    attributes:
+      label: "Qué pasa / What happens"
+      description: "Qué esperabas y qué ocurre en su lugar. / What you expected vs what happens."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Pasos para reproducirlo / Steps to reproduce"
+      placeholder: |
+        1. Abro el plugin
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Logs (opcional)"
+      description: "Si los tienes, pégalos aquí. / Paste any logs if you have them."
+      render: text
+    validations:
+      required: false
