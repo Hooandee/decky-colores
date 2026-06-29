@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.10.0...decky-colores-v0.10.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* **EN:** recover LED config after a cold boot: ambient now reconnects to the gamescope capture source (showing the last solid color as a fallback while there is no source) instead of giving up, plus a defensive re-assert and better diagnostics for static modes ([696e81e](https://github.com/Hooandee/decky-colores/commit/696e81e658771a95858e92ea92bb64ccb96d296d))
+* **ES:** recuperar la configuración de LEDs tras un arranque en frío: ambient ahora se reconecta a la fuente de captura de gamescope (mostrando el último color sólido como respaldo mientras no hay fuente) en lugar de rendirse, con una reafirmación defensiva y mejor diagnóstico para los modos estáticos ([696e81e](https://github.com/Hooandee/decky-colores/commit/696e81e658771a95858e92ea92bb64ccb96d296d))
+
 ## [0.10.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.9.0...decky-colores-v0.10.0) (2026-06-29)
 
 
