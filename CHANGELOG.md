@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.9.0...decky-colores-v0.10.0) (2026-06-29)
+
+
+### Features
+
+* add experimental power-button LED toggle for Legion Go ([807a40b](https://github.com/Hooandee/decky-colores/commit/807a40b54735b7fef3b6158e0ecbd848bfb388d5))
+* experimental power-button LED toggle for Legion Go ([b77ff2f](https://github.com/Hooandee/decky-colores/commit/b77ff2f915c73ce391067ba35307faf1ce9d985c))
+
 ## [0.9.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.8.0...decky-colores-v0.9.0) (2026-06-28)
 
 
