@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.10.0...decky-colores-v0.10.1) (2026-06-29)
+
+
+### Bug Fixes
+
+* recover LED config after a cold boot ([696e81e](https://github.com/Hooandee/decky-colores/commit/696e81e658771a95858e92ea92bb64ccb96d296d))
+* recover LED config after a cold boot / recuperar la configuración de LEDs tras un arranque en frío ([aac7791](https://github.com/Hooandee/decky-colores/commit/aac7791b02a7c95473c2d7783bac54f5619e07c8))
+
 ## [0.10.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.9.0...decky-colores-v0.10.0) (2026-06-29)
 
 
