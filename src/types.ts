@@ -65,6 +65,7 @@ export interface ColoresState {
   ambilight: AmbilightState;
   savedGradients: GradientPreset[];
   powerLedOff: boolean;
+  chargerOnly: boolean;
 }
 
 export interface GradientPreset {

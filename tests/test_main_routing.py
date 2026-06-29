@@ -120,6 +120,66 @@ def _plugin(
     return p
 
 
+@pytest.mark.parametrize(
+    "power,charger_only,ac_online,expected",
+    [
+        (False, False, True, False),
+        (False, True, True, False),
+        (True, False, False, True),
+        (True, True, True, True),
+        (True, True, False, False),
+    ],
+)
+def test_effective_power_truth_table(main_module, power, charger_only, ac_online, expected):
+    p = _plugin(main_module, "solid", power=power)
+    p._settings["charger_only"] = charger_only
+    p._ac_online = ac_online
+    assert p._effective_power() is expected
+
+
+def test_charger_only_on_battery_gates_per_zone_off(main_module):
+    # Charger-only active + on battery: the per-zone path writes black WITHOUT
+    # changing the stored mode/color (it's a gate, not a config change).
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p._settings["charger_only"] = True
+    p._ac_online = False
+    p._apply()
+    assert ("static", [(0, 0, 0)] * p._zones) in p._engine.events
+    assert p._settings["mode"] == "solid"
+
+
+def test_charger_only_plugged_in_renders_normally(main_module):
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p._settings["charger_only"] = True
+    p._ac_online = True
+    p._apply()
+    assert ("static", [(255, 0, 0)] * p._zones) in p._engine.events
+
+
+def test_charger_watch_reapplies_only_on_edge(main_module, monkeypatch):
+    # The watcher must reapply when the plug state flips (and the gate is on), and
+    # must NOT touch anything when the feature is off.
+    monkeypatch.setattr(main_module, "CHARGER_POLL_INTERVAL", 0.001)
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p._settings["charger_only"] = True
+    p._ac_online = True
+    states = iter([False, False, True])
+    monkeypatch.setattr(main_module, "charger_online", lambda: next(states, True))
+
+    async def drive():
+        task = asyncio.create_task(p._charger_watch())
+        await asyncio.sleep(0.02)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(drive())
+    assert p._ac_online is True
+    assert any(e[0] == "static" for e in p._engine.events)
+
+
 def test_wave_on_single_color_device_uses_hardware_effect(main_module):
     # Legion Go S-like: hardware effects, single-color zones, no per-controller.
     # Wave must use the native firmware effect (a single solid color), not the

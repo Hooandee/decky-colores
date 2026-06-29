@@ -3,6 +3,7 @@ import { ColoresState, GradientPreset } from "./types";
 
 export const getState = callable<[], ColoresState>("get_state");
 export const setPower = callable<[on: boolean], void>("set_power");
+export const setChargerOnly = callable<[on: boolean], void>("set_charger_only");
 export const setBrightness = callable<[value: number], void>("set_brightness");
 export const setMode = callable<[mode: string], void>("set_mode");
 export const setSolid = callable<[r: number, g: number, b: number], void>("set_solid");
