@@ -10,6 +10,7 @@ from device import build_device
 from settings_store import SettingsStore
 from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
+from power_supply import charger_online
 from saved_gradients import upsert_gradient, remove_gradient
 
 DEFAULTS = {
@@ -24,7 +25,12 @@ DEFAULTS = {
     "saved_gradients": [],
     "enabled_experiments": [],
     "power_led_off": False,
+    "charger_only": False,
 }
+
+# How often the background watcher samples the AC adapter to react to plug/unplug
+# while the menu is closed. A couple of sysfs reads every few seconds is negligible.
+CHARGER_POLL_INTERVAL = 3.0
 
 # Cold-boot LED acquisition: the Ally's RGB node hangs off a USB HID device that can
 # enumerate late, so /sys/class/leds/...:rgb may not exist yet when the plugin loads.
@@ -62,6 +68,7 @@ class Plugin:
         self._settings = self._store.load(DEFAULTS)
         self._settings["ambilight"] = {**DEFAULTS["ambilight"], **self._settings["ambilight"]}
         self._settings["effect"] = {**DEFAULTS["effect"], **self._settings["effect"]}
+        self._ac_online = charger_online()
         self._apply_power_led()
         self._ready = True
 
@@ -170,11 +177,19 @@ class Plugin:
             "ambilight": s["ambilight"],
             "savedGradients": self._serialized_saved(),
             "powerLedOff": s.get("power_led_off", False),
+            "chargerOnly": s.get("charger_only", False),
         }
 
     async def set_power(self, on: bool) -> None:
         self._init()
         self._settings["power"] = on
+        self._save_and_apply()
+
+    async def set_charger_only(self, on: bool) -> None:
+        self._init()
+        self._settings["charger_only"] = on
+        if on:
+            self._ac_online = charger_online()
         self._save_and_apply()
 
     async def set_brightness(self, value: int) -> None:
@@ -257,9 +272,19 @@ class Plugin:
         self._settings["enabled_experiments"] = sorted(enabled)
         self._store.save(self._settings)
 
+    def _effective_power(self) -> bool:
+        # The manual power switch is the master. "Charger only" is a modifier on top:
+        # when on and running on battery, the LEDs are gated off WITHOUT touching the
+        # user's mode/effect/color — flipping back on at the wall restores it exactly.
+        if not self._settings["power"]:
+            return False
+        if self._settings.get("charger_only", False):
+            return bool(getattr(self, "_ac_online", True))
+        return True
+
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(
-            zone_colors, self._settings["brightness"], self._settings["power"]
+            zone_colors, self._settings["brightness"], self._effective_power()
         )
 
     def _save_and_apply(self) -> None:
@@ -307,7 +332,7 @@ class Plugin:
         self._ambilight.stop()
         self._engine.stop()
         brightness = s["brightness"]
-        power = s["power"]
+        power = self._effective_power()
         if not power:
             self._controller.apply_solid((0, 0, 0), 0, False)
             return
@@ -325,7 +350,7 @@ class Plugin:
 
     def _apply_per_zone(self) -> None:
         s = self._settings
-        if not s["power"]:
+        if not self._effective_power():
             self._ambilight.stop()
             self._engine.set_static([(0, 0, 0)] * self._zones)
             return
@@ -385,11 +410,31 @@ class Plugin:
         )
         self._apply()
         self._reassert_task = asyncio.create_task(self._acquire_and_reassert())
+        self._charger_task = asyncio.create_task(self._charger_watch())
+
+    async def _charger_watch(self) -> None:
+        # React to plug/unplug live, even with the menu closed. Reapply ONLY on the
+        # edge (state actually changed), never every tick — so a running effect is
+        # not restarted at frame 0. The "charger only" gate is read inside
+        # _effective_power, so this stays a cheap no-op when the feature is off.
+        try:
+            while True:
+                await asyncio.sleep(CHARGER_POLL_INTERVAL)
+                online = charger_online()
+                if online != getattr(self, "_ac_online", True):
+                    self._ac_online = online
+                    if self._settings.get("charger_only", False):
+                        self._apply()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # a sysfs hiccup must never kill the plugin
+            decky.logger.warning("Colores: charger watch failed: %s", error)
 
     async def _unload(self):
-        task = getattr(self, "_reassert_task", None)
-        if task:
-            task.cancel()
+        for attr in ("_reassert_task", "_charger_task"):
+            task = getattr(self, attr, None)
+            if task:
+                task.cancel()
         if getattr(self, "_ambilight", None):
             self._ambilight.stop()
         if getattr(self, "_engine", None):

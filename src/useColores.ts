@@ -78,6 +78,13 @@ export function useColores() {
     api.setPower(power);
   };
 
+  const setChargerOnly = (chargerOnly: boolean) => {
+    setState((s) => (s ? { ...s, chargerOnly } : s));
+    api.setChargerOnly(chargerOnly).catch((e) =>
+      console.error("Colores: setChargerOnly failed", e),
+    );
+  };
+
   const setMode = (mode: Mode) => {
     setState((s) => (s ? { ...s, mode } : s));
     api.setMode(mode);
@@ -157,6 +164,7 @@ export function useColores() {
     retry: refreshState,
     setBrightness,
     setPower,
+    setChargerOnly,
     setMode,
     setColor,
     setGradient,

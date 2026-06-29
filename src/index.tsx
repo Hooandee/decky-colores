@@ -207,6 +207,7 @@ function Content() {
     retry,
     setBrightness,
     setPower,
+    setChargerOnly,
     setMode,
     setColor,
     setGradient,
@@ -287,6 +288,7 @@ function Content() {
     device,
     savedGradients,
     powerLedOff,
+    chargerOnly,
   } = state;
   const hasLeds = caps.color || caps.brightness;
 
@@ -365,7 +367,17 @@ function Content() {
           </PanelSectionRow>
 
           <PanelSectionRow>
-            <ToggleField label={t("power.label")} checked={power} onChange={setPower} bottomSeparator="thick" />
+            <ToggleField label={t("power.label")} checked={power} onChange={setPower} bottomSeparator="none" />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <ToggleField
+              label={t("chargerOnly.label")}
+              description={t("chargerOnly.hint")}
+              checked={chargerOnly}
+              onChange={setChargerOnly}
+              disabled={!power}
+              bottomSeparator="thick"
+            />
           </PanelSectionRow>
 
           {caps.color && (

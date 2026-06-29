@@ -15,6 +15,8 @@ const es: Record<string, string> = {
   "device.preview.ambient": "Siguiendo la pantalla",
 
   "power.label": "Encendido",
+  "chargerOnly.label": "Solo con cargador",
+  "chargerOnly.hint": "Las luces se encienden solo cuando el cargador está conectado.",
   "reconnect.label": "Reconectar mandos",
   "reconnect.hint": "¿Las luces no responden tras suspender? Reinicia la conexión con los mandos.",
 
@@ -116,6 +118,8 @@ const en: Record<string, string> = {
   "device.preview.ambient": "Reacting to screen",
 
   "power.label": "Power",
+  "chargerOnly.label": "Only while charging",
+  "chargerOnly.hint": "The lights turn on only when the charger is connected.",
   "reconnect.label": "Reconnect controllers",
   "reconnect.hint": "Lights not responding after sleep? Restart the connection to the controllers.",
 
