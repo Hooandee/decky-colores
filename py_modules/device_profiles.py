@@ -16,6 +16,17 @@ MSI_HID = {
     "experimental": [],
 }
 
+# Power-button ring LED control via the Embedded Controller (see power_led.py).
+# Each entry is an EC byte/bit to SET to turn the LED off (cleared = on); polarity is
+# uniform across Legion devices. Offsets reverse-engineered from each device's DSDT
+# (GZFD.WMAF -> SLT2) and verified on hardware. A list because the original Legion Go
+# uses two separate fields (awake + suspend) while Go S / Go 2 use a single shared bit.
+POWER_LED_LPBL = [{"offset": 0x10, "mask": 0x40}]  # Go S, Go 2 (LPBL, awake+suspend)
+POWER_LED_LEDPM = [  # original Legion Go (LEDP awake + LEDM suspend)
+    {"offset": 0x52, "mask": 0x20},
+    {"offset": 0x58, "mask": 0x01},
+]
+
 LEGION_TABLET_HID = {
     "driver": "hid_legion_tablet",
     "color_order": "rgb",
@@ -44,15 +55,23 @@ GENERIC = {
 }
 
 
+def _copy_bits(bits):
+    return [dict(bit) for bit in bits]
+
+
 def _copy_profile(base):
     merged = dict(base)
     merged["experimental"] = list(base.get("experimental", []))
+    if base.get("power_led"):
+        merged["power_led"] = _copy_bits(base["power_led"])
     return merged
 
 
-def _profile(base, name):
+def _profile(base, name, power_led=None):
     merged = _copy_profile(base)
     merged["name"] = name
+    if power_led is not None:
+        merged["power_led"] = _copy_bits(power_led)
     return merged
 
 
@@ -61,13 +80,13 @@ PROFILES = [
     ("board", "RC72LA", _profile(ASUS_SYSFS, "ROG Ally X")),
     ("board", "RC73YA", _profile(ASUS_SYSFS, "ROG Xbox Ally")),
     ("board", "RC73XA", _profile(ASUS_SYSFS, "ROG Xbox Ally X")),
-    ("product", "83E1", _profile(LEGION_TABLET_HID, "Legion Go")),
-    ("product", "83N0", _profile(LEGION_TABLET_HID, "Legion Go 2")),
-    ("product", "83N1", _profile(LEGION_TABLET_HID, "Legion Go 2")),
-    ("product", "83L3", _profile(LEGION_GO_S_HID, "Legion Go S")),
-    ("product", "83Q2", _profile(LEGION_GO_S_HID, "Legion Go S")),
-    ("product", "83N6", _profile(LEGION_GO_S_HID, "Legion Go S")),
-    ("product", "83Q3", _profile(LEGION_GO_S_HID, "Legion Go S")),
+    ("product", "83E1", _profile(LEGION_TABLET_HID, "Legion Go", POWER_LED_LEDPM)),
+    ("product", "83N0", _profile(LEGION_TABLET_HID, "Legion Go 2", POWER_LED_LPBL)),
+    ("product", "83N1", _profile(LEGION_TABLET_HID, "Legion Go 2", POWER_LED_LPBL)),
+    ("product", "83L3", _profile(LEGION_GO_S_HID, "Legion Go S", POWER_LED_LPBL)),
+    ("product", "83Q2", _profile(LEGION_GO_S_HID, "Legion Go S", POWER_LED_LPBL)),
+    ("product", "83N6", _profile(LEGION_GO_S_HID, "Legion Go S", POWER_LED_LPBL)),
+    ("product", "83Q3", _profile(LEGION_GO_S_HID, "Legion Go S", POWER_LED_LPBL)),
     ("product_contains", "Claw 8 AI+", _profile(MSI_HID, "MSI Claw 8 AI+")),
     ("product_contains", "Claw A1M", _profile(MSI_HID, "MSI Claw")),
 ]

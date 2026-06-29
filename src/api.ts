@@ -15,4 +15,5 @@ export const saveGradient = callable<[name: string, stops: number[][]], Gradient
 export const deleteGradient = callable<[name: string], GradientPreset[]>("delete_gradient");
 export const getVersion = callable<[], string>("get_version");
 export const setExperiment = callable<[feature: string, on: boolean], void>("set_experiment");
+export const setPowerLed = callable<[off: boolean], void>("set_power_led");
 export const reconnect = callable<[], boolean>("reconnect");

@@ -100,6 +100,10 @@ const es: Record<string, string> = {
   "experimental.feature.brightness": "Brillo",
   "experimental.feature.effects": "Efectos",
   "experimental.feature.ambilight": "Ambilight",
+
+  "powerLed.section": "Luz del botón de encendido (experimental)",
+  "powerLed.label": "Apagar luz del botón de encendido",
+  "powerLed.warning": "Apaga el LED del botón de encendido.",
 };
 
 const en: Record<string, string> = {
@@ -197,6 +201,10 @@ const en: Record<string, string> = {
   "experimental.feature.brightness": "Brightness",
   "experimental.feature.effects": "Effects",
   "experimental.feature.ambilight": "Ambilight",
+
+  "powerLed.section": "Power button light (experimental)",
+  "powerLed.label": "Turn off power button light",
+  "powerLed.warning": "Turns off the power button LED.",
 };
 
 const DICTS: Record<Lang, Record<string, string>> = { es, en };

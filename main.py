@@ -22,6 +22,7 @@ DEFAULTS = {
     "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
     "saved_gradients": [],
     "enabled_experiments": [],
+    "power_led_off": False,
 }
 
 
@@ -51,6 +52,7 @@ class Plugin:
         self._capabilities = ctx["capabilities"]
         self._zones = self._capabilities.get("zones", 1) or 1
         self._controller = ctx["device"]
+        self._power_led = ctx.get("power_led")
         self._store = SettingsStore(
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
         )
@@ -67,7 +69,18 @@ class Plugin:
             gid,
             layout=self._capabilities.get("layout"),
         )
+        self._apply_power_led()
         self._ready = True
+
+    def _apply_power_led(self) -> None:
+        # Reassert ONLY the "off" state on load. When the feature is off we leave the
+        # EC untouched and never load ec_sys, so a Legion that never enables the toggle
+        # is never tainted (matches PowerLedController's lazy-load contract). Turning
+        # the LED back on is handled by the explicit set_power_led path.
+        if not (self._power_led and self._capabilities.get("powerLed")):
+            return
+        if self._settings.get("power_led_off", False) and not self._power_led.set(True):
+            decky.logger.warning("Colores: power LED apply on load failed")
 
     async def get_version(self) -> str:
         return read_version()
@@ -108,6 +121,7 @@ class Plugin:
             },
             "ambilight": s["ambilight"],
             "savedGradients": self._serialized_saved(),
+            "powerLedOff": s.get("power_led_off", False),
         }
 
     async def set_power(self, on: bool) -> None:
@@ -175,6 +189,14 @@ class Plugin:
         self._init()
         self._settings["ambilight"] = {"saturation": saturation, "smoothing": smoothing, "fps": fps}
         self._save_and_apply()
+
+    async def set_power_led(self, off: bool) -> None:
+        self._init()
+        self._settings["power_led_off"] = off
+        self._store.save(self._settings)
+        if self._power_led and self._capabilities.get("powerLed"):
+            if not self._power_led.set(off):
+                decky.logger.warning("Colores: power LED write failed (off=%s)", off)
 
     async def set_experiment(self, feature: str, on: bool) -> None:
         self._init()
