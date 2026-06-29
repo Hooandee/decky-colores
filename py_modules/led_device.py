@@ -10,6 +10,9 @@ def _clamp_pct(value):
 
 
 class LedDevice:
+    led_path = None
+    last_error = None
+
     @property
     def available(self):
         return False
@@ -54,6 +57,10 @@ class SysfsRgbDevice(LedDevice):
     @property
     def available(self):
         return bool(self._led_path)
+
+    @property
+    def led_path(self):
+        return self._led_path
 
     def supports_per_zone(self):
         return True

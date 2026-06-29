@@ -2,13 +2,18 @@ import asyncio
 import json
 import logging
 import os
-import subprocess
 
 logger = logging.getLogger("colores.ambilight")
 
 GAMESCOPE_NODE = "gamescope"
 CAP_W = 32
 CAP_H = 18
+
+# Seconds between reconnect attempts when the gamescope source is missing or the
+# stream drops. On a cold boot the user's PipeWire/gamescope session isn't ready when
+# the (root) plugin loads, so the capture must keep retrying instead of giving up —
+# otherwise ambient mode stays dark until the user manually re-selects it.
+RETRY_INTERVAL = 3.0
 
 _FULL_REGION = [0.0, 0.0, 1.0, 1.0]
 
@@ -84,6 +89,13 @@ class Ambilight:
     def running(self):
         return self._task is not None and not self._task.done()
 
+    def _fallback(self):
+        # Shown when there's no game source to sample (e.g. the Steam home screen, or a
+        # cold boot before the session is up) so the LEDs hold the user's last solid color
+        # instead of going dark. Routes through _apply, so brightness/power still apply.
+        color = self._options.get("fallback") or (0, 0, 0)
+        return [tuple(color)] * self._zones
+
     def _env(self):
         env = dict(os.environ)
         if self._runtime_dir:
@@ -95,15 +107,27 @@ class Ambilight:
             return {}
         return {"user": self._uid, "group": self._gid}
 
-    def _find_node(self):
+    async def _find_node(self):
+        # Async so the retry loop never blocks the event loop while waiting on pw-dump
+        # (it runs every RETRY_INTERVAL while the source is missing).
+        proc = None
         try:
-            result = subprocess.run(
-                ["pw-dump"], capture_output=True, text=True, env=self._env(), timeout=5,
+            proc = await asyncio.create_subprocess_exec(
+                "pw-dump",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+                env=self._env(),
                 **self._cred(),
             )
-            data = json.loads(result.stdout)
-        except (OSError, ValueError, subprocess.SubprocessError) as error:
+            out, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+            data = json.loads(out)
+        except (OSError, ValueError, asyncio.TimeoutError) as error:
             logger.warning("pw-dump failed: %s", error)
+            if proc is not None:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
             return None
         for obj in data:
             props = (obj.get("info") or {}).get("props") or {}
@@ -136,49 +160,55 @@ class Ambilight:
             self._proc = None
 
     async def _run(self):
-        node = self._find_node()
-        if node is None:
-            logger.warning("gamescope PipeWire node not found; ambilight idle")
-            self.status = "no_source"
-            self._apply([(0, 0, 0)] * self._zones)
-            return
-
-        interval = 1.0 / max(1, int(self._options.get("fps", 10)))
-        command = _gst_command(node, CAP_W, CAP_H)
+        # Outer reconnect loop: keep trying to find the gamescope source and capture it
+        # until stop() cancels us. The source can be absent at boot (session not up yet)
+        # or vanish (leaving Game Mode) and reappear — we recover from both automatically.
         frame_bytes = CAP_W * CAP_H * 3
-        proc = None
-        logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / interval)
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *command,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                env=self._env(),
-                **self._cred(),
-            )
-            self._proc = proc
-            self.status = "running"
-            while True:
-                frame = await proc.stdout.readexactly(frame_bytes)
-                self._update_targets(frame)
-                self._tick()
-                await asyncio.sleep(interval)
-        except asyncio.IncompleteReadError:
-            self.status = "no_source"
-            await self._log_exit(proc)
-            self._apply([(0, 0, 0)] * self._zones)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("ambilight loop failed")
-        finally:
-            if proc is not None:
-                try:
-                    proc.kill()
-                except ProcessLookupError:
-                    pass
-            if self._proc is proc:
-                self._proc = None
+        while True:
+            node = await self._find_node()
+            if node is None:
+                logger.warning("gamescope PipeWire node not found; retrying")
+                self.status = "no_source"
+                self._apply(self._fallback())
+                await asyncio.sleep(RETRY_INTERVAL)
+                continue
+
+            interval = 1.0 / max(1, int(self._options.get("fps", 10)))
+            command = _gst_command(node, CAP_W, CAP_H)
+            proc = None
+            logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / interval)
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    *command,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=self._env(),
+                    **self._cred(),
+                )
+                self._proc = proc
+                self.status = "running"
+                while True:
+                    frame = await proc.stdout.readexactly(frame_bytes)
+                    self._update_targets(frame)
+                    self._tick()
+                    await asyncio.sleep(interval)
+            except asyncio.IncompleteReadError:
+                self.status = "no_source"
+                await self._log_exit(proc)
+                self._apply(self._fallback())
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("ambilight loop failed")
+            finally:
+                if proc is not None:
+                    try:
+                        proc.kill()
+                    except ProcessLookupError:
+                        pass
+                if self._proc is proc:
+                    self._proc = None
+            await asyncio.sleep(RETRY_INTERVAL)
 
     async def _log_exit(self, proc):
         if proc is None:

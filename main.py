@@ -1,3 +1,4 @@
+import asyncio
 import os
 import pwd
 import shutil
@@ -25,6 +26,14 @@ DEFAULTS = {
     "power_led_off": False,
 }
 
+# Cold-boot LED acquisition: the Ally's RGB node hangs off a USB HID device that can
+# enumerate late, so /sys/class/leds/...:rgb may not exist yet when the plugin loads.
+# Poll for it for a bounded window, then re-assert once more to beat any default the
+# firmware/another plugin writes shortly after load. Module-level so tests can shrink them.
+ACQUIRE_ATTEMPTS = 20
+ACQUIRE_INTERVAL = 1.0
+REASSERT_DELAY = 5.0
+
 
 def _rgb(values):
     return {"r": values[0], "g": values[1], "b": values[2]}
@@ -46,19 +55,26 @@ class Plugin:
     def _init(self) -> None:
         if getattr(self, "_ready", False):
             return
-        ambilight_available = shutil.which("gst-launch-1.0") is not None
-        ctx = build_device(ambilight=ambilight_available)
-        self._device = ctx["info"]
-        self._capabilities = ctx["capabilities"]
-        self._zones = self._capabilities.get("zones", 1) or 1
-        self._controller = ctx["device"]
-        self._power_led = ctx.get("power_led")
+        self._setup_device(self._build_context())
         self._store = SettingsStore(
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
         )
         self._settings = self._store.load(DEFAULTS)
         self._settings["ambilight"] = {**DEFAULTS["ambilight"], **self._settings["ambilight"]}
         self._settings["effect"] = {**DEFAULTS["effect"], **self._settings["effect"]}
+        self._apply_power_led()
+        self._ready = True
+
+    def _build_context(self) -> dict:
+        ambilight_available = shutil.which("gst-launch-1.0") is not None
+        return build_device(ambilight=ambilight_available)
+
+    def _setup_device(self, ctx: dict) -> None:
+        self._device = ctx["info"]
+        self._capabilities = ctx["capabilities"]
+        self._zones = self._capabilities.get("zones", 1) or 1
+        self._controller = ctx["device"]
+        self._power_led = ctx.get("power_led")
         self._engine = EffectEngine(self._render, self._zones)
         runtime_dir, uid, gid = _user_creds()
         self._ambilight = Ambilight(
@@ -69,8 +85,40 @@ class Plugin:
             gid,
             layout=self._capabilities.get("layout"),
         )
-        self._apply_power_led()
-        self._ready = True
+
+    def _reprobe_device(self) -> bool:
+        # Recover a controller that wasn't present at load (late USB HID enumeration on
+        # cold boot). No-op once we already have a working LED — this guard is what keeps
+        # a healthy machine completely untouched (never rebuilds the engine mid-effect).
+        if self._controller.available:
+            return True
+        ctx = self._build_context()
+        if not ctx["device"].available:
+            return False
+        self._ambilight.stop()
+        self._engine.stop()
+        self._setup_device(ctx)
+        return True
+
+    async def _acquire_and_reassert(self) -> None:
+        try:
+            # H1: wait for the LED node to appear, applying as soon as it does.
+            for _ in range(ACQUIRE_ATTEMPTS):
+                if self._controller.available:
+                    break
+                await asyncio.sleep(ACQUIRE_INTERVAL)
+                if self._reprobe_device():
+                    self._apply()
+            # H2: a static write can be overwritten by a late firmware/other-plugin default.
+            # Re-assert once. Skip it when a render loop is active (effect/ambilight): that
+            # loop already rewrites ~30fps and wins on its own, so reapplying would only
+            # restart the effect at frame 0 — needless disruption of something that works.
+            await asyncio.sleep(REASSERT_DELAY)
+            self._reprobe_device()
+            if not self._wants_render_loop():
+                self._apply()
+        except Exception as error:  # never let the background task break plugin load
+            decky.logger.warning("Colores: acquire/reassert failed: %s", error)
 
     def _apply_power_led(self) -> None:
         # Reassert ONLY the "off" state on load. When the feature is off we leave the
@@ -177,6 +225,7 @@ class Plugin:
 
     async def reconnect(self) -> bool:
         self._init()
+        self._reprobe_device()
         ok = self._controller.reconnect()
         self._apply()
         return bool(ok)
@@ -289,6 +338,7 @@ class Plugin:
                     "saturation": amb["saturation"] / 100.0,
                     "smoothing": amb["smoothing"],
                     "fps": amb.get("fps", 10),
+                    "fallback": tuple(s["color"]),
                 }
             )
             return
@@ -322,18 +372,24 @@ class Plugin:
     async def _main(self):
         self._init()
         decky.logger.info(
-            "Colores v%s on %s (euid=%s color=%s zones=%s ambilight=%s ledPath=%s)",
+            "Colores v%s on %s (euid=%s color=%s zones=%s ambilight=%s available=%s ledPath=%s lastError=%s)",
             read_version(),
             self._device["name"],
             os.geteuid(),
             self._capabilities["color"],
             self._capabilities["zones"],
             self._capabilities["ambilight"],
-            self._capabilities.get("ledPath"),
+            self._controller.available,
+            self._controller.led_path,
+            self._controller.last_error,
         )
         self._apply()
+        self._reassert_task = asyncio.create_task(self._acquire_and_reassert())
 
     async def _unload(self):
+        task = getattr(self, "_reassert_task", None)
+        if task:
+            task.cancel()
         if getattr(self, "_ambilight", None):
             self._ambilight.stop()
         if getattr(self, "_engine", None):
