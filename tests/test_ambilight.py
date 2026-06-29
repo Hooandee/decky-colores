@@ -1,4 +1,8 @@
+import asyncio
+
+import py_modules.ambilight as ambilight_mod
 from py_modules.ambilight import (
+    Ambilight,
     _gst_command,
     alpha_for,
     avg_region,
@@ -6,6 +10,61 @@ from py_modules.ambilight import (
     lerp,
     subdivide,
 )
+
+
+def test_run_retries_when_source_missing(monkeypatch):
+    # Cold boot: the gamescope node isn't there yet. The capture must keep retrying
+    # (and stay alive) instead of giving up after one miss — otherwise ambient mode
+    # never recovers without manual intervention.
+    monkeypatch.setattr(ambilight_mod, "RETRY_INTERVAL", 0.001)
+    applied = []
+    amb = Ambilight(lambda colors: applied.append(list(colors)), zones=4, runtime_dir=None)
+    async def _no_node():
+        return None
+
+    amb._find_node = _no_node
+
+    async def drive():
+        amb.start({"fps": 10})
+        task = amb._task
+        await asyncio.sleep(0.05)
+        assert amb.running
+        assert amb.status == "no_source"
+        assert len(applied) >= 2
+        assert applied[0] == [(0, 0, 0)] * 4
+        amb.stop()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(drive())
+    assert not amb.running
+
+
+def test_run_shows_fallback_color_when_source_missing(monkeypatch):
+    # No game source -> hold the user's last solid color instead of going dark.
+    monkeypatch.setattr(ambilight_mod, "RETRY_INTERVAL", 0.001)
+    applied = []
+    amb = Ambilight(lambda colors: applied.append(list(colors)), zones=4, runtime_dir=None)
+    async def _no_node():
+        return None
+
+    amb._find_node = _no_node
+
+    async def drive():
+        amb.start({"fps": 10, "fallback": (10, 20, 30)})
+        task = amb._task
+        await asyncio.sleep(0.02)
+        amb.stop()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(drive())
+    assert applied
+    assert applied[0] == [(10, 20, 30)] * 4
 
 
 def test_gst_command_uses_leaky_queue_before_scaling():

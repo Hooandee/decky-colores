@@ -34,6 +34,9 @@ class FakeController:
         self._per_zone = per_zone
         self.calls = []
         self.reconnected = False
+        self.available = True
+        self.led_path = None
+        self.last_error = None
 
     def supports_hardware_effects(self):
         return self._hw
@@ -244,3 +247,80 @@ def test_reconnect_resets_controller_and_reapplies(main_module):
     assert ok is True
     assert p._controller.reconnected is True
     assert any(c[0] == "solid" for c in p._controller.calls)
+
+
+def _late_ctx(device):
+    return {
+        "info": {"name": "ROG Xbox Ally X"},
+        "capabilities": {"zones": 4, "color": True, "ambilight": True, "layout": []},
+        "device": device,
+        "power_led": None,
+    }
+
+
+def test_reprobe_recovers_late_led_and_rebuilds_zones(main_module, monkeypatch):
+    # Cold-boot: the LED node wasn't present at load (NullDevice). Once it appears,
+    # _reprobe_device must swap in the real controller and rebuild the engine to the
+    # device's real zone count.
+    p = _plugin(main_module, "solid")
+    p._controller.available = False
+    new_ctrl = FakeController(hw=False, per_zone=True)
+    monkeypatch.setattr(main_module, "build_device", lambda **k: _late_ctx(new_ctrl))
+    assert p._reprobe_device() is True
+    assert p._controller is new_ctrl
+    assert p._zones == 4
+
+
+def test_reprobe_is_noop_when_already_available(main_module, monkeypatch):
+    # Healthy machine: a present LED must never trigger a re-probe (build_device must
+    # not even be called) — this is the guarantee that we don't disturb working setups.
+    p = _plugin(main_module, "solid")
+    monkeypatch.setattr(
+        main_module, "build_device",
+        lambda **k: (_ for _ in ()).throw(AssertionError("must not reprobe")),
+    )
+    assert p._reprobe_device() is True
+
+
+def test_acquire_applies_when_led_appears_late(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "ACQUIRE_INTERVAL", 0.001)
+    monkeypatch.setattr(main_module, "REASSERT_DELAY", 0.001)
+    p = _plugin(main_module, "solid")
+    p._controller.available = False
+    new_ctrl = FakeController(hw=False, per_zone=True)
+    monkeypatch.setattr(main_module, "build_device", lambda **k: _late_ctx(new_ctrl))
+    asyncio.run(p._acquire_and_reassert())
+    assert p._controller is new_ctrl
+    assert any(c[0] == "zones" for c in new_ctrl.calls)
+
+
+def test_reassert_reapplies_static_mode(main_module, monkeypatch):
+    # Static mode (solid): a single write can be lost to a late default, so re-assert.
+    monkeypatch.setattr(main_module, "ACQUIRE_INTERVAL", 0.001)
+    monkeypatch.setattr(main_module, "REASSERT_DELAY", 0.001)
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    asyncio.run(p._acquire_and_reassert())
+    assert any(e[0] == "static" for e in p._engine.events)
+
+
+def test_reassert_does_not_restart_running_effect(main_module, monkeypatch):
+    # No-regression: in a render-loop mode the engine already rewrites continuously, so
+    # the deferred re-assert must NOT reapply (which would restart the effect at frame 0)
+    # and must not rebuild/swap anything on a healthy machine.
+    monkeypatch.setattr(main_module, "ACQUIRE_INTERVAL", 0.001)
+    monkeypatch.setattr(main_module, "REASSERT_DELAY", 0.001)
+    monkeypatch.setattr(
+        main_module, "build_device",
+        lambda **k: (_ for _ in ()).throw(AssertionError("must not reprobe")),
+    )
+    p = _plugin(
+        main_module, "effect",
+        {"id": "breathing", "speed": 50, "use_gradient": True},
+        hw=False, per_zone=True,
+    )
+    engine = p._engine
+    ctrl = p._controller
+    asyncio.run(p._acquire_and_reassert())
+    assert p._engine is engine
+    assert p._controller is ctrl
+    assert not engine.events
