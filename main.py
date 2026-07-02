@@ -451,15 +451,18 @@ class Plugin:
         # Another RGB tool (e.g. HHD) keeps reapplying its own colors on its events, so
         # a one-shot reclaim doesn't hold. Re-assert our state on a coarse tick to win it
         # back within a couple seconds, even with the menu closed. This is a blind
-        # re-write (no read-back, no ownership check). invalidate() forces the full Aura
-        # init+commit so the reclaim actually latches. Skipped while a render loop
-        # (effect/ambilight) is active: that already rewrites ~30fps, and re-applying
-        # would restart it at frame 0. Only created on conflicting devices.
+        # re-write (no read-back, no ownership check). It is a GENTLE re-assert: it does
+        # NOT invalidate()/re-init, so apply_zones takes its fast path (per-zone color
+        # only, no Aura init handshake or APPLY latch) — re-writing the same color that
+        # way is visually seamless, where a full re-init every tick makes the LEDs blink.
+        # The strong, latched reclaim (invalidate) runs on real reclaim moments instead:
+        # toggling the switch on, panel-open (reconnect), and resume. Skipped while a
+        # render loop (effect/ambilight) is active: that already rewrites ~30fps, and
+        # re-applying would restart it at frame 0. Only created on conflicting devices.
         try:
             while True:
                 await asyncio.sleep(FORCE_CONTROL_INTERVAL)
                 if self._settings.get("force_control") and not self._wants_render_loop():
-                    self._controller.invalidate()
                     self._apply()
         except asyncio.CancelledError:
             raise

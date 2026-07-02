@@ -428,14 +428,14 @@ def _drive_watch(main_module, plugin):
 
 
 def test_force_control_watch_reasserts_static_mode(main_module, monkeypatch):
-    # Force control on + a static mode: the watch must re-assert, forcing a full
-    # re-init (invalidate) so it reclaims the LEDs from another tool.
+    # Force control on + a static mode: the watch must re-assert, but GENTLY — no
+    # invalidate()/re-init (that would blink the LEDs); just re-write the colors.
     monkeypatch.setattr(main_module, "FORCE_CONTROL_INTERVAL", 0.001)
     p = _plugin(main_module, "solid", hw=True, per_zone=True)
     p._settings["force_control"] = True
     p._controller.calls.clear()
     _drive_watch(main_module, p)
-    assert p._controller.invalidated is True
+    assert p._controller.invalidated is False, "maintenance re-assert must not re-init"
     assert p._controller.calls, "watch must re-apply in a static mode"
 
 
