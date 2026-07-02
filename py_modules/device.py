@@ -160,6 +160,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "states": states,
         "experimental": list(profile.get("experimental", [])),
         "powerLed": bool(power_led and power_led.available()),
+        "conflictsWithSystemRgb": bool(profile.get("conflicts_with_system_rgb", False)),
         "layout": build_layout(zones, profile.get("swap_sticks", False)),
     }
 
@@ -181,7 +182,7 @@ def _find_rgb_led(leds_dir):
     return None
 
 
-_IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s"}
+_IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally"}
 
 
 def _build_hid_context(profile, ambilight, power_led=None):
