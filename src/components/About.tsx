@@ -31,6 +31,8 @@ export const About: FC<{ lang: Lang; hasUpdate: boolean }> = ({ lang, hasUpdate 
       <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 10px" }} />
       <div
         style={{
+          display: "flex",
+          alignItems: "center",
           fontSize: 11,
           fontWeight: 700,
           letterSpacing: "0.14em",
