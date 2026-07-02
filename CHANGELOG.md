@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.0...decky-colores-v0.15.1) (2026-07-02)
+
+
+### Bug Fixes
+
+* match GitHub's dotted release asset name ([afd7cbd](https://github.com/Hooandee/decky-colores/commit/afd7cbd80a651cbb28dad3dabbe405c239e9bda2))
+
 ## [0.15.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.14.0...decky-colores-v0.15.0) (2026-07-02)
 
 
