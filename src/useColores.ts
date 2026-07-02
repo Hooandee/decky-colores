@@ -164,6 +164,13 @@ export function useColores() {
     api.setPowerLed(off).catch((e) => console.error("Colores: setPowerLed failed", e));
   };
 
+  const setForceControl = (forceControl: boolean) => {
+    setState((s) => (s ? { ...s, forceControl } : s));
+    api.setForceControl(forceControl).catch((e) =>
+      console.error("Colores: setForceControl failed", e),
+    );
+  };
+
   const setExperiment = (feature: string, on: boolean) => {
     api
       .setExperiment(feature, on)
@@ -196,6 +203,7 @@ export function useColores() {
     deleteGradient,
     setExperiment,
     setPowerLed,
+    setForceControl,
     reconnect,
   };
 }

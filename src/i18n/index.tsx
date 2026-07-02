@@ -17,6 +17,10 @@ const es: Record<string, string> = {
   "power.label": "Encendido",
   "chargerOnly.label": "Solo con cargador",
   "chargerOnly.hint": "Las luces se encienden solo cuando el cargador está conectado.",
+  "forceControl.label": "Priorizar Colores",
+  "forceControl.hint": "Recupera el control de las luces al abrir Colores.",
+  "forceControl.notice":
+    "Para evitar conflictos, desactiva el control RGB de HHD u otros modulos que gestionen las luces.",
   "reconnect.label": "Reconectar mandos",
   "reconnect.hint": "¿Las luces no responden tras suspender? Reinicia la conexión con los mandos.",
 
@@ -120,6 +124,10 @@ const en: Record<string, string> = {
   "power.label": "Power",
   "chargerOnly.label": "Only while charging",
   "chargerOnly.hint": "The lights turn on only when the charger is connected.",
+  "forceControl.label": "Prioritize Colores",
+  "forceControl.hint": "Reclaims the lights whenever you open Colores.",
+  "forceControl.notice":
+    "To avoid conflicts, disable RGB control in HHD or any other module that manages the lights.",
   "reconnect.label": "Reconnect controllers",
   "reconnect.hint": "Lights not responding after sleep? Restart the connection to the controllers.",
 

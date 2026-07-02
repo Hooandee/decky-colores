@@ -14,7 +14,7 @@ import { definePlugin } from "@decky/api";
 import { useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus, reconnect as apiReconnect } from "./api";
+import { getAmbilightStatus, reconnect as apiReconnect, reassert as apiReassert } from "./api";
 import { rgbToCss, gradientCss } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -220,6 +220,7 @@ function Content() {
     deleteGradient,
     setExperiment,
     setPowerLed,
+    setForceControl,
     reconnect,
   } = useColores();
   const { t } = useI18n();
@@ -240,6 +241,13 @@ function Content() {
       clearInterval(timer);
     };
   }, [ambientActive]);
+
+  // When Force control is on (only exposed on devices where another tool, e.g. HHD,
+  // owns the RGB), reclaim the LEDs whenever the panel opens. Event-driven, no polling.
+  useEffect(() => {
+    if (!state?.capabilities.conflictsWithSystemRgb || !state?.forceControl) return;
+    apiReassert().catch(() => {});
+  }, [state?.capabilities.conflictsWithSystemRgb, state?.forceControl]);
 
   if (!state) {
     return (
@@ -289,6 +297,7 @@ function Content() {
     savedGradients,
     powerLedOff,
     chargerOnly,
+    forceControl,
   } = state;
   const hasLeds = caps.color || caps.brightness;
 
@@ -376,9 +385,20 @@ function Content() {
               checked={chargerOnly}
               onChange={setChargerOnly}
               disabled={!power}
-              bottomSeparator="thick"
+              bottomSeparator={caps.conflictsWithSystemRgb ? "none" : "thick"}
             />
           </PanelSectionRow>
+          {caps.conflictsWithSystemRgb && (
+            <PanelSectionRow>
+              <ToggleField
+                label={t("forceControl.label")}
+                description={t("forceControl.hint")}
+                checked={forceControl}
+                onChange={setForceControl}
+                bottomSeparator="thick"
+              />
+            </PanelSectionRow>
+          )}
 
           {caps.color && (
             <>
@@ -655,6 +675,21 @@ function Content() {
             </PanelSectionRow>
           ))}
         </>
+      )}
+
+      {caps.conflictsWithSystemRgb && (
+        <PanelSectionRow>
+          <div
+            style={{
+              fontSize: 12,
+              color: "rgba(255,255,255,0.55)",
+              padding: "4px 2px 8px",
+              lineHeight: 1.45,
+            }}
+          >
+            {t("forceControl.notice")}
+          </div>
+        </PanelSectionRow>
       )}
 
       <PanelSectionRow>

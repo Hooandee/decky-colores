@@ -18,3 +18,5 @@ export const getVersion = callable<[], string>("get_version");
 export const setExperiment = callable<[feature: string, on: boolean], void>("set_experiment");
 export const setPowerLed = callable<[off: boolean], void>("set_power_led");
 export const reconnect = callable<[], boolean>("reconnect");
+export const setForceControl = callable<[on: boolean], void>("set_force_control");
+export const reassert = callable<[], void>("reassert");

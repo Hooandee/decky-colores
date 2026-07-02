@@ -34,6 +34,7 @@ export interface Capabilities {
   states: Record<string, "supported" | "experimental" | "unsupported">;
   enabledExperiments: string[];
   powerLed: boolean;
+  conflictsWithSystemRgb: boolean;
 }
 
 export type Mode = "solid" | "gradient" | "effect" | "ambient";
@@ -66,6 +67,7 @@ export interface ColoresState {
   savedGradients: GradientPreset[];
   powerLedOff: boolean;
   chargerOnly: boolean;
+  forceControl: boolean;
 }
 
 export interface GradientPreset {
