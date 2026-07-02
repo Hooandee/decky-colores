@@ -26,6 +26,7 @@ DEFAULTS = {
     "enabled_experiments": [],
     "power_led_off": False,
     "charger_only": False,
+    "force_control": False,
 }
 
 # How often the background watcher samples the AC adapter to react to plug/unplug
@@ -178,6 +179,7 @@ class Plugin:
             "savedGradients": self._serialized_saved(),
             "powerLedOff": s.get("power_led_off", False),
             "chargerOnly": s.get("charger_only", False),
+            "forceControl": s.get("force_control", False),
         }
 
     async def set_power(self, on: bool) -> None:
@@ -191,6 +193,18 @@ class Plugin:
         if on:
             self._ac_online = charger_online()
         self._save_and_apply()
+
+    async def set_force_control(self, on: bool) -> None:
+        self._init()
+        self._settings["force_control"] = on
+        self._save_and_apply()
+
+    async def reassert(self) -> None:
+        # Re-apply the current LED state on demand (used by the frontend to reclaim
+        # the LEDs from another RGB tool when Force control is on and the panel opens).
+        # Event-driven only: no polling, no read-back.
+        self._init()
+        self._apply()
 
     async def set_brightness(self, value: int) -> None:
         self._init()
@@ -343,7 +357,7 @@ class Plugin:
             )
         elif s["mode"] == "gradient":
             self._controller.apply_zones(
-                interpolate_gradient([tuple(c) for c in s["gradient"]], 2), brightness, power
+                interpolate_gradient([tuple(c) for c in s["gradient"]], self._zones), brightness, power
             )
         else:
             self._controller.apply_solid(tuple(s["color"]), brightness, power)

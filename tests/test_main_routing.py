@@ -384,3 +384,34 @@ def test_reassert_does_not_restart_running_effect(main_module, monkeypatch):
     assert p._engine is engine
     assert p._controller is ctrl
     assert not engine.events
+
+
+def test_force_control_default_is_false(main_module):
+    assert main_module.DEFAULTS["force_control"] is False
+
+
+def test_set_force_control_persists_and_applies(main_module):
+    p = _plugin(main_module, "solid")
+    saved = {}
+    p._store = types.SimpleNamespace(save=lambda s: saved.update({"v": dict(s)}))
+    asyncio.run(p.set_force_control(True))
+    assert p._settings["force_control"] is True
+    assert saved["v"]["force_control"] is True
+    assert p._controller.calls, "set_force_control must re-apply"
+
+
+def test_reassert_reapplies(main_module):
+    p = _plugin(main_module, "solid")
+    p._controller.calls.clear()
+    asyncio.run(p.reassert())
+    assert p._controller.calls, "reassert must call _apply"
+
+
+def test_hardware_gradient_uses_device_zone_count(main_module):
+    p = _plugin(main_module, "gradient", hw=True, per_zone=True)
+    p._zones = 4
+    p._capabilities["zones"] = 4
+    p._apply()
+    zone_calls = [c for c in p._controller.calls if c[0] == "zones"]
+    assert zone_calls, "expected a per-zone hardware gradient write"
+    assert len(zone_calls[0][1]) == 4
