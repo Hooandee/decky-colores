@@ -30,6 +30,11 @@ class LedDevice:
     def reconnect(self):
         return self.available
 
+    def invalidate(self):
+        # Drop any cached "already in this mode" state so the next apply re-sends the
+        # full init/commit sequence. No-op for devices that always write in full (sysfs).
+        return None
+
     def apply_zones(self, zone_colors, brightness, power):
         return False
 
