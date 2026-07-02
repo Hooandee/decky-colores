@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.1...decky-colores-v0.15.2) (2026-07-02)
+
+
+### Bug Fixes
+
+* show the changelog in a formatted modal instead of raw inline text ([ad5cf01](https://github.com/Hooandee/decky-colores/commit/ad5cf012536dd7825d280374924138a0f75cbe04))
+
 ## [0.15.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.0...decky-colores-v0.15.1) (2026-07-02)
 
 
