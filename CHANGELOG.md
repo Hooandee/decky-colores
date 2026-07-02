@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.13.0...decky-colores-v0.14.0) (2026-07-02)
+
+
+### Features
+
+* add battery mode that colors LEDs by charge level ([225a5c2](https://github.com/Hooandee/decky-colores/commit/225a5c2fdf641d1bb164057411b5347af633f52d))
+
 ## [0.13.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.12.0...decky-colores-v0.13.0) (2026-07-02)
 
 
