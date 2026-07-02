@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.12.0...decky-colores-v0.13.0) (2026-07-02)
+
+
+### Features
+
+* keep Prioritize-Colores holding via a background re-assert ([4331003](https://github.com/Hooandee/decky-colores/commit/4331003b3c5f00379224cb8b3b3df00c14dd5947))
+* keep Prioritize-Colores holding via a background re-assert ([b8e4dd3](https://github.com/Hooandee/decky-colores/commit/b8e4dd3d00c9fad56e1ae9d913cfa4b9a2def9bc))
+
+
+### Bug Fixes
+
+* gentle periodic re-assert to avoid a 2s LED flicker ([ed8813c](https://github.com/Hooandee/decky-colores/commit/ed8813c7f10dd332848a330844ff14fec4e66349))
+
 ## [0.12.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.11.0...decky-colores-v0.12.0) (2026-07-02)
 
 
