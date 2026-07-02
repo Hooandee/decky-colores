@@ -171,6 +171,13 @@ export function useColores() {
     );
   };
 
+  const setBatteryBreathe = (batteryBreathe: boolean) => {
+    setState((s) => (s ? { ...s, batteryBreathe } : s));
+    api.setBatteryBreathe(batteryBreathe).catch((e) =>
+      console.error("Colores: setBatteryBreathe failed", e),
+    );
+  };
+
   const setExperiment = (feature: string, on: boolean) => {
     api
       .setExperiment(feature, on)
@@ -204,6 +211,7 @@ export function useColores() {
     setExperiment,
     setPowerLed,
     setForceControl,
+    setBatteryBreathe,
     reconnect,
   };
 }

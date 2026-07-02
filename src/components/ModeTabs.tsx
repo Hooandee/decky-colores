@@ -14,6 +14,7 @@ const LABEL_KEYS: Record<Mode, string> = {
   gradient: "mode.gradient",
   effect: "mode.effect",
   ambient: "mode.ambient",
+  battery: "mode.battery",
 };
 
 export const ModeTabs: FC<ModeTabsProps> = ({ value, modes, onChange }) => {

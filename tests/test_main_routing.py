@@ -78,6 +78,9 @@ class FakeEngine:
     def start_effect(self, effect_id, speed, params):
         self.events.append(("effect", effect_id, params))
 
+    def start_battery(self, state_fn):
+        self.events.append(("battery", state_fn()))
+
 
 class FakeAmbilight:
     def __init__(self):
@@ -388,6 +391,50 @@ def test_reassert_does_not_restart_running_effect(main_module, monkeypatch):
     assert p._engine is engine
     assert p._controller is ctrl
     assert not engine.events
+
+
+def test_battery_mode_starts_battery_loop(main_module):
+    p = _plugin(main_module, "battery", hw=False, per_zone=True)
+    p._battery_level = 45
+    p._ac_online = False
+    p._apply()
+    battery = next(e for e in p._engine.events if e[0] == "battery")
+    assert battery[1] == {"level": 45, "charging": False, "breathe": True}
+    assert not any(c[0] == "hw_effect" for c in p._controller.calls)
+
+
+def test_battery_mode_wants_render_loop(main_module):
+    p = _plugin(main_module, "battery")
+    assert p._wants_render_loop() is True
+
+
+def test_battery_mode_on_hardware_device_stays_software(main_module):
+    # Even on a firmware-effects device (Legion) battery bands are painted in
+    # software (easing/breathing), never a hardware effect.
+    p = _plugin(main_module, "battery", hw=True, per_zone=False, per_controller=True)
+    p._apply()
+    assert any(e[0] == "battery" for e in p._engine.events)
+    assert not any(c[0] == "hw_effect" for c in p._controller.calls)
+
+
+def test_battery_mode_gated_off_when_power_off(main_module):
+    p = _plugin(main_module, "battery", hw=False, per_zone=True, power=False)
+    p._apply()
+    assert ("static", [(0, 0, 0)] * p._zones) in p._engine.events
+    assert not any(e[0] == "battery" for e in p._engine.events)
+
+
+def test_battery_breathe_default_is_true(main_module):
+    assert main_module.DEFAULTS["battery_breathe"] is True
+
+
+def test_set_battery_breathe_persists(main_module):
+    p = _plugin(main_module, "battery", hw=False, per_zone=True)
+    saved = {}
+    p._store = types.SimpleNamespace(save=lambda s: saved.update({"v": dict(s)}))
+    asyncio.run(p.set_battery_breathe(False))
+    assert p._settings["battery_breathe"] is False
+    assert saved["v"]["battery_breathe"] is False
 
 
 def test_force_control_default_is_false(main_module):

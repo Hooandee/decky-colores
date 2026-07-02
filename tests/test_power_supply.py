@@ -1,6 +1,6 @@
 import os
 
-from py_modules.power_supply import charger_online
+from py_modules.power_supply import charger_online, battery_present, battery_level
 
 
 def _supply(root, name, kind, online=None):
@@ -50,3 +50,48 @@ def test_battery_only_node_is_ignored(tmp_path):
 
 def test_missing_root_assumes_plugged(tmp_path):
     assert charger_online(os.path.join(str(tmp_path), "nope")) is True
+
+
+def _battery(root, name, capacity=None):
+    path = os.path.join(root, name)
+    os.makedirs(path)
+    with open(os.path.join(path, "type"), "w") as handle:
+        handle.write("Battery\n")
+    if capacity is not None:
+        with open(os.path.join(path, "capacity"), "w") as handle:
+            handle.write(str(capacity) + "\n")
+
+
+def test_battery_present_true_with_capacity(tmp_path):
+    root = str(tmp_path)
+    _battery(root, "BAT0", 72)
+    assert battery_present(root) is True
+
+
+def test_battery_present_false_without_battery(tmp_path):
+    root = str(tmp_path)
+    _supply(root, "ADP0", "Mains", "1")
+    assert battery_present(root) is False
+
+
+def test_battery_present_false_when_capacity_missing(tmp_path):
+    root = str(tmp_path)
+    _battery(root, "BAT0")  # battery node but no capacity file
+    assert battery_present(root) is False
+
+
+def test_battery_level_reads_capacity(tmp_path):
+    root = str(tmp_path)
+    _battery(root, "BAT0", 42)
+    assert battery_level(root) == 42
+
+
+def test_battery_level_clamps_and_averages(tmp_path):
+    root = str(tmp_path)
+    _battery(root, "BAT0", 40)
+    _battery(root, "BAT1", 60)
+    assert battery_level(root) == 50
+
+
+def test_battery_level_none_when_unreadable(tmp_path):
+    assert battery_level(os.path.join(str(tmp_path), "nope")) is None

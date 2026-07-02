@@ -155,6 +155,25 @@ export const EFFECT_PRESETS: EffectMeta[] = [
   },
 ];
 
+// Battery mode color bands (blue full -> red empty). Each entry is the inclusive
+// minimum level and its color. Must stay in sync with the backend BATTERY_BANDS
+// (py_modules/effects.py), which does the actual LED rendering; these drive the
+// legend and the on-screen preview only.
+export const BATTERY_BANDS: { min: number; color: RGB }[] = [
+  { min: 81, color: { r: 0, g: 120, b: 255 } },
+  { min: 61, color: { r: 0, g: 200, b: 60 } },
+  { min: 41, color: { r: 255, g: 200, b: 0 } },
+  { min: 21, color: { r: 255, g: 110, b: 0 } },
+  { min: 0, color: { r: 255, g: 30, b: 20 } },
+];
+
+export function batteryBandColor(level: number): RGB {
+  for (const band of BATTERY_BANDS) {
+    if (level >= band.min) return band.color;
+  }
+  return BATTERY_BANDS[BATTERY_BANDS.length - 1].color;
+}
+
 const NAME_PARTS: Record<"es" | "en", { adjectives: string[]; nouns: string[] }> = {
   es: {
     adjectives: ["Borracho", "Eléctrico", "Cósmico", "Disco", "Pastel", "Neón", "Salvaje", "Turbo", "Místico", "Picante"],

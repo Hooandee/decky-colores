@@ -19,3 +19,4 @@ export const setExperiment = callable<[feature: string, on: boolean], void>("set
 export const setPowerLed = callable<[off: boolean], void>("set_power_led");
 export const reconnect = callable<[], boolean>("reconnect");
 export const setForceControl = callable<[on: boolean], void>("set_force_control");
+export const setBatteryBreathe = callable<[on: boolean], void>("set_battery_breathe");

@@ -24,7 +24,7 @@ import { EffectsGallery } from "./components/EffectsGallery";
 import { GradientModal } from "./components/GradientModal";
 import { About } from "./components/About";
 import { ColorWheelIcon } from "./components/ColorWheelIcon";
-import { GRADIENT_PRESETS, EFFECT_PRESETS } from "./palette";
+import { GRADIENT_PRESETS, EFFECT_PRESETS, BATTERY_BANDS, batteryBandColor } from "./palette";
 import { I18nProvider, LangToggle, useI18n } from "./i18n";
 
 function DeviceHeader({ name, color }: { name: string; color: RGB }) {
@@ -200,6 +200,89 @@ function EffectSource({
   );
 }
 
+function BatteryPanel({
+  level,
+  breathe,
+  disabled,
+  onBreathe,
+}: {
+  level: number;
+  breathe: boolean;
+  disabled?: boolean;
+  onBreathe: (on: boolean) => void;
+}) {
+  const { t } = useI18n();
+  // Left (0%) -> right (100%): red ... blue. BATTERY_BANDS is high-to-low, so reverse.
+  const barStops = [...BATTERY_BANDS].reverse().map((b) => b.color);
+  const marker = Math.max(0, Math.min(100, level));
+  return (
+    <>
+      <PanelSectionRow>
+        <div
+          style={{
+            fontSize: 12,
+            color: "rgba(255,255,255,0.55)",
+            padding: "4px 2px 10px",
+            lineHeight: 1.45,
+          }}
+        >
+          {t("battery.hint")}
+        </div>
+      </PanelSectionRow>
+      <PanelSectionRow>
+        <div style={{ padding: "2px 2px 4px" }}>
+          <div
+            style={{
+              position: "relative",
+              height: 14,
+              borderRadius: 7,
+              background: gradientCss(barStops),
+              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                top: -3,
+                bottom: -3,
+                left: `calc(${marker}% - 2px)`,
+                width: 4,
+                borderRadius: 2,
+                background: "#fff",
+                boxShadow: "0 0 4px rgba(0,0,0,0.6)",
+              }}
+            />
+          </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontSize: 11,
+              color: "rgba(255,255,255,0.45)",
+              padding: "6px 1px 0",
+            }}
+          >
+            <span>0%</span>
+            <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
+              {t("battery.level", { n: marker })}
+            </span>
+            <span>100%</span>
+          </div>
+        </div>
+      </PanelSectionRow>
+      <PanelSectionRow>
+        <ToggleField
+          label={t("battery.breathe.label")}
+          description={t("battery.breathe.hint")}
+          checked={breathe}
+          disabled={disabled}
+          onChange={onBreathe}
+        />
+      </PanelSectionRow>
+    </>
+  );
+}
+
 function Content() {
   const {
     state,
@@ -221,6 +304,7 @@ function Content() {
     setExperiment,
     setPowerLed,
     setForceControl,
+    setBatteryBreathe,
     reconnect,
   } = useColores();
   const { t } = useI18n();
@@ -300,6 +384,8 @@ function Content() {
     powerLedOff,
     chargerOnly,
     forceControl,
+    batteryBreathe,
+    batteryLevel,
   } = state;
   const hasLeds = caps.color || caps.brightness;
 
@@ -313,6 +399,7 @@ function Content() {
 
   const modes: Mode[] = (() => {
     const base: Mode[] = canGradient ? ["solid", "gradient", "effect"] : ["solid", "effect"];
+    if (caps.batteryMode) base.push("battery");
     if (caps.ambilight) base.push("ambient");
     return base;
   })();
@@ -347,7 +434,9 @@ function Content() {
         ? effectPreview()
         : mode === "ambient"
           ? AMBIENT_HINT
-          : [color];
+          : mode === "battery"
+            ? [batteryBandColor(batteryLevel)]
+            : [color];
 
   return (
     <PanelSection>
@@ -553,6 +642,15 @@ function Content() {
                     />
                   </PanelSectionRow>
                 </>
+              )}
+
+              {mode === "battery" && (
+                <BatteryPanel
+                  level={batteryLevel}
+                  breathe={batteryBreathe}
+                  disabled={!power}
+                  onBreathe={setBatteryBreathe}
+                />
               )}
             </>
           )}

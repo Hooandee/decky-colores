@@ -10,7 +10,7 @@ from device import build_device
 from settings_store import SettingsStore
 from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
-from power_supply import charger_online
+from power_supply import charger_online, battery_level
 from saved_gradients import upsert_gradient, remove_gradient
 
 DEFAULTS = {
@@ -27,6 +27,7 @@ DEFAULTS = {
     "power_led_off": False,
     "charger_only": False,
     "force_control": False,
+    "battery_breathe": True,
 }
 
 # How often the background watcher samples the AC adapter to react to plug/unplug
@@ -75,6 +76,8 @@ class Plugin:
         self._settings["ambilight"] = {**DEFAULTS["ambilight"], **self._settings["ambilight"]}
         self._settings["effect"] = {**DEFAULTS["effect"], **self._settings["effect"]}
         self._ac_online = charger_online()
+        level = battery_level()
+        self._battery_level = 100 if level is None else level
         self._apply_power_led()
         self._ready = True
 
@@ -185,6 +188,8 @@ class Plugin:
             "powerLedOff": s.get("power_led_off", False),
             "chargerOnly": s.get("charger_only", False),
             "forceControl": s.get("force_control", False),
+            "batteryBreathe": s.get("battery_breathe", True),
+            "batteryLevel": getattr(self, "_battery_level", 100),
         }
 
     async def set_power(self, on: bool) -> None:
@@ -206,6 +211,13 @@ class Plugin:
         if on:
             self._controller.invalidate()  # force a full re-init so it reclaims at once
         self._apply()
+
+    async def set_battery_breathe(self, on: bool) -> None:
+        self._init()
+        self._settings["battery_breathe"] = on
+        # The battery loop reads this live via _battery_state, so persisting is
+        # enough; no restart needed. Re-apply is a cheap no-op unless idle.
+        self._save_and_apply()
 
     async def set_brightness(self, value: int) -> None:
         self._init()
@@ -297,6 +309,16 @@ class Plugin:
             return bool(getattr(self, "_ac_online", True))
         return True
 
+    def _battery_state(self) -> dict:
+        # Live state for the battery render loop. "charging" uses the cached adapter
+        # state (plugged) as the proxy; the loop only breathes when plugged AND below
+        # 100%. Level is refreshed on the coarse charger poll — battery moves slowly.
+        return {
+            "level": getattr(self, "_battery_level", 100),
+            "charging": bool(getattr(self, "_ac_online", True)),
+            "breathe": self._settings.get("battery_breathe", True),
+        }
+
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(
             zone_colors, self._settings["brightness"], self._effective_power()
@@ -317,7 +339,7 @@ class Plugin:
         # (per-zone or per-controller). Single-color devices render wave with
         # their native hardware effect instead of collapsing it to a flat color.
         s = self._settings
-        if s["mode"] == "ambient":
+        if s["mode"] in ("ambient", "battery"):
             return True
         if s["mode"] == "gradient":
             return not self._controller.supports_per_zone()
@@ -385,7 +407,9 @@ class Plugin:
 
         self._ambilight.stop()
 
-        if s["mode"] == "effect":
+        if s["mode"] == "battery":
+            self._engine.start_battery(self._battery_state)
+        elif s["mode"] == "effect":
             effect = s["effect"]
             self._engine.start_effect(
                 effect["id"],
@@ -437,6 +461,11 @@ class Plugin:
         try:
             while True:
                 await asyncio.sleep(CHARGER_POLL_INTERVAL)
+                # Refresh the cached battery level; the battery render loop reads it
+                # live, so no reapply is needed for it to ease to a new band.
+                level = battery_level()
+                if level is not None:
+                    self._battery_level = level
                 online = charger_online()
                 if online != getattr(self, "_ac_online", True):
                     self._ac_online = online

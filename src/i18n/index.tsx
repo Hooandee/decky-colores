@@ -28,6 +28,7 @@ const es: Record<string, string> = {
   "mode.gradient": "Degradado",
   "mode.effect": "Efecto",
   "mode.ambient": "Ambilight",
+  "mode.battery": "Batería",
 
   "color.hue": "Tono",
   "color.saturation": "Saturación",
@@ -90,6 +91,11 @@ const es: Record<string, string> = {
   "ambient.smoothing": "Suavizado",
   "ambient.captureRate": "Tasa de captura",
 
+  "battery.hint": "Las luces muestran el nivel de batería con un color que va del azul al rojo.",
+  "battery.level": "{n}%",
+  "battery.breathe.label": "Respirar al cargar",
+  "battery.breathe.hint": "Mientras se carga, el color respira suavemente.",
+
   "brightness.label": "Brillo",
 
   "about.title": "Acerca de",
@@ -135,6 +141,7 @@ const en: Record<string, string> = {
   "mode.gradient": "Gradient",
   "mode.effect": "Effect",
   "mode.ambient": "Ambient",
+  "mode.battery": "Battery",
 
   "color.hue": "Hue",
   "color.saturation": "Saturation",
@@ -196,6 +203,11 @@ const en: Record<string, string> = {
   "ambient.vividness": "Vividness",
   "ambient.smoothing": "Smoothing",
   "ambient.captureRate": "Capture rate",
+
+  "battery.hint": "The lights show the battery level with a color from blue to red.",
+  "battery.level": "{n}%",
+  "battery.breathe.label": "Breathe while charging",
+  "battery.breathe.hint": "While charging, the color gently breathes.",
 
   "brightness.label": "Brightness",
 

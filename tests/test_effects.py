@@ -1,4 +1,6 @@
 from py_modules.effects import (
+    BATTERY_BANDS,
+    battery_band_color,
     frame_breathing,
     frame_cycle,
     frame_gradient_sweep,
@@ -110,3 +112,23 @@ def test_frame_spiral_rotates_and_stays_valid():
         if frame != start:
             moved = True
     assert moved
+
+
+def test_battery_band_color_thresholds():
+    assert battery_band_color(100) == (0, 120, 255)
+    assert battery_band_color(81) == (0, 120, 255)
+    assert battery_band_color(80) == (0, 200, 60)
+    assert battery_band_color(61) == (0, 200, 60)
+    assert battery_band_color(60) == (255, 200, 0)
+    assert battery_band_color(41) == (255, 200, 0)
+    assert battery_band_color(40) == (255, 110, 0)
+    assert battery_band_color(21) == (255, 110, 0)
+    assert battery_band_color(20) == (255, 30, 20)
+    assert battery_band_color(0) == (255, 30, 20)
+
+
+def test_battery_bands_cover_full_range_descending():
+    thresholds = [b[0] for b in BATTERY_BANDS]
+    assert thresholds == sorted(thresholds, reverse=True)
+    assert thresholds[-1] == 0
+    assert all(_valid(color) for _, color in BATTERY_BANDS)

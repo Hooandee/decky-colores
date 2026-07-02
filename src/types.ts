@@ -34,10 +34,11 @@ export interface Capabilities {
   states: Record<string, "supported" | "experimental" | "unsupported">;
   enabledExperiments: string[];
   powerLed: boolean;
+  batteryMode: boolean;
   conflictsWithSystemRgb: boolean;
 }
 
-export type Mode = "solid" | "gradient" | "effect" | "ambient";
+export type Mode = "solid" | "gradient" | "effect" | "ambient" | "battery";
 
 export interface AmbilightState {
   saturation: number;
@@ -68,6 +69,8 @@ export interface ColoresState {
   powerLedOff: boolean;
   chargerOnly: boolean;
   forceControl: boolean;
+  batteryBreathe: boolean;
+  batteryLevel: number;
 }
 
 export interface GradientPreset {
