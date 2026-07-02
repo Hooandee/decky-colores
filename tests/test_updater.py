@@ -104,6 +104,21 @@ def test_shape_component_tag(monkeypatch):
     assert result["has_update"] is True
 
 
+def test_shape_matches_github_dotted_asset_name(monkeypatch):
+    # GitHub replaces spaces with dots: "Panel de Control.zip" -> "Panel.de.Control.zip".
+    monkeypatch.setattr(updater, "_plugin_name", lambda: "Panel de Control")
+    payload = {
+        "tag_name": "v0.2.0",
+        "body": "",
+        "assets": [
+            {"name": "Panel.de.Control.zip", "browser_download_url": "https://x/Panel.de.Control.zip"},
+        ],
+    }
+    result = updater._shape(payload, "0.1.0")
+    assert result["download_url"] == "https://x/Panel.de.Control.zip"
+    assert result["has_update"] is True
+
+
 def test_check_404_is_benign(monkeypatch):
     import urllib.error
 
