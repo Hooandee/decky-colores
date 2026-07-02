@@ -1,7 +1,7 @@
 import os
 import sys
 
-from led_device import LedDevice, _clamp8, _clamp_pct
+from led_device import LedDevice, _clamp8, _clamp_pct, apply_gain
 
 _HUESYNC_DIR = os.path.join(os.path.dirname(__file__), "huesync")
 if _HUESYNC_DIR not in sys.path:
@@ -104,8 +104,26 @@ def _legion_speed(speed):
 
 
 class _BaseHidDevice(LedDevice):
+    _color_correction = (1.0, 1.0, 1.0)
+
     def __init__(self, transport):
         self._transport = transport
+
+    def set_color_correction(self, gains):
+        self._color_correction = tuple(gains)
+
+    def _correct(self, color):
+        return apply_gain(color, self._color_correction)
+
+    def _write(self, reps):
+        device = self._transport.hid_device
+        if device is None:
+            if not self._transport.is_ready():
+                return False
+            device = self._transport.hid_device
+        for rep in reps:
+            device.write(rep)
+        return True
 
     @property
     def available(self):
@@ -229,16 +247,6 @@ class LegionTabletHidDevice(_LegionHidDevice):
             )
         )
 
-    def _write(self, reps):
-        device = self._transport.hid_device
-        if device is None:
-            if not self._transport.is_ready():
-                return False
-            device = self._transport.hid_device
-        for rep in reps:
-            device.write(rep)
-        return True
-
     def apply_zones(self, zone_colors, brightness, power):
         colors = list(zone_colors) or [(0, 0, 0)]
         left = colors[0]
@@ -305,16 +313,6 @@ class LegionGoSHidDevice(_LegionHidDevice):
             )
         )
 
-    def _write(self, reps):
-        device = self._transport.hid_device
-        if device is None:
-            if not self._transport.is_ready():
-                return False
-            device = self._transport.hid_device
-        for rep in reps:
-            device.write(rep)
-        return True
-
     def apply_solid(self, color, brightness, power):
         r, g, b = (_clamp8(c) for c in color)
         if not power or (r == 0 and g == 0 and b == 0):
@@ -348,8 +346,8 @@ class LegionGoSHidDevice(_LegionHidDevice):
 
 
 class AsusAllyHidDevice(_BaseHidDevice):
-    # The green channel is toned down to match the sysfs Ally profile's calibration.
-    _COLOR_CORRECTION = (1.0, 0.85, 1.0)
+    # Green is toned down to match the Ally calibration; the gain comes from the
+    # profile's color_correction via set_color_correction (see _build_hid_context).
 
     @classmethod
     def create(cls):
@@ -370,25 +368,11 @@ class AsusAllyHidDevice(_BaseHidDevice):
     def supports_hardware_effects(self):
         return True
 
-    def _correct(self, color):
-        gains = self._COLOR_CORRECTION
-        return tuple(_clamp8(round(c * gains[i])) for i, c in enumerate(color))
-
     def _fit(self, zone_colors):
         colors = [tuple(c) for c in zone_colors] or [(0, 0, 0)]
         if len(colors) < 4:
             colors += [colors[-1]] * (4 - len(colors))
         return [self._correct(c) for c in colors[:4]]
-
-    def _write(self, reps):
-        device = self._transport.hid_device
-        if device is None:
-            if not self._transport.is_ready():
-                return False
-            device = self._transport.hid_device
-        for rep in reps:
-            device.write(rep)
-        return True
 
     def _off(self):
         def _do():
@@ -431,7 +415,7 @@ class AsusAllyHidDevice(_BaseHidDevice):
 
         def _do():
             reps = list(init_cmds())
-            reps.append(brightness_cmd(pct_to_level(100)))
+            reps.append(brightness_cmd(3))
             for zone in ZONE_CODES:
                 reps.append(zone_cmd(zone, code, r, g, b, speed=speed_byte))
             reps.extend(set_apply_cmds())

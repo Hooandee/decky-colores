@@ -9,6 +9,10 @@ def _clamp_pct(value):
     return max(0, min(100, int(value)))
 
 
+def apply_gain(color, gains):
+    return tuple(_clamp8(round(c * gains[i])) for i, c in enumerate(color))
+
+
 class LedDevice:
     led_path = None
     last_error = None
@@ -76,8 +80,7 @@ class SysfsRgbDevice(LedDevice):
         return colors[: self._zones]
 
     def _order(self, color):
-        gains = self._color_correction
-        r, g, b = (_clamp8(round(c * gains[i])) for i, c in enumerate(color))
+        r, g, b = apply_gain(color, self._color_correction)
         if self._color_order == "bgr":
             return b, g, r
         return r, g, b

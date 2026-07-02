@@ -189,6 +189,9 @@ def _build_hid_context(profile, ambilight, power_led=None):
     device = build_hid_device(profile["driver"])
     if device is None or not device.available:
         return None
+    correction = profile.get("color_correction")
+    if correction and hasattr(device, "set_color_correction"):
+        device.set_color_correction(correction)
     zones = profile.get("zones") or 1
     capabilities = build_capabilities(profile, True, zones, 100, ambilight, power_led)
     capabilities["perZone"] = device.supports_per_zone()

@@ -462,3 +462,14 @@ def test_ally_hardware_effect_uses_mode_and_speed(hid_env):
     assert zone_packets
     assert all(p[3] == 0x02 for p in zone_packets)
     assert all(p[7] == 0xF5 for p in zone_packets)
+
+
+def test_ally_color_correction_threads_through(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.set_color_correction((1.0, 0.85, 1.0))  # what _build_hid_context passes from the profile
+    writes.clear()
+    dev.apply_solid((0, 255, 0), 100, True)
+    green_zone = writes[2]  # after init + brightness
+    assert tuple(green_zone[4:7]) == (0, round(255 * 0.85), 0)
