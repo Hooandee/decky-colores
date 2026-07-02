@@ -1,7 +1,7 @@
 import os
 import sys
 
-from led_device import LedDevice, _clamp8, _clamp_pct
+from led_device import LedDevice, _clamp8, _clamp_pct, apply_gain
 
 _HUESYNC_DIR = os.path.join(os.path.dirname(__file__), "huesync")
 if _HUESYNC_DIR not in sys.path:
@@ -29,6 +29,18 @@ try:
     )
     from legion_led_device_hid import LegionGoLEDDeviceHID
     from hhd_legino_go_s_hid import rgb_enable, rgb_multi_load_settings
+    from asus_ally_hid import (
+        AsusAllyTransport,
+        brightness_cmd,
+        zone_cmd,
+        init_cmds,
+        set_apply_cmds,
+        pct_to_level,
+        speed_to_code,
+        mode_code,
+        ZONE_CODES,
+        MODE_SOLID,
+    )
 
     HID_AVAILABLE = True
 except Exception as error:  # pragma: no cover - exercised only without libhidapi
@@ -55,6 +67,13 @@ LEGION_GO_S_IDS = {
     "usage_page": [0xFFA0],
     "usage": [0x0001],
     "interface": 3,
+}
+
+ASUS_ALLY_IDS = {
+    "vid": [0x0B05],
+    "pid": [0x1ABE],
+    "usage_page": [0xFF31],
+    "usage": [0x0080],
 }
 
 
@@ -85,8 +104,26 @@ def _legion_speed(speed):
 
 
 class _BaseHidDevice(LedDevice):
+    _color_correction = (1.0, 1.0, 1.0)
+
     def __init__(self, transport):
         self._transport = transport
+
+    def set_color_correction(self, gains):
+        self._color_correction = tuple(gains)
+
+    def _correct(self, color):
+        return apply_gain(color, self._color_correction)
+
+    def _write(self, reps):
+        device = self._transport.hid_device
+        if device is None:
+            if not self._transport.is_ready():
+                return False
+            device = self._transport.hid_device
+        for rep in reps:
+            device.write(rep)
+        return True
 
     @property
     def available(self):
@@ -210,16 +247,6 @@ class LegionTabletHidDevice(_LegionHidDevice):
             )
         )
 
-    def _write(self, reps):
-        device = self._transport.hid_device
-        if device is None:
-            if not self._transport.is_ready():
-                return False
-            device = self._transport.hid_device
-        for rep in reps:
-            device.write(rep)
-        return True
-
     def apply_zones(self, zone_colors, brightness, power):
         colors = list(zone_colors) or [(0, 0, 0)]
         left = colors[0]
@@ -286,16 +313,6 @@ class LegionGoSHidDevice(_LegionHidDevice):
             )
         )
 
-    def _write(self, reps):
-        device = self._transport.hid_device
-        if device is None:
-            if not self._transport.is_ready():
-                return False
-            device = self._transport.hid_device
-        for rep in reps:
-            device.write(rep)
-        return True
-
     def apply_solid(self, color, brightness, power):
         r, g, b = (_clamp8(c) for c in color)
         if not power or (r == 0 and g == 0 and b == 0):
@@ -328,10 +345,93 @@ class LegionGoSHidDevice(_LegionHidDevice):
         )
 
 
+class AsusAllyHidDevice(_BaseHidDevice):
+    # Green is toned down to match the Ally calibration; the gain comes from the
+    # profile's color_correction via set_color_correction (see _build_hid_context).
+
+    @classmethod
+    def create(cls):
+        if not HID_AVAILABLE:
+            return None
+        return cls(
+            AsusAllyTransport(
+                ASUS_ALLY_IDS["vid"],
+                ASUS_ALLY_IDS["pid"],
+                ASUS_ALLY_IDS["usage_page"],
+                ASUS_ALLY_IDS["usage"],
+            )
+        )
+
+    def supports_per_zone(self):
+        return True
+
+    def supports_hardware_effects(self):
+        return True
+
+    def _fit(self, zone_colors):
+        colors = [tuple(c) for c in zone_colors] or [(0, 0, 0)]
+        if len(colors) < 4:
+            colors += [colors[-1]] * (4 - len(colors))
+        return [self._correct(c) for c in colors[:4]]
+
+    def _off(self):
+        def _do():
+            reps = [brightness_cmd(0), zone_cmd(0x00, MODE_SOLID, 0, 0, 0), *set_apply_cmds()]
+            ok = self._write(reps)
+            if ok:
+                self._transport.prev_mode = None
+            return ok
+
+        return self._heal(_do)
+
+    def apply_zones(self, zone_colors, brightness, power):
+        if not power:
+            return self._off()
+
+        def _do():
+            new_mode = self._transport.prev_mode != "solid"
+            reps = list(init_cmds()) if new_mode else []
+            reps.append(brightness_cmd(pct_to_level(brightness)))
+            for code, (r, g, b) in zip(ZONE_CODES, self._fit(zone_colors)):
+                reps.append(zone_cmd(code, MODE_SOLID, r, g, b))
+            if new_mode:
+                reps.extend(set_apply_cmds())
+            ok = self._write(reps)
+            if ok:
+                self._transport.prev_mode = "solid"
+            return ok
+
+        return self._heal(_do)
+
+    def apply_solid(self, color, brightness, power):
+        return self.apply_zones([tuple(color)] * 4, brightness, power)
+
+    def apply_hardware_effect(self, effect_id, color, speed, power):
+        if not power:
+            return self._off()
+        code = mode_code(effect_id)
+        speed_byte = speed_to_code(speed)
+        r, g, b = self._correct(color)
+
+        def _do():
+            reps = list(init_cmds())
+            reps.append(brightness_cmd(3))
+            for zone in ZONE_CODES:
+                reps.append(zone_cmd(zone, code, r, g, b, speed=speed_byte))
+            reps.extend(set_apply_cmds())
+            ok = self._write(reps)
+            if ok:
+                self._transport.prev_mode = effect_id
+            return ok
+
+        return self._heal(_do)
+
+
 HID_DRIVERS = {
     "hid_msi": MsiHidDevice,
     "hid_legion_tablet": LegionTabletHidDevice,
     "hid_legion_go_s": LegionGoSHidDevice,
+    "hid_asus_ally": AsusAllyHidDevice,
 }
 
 

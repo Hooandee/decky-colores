@@ -381,3 +381,95 @@ def test_build_device_hid_unavailable_states_do_not_accumulate(hid_env, tmp_path
     assert first["capabilities"]["states"] == second["capabilities"]["states"]
     assert first["capabilities"]["experimental"] == second["capabilities"]["experimental"]
     sys.modules.pop("device", None)
+
+
+def _ally_entry():
+    return {
+        "vendor_id": 0x0B05,
+        "product_id": 0x1ABE,
+        "usage_page": 0xFF31,
+        "usage": 0x0080,
+        "interface_number": 0,
+        "path": b"ally",
+    }
+
+
+def test_ally_hid_registered(hid_env):
+    adapters, _ = hid_env
+    assert "hid_asus_ally" in adapters.HID_DRIVERS
+
+
+def test_ally_first_solid_sends_init_and_apply(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    assert dev.available is True
+    assert dev.supports_per_zone() is True
+    assert dev.supports_hardware_effects() is True
+    writes.clear()
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    assert len(writes) == 8
+    assert writes[0][:15] == bytes([0x5D]) + b"ASUS Tech.Inc."
+    assert writes[1][:5] == bytes.fromhex("5abac5c403")
+    zone_packets = writes[2:6]
+    assert [p[2] for p in zone_packets] == [0x01, 0x02, 0x03, 0x04]
+    assert all(tuple(p[4:7]) == (255, 0, 0) for p in zone_packets)
+    assert writes[6][:2] == bytes([0x5D, 0xB5])
+    assert writes[7][:2] == bytes([0x5D, 0xB4])
+
+
+def test_ally_second_solid_skips_init(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.apply_solid((255, 0, 0), 100, True)
+    writes.clear()
+    assert dev.apply_solid((0, 0, 255), 100, True) is True
+    assert len(writes) == 5
+    assert all(tuple(p[4:7]) == (0, 0, 255) for p in writes[1:5])
+
+
+def test_ally_per_zone_distinct_colors(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.apply_solid((1, 0, 0), 100, True)
+    writes.clear()
+    colors = [(10, 0, 0), (20, 0, 0), (30, 0, 0), (40, 0, 0)]
+    assert dev.apply_zones(colors, 100, True) is True
+    zone_packets = writes[1:5]
+    assert [tuple(p[4:7]) for p in zone_packets] == colors
+
+
+def test_ally_power_off_blacks_out(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.apply_solid((255, 0, 0), 100, True)
+    writes.clear()
+    assert dev.apply_zones([(255, 0, 0)] * 4, 100, False) is True
+    assert writes[0][:5] == bytes.fromhex("5abac5c400")
+    assert tuple(writes[1][4:7]) == (0, 0, 0)
+
+
+def test_ally_hardware_effect_uses_mode_and_speed(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    writes.clear()
+    assert dev.apply_hardware_effect("rainbow", (0, 255, 0), 90, True) is True
+    zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
+    assert zone_packets
+    assert all(p[3] == 0x02 for p in zone_packets)
+    assert all(p[7] == 0xF5 for p in zone_packets)
+
+
+def test_ally_color_correction_threads_through(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.set_color_correction((1.0, 0.85, 1.0))  # what _build_hid_context passes from the profile
+    writes.clear()
+    dev.apply_solid((0, 255, 0), 100, True)
+    green_zone = writes[2]  # after init + brightness
+    assert tuple(green_zone[4:7]) == (0, round(255 * 0.85), 0)

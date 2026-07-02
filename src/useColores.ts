@@ -50,6 +50,25 @@ export function useColores() {
     refreshState();
   }, [refreshState]);
 
+  // The RGB node hangs off a USB HID device that can enumerate late on cold boot,
+  // so the first getState may report no LEDs. The backend keeps probing for ~25s
+  // (ACQUIRE_ATTEMPTS) and rebuilds its capabilities once the node appears, but it
+  // never pushes; without this the QAM stays on "no LEDs" until reopened. While the
+  // loaded state shows no LEDs, re-fetch every 2s within a bounded window so the UI
+  // self-heals. A machine that detects LEDs immediately schedules zero timers.
+  const noLeds = !!state && !state.capabilities.color && !state.capabilities.brightness;
+  const acquireDeadline = useRef<number | null>(null);
+  useEffect(() => {
+    if (!noLeds) {
+      acquireDeadline.current = null;
+      return;
+    }
+    if (acquireDeadline.current === null) acquireDeadline.current = Date.now() + 30000;
+    if (Date.now() >= acquireDeadline.current) return;
+    const timer = setTimeout(refreshState, 2000);
+    return () => clearTimeout(timer);
+  }, [noLeds, state, refreshState]);
+
   // Mirror the live effect so successive setters in the same tick chain off the
   // latest value instead of a stale render-time snapshot.
   const effectRef = useRef<EffectState | null>(null);
@@ -145,6 +164,13 @@ export function useColores() {
     api.setPowerLed(off).catch((e) => console.error("Colores: setPowerLed failed", e));
   };
 
+  const setForceControl = (forceControl: boolean) => {
+    setState((s) => (s ? { ...s, forceControl } : s));
+    api.setForceControl(forceControl).catch((e) =>
+      console.error("Colores: setForceControl failed", e),
+    );
+  };
+
   const setExperiment = (feature: string, on: boolean) => {
     api
       .setExperiment(feature, on)
@@ -177,6 +203,7 @@ export function useColores() {
     deleteGradient,
     setExperiment,
     setPowerLed,
+    setForceControl,
     reconnect,
   };
 }

@@ -189,3 +189,19 @@ def test_build_device_msi_uses_bgr_on_sysfs_fallback(tmp_path):
     assert ctx["info"]["name"] == "MSI Claw 8 AI+"
     assert isinstance(ctx["device"], SysfsRgbDevice)
     assert ctx["device"]._color_order == "bgr"
+
+
+def test_capabilities_expose_conflicts_with_system_rgb():
+    from py_modules.device_profiles import resolve_profile
+
+    profile = resolve_profile("RC71L", "ROG Ally RC71L_RC71L")
+    caps = build_capabilities(profile, True, 4, 100, False)
+    assert caps["conflictsWithSystemRgb"] is True
+
+
+def test_capabilities_conflicts_defaults_false():
+    from py_modules.device_profiles import resolve_profile
+
+    profile = resolve_profile("RC72LA", "ROG Ally X")
+    caps = build_capabilities(profile, True, 4, 255, False)
+    assert caps["conflictsWithSystemRgb"] is False
