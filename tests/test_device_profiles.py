@@ -58,3 +58,18 @@ def test_generic_fallback_experimental_is_not_shared():
     first["experimental"].append("mutated")
     second = resolve_profile("Y", "OtherMystery")
     assert "mutated" not in second["experimental"]
+
+
+def test_rog_ally_rc71l_uses_aura_hid():
+    p = resolve_profile("RC71L", "ROG Ally RC71L_RC71L")
+    assert p["name"] == "ROG Ally"
+    assert p["driver"] == "hid_asus_ally"
+    assert p["zones"] == 4
+    assert p["conflicts_with_system_rgb"] is True
+
+
+def test_ally_x_stays_sysfs_not_hid():  # regression guard: do NOT touch Ally X
+    for board in ("RC72LA", "RC73XA", "RC73YA"):
+        p = resolve_profile(board, "whatever")
+        assert p["driver"] == "sysfs", f"{board} must stay sysfs"
+        assert p.get("conflicts_with_system_rgb", False) is False

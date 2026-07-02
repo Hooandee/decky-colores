@@ -7,6 +7,16 @@ ASUS_SYSFS = {
     "experimental": [],
 }
 
+ASUS_ALLY_HID = {
+    "driver": "hid_asus_ally",
+    "color_order": "rgb",
+    "zones": 4,
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle", "spiral"],
+    "color_correction": [1.0, 0.85, 1.0],
+    "conflicts_with_system_rgb": True,
+    "experimental": [],
+}
+
 MSI_HID = {
     "driver": "hid_msi",
     "color_order": "bgr",
@@ -76,7 +86,7 @@ def _profile(base, name, power_led=None):
 
 
 PROFILES = [
-    ("board", "RC71L", _profile(ASUS_SYSFS, "ROG Ally")),
+    ("board", "RC71L", _profile(ASUS_ALLY_HID, "ROG Ally")),
     ("board", "RC72LA", _profile(ASUS_SYSFS, "ROG Ally X")),
     ("board", "RC73YA", _profile(ASUS_SYSFS, "ROG Xbox Ally")),
     ("board", "RC73XA", _profile(ASUS_SYSFS, "ROG Xbox Ally X")),
