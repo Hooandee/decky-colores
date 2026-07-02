@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.12.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.11.0...decky-colores-v0.12.0) (2026-07-02)
+
+
+### Features
+
+* add AsusAllyHidDevice Aura HID adapter ([a984584](https://github.com/Hooandee/decky-colores/commit/a98458467cce872e5e975a79288f1203e26594a5))
+* add force_control setting and reassert RPC ([5f100a6](https://github.com/Hooandee/decky-colores/commit/5f100a62e5ee5637fe6718bda2b39777aff9de59))
+* add ROG Ally Aura RGB protocol builders ([95eb35d](https://github.com/Hooandee/decky-colores/commit/95eb35d040aa5a75684e779728a84d8f215cfeff))
+* expose conflictsWithSystemRgb and implement hid_asus_ally ([edad75e](https://github.com/Hooandee/decky-colores/commit/edad75eaa2e42336349dfecee8ee30009719e9f1))
+* force-control toggle and HHD conflict notice for the Ally ([cbbb3b7](https://github.com/Hooandee/decky-colores/commit/cbbb3b765f776c507b3e5b776e57fd80e481a6b7))
+* map ROG Ally RC71L to the Aura HID driver ([1511e72](https://github.com/Hooandee/decky-colores/commit/1511e72d5b1ccabc4bce9e9a8b2430fb4e6b9f5b))
+* ROG Ally (RC71L) RGB support via Aura HID + Prioritize-Colores toggle ([ae89cb4](https://github.com/Hooandee/decky-colores/commit/ae89cb4fe8786dcd53e3a97cac17f1b6e79883c5))
+
+
+### Bug Fixes
+
+* hide Legion-only spiral effect on the ROG Ally ([ea77df0](https://github.com/Hooandee/decky-colores/commit/ea77df01d867bfa058870665a3bb066ade74e872))
+* re-poll state while no LEDs so a late-enumerating node self-heals the UI ([f7575d6](https://github.com/Hooandee/decky-colores/commit/f7575d6bf23d1fbc1d5ff794ea072b3759c1a94f))
+* reclaim via reconnect so force-control re-inits the Aura device ([123b2e1](https://github.com/Hooandee/decky-colores/commit/123b2e19cd40749bb5de56e9427fd18ddf6c509c))
+
 ## [0.11.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.10.1...decky-colores-v0.11.0) (2026-06-29)
 
 
