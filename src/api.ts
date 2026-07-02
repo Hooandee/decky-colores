@@ -20,3 +20,24 @@ export const setPowerLed = callable<[off: boolean], void>("set_power_led");
 export const reconnect = callable<[], boolean>("reconnect");
 export const setForceControl = callable<[on: boolean], void>("set_force_control");
 export const setBatteryBreathe = callable<[on: boolean], void>("set_battery_breathe");
+
+// ── Self-updater ──
+
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  has_update: boolean;
+  notes: string;
+  download_url: string;
+  error: string;
+}
+
+export interface InstallResult {
+  ok: boolean;
+  needs_restart: boolean;
+  message: string;
+}
+
+export const checkUpdate = callable<[force: boolean], UpdateInfo>("check_update");
+export const installUpdate = callable<[], InstallResult>("install_update");
+export const restartLoader = callable<[], void>("restart_loader");

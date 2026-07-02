@@ -26,6 +26,7 @@ import { About } from "./components/About";
 import { ColorWheelIcon } from "./components/ColorWheelIcon";
 import { GRADIENT_PRESETS, EFFECT_PRESETS, BATTERY_BANDS, batteryBandColor } from "./palette";
 import { I18nProvider, LangToggle, useI18n } from "./i18n";
+import { useUpdate } from "./updater/useUpdate";
 
 function DeviceHeader({ name, color }: { name: string; color: RGB }) {
   return (
@@ -307,7 +308,8 @@ function Content() {
     setBatteryBreathe,
     reconnect,
   } = useColores();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const { hasUpdate } = useUpdate(lang);
   const [ambStatus, setAmbStatus] = useState<string>("idle");
 
   const ambientActive = state?.mode === "ambient" && state?.power;
@@ -793,7 +795,7 @@ function Content() {
       )}
 
       <PanelSectionRow>
-        <About />
+        <About lang={lang} hasUpdate={hasUpdate} />
       </PanelSectionRow>
     </PanelSection>
   );

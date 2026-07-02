@@ -12,6 +12,7 @@ from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
 from power_supply import charger_online, battery_level
 from saved_gradients import upsert_gradient, remove_gradient
+import self_updater
 
 DEFAULTS = {
     "power": True,
@@ -148,6 +149,18 @@ class Plugin:
 
     async def get_version(self) -> str:
         return read_version()
+
+    async def check_update(self, force: bool = False) -> dict:
+        self._init()
+        return self_updater.check(force)
+
+    async def install_update(self) -> dict:
+        self._init()
+        return self_updater.install()
+
+    async def restart_loader(self) -> None:
+        # Fire-and-forget: restarts Decky to load the just-installed files.
+        self_updater.restart_loader()
 
     def _serialized_saved(self) -> list:
         return [_saved(g) for g in self._settings["saved_gradients"]]

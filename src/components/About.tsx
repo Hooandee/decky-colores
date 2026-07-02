@@ -2,12 +2,14 @@ import { FC, useEffect, useState } from "react";
 import { Focusable, Navigation } from "@decky/ui";
 
 import { getVersion } from "../api";
-import { useI18n } from "../i18n";
+import { useI18n, type Lang } from "../i18n";
+import { AlertDot } from "../updater/AlertDot";
+import { UpdatePanel } from "../updater/UpdatePanel";
 
 const AUTHOR = "Hooandee";
 const YOUTUBE_URL = "https://www.youtube.com/@Hooandee";
 
-export const About: FC = () => {
+export const About: FC<{ lang: Lang; hasUpdate: boolean }> = ({ lang, hasUpdate }) => {
   const { t } = useI18n();
   const [version, setVersion] = useState<string>("");
 
@@ -38,12 +40,12 @@ export const About: FC = () => {
         }}
       >
         {t("about.title")}
+        <AlertDot show={hasUpdate} />
       </div>
-      {version && (
-        <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", marginBottom: 4 }}>
-          {t("about.version", { v: version })}
-        </div>
-      )}
+
+      <div style={{ marginBottom: 8 }}>
+        <UpdatePanel lang={lang} version={version} />
+      </div>
       <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
         {before}
         <Focusable
