@@ -199,13 +199,6 @@ class Plugin:
         self._settings["force_control"] = on
         self._save_and_apply()
 
-    async def reassert(self) -> None:
-        # Re-apply the current LED state on demand (used by the frontend to reclaim
-        # the LEDs from another RGB tool when Force control is on and the panel opens).
-        # Event-driven only: no polling, no read-back.
-        self._init()
-        self._apply()
-
     async def set_brightness(self, value: int) -> None:
         self._init()
         self._settings["brightness"] = value

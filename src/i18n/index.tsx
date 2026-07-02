@@ -20,7 +20,7 @@ const es: Record<string, string> = {
   "forceControl.label": "Priorizar Colores",
   "forceControl.hint": "Recupera el control de las luces al abrir Colores.",
   "forceControl.notice":
-    "Para evitar conflictos, desactiva el control RGB de HHD u otros modulos que gestionen las luces.",
+    "Para evitar conflictos, desactiva el control RGB de HHD u otros módulos que gestionen las luces.",
   "reconnect.label": "Reconectar mandos",
   "reconnect.hint": "¿Las luces no responden tras suspender? Reinicia la conexión con los mandos.",
 

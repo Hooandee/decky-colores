@@ -400,13 +400,6 @@ def test_set_force_control_persists_and_applies(main_module):
     assert p._controller.calls, "set_force_control must re-apply"
 
 
-def test_reassert_reapplies(main_module):
-    p = _plugin(main_module, "solid")
-    p._controller.calls.clear()
-    asyncio.run(p.reassert())
-    assert p._controller.calls, "reassert must call _apply"
-
-
 def test_hardware_gradient_uses_device_zone_count(main_module):
     p = _plugin(main_module, "gradient", hw=True, per_zone=True)
     p._zones = 4

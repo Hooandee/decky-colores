@@ -14,7 +14,7 @@ import { definePlugin } from "@decky/api";
 import { useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus, reconnect as apiReconnect, reassert as apiReassert } from "./api";
+import { getAmbilightStatus, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -243,10 +243,12 @@ function Content() {
   }, [ambientActive]);
 
   // When Force control is on (only exposed on devices where another tool, e.g. HHD,
-  // owns the RGB), reclaim the LEDs whenever the panel opens. Event-driven, no polling.
+  // owns the RGB), reclaim the LEDs whenever the panel opens. reconnect() re-opens the
+  // HID handle and re-applies from a clean state, forcing the Aura init handshake +
+  // apply so the reclaim holds even if another tool grabbed the device. No polling.
   useEffect(() => {
     if (!state?.capabilities.conflictsWithSystemRgb || !state?.forceControl) return;
-    apiReassert().catch(() => {});
+    apiReconnect().catch(() => {});
   }, [state?.capabilities.conflictsWithSystemRgb, state?.forceControl]);
 
   if (!state) {
