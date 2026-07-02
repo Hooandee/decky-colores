@@ -66,6 +66,13 @@ def test_rog_ally_rc71l_uses_aura_hid():
     assert p["driver"] == "hid_asus_ally"
     assert p["zones"] == 4
     assert p["conflicts_with_system_rgb"] is True
+    # "spiral" is the Legion-only firmware effect ("Espiral GO") — never on the Ally.
+    assert "spiral" not in p["supported_effects"]
+
+
+def test_legion_keeps_spiral_effect():  # regression guard for the Legion-only spiral
+    for product in ("83E1", "83N0", "83L3"):
+        assert "spiral" in resolve_profile("", product)["supported_effects"]
 
 
 def test_ally_x_stays_sysfs_not_hid():  # regression guard: do NOT touch Ally X

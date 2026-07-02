@@ -11,7 +11,8 @@ ASUS_ALLY_HID = {
     "driver": "hid_asus_ally",
     "color_order": "rgb",
     "zones": 4,
-    "supported_effects": ["breathing", "rainbow", "wave", "cycle", "spiral"],
+    # No "spiral": that renders as the Legion-only firmware effect ("Espiral GO").
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
     "color_correction": [1.0, 0.85, 1.0],
     "conflicts_with_system_rgb": True,
     "experimental": [],
