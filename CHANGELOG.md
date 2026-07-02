@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.14.0...decky-colores-v0.15.0) (2026-07-02)
+
+
+### Features
+
+* add in-plugin self-updater ([1128390](https://github.com/Hooandee/decky-colores/commit/11283900aa5a5d85d8a1d00f31e727aa34b26c91))
+
 ## [0.14.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.13.0...decky-colores-v0.14.0) (2026-07-02)
 
 
