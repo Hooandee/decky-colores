@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.4](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.3...decky-colores-v0.15.4) (2026-07-02)
+
+
+### Bug Fixes
+
+* minor fixes ([72f4472](https://github.com/Hooandee/decky-colores/commit/72f44727aba574efe5d0f6196395abb44ae914bc))
+
 ## [0.15.3](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.2...decky-colores-v0.15.3) (2026-07-02)
 
 
