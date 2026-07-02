@@ -34,9 +34,13 @@ class FakeController:
         self._per_zone = per_zone
         self.calls = []
         self.reconnected = False
+        self.invalidated = False
         self.available = True
         self.led_path = None
         self.last_error = None
+
+    def invalidate(self):
+        self.invalidated = True
 
     def supports_hardware_effects(self):
         return self._hw
@@ -408,3 +412,57 @@ def test_hardware_gradient_uses_device_zone_count(main_module):
     zone_calls = [c for c in p._controller.calls if c[0] == "zones"]
     assert zone_calls, "expected a per-zone hardware gradient write"
     assert len(zone_calls[0][1]) == 4
+
+
+def _drive_watch(main_module, plugin):
+    async def drive():
+        task = asyncio.create_task(plugin._force_control_watch())
+        await asyncio.sleep(0.02)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(drive())
+
+
+def test_force_control_watch_reasserts_static_mode(main_module, monkeypatch):
+    # Force control on + a static mode: the watch must re-assert, but GENTLY — no
+    # invalidate()/re-init (that would blink the LEDs); just re-write the colors.
+    monkeypatch.setattr(main_module, "FORCE_CONTROL_INTERVAL", 0.001)
+    p = _plugin(main_module, "solid", hw=True, per_zone=True)
+    p._settings["force_control"] = True
+    p._controller.calls.clear()
+    _drive_watch(main_module, p)
+    assert p._controller.invalidated is False, "maintenance re-assert must not re-init"
+    assert p._controller.calls, "watch must re-apply in a static mode"
+
+
+def test_force_control_watch_skips_running_effect(main_module, monkeypatch):
+    # A software render loop (wave on a per-zone device) already rewrites ~30fps;
+    # the watch must NOT re-apply or it would restart the effect at frame 0.
+    monkeypatch.setattr(main_module, "FORCE_CONTROL_INTERVAL", 0.001)
+    p = _plugin(
+        main_module,
+        "effect",
+        {"id": "wave", "speed": 50, "use_gradient": False},
+        hw=False,
+        per_zone=True,
+    )
+    p._settings["force_control"] = True
+    p._controller.calls.clear()
+    p._engine.events.clear()
+    _drive_watch(main_module, p)
+    assert p._controller.invalidated is False
+    assert not p._engine.events, "watch must leave a running effect untouched"
+
+
+def test_force_control_watch_noop_when_off(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "FORCE_CONTROL_INTERVAL", 0.001)
+    p = _plugin(main_module, "solid", hw=True, per_zone=True)
+    p._settings["force_control"] = False
+    p._controller.calls.clear()
+    _drive_watch(main_module, p)
+    assert p._controller.invalidated is False
+    assert not p._controller.calls

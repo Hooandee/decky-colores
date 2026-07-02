@@ -112,6 +112,10 @@ class _BaseHidDevice(LedDevice):
     def set_color_correction(self, gains):
         self._color_correction = tuple(gains)
 
+    def invalidate(self):
+        if hasattr(self._transport, "prev_mode"):
+            self._transport.prev_mode = None
+
     def _correct(self, color):
         return apply_gain(color, self._color_correction)
 

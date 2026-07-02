@@ -33,6 +33,11 @@ DEFAULTS = {
 # while the menu is closed. A couple of sysfs reads every few seconds is negligible.
 CHARGER_POLL_INTERVAL = 3.0
 
+# When "force control" is on, how often we re-assert our LED state to win it back
+# from another RGB tool (e.g. HHD) that keeps reapplying its own colors. A blind
+# re-write, not an ownership check. Only runs on devices that actually conflict.
+FORCE_CONTROL_INTERVAL = 2.0
+
 # Cold-boot LED acquisition: the Ally's RGB node hangs off a USB HID device that can
 # enumerate late, so /sys/class/leds/...:rgb may not exist yet when the plugin loads.
 # Poll for it for a bounded window, then re-assert once more to beat any default the
@@ -197,7 +202,10 @@ class Plugin:
     async def set_force_control(self, on: bool) -> None:
         self._init()
         self._settings["force_control"] = on
-        self._save_and_apply()
+        self._store.save(self._settings)
+        if on:
+            self._controller.invalidate()  # force a full re-init so it reclaims at once
+        self._apply()
 
     async def set_brightness(self, value: int) -> None:
         self._init()
@@ -418,6 +426,8 @@ class Plugin:
         self._apply()
         self._reassert_task = asyncio.create_task(self._acquire_and_reassert())
         self._charger_task = asyncio.create_task(self._charger_watch())
+        if self._capabilities.get("conflictsWithSystemRgb"):
+            self._force_control_task = asyncio.create_task(self._force_control_watch())
 
     async def _charger_watch(self) -> None:
         # React to plug/unplug live, even with the menu closed. Reapply ONLY on the
@@ -437,8 +447,30 @@ class Plugin:
         except Exception as error:  # a sysfs hiccup must never kill the plugin
             decky.logger.warning("Colores: charger watch failed: %s", error)
 
+    async def _force_control_watch(self) -> None:
+        # Another RGB tool (e.g. HHD) keeps reapplying its own colors on its events, so
+        # a one-shot reclaim doesn't hold. Re-assert our state on a coarse tick to win it
+        # back within a couple seconds, even with the menu closed. This is a blind
+        # re-write (no read-back, no ownership check). It is a GENTLE re-assert: it does
+        # NOT invalidate()/re-init, so apply_zones takes its fast path (per-zone color
+        # only, no Aura init handshake or APPLY latch) — re-writing the same color that
+        # way is visually seamless, where a full re-init every tick makes the LEDs blink.
+        # The strong, latched reclaim (invalidate) runs on real reclaim moments instead:
+        # toggling the switch on, panel-open (reconnect), and resume. Skipped while a
+        # render loop (effect/ambilight) is active: that already rewrites ~30fps, and
+        # re-applying would restart it at frame 0. Only created on conflicting devices.
+        try:
+            while True:
+                await asyncio.sleep(FORCE_CONTROL_INTERVAL)
+                if self._settings.get("force_control") and not self._wants_render_loop():
+                    self._apply()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # never let the background task break plugin load
+            decky.logger.warning("Colores: force-control watch failed: %s", error)
+
     async def _unload(self):
-        for attr in ("_reassert_task", "_charger_task"):
+        for attr in ("_reassert_task", "_charger_task", "_force_control_task"):
             task = getattr(self, attr, None)
             if task:
                 task.cancel()

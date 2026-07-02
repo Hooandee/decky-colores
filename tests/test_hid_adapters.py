@@ -473,3 +473,16 @@ def test_ally_color_correction_threads_through(hid_env):
     dev.apply_solid((0, 255, 0), 100, True)
     green_zone = writes[2]  # after init + brightness
     assert tuple(green_zone[4:7]) == (0, round(255 * 0.85), 0)
+
+
+def test_ally_invalidate_forces_reinit(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.apply_solid((255, 0, 0), 100, True)  # prev_mode -> "solid"
+    dev.invalidate()  # drop the cached mode
+    writes.clear()
+    dev.apply_solid((255, 0, 0), 100, True)  # must re-send the full init+apply
+    assert len(writes) == 8
+    assert writes[0][:15] == bytes([0x5D]) + b"ASUS Tech.Inc."
+    assert writes[-1][:2] == bytes([0x5D, 0xB4])  # APPLY
