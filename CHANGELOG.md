@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.10.1...decky-colores-v0.11.0) (2026-06-29)
+
+
+### Features
+
+* encender LEDs solo con el cargador conectado ([d65998d](https://github.com/Hooandee/decky-colores/commit/d65998def3b17ac5a4cb3de057c6c0f39887b8f7))
+* gate LEDs on charger connection (charger-only mode) ([b06650c](https://github.com/Hooandee/decky-colores/commit/b06650cc1b60d322b4226da76f93a8732e9da0b0))
+
 ## [0.10.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.10.0...decky-colores-v0.10.1) (2026-06-29)
 
 
