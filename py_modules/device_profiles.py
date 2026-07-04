@@ -65,6 +65,10 @@ GENERIC = {
     "experimental": ["color", "brightness", "effects", "ambilight"],
 }
 
+# The sysfs RGB node isn't guaranteed on every kernel/Bazzite build for the Ally line.
+# When it's missing, build_device drops to the Aura HID driver instead of "no LEDs".
+ASUS_SYSFS["fallback"] = ASUS_ALLY_HID
+
 
 def _copy_bits(bits):
     return [dict(bit) for bit in bits]
@@ -75,6 +79,8 @@ def _copy_profile(base):
     merged["experimental"] = list(base.get("experimental", []))
     if base.get("power_led"):
         merged["power_led"] = _copy_bits(base["power_led"])
+    if base.get("fallback"):
+        merged["fallback"] = _copy_profile(base["fallback"])
     return merged
 
 
