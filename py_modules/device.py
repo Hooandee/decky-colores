@@ -235,6 +235,18 @@ def build_device(sysfs_root="/", ambilight=False):
         )
         has_led = True
     else:
+        fallback = profile.get("fallback")
+        if fallback and HID_AVAILABLE and fallback.get("driver") in HID_DRIVERS:
+            fb_profile = dict(fallback)
+            fb_profile["name"] = profile["name"]
+            hid_ctx = _build_hid_context(fb_profile, ambilight, power_led, battery)
+            if hid_ctx is not None:
+                return {
+                    "info": info,
+                    "capabilities": hid_ctx["capabilities"],
+                    "device": hid_ctx["device"],
+                    "power_led": power_led,
+                }
         zones, max_brightness, device, has_led = 0, 255, NullDevice(), False
 
     if profile["driver"] not in _IMPLEMENTED_DRIVERS:

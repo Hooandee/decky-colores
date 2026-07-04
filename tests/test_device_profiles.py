@@ -75,6 +75,30 @@ def test_legion_keeps_spiral_effect():  # regression guard for the Legion-only s
         assert "spiral" in resolve_profile("", product)["supported_effects"]
 
 
+def test_asus_sysfs_profiles_expose_aura_hid_fallback():
+    # When the kernel sysfs RGB node is missing (varies by kernel/Bazzite version),
+    # build_device drops to this Aura HID driver instead of showing "no LEDs".
+    for board in ("RC72LA", "RC73XA", "RC73YA"):
+        p = resolve_profile(board, "whatever")
+        fb = p["fallback"]
+        assert fb["driver"] == "hid_asus_ally"
+        assert fb["conflicts_with_system_rgb"] is True
+        # spiral renders as the Legion-only "Espiral GO" under hardwareEffects — keep it out.
+        assert "spiral" not in fb["supported_effects"]
+
+
+def test_asus_fallback_is_private_copy():
+    first = resolve_profile("RC72LA", "x")
+    first["fallback"]["experimental"].append("mutated")
+    second = resolve_profile("RC72LA", "x")
+    assert "mutated" not in second["fallback"]["experimental"]
+
+
+def test_generic_and_hid_profiles_have_no_asus_fallback():
+    assert "fallback" not in resolve_profile("X", "MysteryHandheld")
+    assert "fallback" not in resolve_profile("RC71L", "ROG Ally RC71L_RC71L")
+
+
 def test_ally_x_stays_sysfs_not_hid():  # regression guard: do NOT touch Ally X
     for board in ("RC72LA", "RC73XA", "RC73YA"):
         p = resolve_profile(board, "whatever")

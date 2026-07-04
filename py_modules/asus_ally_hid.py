@@ -1,4 +1,5 @@
-# Aura RGB protocol for the ASUS ROG Ally "N-KEY Device" (VID 0x0B05, PID 0x1ABE).
+# Aura RGB protocol for the ASUS ROG Ally line "N-KEY Device" (VID 0x0B05, Aura usage
+# page 0xFF31 / usage 0x0080; PID varies: 0x1ABE original Ally, others on Ally X/Xbox Ally).
 # The byte layout is an interface fact of the device, documented by asusctl/HHD; this
 # is an original implementation (no third-party code copied). Report ids: 0x5D for RGB
 # commands, 0x5A for brightness. All output reports are 64 bytes.
@@ -108,7 +109,7 @@ class AsusAllyTransport:
         for device in hid.enumerate():
             if device["vendor_id"] not in self._vid:
                 continue
-            if device["product_id"] not in self._pid:
+            if self._pid and device["product_id"] not in self._pid:
                 continue
             if device["usage_page"] in self._usage_page and device["usage"] in self._usage:
                 self.hid_device = hid.Device(path=device["path"])

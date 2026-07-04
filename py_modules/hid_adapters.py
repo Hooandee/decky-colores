@@ -69,9 +69,12 @@ LEGION_GO_S_IDS = {
     "interface": 3,
 }
 
+# Match the Aura N-KEY interface by VID + usage only. The original Ally is PID 0x1ABE,
+# but the Ally X / Xbox Ally enumerate the same interface under different PIDs; an empty
+# pid list means "any PID", so one driver covers the whole ROG Ally line.
 ASUS_ALLY_IDS = {
     "vid": [0x0B05],
-    "pid": [0x1ABE],
+    "pid": [],
     "usage_page": [0xFF31],
     "usage": [0x0080],
 }

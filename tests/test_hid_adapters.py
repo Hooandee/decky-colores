@@ -394,9 +394,106 @@ def _ally_entry():
     }
 
 
+def _ally_x_entry():
+    # Ally X / Xbox Ally enumerate the same Aura N-KEY interface under a DIFFERENT PID
+    # than the original Ally (0x1ABE). We match by VID + usage, so the PID is irrelevant.
+    return {
+        "vendor_id": 0x0B05,
+        "product_id": 0x1B4C,
+        "usage_page": 0xFF31,
+        "usage": 0x0080,
+        "interface_number": 0,
+        "path": b"allyx",
+    }
+
+
 def test_ally_hid_registered(hid_env):
     adapters, _ = hid_env
     assert "hid_asus_ally" in adapters.HID_DRIVERS
+
+
+def test_ally_matches_by_vid_and_usage_ignoring_pid(hid_env):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    assert dev.available is True
+
+
+def test_ally_ignores_foreign_vid_even_with_matching_usage(hid_env):
+    adapters, _ = hid_env
+    foreign = dict(_ally_x_entry(), vendor_id=0x1234)
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [foreign]
+    dev = adapters.AsusAllyHidDevice.create()
+    assert dev.available is False
+
+
+def _make_ally_x_root(tmp_path, with_empty_leds=True):
+    import os
+
+    dmi = os.path.join(str(tmp_path), "sys/class/dmi/id")
+    os.makedirs(dmi)
+    with open(os.path.join(dmi, "board_name"), "w") as handle:
+        handle.write("RC72LA")
+    with open(os.path.join(dmi, "product_name"), "w") as handle:
+        handle.write("ROG Ally X RC72LA")
+    if with_empty_leds:
+        os.makedirs(os.path.join(str(tmp_path), "sys/class/leds"))
+    return str(tmp_path)
+
+
+def test_build_device_ally_x_falls_back_to_hid_without_sysfs(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    device = _reload_device()
+    root = _make_ally_x_root(tmp_path)
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+    assert isinstance(ctx["device"], adapters.AsusAllyHidDevice)
+    caps = ctx["capabilities"]
+    assert caps["color"] is True
+    assert caps["hardwareEffects"] is True
+    assert caps["reconnectable"] is True
+    assert caps["conflictsWithSystemRgb"] is True
+    assert "spiral" not in caps["supportedEffects"]
+    assert ctx["info"]["name"] == "ROG Ally X"
+    sys.modules.pop("device", None)
+
+
+def test_build_device_ally_x_prefers_sysfs_when_node_present(hid_env, tmp_path):
+    import os
+
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    device = _reload_device()
+    root = _make_ally_x_root(tmp_path, with_empty_leds=False)
+    led = os.path.join(root, "sys/class/leds", "ally:rgb:joystick_rings")
+    os.makedirs(led)
+    for name, content in {
+        "multi_intensity": "0 0 0 0",
+        "multi_index": "rgb rgb rgb rgb",
+        "max_brightness": "255",
+        "brightness": "0",
+    }.items():
+        with open(os.path.join(led, name), "w") as handle:
+            handle.write(content)
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+    from led_device import SysfsRgbDevice
+
+    assert isinstance(ctx["device"], SysfsRgbDevice)
+    assert ctx["capabilities"]["conflictsWithSystemRgb"] is False
+    sys.modules.pop("device", None)
+
+
+def test_build_device_ally_x_null_when_no_sysfs_and_no_hid(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: []  # HID device absent too
+    device = _reload_device()
+    root = _make_ally_x_root(tmp_path)
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+    from led_device import NullDevice
+
+    assert isinstance(ctx["device"], NullDevice)
+    assert ctx["capabilities"]["color"] is False
+    sys.modules.pop("device", None)
 
 
 def test_ally_first_solid_sends_init_and_apply(hid_env):
