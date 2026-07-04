@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.5](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.4...decky-colores-v0.15.5) (2026-07-04)
+
+
+### Bug Fixes
+
+* recupera los LEDs del ROG Ally/Ally X sin nodo sysfs vía HID | recover ROG Ally/Ally X LEDs with no sysfs node via HID ([8f748a3](https://github.com/Hooandee/decky-colores/commit/8f748a35cf6cee0bb40a761c9b6a112d65dc9b00))
+* recupera los LEDs del ROG Ally/Ally X sin nodo sysfs vía HID | recover ROG Ally/Ally X LEDs with no sysfs node via HID ([6e683d8](https://github.com/Hooandee/decky-colores/commit/6e683d84a55000899dea7af653fb44c9fa5cff5c))
+
 ## [0.15.4](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.3...decky-colores-v0.15.4) (2026-07-02)
 
 
