@@ -3,10 +3,10 @@
 ## [0.16.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.5...decky-colores-v0.16.0) (2026-07-09)
 
 
-### Features
+### Features / Novedades
 
-* in-plugin bug reporter with diagnostic bundle ([895e4f5](https://github.com/Hooandee/decky-colores/commit/895e4f5b9e18a4a3d6a7f2bc66c934cfac028f8c))
-* in-plugin bug reporter with diagnostic bundle ([3a01cfe](https://github.com/Hooandee/decky-colores/commit/3a01cfe782f877f61237b23fbf4b65fad400dcf9))
+* Report a problem: a new option under About lets you send me a bug report in one tap. It automatically gathers the technical details about your lights and handheld — kept private and encrypted — and gives you a code to follow it up. ([#35](https://github.com/Hooandee/decky-colores/pull/35)) ([895e4f5](https://github.com/Hooandee/decky-colores/commit/895e4f5b9e18a4a3d6a7f2bc66c934cfac028f8c))
+* **ES:** Reportar un problema: una nueva opción en Acerca de te permite enviarme un reporte de fallo con un toque. Recoge automáticamente la info técnica de tus luces y tu equipo —privada y cifrada— y te da un código para seguirlo. ([#35](https://github.com/Hooandee/decky-colores/pull/35)) ([895e4f5](https://github.com/Hooandee/decky-colores/commit/895e4f5b9e18a4a3d6a7f2bc66c934cfac028f8c))
 
 ## [0.15.5](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.4...decky-colores-v0.15.5) (2026-07-04)
 
