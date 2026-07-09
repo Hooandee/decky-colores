@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.5...decky-colores-v0.16.0) (2026-07-09)
+
+
+### Features
+
+* in-plugin bug reporter with diagnostic bundle ([895e4f5](https://github.com/Hooandee/decky-colores/commit/895e4f5b9e18a4a3d6a7f2bc66c934cfac028f8c))
+* in-plugin bug reporter with diagnostic bundle ([3a01cfe](https://github.com/Hooandee/decky-colores/commit/3a01cfe782f877f61237b23fbf4b65fad400dcf9))
+
 ## [0.15.5](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.4...decky-colores-v0.15.5) (2026-07-04)
 
 
