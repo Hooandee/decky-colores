@@ -795,7 +795,7 @@ function Content() {
       )}
 
       <PanelSectionRow>
-        <About lang={lang} hasUpdate={hasUpdate} />
+        <About lang={lang} hasUpdate={hasUpdate} unvalidated={!hasLeds} />
       </PanelSectionRow>
     </PanelSection>
   );

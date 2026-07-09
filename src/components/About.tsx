@@ -1,15 +1,20 @@
 import { FC, useEffect, useState } from "react";
-import { Focusable, Navigation } from "@decky/ui";
+import { ButtonItem, Focusable, Navigation } from "@decky/ui";
 
 import { getVersion } from "../api";
 import { useI18n, type Lang } from "../i18n";
 import { AlertDot } from "../updater/AlertDot";
 import { UpdatePanel } from "../updater/UpdatePanel";
+import { openReportModal } from "./ReportModal";
 
 const AUTHOR = "Hooandee";
 const YOUTUBE_URL = "https://www.youtube.com/@Hooandee";
 
-export const About: FC<{ lang: Lang; hasUpdate: boolean }> = ({ lang, hasUpdate }) => {
+export const About: FC<{ lang: Lang; hasUpdate: boolean; unvalidated?: boolean }> = ({
+  lang,
+  hasUpdate,
+  unvalidated,
+}) => {
   const { t } = useI18n();
   const [version, setVersion] = useState<string>("");
 
@@ -48,6 +53,29 @@ export const About: FC<{ lang: Lang; hasUpdate: boolean }> = ({ lang, hasUpdate 
       <div style={{ marginBottom: 8 }}>
         <UpdatePanel lang={lang} version={version} />
       </div>
+
+      {unvalidated && (
+        <div
+          style={{
+            fontSize: 12,
+            color: "rgba(255,255,255,0.6)",
+            lineHeight: 1.45,
+            marginBottom: 6,
+          }}
+        >
+          {t("report.unvalidated.note")}
+        </div>
+      )}
+      <div style={{ marginBottom: 10 }}>
+        <ButtonItem
+          layout="below"
+          description={t("report.button.desc")}
+          onClick={() => openReportModal()}
+        >
+          {t("report.button")}
+        </ButtonItem>
+      </div>
+
       <div style={{ fontSize: 13, color: "rgba(255,255,255,0.7)", marginBottom: 4 }}>
         {before}
         <Focusable
