@@ -4,9 +4,26 @@ Control de luces RGB para PCs portátiles, como plugin de [Decky Loader](https:/
 
 Español · [English](README.en.md)
 
+<p align="center">
+  <a href="https://ko-fi.com/hooandee"><img src="https://img.shields.io/badge/Ko--fi-Inv%C3%ADtame%20un%20caf%C3%A9-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://www.patreon.com/hooandee"><img src="https://img.shields.io/badge/Patreon-Ap%C3%B3yame-FF424D?style=for-the-badge&logo=patreon&logoColor=white" alt="Patreon"></a>
+  <a href="https://www.youtube.com/channel/UCDsSJByXklp6xc_WwQJI7Lw/join"><img src="https://img.shields.io/badge/YouTube-Hazte%20miembro-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube"></a>
+  <a href="https://discord.gg/x2ZNARy"><img src="https://img.shields.io/badge/Discord-%C3%9Anete-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://linktr.ee/hooandee"><img src="https://img.shields.io/badge/Todos%20mis%20enlaces-Linktree-43E660?style=for-the-badge&logo=linktree&logoColor=white" alt="Linktree"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Hooandee/decky-colores/actions/workflows/ci.yml"><img src="https://github.com/Hooandee/decky-colores/actions/workflows/ci.yml/badge.svg" alt="Estado del CI"></a>
+  <a href="https://github.com/Hooandee/decky-colores/releases/latest"><img src="https://img.shields.io/github/v/release/Hooandee/decky-colores?label=%C3%BAltima%20versi%C3%B3n&color=blue" alt="Última versión"></a>
+</p>
+
 Colores detecta tu consola al arrancar y te muestra solo lo que tu máquina puede hacer de verdad. Sin configuración, sin tocar archivos, sin elegir tu modelo en una lista. Lo abres desde el menú de acceso rápido y ya está.
 
-https://youtu.be/ug5Nh0YtadE
+## Vídeo
+
+En este vídeo enseño y explico el plugin a fondo:
+
+[![Colores en acción](https://img.youtube.com/vi/ug5Nh0YtadE/maxresdefault.jpg)](https://youtu.be/ug5Nh0YtadE)
 
 ## Dispositivos compatibles
 
