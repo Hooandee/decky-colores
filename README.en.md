@@ -4,9 +4,26 @@ RGB lighting control for handheld PCs, as a [Decky Loader](https://github.com/St
 
 [Español](README.md) · English
 
+<p align="center">
+  <a href="https://ko-fi.com/hooandee"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://www.patreon.com/hooandee"><img src="https://img.shields.io/badge/Patreon-Support%20me-FF424D?style=for-the-badge&logo=patreon&logoColor=white" alt="Patreon"></a>
+  <a href="https://www.youtube.com/channel/UCDsSJByXklp6xc_WwQJI7Lw/join"><img src="https://img.shields.io/badge/YouTube-Become%20a%20member-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="YouTube"></a>
+  <a href="https://discord.gg/x2ZNARy"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
+  <a href="https://linktr.ee/hooandee"><img src="https://img.shields.io/badge/All%20my%20links-Linktree-43E660?style=for-the-badge&logo=linktree&logoColor=white" alt="Linktree"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Hooandee/decky-colores/actions/workflows/ci.yml"><img src="https://github.com/Hooandee/decky-colores/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/Hooandee/decky-colores/releases/latest"><img src="https://img.shields.io/github/v/release/Hooandee/decky-colores?label=latest%20release&color=blue" alt="Latest release"></a>
+</p>
+
 Colores detects your handheld at startup and shows you only what your machine can actually do. No config, no editing files, no picking your model from a list. Open it from the quick access menu and you're set.
 
-https://youtu.be/ug5Nh0YtadE
+## Video
+
+In this video I show and explain the plugin in depth:
+
+[![Colores in action](https://img.youtube.com/vi/ug5Nh0YtadE/maxresdefault.jpg)](https://youtu.be/ug5Nh0YtadE)
 
 ## Supported devices
 
