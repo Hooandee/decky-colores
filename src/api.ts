@@ -41,3 +41,14 @@ export interface InstallResult {
 export const checkUpdate = callable<[force: boolean], UpdateInfo>("check_update");
 export const installUpdate = callable<[], InstallResult>("install_update");
 export const restartLoader = callable<[], void>("restart_loader");
+
+export interface ReportResult {
+  ok: boolean;
+  code?: string;
+  issue_url?: string;
+  error?: string;
+  saved_path?: string;
+}
+
+export const submitReport =
+  callable<[categories: string[], text: string], ReportResult>("submit_report");

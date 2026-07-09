@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import pwd
 import shutil
@@ -13,6 +14,13 @@ from ambilight import Ambilight
 from power_supply import charger_online, battery_level
 from saved_gradients import upsert_gradient, remove_gradient
 import self_updater
+from report import collector as report_collector
+from report import client as report_client
+
+_REPORT_APP = "colores"
+_REPORT_SERVICE_URL = os.environ.get(
+    "COLORES_REPORT_URL", "https://bug-collector-khaki.vercel.app/api/report"
+)
 
 DEFAULTS = {
     "power": True,
@@ -161,6 +169,146 @@ class Plugin:
     async def restart_loader(self) -> None:
         # Fire-and-forget: restarts Decky to load the just-installed files.
         self_updater.restart_loader()
+
+    async def submit_report(self, categories=None, text: str = "") -> dict:
+        self._init()
+        home, hostname = self._redact_ids()
+        try:
+            bundle = await self._build_report_bundle(categories, text, home, hostname)
+        except Exception as e:  # noqa: BLE001
+            decky.logger.error("Colores: report bundle failed: %s", e)
+            bundle = report_collector.build_bundle(
+                app=_REPORT_APP, categories=categories, text=text,
+                environment={}, capabilities={}, state={}, stores={}, logs=[],
+                home=home, hostname=hostname,
+            )
+            bundle["error"] = "bundle_incomplete"
+        res = await asyncio.get_running_loop().run_in_executor(
+            None, lambda: report_client.submit(_REPORT_SERVICE_URL, bundle)
+        )
+        if res.get("ok"):
+            decky.logger.info("Colores: report sent: %s", res.get("code"))
+            return {"ok": True, "code": res["code"], "issue_url": res.get("issue_url")}
+        path = report_client.save_local(
+            getattr(decky, "DECKY_PLUGIN_LOG_DIR", "."), bundle
+        )
+        decky.logger.warning(
+            "Colores: report send failed (%s); saved to %s", res.get("error"), path
+        )
+        return {"ok": False, "error": res.get("error", "unknown"), "saved_path": path}
+
+    def _redact_ids(self):
+        home = getattr(decky, "DECKY_USER_HOME", None) or os.path.expanduser("~")
+        try:
+            import socket
+
+            hostname = socket.gethostname()
+        except Exception:  # noqa: BLE001
+            hostname = None
+        return home, hostname
+
+    async def _build_report_bundle(self, categories, text, home, hostname) -> dict:
+        loop = asyncio.get_running_loop()
+        try:
+            state = await self.get_state()
+        except Exception:  # noqa: BLE001
+            state = {}
+        capabilities = report_collector.capabilities_from(
+            state,
+            driver=type(self._controller).__name__,
+            led_path=getattr(self._controller, "led_path", None),
+            last_error=getattr(self._controller, "last_error", None),
+        )
+
+        def _assemble() -> dict:
+            logs = report_collector.tail_logs(
+                getattr(decky, "DECKY_PLUGIN_LOG_DIR", ""), home=home, hostname=hostname
+            )
+            snapshot = report_collector.sysfs_snapshot(home=home, hostname=hostname)
+            kernel = report_collector.kernel_logs(
+                self._run_capture,
+                extra=report_collector.rgb_conflict_cmds(
+                    bool(capabilities.get("conflicts_with_system_rgb"))
+                ),
+                home=home,
+                hostname=hostname,
+            )
+            return report_collector.build_bundle(
+                app=_REPORT_APP,
+                categories=categories,
+                text=text,
+                environment=self._report_environment(),
+                capabilities=capabilities,
+                state=state,
+                stores=self._report_stores(),
+                logs=logs,
+                kernel=kernel,
+                sysfs=snapshot,
+                home=home,
+                hostname=hostname,
+            )
+
+        return await loop.run_in_executor(None, _assemble)
+
+    def _run_capture(self, cmd) -> str | None:
+        try:
+            import subprocess
+
+            env = dict(os.environ)
+            env.pop("LD_LIBRARY_PATH", None)
+            env.pop("LD_PRELOAD", None)
+            r = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=5, env=env,
+            )  # noqa: S603
+            return r.stdout or ""
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _report_environment(self) -> dict:
+        def _dmi(name):
+            try:
+                with open(f"/sys/class/dmi/id/{name}") as f:
+                    return f.read().strip()
+            except OSError:
+                return None
+
+        os_name = None
+        try:
+            rel = {}
+            with open("/etc/os-release") as f:
+                for line in f:
+                    if "=" in line:
+                        k, v = line.rstrip().split("=", 1)
+                        rel[k] = v.strip('"')
+            os_name = rel.get("PRETTY_NAME") or rel.get("NAME")
+        except Exception:  # noqa: BLE001
+            pass
+        kernel = None
+        try:
+            u = os.uname()
+            kernel = f"{u.sysname} {u.release}"
+        except Exception:  # noqa: BLE001
+            pass
+        dev = getattr(self, "_device", {}) or {}
+        return {
+            "plugin_version": read_version(),
+            "decky_version": getattr(decky, "DECKY_VERSION", None),
+            "device_key": dev.get("name"),
+            "product_name": dev.get("product") or _dmi("product_name"),
+            "product_family": _dmi("product_family"),
+            "board_name": dev.get("board") or _dmi("board_name"),
+            "os": os_name,
+            "kernel": kernel,
+        }
+
+    def _report_stores(self) -> dict:
+        base = getattr(decky, "DECKY_PLUGIN_SETTINGS_DIR", "")
+        try:
+            with open(os.path.join(base, "state.json")) as f:
+                settings = json.load(f)
+        except Exception:  # noqa: BLE001
+            settings = getattr(self, "_settings", {})
+        return {"settings": settings}
 
     def _serialized_saved(self) -> list:
         return [_saved(g) for g in self._settings["saved_gradients"]]
