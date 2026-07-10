@@ -3,10 +3,10 @@
 ## [0.18.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.17.1...decky-colores-v0.18.0) (2026-07-10)
 
 
-### Features
+### Features / Novedades
 
-* modo Temperatura en la pestaña Sensores | Temperature mode under a Sensors tab ([0070768](https://github.com/Hooandee/decky-colores/commit/0070768f5bf4656596e9049d5ab791329c59f7ec))
-* modo Temperatura en la pestaña Sensores | Temperature mode under a Sensors tab ([7656170](https://github.com/Hooandee/decky-colores/commit/76561704e395bf9656a56bfc013b1a65c0b4e4f0))
+* Sensors tab: the Battery tab is now **Sensors** and adds a new **Temperature** mode that colors your lights by your handheld's processor temperature, from cool blue when idle through to red when it runs hot. It uses the same smooth color bands as Battery and can gently pulse as a warning when things get very hot. It shows up automatically on any handheld with a temperature sensor, no setup needed. ([#41](https://github.com/Hooandee/decky-colores/pull/41)) ([0070768](https://github.com/Hooandee/decky-colores/commit/0070768f5bf4656596e9049d5ab791329c59f7ec))
+* **ES:** Pestaña Sensores: la pestaña Batería ahora es **Sensores** y suma un nuevo modo **Temperatura** que colorea tus luces según la temperatura del procesador de tu consola, del azul en reposo al rojo cuando se calienta. Usa las mismas bandas de color suaves que Batería y puede latir con suavidad como aviso cuando la cosa se pone muy caliente. Aparece sola en cualquier consola con sensor de temperatura, sin configurar nada. ([#41](https://github.com/Hooandee/decky-colores/pull/41)) ([0070768](https://github.com/Hooandee/decky-colores/commit/0070768f5bf4656596e9049d5ab791329c59f7ec))
 
 ## [0.17.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.17.0...decky-colores-v0.17.1) (2026-07-10)
 
