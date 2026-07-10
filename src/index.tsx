@@ -670,12 +670,14 @@ function Content() {
 
       {contentMode && (
         <PanelSectionRow>
-          <DevicePreview
-            colors={previewColors}
-            brightness={brightness}
-            power={power}
-            label={contentMode === "ambient" ? t("device.preview.ambient") : undefined}
-          />
+          <div style={{ marginTop: 12 }}>
+            <DevicePreview
+              colors={previewColors}
+              brightness={brightness}
+              power={power}
+              label={contentMode === "ambient" ? t("device.preview.ambient") : undefined}
+            />
+          </div>
         </PanelSectionRow>
       )}
 
