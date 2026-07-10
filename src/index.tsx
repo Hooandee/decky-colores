@@ -11,36 +11,68 @@ import {
   staticClasses,
 } from "@decky/ui";
 import { definePlugin } from "@decky/api";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
 import { getAmbilightStatus, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss } from "./color";
-import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed } from "./types";
+import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { ColorEditor } from "./components/ColorEditor";
-import { ModeTabs } from "./components/ModeTabs";
 import { EffectsGallery } from "./components/EffectsGallery";
 import { GradientModal } from "./components/GradientModal";
-import { About } from "./components/About";
+import { TabBar } from "./components/TabBar";
+import { SettingsSection } from "./components/SettingsSection";
 import { ColorWheelIcon } from "./components/ColorWheelIcon";
 import { GRADIENT_PRESETS, EFFECT_PRESETS, BATTERY_BANDS, batteryBandColor } from "./palette";
-import { I18nProvider, LangToggle, useI18n } from "./i18n";
+import { I18nProvider, useI18n } from "./i18n";
 import { useUpdate } from "./updater/useUpdate";
+import { AlertDot } from "./updater/AlertDot";
+import { useLayout } from "./nav/store";
+import { visibleIds } from "./nav/layout";
+import { PINNED_TAB, tabMeta, TAB_META } from "./nav/manifest";
+import { useShoulderNav } from "./nav/useShoulderNav";
+import { readActiveTab, writeActiveTab } from "./nav/activeTab";
 
 function DeviceHeader({ name, color }: { name: string; color: RGB }) {
+  const css = rgbToCss(color);
+  const tint = `rgba(${color.r}, ${color.g}, ${color.b}, 0.55)`;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "4px 2px 16px" }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "7px 12px",
+        marginBottom: 10,
+        borderRadius: 10,
+        background: "rgba(255,255,255,0.04)",
+        border: `1.5px solid ${tint}`,
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.05)",
+      }}
+    >
       <div
         style={{
           width: 12,
           height: 12,
           borderRadius: "50%",
-          background: rgbToCss(color),
-          boxShadow: `0 0 8px ${rgbToCss(color)}`,
+          flexShrink: 0,
+          background: css,
+          boxShadow: `0 0 8px ${css}`,
         }}
       />
-      <div style={{ fontWeight: 600, fontSize: 15 }}>{name}</div>
+      <div
+        style={{
+          fontWeight: 600,
+          fontSize: 14,
+          minWidth: 0,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {name}
+      </div>
     </div>
   );
 }
@@ -284,6 +316,25 @@ function BatteryPanel({
   );
 }
 
+function modeIdsFor(caps: Capabilities | null): Mode[] {
+  if (!caps || !caps.color) return [];
+  return TAB_META.filter((m) => {
+    switch (m.id) {
+      case "solid":
+      case "effect":
+        return true;
+      case "gradient":
+        return caps.zones >= 1;
+      case "battery":
+        return caps.batteryMode;
+      case "ambient":
+        return caps.ambilight;
+      default:
+        return false;
+    }
+  }).map((m) => m.id as Mode);
+}
+
 function Content() {
   const {
     state,
@@ -311,6 +362,34 @@ function Content() {
   const { t, lang } = useI18n();
   const { hasUpdate } = useUpdate(lang);
   const [ambStatus, setAmbStatus] = useState<string>("idle");
+  const [viewingSettings, setViewingSettings] = useState<boolean>(
+    () => readActiveTab() === PINNED_TAB,
+  );
+  const layout = useLayout();
+
+  const caps = state?.capabilities ?? null;
+  const modeIds = modeIdsFor(caps);
+  const availableTabIds = [...modeIds, PINNED_TAB];
+  const visibleTabIds = visibleIds(availableTabIds, layout.tabs, [PINNED_TAB]);
+  const desiredTab = viewingSettings || !state ? PINNED_TAB : state.mode;
+  const activeTab = visibleTabIds.includes(desiredTab) ? desiredTab : PINNED_TAB;
+  const contentMode: Mode | null =
+    activeTab !== PINNED_TAB && modeIds.includes(activeTab as Mode) ? (activeTab as Mode) : null;
+  const highlight = activeTab;
+
+  const select = useCallback(
+    (id: string) => {
+      if (id === PINNED_TAB) {
+        setViewingSettings(true);
+        writeActiveTab(PINNED_TAB);
+      } else {
+        setViewingSettings(false);
+        writeActiveTab(id);
+        setMode(id as Mode);
+      }
+    },
+    [setMode],
+  );
 
   const ambientActive = state?.mode === "ambient" && state?.power;
   useEffect(() => {
@@ -328,14 +407,12 @@ function Content() {
     };
   }, [ambientActive]);
 
-  // When Force control is on (only exposed on devices where another tool, e.g. HHD,
-  // owns the RGB), reclaim the LEDs whenever the panel opens. reconnect() re-opens the
-  // HID handle and re-applies from a clean state, forcing the Aura init handshake +
-  // apply so the reclaim holds even if another tool grabbed the device. No polling.
   useEffect(() => {
     if (!state?.capabilities.conflictsWithSystemRgb || !state?.forceControl) return;
     apiReconnect().catch(() => {});
   }, [state?.capabilities.conflictsWithSystemRgb, state?.forceControl]);
+
+  useShoulderNav(visibleTabIds, highlight, select);
 
   if (!state) {
     return (
@@ -372,7 +449,7 @@ function Content() {
   }
 
   const {
-    capabilities: caps,
+    capabilities,
     color,
     gradient,
     gradientSpeed,
@@ -389,33 +466,19 @@ function Content() {
     batteryBreathe,
     batteryLevel,
   } = state;
-  const hasLeds = caps.color || caps.brightness;
+  const hasLeds = capabilities.color || capabilities.brightness;
+  const showDeviceControls = hasLeds;
 
-  // Any colour device offers a gradient: per-zone devices render it spatially,
-  // single-colour devices (Legion Go S / Go 2) crossfade through the palette over
-  // time — the same gradient experience on every Legion Go.
-  const canGradient = caps.color && caps.zones >= 1;
-  // Devices that can't render a spatial gradient (single-color zones, e.g. Legion
-  // rings) animate a crossfade through the palette, so they expose a speed control.
-  const gradientAnimated = canGradient && !caps.perZone;
+  const canGradient = capabilities.color && capabilities.zones >= 1;
+  const gradientAnimated = canGradient && !capabilities.perZone;
 
-  const modes: Mode[] = (() => {
-    const base: Mode[] = canGradient ? ["solid", "gradient", "effect"] : ["solid", "effect"];
-    if (caps.batteryMode) base.push("battery");
-    if (caps.ambilight) base.push("ambient");
-    return base;
-  })();
-
-  const visibleEffects = caps.supportedEffects.length > 0
-    ? EFFECT_PRESETS.filter((e) => caps.supportedEffects.includes(e.id))
+  const visibleEffects = capabilities.supportedEffects.length > 0
+    ? EFFECT_PRESETS.filter((e) => capabilities.supportedEffects.includes(e.id))
     : EFFECT_PRESETS;
 
   const selectedEffect = visibleEffects.find((e) => e.id === effect.id) ?? visibleEffects[0];
 
-  // Devices with native firmware effects (Legion Go) run spiral as their own
-  // fixed-palette effect — labelled "Spiral GO", taking no user color. Devices
-  // that paint zones in software (Ally) spin the user's gradient instead.
-  const firmwareSpiral = caps.hardwareEffects;
+  const firmwareSpiral = capabilities.hardwareEffects;
   const isFirmwareSpiral = selectedEffect?.id === "spiral" && firmwareSpiral;
   const effectNeed: EffectColorNeed = isFirmwareSpiral
     ? "none"
@@ -440,34 +503,182 @@ function Content() {
             ? [batteryBandColor(batteryLevel)]
             : [color];
 
+  const tabItems = visibleTabIds.map((id) => {
+    const meta = tabMeta(id);
+    return {
+      id,
+      icon: meta?.icon,
+      label: meta ? t(meta.labelKey) : id,
+      badge: id === PINNED_TAB ? <AlertDot show={hasUpdate} /> : undefined,
+    };
+  });
+
+  const renderModeContent = () => {
+    switch (contentMode) {
+      case "solid":
+        return <ColorEditor color={color} disabled={!power} onChange={setColor} />;
+      case "gradient":
+        return canGradient ? (
+          <GradientControls
+            gradient={gradient}
+            layout={capabilities.layout}
+            crossfade={capabilities.gradientCrossfade}
+            savedGradients={savedGradients}
+            disabled={!power}
+            onChange={setGradient}
+            onSave={saveGradient}
+            onDelete={deleteGradient}
+            speed={gradientSpeed}
+            onSpeed={gradientAnimated ? setGradientSpeed : undefined}
+          />
+        ) : null;
+      case "effect":
+        return (
+          <>
+            <PanelSectionRow>
+              <EffectsGallery
+                effects={visibleEffects}
+                selected={effect.id}
+                speed={effect.speed}
+                disabled={!power}
+                firmwareSpiral={firmwareSpiral}
+                onSelect={setEffectId}
+                onSpeed={setEffectSpeed}
+              />
+            </PanelSectionRow>
+            {effectNeed === "color" && (
+              <>
+                {canGradient && (
+                  <PanelSectionRow>
+                    <ToggleField
+                      label={t("effect.useGradient")}
+                      checked={effect.useGradient}
+                      disabled={!power}
+                      onChange={setEffectGradient}
+                    />
+                  </PanelSectionRow>
+                )}
+                <EffectSource
+                  kind={canGradient && effect.useGradient ? "gradient" : "color"}
+                  color={color}
+                  gradient={gradient}
+                />
+              </>
+            )}
+            {effectNeed === "gradient" && (
+              <EffectSource kind="gradient" color={color} gradient={gradient} />
+            )}
+            {effectNeed === "none" && (
+              <PanelSectionRow>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", padding: "4px 2px 8px" }}>
+                  {isFirmwareSpiral ? t("effect.spiral.firmwareNote") : t("effect.spectrumNote")}
+                </div>
+              </PanelSectionRow>
+            )}
+          </>
+        );
+      case "ambient":
+        return (
+          <>
+            {power && ambStatus === "no_source" && (
+              <PanelSectionRow>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#ffcf66",
+                    background: "rgba(255, 184, 0, 0.1)",
+                    border: "1px solid rgba(255, 184, 0, 0.3)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {t("ambient.gameModeBanner")}
+                </div>
+              </PanelSectionRow>
+            )}
+            <PanelSectionRow>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "4px 2px 12px", lineHeight: 1.45 }}>
+                {t("ambient.stickHint")}
+              </div>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <SliderField
+                label={t("ambient.vividness")}
+                value={ambilight.saturation}
+                min={100}
+                max={250}
+                step={5}
+                valueSuffix="%"
+                showValue
+                disabled={!power}
+                onChange={(v) => setAmbilight(v, ambilight.smoothing, ambilight.fps)}
+              />
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <SliderField
+                label={t("ambient.smoothing")}
+                value={ambilight.smoothing}
+                min={0}
+                max={100}
+                step={1}
+                valueSuffix="%"
+                showValue
+                disabled={!power}
+                onChange={(v) => setAmbilight(ambilight.saturation, v, ambilight.fps)}
+              />
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <SliderField
+                label={t("ambient.captureRate")}
+                value={ambilight.fps}
+                min={5}
+                max={30}
+                step={5}
+                valueSuffix=" fps"
+                showValue
+                disabled={!power}
+                onChange={(v) => setAmbilight(ambilight.saturation, ambilight.smoothing, v)}
+              />
+            </PanelSectionRow>
+          </>
+        );
+      case "battery":
+        return (
+          <BatteryPanel
+            level={batteryLevel}
+            breathe={batteryBreathe}
+            disabled={!power}
+            onBreathe={setBatteryBreathe}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <PanelSection>
       <PanelSectionRow>
-        <LangToggle />
+        <DeviceHeader name={device.name} color={previewColors[0] ?? color} />
       </PanelSectionRow>
       <PanelSectionRow>
-        <DeviceHeader name={device.name} color={previewColors[0]} />
+        <TabBar tabs={tabItems} activeId={highlight} onSelect={select} />
       </PanelSectionRow>
 
-      {!hasLeds && (
+      {contentMode && (
         <PanelSectionRow>
-          <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", padding: "4px 2px" }}>
-            {t("device.noLeds")}
-          </div>
+          <DevicePreview
+            colors={previewColors}
+            brightness={brightness}
+            power={power}
+            label={contentMode === "ambient" ? t("device.preview.ambient") : undefined}
+          />
         </PanelSectionRow>
       )}
 
-      {hasLeds && (
+      {showDeviceControls && (
         <>
-          <PanelSectionRow>
-            <DevicePreview
-              colors={previewColors}
-              brightness={brightness}
-              power={power}
-              label={mode === "ambient" ? t("device.preview.ambient") : undefined}
-            />
-          </PanelSectionRow>
-
           <PanelSectionRow>
             <ToggleField label={t("power.label")} checked={power} onChange={setPower} bottomSeparator="none" />
           </PanelSectionRow>
@@ -478,325 +689,57 @@ function Content() {
               checked={chargerOnly}
               onChange={setChargerOnly}
               disabled={!power}
-              bottomSeparator={caps.conflictsWithSystemRgb ? "none" : "thick"}
+              bottomSeparator="thick"
             />
           </PanelSectionRow>
-          {caps.conflictsWithSystemRgb && (
+        </>
+      )}
+
+      {contentMode && renderModeContent()}
+
+      {showDeviceControls && capabilities.brightness && (
+        <>
+          <PanelSectionRow>
+            <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }} />
+          </PanelSectionRow>
+          <PanelSectionRow>
+            <SliderField
+              label={t("brightness.label")}
+              value={brightness}
+              min={0}
+              max={100}
+              step={1}
+              valueSuffix="%"
+              showValue
+              disabled={!power}
+              onChange={setBrightness}
+            />
+          </PanelSectionRow>
+        </>
+      )}
+
+      {!contentMode && (
+        <>
+          {!hasLeds && (
             <PanelSectionRow>
-              <ToggleField
-                label={t("forceControl.label")}
-                description={t("forceControl.hint")}
-                checked={forceControl}
-                onChange={setForceControl}
-                bottomSeparator="thick"
-              />
+              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", padding: "8px 2px 4px" }}>
+                {t("device.noLeds")}
+              </div>
             </PanelSectionRow>
           )}
-
-          {caps.color && (
-            <>
-              <PanelSectionRow>
-                <div style={{ margin: "8px 0 14px" }}>
-                  <ModeTabs value={mode} modes={modes} onChange={setMode} />
-                </div>
-              </PanelSectionRow>
-
-              {mode === "solid" && (
-                <ColorEditor color={color} disabled={!power} onChange={setColor} />
-              )}
-
-              {mode === "gradient" && canGradient && (
-                <GradientControls
-                  gradient={gradient}
-                  layout={caps.layout}
-                  crossfade={caps.gradientCrossfade}
-                  savedGradients={savedGradients}
-                  disabled={!power}
-                  onChange={setGradient}
-                  onSave={saveGradient}
-                  onDelete={deleteGradient}
-                  speed={gradientSpeed}
-                  onSpeed={gradientAnimated ? setGradientSpeed : undefined}
-                />
-              )}
-
-              {mode === "effect" && (
-                <>
-                  <PanelSectionRow>
-                    <EffectsGallery
-                      effects={visibleEffects}
-                      selected={effect.id}
-                      speed={effect.speed}
-                      disabled={!power}
-                      firmwareSpiral={firmwareSpiral}
-                      onSelect={setEffectId}
-                      onSpeed={setEffectSpeed}
-                    />
-                  </PanelSectionRow>
-                  {effectNeed === "color" && (
-                    <>
-                      {canGradient && (
-                        <PanelSectionRow>
-                          <ToggleField
-                            label={t("effect.useGradient")}
-                            checked={effect.useGradient}
-                            disabled={!power}
-                            onChange={setEffectGradient}
-                          />
-                        </PanelSectionRow>
-                      )}
-                      <EffectSource
-                        kind={canGradient && effect.useGradient ? "gradient" : "color"}
-                        color={color}
-                        gradient={gradient}
-                      />
-                    </>
-                  )}
-                  {effectNeed === "gradient" && (
-                    <EffectSource kind="gradient" color={color} gradient={gradient} />
-                  )}
-                  {effectNeed === "none" && (
-                    <PanelSectionRow>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "rgba(255,255,255,0.5)",
-                          padding: "4px 2px 8px",
-                        }}
-                      >
-                        {isFirmwareSpiral
-                          ? t("effect.spiral.firmwareNote")
-                          : t("effect.spectrumNote")}
-                      </div>
-                    </PanelSectionRow>
-                  )}
-                </>
-              )}
-
-              {mode === "ambient" && (
-                <>
-                  {power && ambStatus === "no_source" && (
-                    <PanelSectionRow>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "#ffcf66",
-                          background: "rgba(255, 184, 0, 0.1)",
-                          border: "1px solid rgba(255, 184, 0, 0.3)",
-                          borderRadius: 10,
-                          padding: "10px 12px",
-                          lineHeight: 1.45,
-                        }}
-                      >
-                        {t("ambient.gameModeBanner")}
-                      </div>
-                    </PanelSectionRow>
-                  )}
-                  <PanelSectionRow>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "rgba(255,255,255,0.55)",
-                        padding: "4px 2px 12px",
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {t("ambient.stickHint")}
-                    </div>
-                  </PanelSectionRow>
-                  <PanelSectionRow>
-                    <SliderField
-                      label={t("ambient.vividness")}
-                      value={ambilight.saturation}
-                      min={100}
-                      max={250}
-                      step={5}
-                      valueSuffix="%"
-                      showValue
-                      disabled={!power}
-                      onChange={(v) => setAmbilight(v, ambilight.smoothing, ambilight.fps)}
-                    />
-                  </PanelSectionRow>
-                  <PanelSectionRow>
-                    <SliderField
-                      label={t("ambient.smoothing")}
-                      value={ambilight.smoothing}
-                      min={0}
-                      max={100}
-                      step={1}
-                      valueSuffix="%"
-                      showValue
-                      disabled={!power}
-                      onChange={(v) => setAmbilight(ambilight.saturation, v, ambilight.fps)}
-                    />
-                  </PanelSectionRow>
-                  <PanelSectionRow>
-                    <SliderField
-                      label={t("ambient.captureRate")}
-                      value={ambilight.fps}
-                      min={5}
-                      max={30}
-                      step={5}
-                      valueSuffix=" fps"
-                      showValue
-                      disabled={!power}
-                      onChange={(v) => setAmbilight(ambilight.saturation, ambilight.smoothing, v)}
-                    />
-                  </PanelSectionRow>
-                </>
-              )}
-
-              {mode === "battery" && (
-                <BatteryPanel
-                  level={batteryLevel}
-                  breathe={batteryBreathe}
-                  disabled={!power}
-                  onBreathe={setBatteryBreathe}
-                />
-              )}
-            </>
-          )}
-
-          {caps.brightness && (
-            <>
-              <PanelSectionRow>
-                <div
-                  style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }}
-                />
-              </PanelSectionRow>
-              <PanelSectionRow>
-                <SliderField
-                  label={t("brightness.label")}
-                  value={brightness}
-                  min={0}
-                  max={100}
-                  step={1}
-                  valueSuffix="%"
-                  showValue
-                  disabled={!power}
-                  onChange={setBrightness}
-                />
-              </PanelSectionRow>
-            </>
-          )}
-
-          {caps.reconnectable && (
-            <>
-              <PanelSectionRow>
-                <div
-                  style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }}
-                />
-              </PanelSectionRow>
-              <PanelSectionRow>
-                <ButtonItem layout="below" onClick={() => reconnect()}>
-                  {t("reconnect.label")}
-                </ButtonItem>
-              </PanelSectionRow>
-              <PanelSectionRow>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "rgba(255,255,255,0.55)",
-                    padding: "2px 2px 4px",
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {t("reconnect.hint")}
-                </div>
-              </PanelSectionRow>
-            </>
-          )}
+          <SettingsSection
+            caps={capabilities}
+            availableTabIds={availableTabIds}
+            lang={lang}
+            forceControl={forceControl}
+            powerLedOff={powerLedOff}
+            onForceControl={setForceControl}
+            onPowerLed={setPowerLed}
+            onExperiment={setExperiment}
+            onReconnect={reconnect}
+          />
         </>
       )}
-
-      {caps.powerLed && (
-        <>
-          <PanelSectionRow>
-            <div
-              style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }}
-            />
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <div style={{ fontWeight: 600, fontSize: 13, padding: "2px 2px 6px" }}>
-              {t("powerLed.section")}
-            </div>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <ToggleField
-              label={t("powerLed.label")}
-              checked={powerLedOff}
-              onChange={setPowerLed}
-            />
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <div
-              style={{
-                fontSize: 12,
-                color: "rgba(255,255,255,0.55)",
-                padding: "0 2px 4px",
-                lineHeight: 1.45,
-              }}
-            >
-              {t("powerLed.warning")}
-            </div>
-          </PanelSectionRow>
-        </>
-      )}
-
-      {caps.experimental.length > 0 && (
-        <>
-          <PanelSectionRow>
-            <div
-              style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }}
-            />
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <div style={{ fontWeight: 600, fontSize: 13, padding: "2px 2px 6px" }}>
-              {t("experimental.title")}
-            </div>
-          </PanelSectionRow>
-          <PanelSectionRow>
-            <div
-              style={{
-                fontSize: 12,
-                color: "rgba(255,255,255,0.55)",
-                padding: "0 2px 10px",
-                lineHeight: 1.45,
-              }}
-            >
-              {t("experimental.description")}
-            </div>
-          </PanelSectionRow>
-          {caps.experimental.map((feature) => (
-            <PanelSectionRow key={feature}>
-              <ToggleField
-                label={t(`experimental.feature.${feature}`)}
-                checked={caps.enabledExperiments.includes(feature)}
-                onChange={(val) => setExperiment(feature, val)}
-              />
-            </PanelSectionRow>
-          ))}
-        </>
-      )}
-
-      {caps.conflictsWithSystemRgb && (
-        <PanelSectionRow>
-          <div
-            style={{
-              fontSize: 12,
-              color: "rgba(255,255,255,0.55)",
-              padding: "4px 2px 8px",
-              lineHeight: 1.45,
-            }}
-          >
-            {t("forceControl.notice")}
-          </div>
-        </PanelSectionRow>
-      )}
-
-      <PanelSectionRow>
-        <About lang={lang} hasUpdate={hasUpdate} unvalidated={!hasLeds} />
-      </PanelSectionRow>
     </PanelSection>
   );
 }

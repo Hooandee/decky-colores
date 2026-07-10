@@ -30,6 +30,18 @@ const es: Record<string, string> = {
   "mode.ambient": "Ambilight",
   "mode.battery": "Batería",
 
+  "nav.settings": "Ajustes",
+  "settings.language": "Idioma",
+  "customize.title": "Personalización",
+  "customize.button": "Personalizar pestañas",
+  "customize.button.desc": "Reordena u oculta las pestañas del panel.",
+  "customize.moveUp": "Subir",
+  "customize.moveDown": "Bajar",
+  "customize.show": "Mostrar",
+  "customize.hide": "Ocultar",
+  "customize.locked": "Siempre visible",
+  "customize.reset": "Restablecer pestañas",
+
   "color.hue": "Tono",
   "color.saturation": "Saturación",
 
@@ -174,6 +186,18 @@ const en: Record<string, string> = {
   "mode.effect": "Effect",
   "mode.ambient": "Ambient",
   "mode.battery": "Battery",
+
+  "nav.settings": "Settings",
+  "settings.language": "Language",
+  "customize.title": "Customization",
+  "customize.button": "Customize tabs",
+  "customize.button.desc": "Reorder or hide the panel tabs.",
+  "customize.moveUp": "Move up",
+  "customize.moveDown": "Move down",
+  "customize.show": "Show",
+  "customize.hide": "Hide",
+  "customize.locked": "Always visible",
+  "customize.reset": "Reset tabs",
 
   "color.hue": "Hue",
   "color.saturation": "Saturation",
