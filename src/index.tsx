@@ -310,6 +310,7 @@ function BatteryPanel({
           checked={breathe}
           disabled={disabled}
           onChange={onBreathe}
+          bottomSeparator="none"
         />
       </PanelSectionRow>
     </>
@@ -641,6 +642,7 @@ function Content() {
                 showValue
                 disabled={!power}
                 onChange={(v) => setAmbilight(ambilight.saturation, ambilight.smoothing, v)}
+                bottomSeparator="none"
               />
             </PanelSectionRow>
           </>
