@@ -371,6 +371,7 @@ function Content() {
   const modeIds = modeIdsFor(caps);
   const availableTabIds = [...modeIds, PINNED_TAB];
   const visibleTabIds = visibleIds(availableTabIds, layout.tabs, [PINNED_TAB]);
+  const visibleModeCount = visibleTabIds.filter((id) => id !== PINNED_TAB).length;
   const desiredTab = viewingSettings || !state ? PINNED_TAB : state.mode;
   const activeTab = visibleTabIds.includes(desiredTab) ? desiredTab : PINNED_TAB;
   const contentMode: Mode | null =
@@ -467,7 +468,8 @@ function Content() {
     batteryLevel,
   } = state;
   const hasLeds = capabilities.color || capabilities.brightness;
-  const showDeviceControls = hasLeds;
+  // On mode tabs, plus devices with no mode tab at all (brightness-only) so the controls stay reachable.
+  const showDeviceControls = hasLeds && (contentMode !== null || visibleModeCount === 0);
 
   const canGradient = capabilities.color && capabilities.zones >= 1;
   const gradientAnimated = canGradient && !capabilities.perZone;
