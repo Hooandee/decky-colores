@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.16.0...decky-colores-v0.17.0) (2026-07-10)
+
+
+### Features
+
+* pestañas de modo personalizables + sección Ajustes ([f6e4939](https://github.com/Hooandee/decky-colores/commit/f6e4939f44fe463108366d283acb11e242195b49))
+* pestañas de modo personalizables + sección Ajustes | customizable mode tabs + Settings section ([d2d35af](https://github.com/Hooandee/decky-colores/commit/d2d35af4cd474a900a48bee219ecc499ab731968))
+
 ## [0.16.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.5...decky-colores-v0.16.0) (2026-07-09)
 
 
