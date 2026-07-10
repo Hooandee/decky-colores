@@ -3,10 +3,10 @@
 ## [0.17.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.16.0...decky-colores-v0.17.0) (2026-07-10)
 
 
-### Features
+### Features / Novedades
 
-* pestañas de modo personalizables + sección Ajustes ([f6e4939](https://github.com/Hooandee/decky-colores/commit/f6e4939f44fe463108366d283acb11e242195b49))
-* pestañas de modo personalizables + sección Ajustes | customizable mode tabs + Settings section ([d2d35af](https://github.com/Hooandee/decky-colores/commit/d2d35af4cd474a900a48bee219ecc499ab731968))
+* Customizable tabs: your lights now live in tabs you can reorder and hide, with a new Settings tab that brings language, updates, reporting a problem and the advanced options together in one place. Long tab names gently scroll instead of getting cut off, and each handheld shows only the tabs it supports. ([#37](https://github.com/Hooandee/decky-colores/pull/37)) ([f6e4939](https://github.com/Hooandee/decky-colores/commit/f6e4939f44fe463108366d283acb11e242195b49))
+* **ES:** Pestañas personalizables: tus luces ahora se organizan en pestañas que puedes reordenar u ocultar, con una nueva pestaña de Ajustes que reúne el idioma, las actualizaciones, reportar un problema y las opciones avanzadas en un solo sitio. Los nombres largos de pestaña se desplazan suavemente en vez de cortarse, y cada consola muestra solo las pestañas que admite. ([#37](https://github.com/Hooandee/decky-colores/pull/37)) ([f6e4939](https://github.com/Hooandee/decky-colores/commit/f6e4939f44fe463108366d283acb11e242195b49))
 
 ## [0.16.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.15.5...decky-colores-v0.16.0) (2026-07-09)
 
