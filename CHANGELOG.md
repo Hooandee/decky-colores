@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.17.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.17.0...decky-colores-v0.17.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* Ajustes - espacio bajo tabs, personalizar antes de reportar, quitar nota HueSync | Settings spacing, reorder, drop HueSync note ([3557fcd](https://github.com/Hooandee/decky-colores/commit/3557fcdde5ccb33d72fa6fc455f8ce7835b56dbf))
+* Ajustes sin controles de LED + más espacio entre secciones ([de3b376](https://github.com/Hooandee/decky-colores/commit/de3b3766c6eb56e6870af4258e8768af0fc73186))
+* doble separador antes del brillo en batería y ambilight | remove double separator before brightness on battery and ambilight ([174de41](https://github.com/Hooandee/decky-colores/commit/174de413668456829574151c9e78b2bd80468c70))
+* espacio entre la barra de tabs y el visor de joystick | space between tab bar and joystick preview ([820ad85](https://github.com/Hooandee/decky-colores/commit/820ad853eebd3225c2d4bbe5761590020e8100c9))
+* mantener encendido/cargador/brillo fuera de Ajustes | keep power/charger/brightness out of the Settings tab ([5fa8d98](https://github.com/Hooandee/decky-colores/commit/5fa8d9891f1a7ae0ed54390bf37a9f8cdd5f9f1b))
+* más espacio entre secciones del panel | more breathing room between panel sections ([fc32478](https://github.com/Hooandee/decky-colores/commit/fc32478745089588c420e0017b4d62b945402286))
+
 ## [0.17.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.16.0...decky-colores-v0.17.0) (2026-07-10)
 
 
