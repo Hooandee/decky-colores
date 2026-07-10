@@ -15,7 +15,7 @@ let versionCache = "";
 
 const divider = (
   <PanelSectionRow>
-    <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "12px 0" }} />
+    <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "18px 0" }} />
   </PanelSectionRow>
 );
 

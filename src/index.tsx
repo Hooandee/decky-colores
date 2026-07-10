@@ -691,10 +691,16 @@ function Content() {
               checked={chargerOnly}
               onChange={setChargerOnly}
               disabled={!power}
-              bottomSeparator="thick"
+              bottomSeparator="none"
             />
           </PanelSectionRow>
         </>
+      )}
+
+      {showDeviceControls && contentMode && (
+        <PanelSectionRow>
+          <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "18px 0 12px" }} />
+        </PanelSectionRow>
       )}
 
       {contentMode && renderModeContent()}
@@ -702,7 +708,7 @@ function Content() {
       {showDeviceControls && capabilities.brightness && (
         <>
           <PanelSectionRow>
-            <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "14px 0 8px" }} />
+            <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "18px 0 12px" }} />
           </PanelSectionRow>
           <PanelSectionRow>
             <SliderField
