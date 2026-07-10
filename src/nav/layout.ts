@@ -53,9 +53,13 @@ export function toggle(set: string[], id: string): string[] {
 const strArray = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 
+// Tab ids that were renamed, so a saved order/hidden preference carries over.
+const RENAMED_TABS: Record<string, string> = { battery: "sensors" };
+
 const asPref = (v: unknown): ListPref => {
   const o = (v && typeof v === "object" ? v : {}) as { order?: unknown; hidden?: unknown };
-  return { order: strArray(o.order), hidden: strArray(o.hidden) };
+  const rename = (ids: string[]) => ids.map((id) => RENAMED_TABS[id] ?? id);
+  return { order: rename(strArray(o.order)), hidden: rename(strArray(o.hidden)) };
 };
 
 // Tolerant of corrupt/old localStorage shapes: anything unrecognized degrades to

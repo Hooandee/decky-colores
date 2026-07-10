@@ -174,6 +174,24 @@ export function batteryBandColor(level: number): RGB {
   return BATTERY_BANDS[BATTERY_BANDS.length - 1].color;
 }
 
+// Keep in sync with the backend TEMPERATURE_BANDS (py_modules/effects.py).
+export const TEMPERATURE_BANDS: { min: number; color: RGB }[] = [
+  { min: 90, color: { r: 255, g: 30, b: 20 } },
+  { min: 80, color: { r: 255, g: 110, b: 0 } },
+  { min: 68, color: { r: 255, g: 200, b: 0 } },
+  { min: 55, color: { r: 0, g: 200, b: 60 } },
+  { min: 0, color: { r: 0, g: 120, b: 255 } },
+];
+
+export const TEMPERATURE_RANGE = { min: 40, max: 95 };
+
+export function temperatureBandColor(temp: number): RGB {
+  for (const band of TEMPERATURE_BANDS) {
+    if (temp >= band.min) return band.color;
+  }
+  return TEMPERATURE_BANDS[TEMPERATURE_BANDS.length - 1].color;
+}
+
 const NAME_PARTS: Record<"es" | "en", { adjectives: string[]; nouns: string[] }> = {
   es: {
     adjectives: ["Borracho", "Eléctrico", "Cósmico", "Disco", "Pastel", "Neón", "Salvaje", "Turbo", "Místico", "Picante"],

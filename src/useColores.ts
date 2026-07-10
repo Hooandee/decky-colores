@@ -178,6 +178,13 @@ export function useColores() {
     );
   };
 
+  const setTemperatureBreathe = (temperatureBreathe: boolean) => {
+    setState((s) => (s ? { ...s, temperatureBreathe } : s));
+    api.setTemperatureBreathe(temperatureBreathe).catch((e) =>
+      console.error("Colores: setTemperatureBreathe failed", e),
+    );
+  };
+
   const setExperiment = (feature: string, on: boolean) => {
     api
       .setExperiment(feature, on)
@@ -212,6 +219,7 @@ export function useColores() {
     setPowerLed,
     setForceControl,
     setBatteryBreathe,
+    setTemperatureBreathe,
     reconnect,
   };
 }

@@ -5,6 +5,7 @@ from led_device import SysfsRgbDevice, NullDevice
 from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device
 from power_led import PowerLedController
 from power_supply import battery_present
+from thermal import temperature_available
 
 DEVICE_REGISTRY = [
     ("board", "Jupiter", "Steam Deck"),
@@ -136,7 +137,7 @@ def _feature_state(profile, feature, present):
     return "supported" if present else "unsupported"
 
 
-def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power_led=None, battery=False):
+def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power_led=None, battery=False, temperature=False):
     present = {
         "color": has_led,
         "brightness": has_led,
@@ -162,6 +163,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "experimental": list(profile.get("experimental", [])),
         "powerLed": bool(power_led and power_led.available()),
         "batteryMode": bool(battery) and active["color"],
+        "temperatureMode": bool(temperature) and active["color"],
         "conflictsWithSystemRgb": bool(profile.get("conflicts_with_system_rgb", False)),
         "layout": build_layout(zones, profile.get("swap_sticks", False)),
     }
@@ -187,7 +189,7 @@ def _find_rgb_led(leds_dir):
 _IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally"}
 
 
-def _build_hid_context(profile, ambilight, power_led=None, battery=False):
+def _build_hid_context(profile, ambilight, power_led=None, battery=False, temperature=False):
     device = build_hid_device(profile["driver"])
     if device is None or not device.available:
         return None
@@ -195,7 +197,7 @@ def _build_hid_context(profile, ambilight, power_led=None, battery=False):
     if correction and hasattr(device, "set_color_correction"):
         device.set_color_correction(correction)
     zones = profile.get("zones") or 1
-    capabilities = build_capabilities(profile, True, zones, 100, ambilight, power_led, battery)
+    capabilities = build_capabilities(profile, True, zones, 100, ambilight, power_led, battery, temperature)
     capabilities["perZone"] = device.supports_per_zone()
     capabilities["hardwareEffects"] = device.supports_hardware_effects()
     capabilities["reconnectable"] = True
@@ -208,10 +210,14 @@ def build_device(sysfs_root="/", ambilight=False):
     info["name"] = profile["name"]
     power_led = PowerLedController(profile.get("power_led"))
     battery = battery_present(os.path.join(sysfs_root, "sys/class/power_supply"))
+    temperature = temperature_available(
+        os.path.join(sysfs_root, "sys/class/hwmon"),
+        os.path.join(sysfs_root, "sys/class/thermal"),
+    )
 
     if profile["driver"] in HID_DRIVERS:
         if HID_AVAILABLE:
-            hid_ctx = _build_hid_context(profile, ambilight, power_led, battery)
+            hid_ctx = _build_hid_context(profile, ambilight, power_led, battery, temperature)
             if hid_ctx is not None:
                 return {
                     "info": info,
@@ -239,7 +245,7 @@ def build_device(sysfs_root="/", ambilight=False):
         if fallback and HID_AVAILABLE and fallback.get("driver") in HID_DRIVERS:
             fb_profile = dict(fallback)
             fb_profile["name"] = profile["name"]
-            hid_ctx = _build_hid_context(fb_profile, ambilight, power_led, battery)
+            hid_ctx = _build_hid_context(fb_profile, ambilight, power_led, battery, temperature)
             if hid_ctx is not None:
                 return {
                     "info": info,
@@ -252,7 +258,7 @@ def build_device(sysfs_root="/", ambilight=False):
     if profile["driver"] not in _IMPLEMENTED_DRIVERS:
         profile["experimental"] = _all_experimental(profile)
 
-    capabilities = build_capabilities(profile, has_led, zones, max_brightness, ambilight, power_led, battery)
+    capabilities = build_capabilities(profile, has_led, zones, max_brightness, ambilight, power_led, battery, temperature)
     return {
         "info": info,
         "capabilities": capabilities,

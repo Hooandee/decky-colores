@@ -1,6 +1,8 @@
 from py_modules.effects import (
     BATTERY_BANDS,
+    TEMPERATURE_BANDS,
     battery_band_color,
+    temperature_band_color,
     frame_breathing,
     frame_cycle,
     frame_gradient_sweep,
@@ -132,3 +134,23 @@ def test_battery_bands_cover_full_range_descending():
     assert thresholds == sorted(thresholds, reverse=True)
     assert thresholds[-1] == 0
     assert all(_valid(color) for _, color in BATTERY_BANDS)
+
+
+def test_temperature_band_color_thresholds():
+    assert temperature_band_color(30) == (0, 120, 255)
+    assert temperature_band_color(54) == (0, 120, 255)
+    assert temperature_band_color(55) == (0, 200, 60)
+    assert temperature_band_color(67) == (0, 200, 60)
+    assert temperature_band_color(68) == (255, 200, 0)
+    assert temperature_band_color(79) == (255, 200, 0)
+    assert temperature_band_color(80) == (255, 110, 0)
+    assert temperature_band_color(89) == (255, 110, 0)
+    assert temperature_band_color(90) == (255, 30, 20)
+    assert temperature_band_color(105) == (255, 30, 20)
+
+
+def test_temperature_bands_cover_full_range_descending():
+    thresholds = [b[0] for b in TEMPERATURE_BANDS]
+    assert thresholds == sorted(thresholds, reverse=True)
+    assert thresholds[-1] == 0
+    assert all(_valid(color) for _, color in TEMPERATURE_BANDS)

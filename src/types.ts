@@ -35,10 +35,11 @@ export interface Capabilities {
   enabledExperiments: string[];
   powerLed: boolean;
   batteryMode: boolean;
+  temperatureMode: boolean;
   conflictsWithSystemRgb: boolean;
 }
 
-export type Mode = "solid" | "gradient" | "effect" | "ambient" | "battery";
+export type Mode = "solid" | "gradient" | "effect" | "ambient" | "battery" | "temperature";
 
 export interface AmbilightState {
   saturation: number;
@@ -71,6 +72,8 @@ export interface ColoresState {
   forceControl: boolean;
   batteryBreathe: boolean;
   batteryLevel: number;
+  temperatureBreathe: boolean;
+  temperature: number | null;
 }
 
 export interface GradientPreset {
