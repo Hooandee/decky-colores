@@ -23,6 +23,7 @@ import { EffectsGallery } from "./components/EffectsGallery";
 import { GradientModal } from "./components/GradientModal";
 import { TabBar } from "./components/TabBar";
 import { SettingsSection } from "./components/SettingsSection";
+import { Divider } from "./components/Divider";
 import { ColorWheelIcon } from "./components/ColorWheelIcon";
 import { GRADIENT_PRESETS, EFFECT_PRESETS, BATTERY_BANDS, batteryBandColor } from "./palette";
 import { I18nProvider, useI18n } from "./i18n";
@@ -469,7 +470,6 @@ function Content() {
     batteryLevel,
   } = state;
   const hasLeds = capabilities.color || capabilities.brightness;
-  // On mode tabs, plus devices with no mode tab at all (brightness-only) so the controls stay reachable.
   const showDeviceControls = hasLeds && (contentMode !== null || visibleModeCount === 0);
 
   const canGradient = capabilities.color && capabilities.zones >= 1;
@@ -701,19 +701,13 @@ function Content() {
         </>
       )}
 
-      {showDeviceControls && contentMode && (
-        <PanelSectionRow>
-          <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "18px 0 12px" }} />
-        </PanelSectionRow>
-      )}
+      {showDeviceControls && contentMode && <Divider margin="18px 0 12px" />}
 
       {contentMode && renderModeContent()}
 
       {showDeviceControls && capabilities.brightness && (
         <>
-          <PanelSectionRow>
-            <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "18px 0 12px" }} />
-          </PanelSectionRow>
+          <Divider margin="18px 0 12px" />
           <PanelSectionRow>
             <SliderField
               label={t("brightness.label")}

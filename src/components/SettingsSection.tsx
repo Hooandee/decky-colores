@@ -6,18 +6,13 @@ import { useI18n, LangToggle, type Lang } from "../i18n";
 import { UpdatePanel } from "../updater/UpdatePanel";
 import { openCustomizeModal } from "./CustomizeModal";
 import { openReportModal } from "./ReportModal";
+import { Divider } from "./Divider";
 import { Capabilities } from "../types";
 
 const AUTHOR = "Hooandee";
 const YOUTUBE_URL = "https://www.youtube.com/@Hooandee";
 
 let versionCache = "";
-
-const divider = (
-  <PanelSectionRow>
-    <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "18px 0" }} />
-  </PanelSectionRow>
-);
 
 const sectionTitle = (text: string) => (
   <PanelSectionRow>
@@ -191,7 +186,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
     <>
       {sections.map((node, i) => (
         <Fragment key={i}>
-          {i > 0 && divider}
+          {i > 0 && <Divider />}
           {node}
         </Fragment>
       ))}
