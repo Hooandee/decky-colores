@@ -113,7 +113,6 @@ const es: Record<string, string> = {
   "about.title": "Acerca de",
   "about.version": "Versión {v}",
   "about.madeBy": "Hecho por {name}",
-  "about.basedOn": "Motor de luces basado en HueSync.",
 
   "lang.spanish": "Español",
   "lang.english": "Inglés",
@@ -270,7 +269,6 @@ const en: Record<string, string> = {
   "about.title": "About",
   "about.version": "Version {v}",
   "about.madeBy": "Made by {name}",
-  "about.basedOn": "Lighting engine based on HueSync.",
 
   "lang.spanish": "Spanish",
   "lang.english": "English",
