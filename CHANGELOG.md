@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.17.1...decky-colores-v0.18.0) (2026-07-10)
+
+
+### Features
+
+* modo Temperatura en la pestaña Sensores | Temperature mode under a Sensors tab ([0070768](https://github.com/Hooandee/decky-colores/commit/0070768f5bf4656596e9049d5ab791329c59f7ec))
+* modo Temperatura en la pestaña Sensores | Temperature mode under a Sensors tab ([7656170](https://github.com/Hooandee/decky-colores/commit/76561704e395bf9656a56bfc013b1a65c0b4e4f0))
+
 ## [0.17.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.17.0...decky-colores-v0.17.1) (2026-07-10)
 
 
