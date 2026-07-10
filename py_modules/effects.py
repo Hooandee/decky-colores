@@ -6,10 +6,9 @@ logger = logging.getLogger("colores.effects")
 
 FRAME_INTERVAL = 1.0 / 30.0
 
-# Battery mode: fixed color bands by charge level (blue full -> red empty). All
-# zones show the same band color; it is a status indicator, not a spatial effect.
-# Each entry is (min_level_inclusive, rgb); scanned high to low. Keep in sync with
-# the frontend BATTERY_BANDS (src/palette.ts) used for the legend and preview.
+# Status-indicator color bands (battery %, APU temperature C). Each entry is
+# (min_value_inclusive, rgb), scanned high to low. Keep in sync with the frontend
+# copies in src/palette.ts (those drive the legend/preview; the LED render is here).
 BATTERY_BANDS = (
     (81, (0, 120, 255)),
     (61, (0, 200, 60)),
@@ -17,16 +16,19 @@ BATTERY_BANDS = (
     (21, (255, 110, 0)),
     (0, (255, 30, 20)),
 )
-# Per-frame easing factor toward the target band color: gives a smooth ~1.3s
-# crossfade when crossing a band boundary and makes the exact threshold jitter-free
-# (implicit hysteresis), so we never need explicit threshold bookkeeping.
-BATTERY_EASE = 0.12
-# Below this per-channel delta the color has settled: stop the 30fps loop and idle
-# on a coarse tick (still polling state) so a static indicator costs ~no CPU.
-BATTERY_CONVERGE_EPS = 1.0
-BATTERY_IDLE_INTERVAL = 0.5
-# Calm breathing while charging (~2s period), well below the effect breathing range.
-BATTERY_BREATHE_SPEED = 22
+TEMPERATURE_BANDS = (
+    (90, (255, 30, 20)),
+    (80, (255, 110, 0)),
+    (68, (255, 200, 0)),
+    (55, (0, 200, 60)),
+    (0, (0, 120, 255)),
+)
+TEMPERATURE_CRITICAL = 90
+
+INDICATOR_EASE = 0.12
+INDICATOR_CONVERGE_EPS = 1.0
+INDICATOR_IDLE_INTERVAL = 0.5
+INDICATOR_BREATHE_SPEED = 22
 
 
 def clamp8(x):
@@ -166,6 +168,13 @@ def battery_band_color(level):
     return BATTERY_BANDS[-1][1]
 
 
+def temperature_band_color(temp):
+    for threshold, color in TEMPERATURE_BANDS:
+        if temp >= threshold:
+            return color
+    return TEMPERATURE_BANDS[-1][1]
+
+
 class EffectEngine:
     def __init__(self, apply_zones, zones):
         self._apply_zones = apply_zones
@@ -192,17 +201,34 @@ class EffectEngine:
         self._task = loop.create_task(self._run(effect_id, speed, params))
 
     def start_battery(self, state_fn):
-        # state_fn() returns the LIVE {level, charging, breathe} each frame, so the
-        # loop reacts to charge/plug changes without a restart. Fixed signature: a
-        # re-apply (e.g. a brightness change) is a no-op while it runs, which keeps
-        # the easing/breathing from resetting.
-        sig = ("__battery__",)
+        self._start_indicator(
+            "__battery__",
+            state_fn,
+            lambda st: battery_band_color(st.get("level", 100)),
+            lambda st: bool(st.get("charging")) and bool(st.get("breathe")) and st.get("level", 100) < 100,
+            "battery",
+        )
+
+    def start_temperature(self, state_fn):
+        self._start_indicator(
+            "__temperature__",
+            state_fn,
+            lambda st: None if st.get("temp") is None else temperature_band_color(st["temp"]),
+            lambda st: bool(st.get("breathe")) and st.get("temp") is not None and st["temp"] >= TEMPERATURE_CRITICAL,
+            "temperature",
+        )
+
+    def _start_indicator(self, sig_key, state_fn, target_fn, breathe_fn, label):
+        # state_fn() returns the LIVE state each frame, so the loop reacts without a
+        # restart. Fixed per-mode signature: a re-apply (e.g. a brightness change) is
+        # a no-op while it runs, keeping the easing/breathing from resetting.
+        sig = (sig_key,)
         if self.running and sig == self._sig:
             return
         self.stop()
         self._sig = sig
         loop = asyncio.get_event_loop()
-        self._task = loop.create_task(self._run_battery(state_fn))
+        self._task = loop.create_task(self._run_indicator(state_fn, target_fn, breathe_fn, label))
 
     def stop(self):
         if self._task is not None:
@@ -229,37 +255,41 @@ class EffectEngine:
             return frame_gradient_sweep(params.get("stops", [(255, 255, 255)]), self._zones, t, speed)
         return [(0, 0, 0) for _ in range(self._zones)]
 
-    async def _run_battery(self, state_fn):
+    async def _run_indicator(self, state_fn, target_fn, breathe_fn, label):
+        # Shared render loop for the status indicators (battery %, APU temperature):
+        # snap to the band on entry, ease toward it at 30fps while crossfading or
+        # breathing, and hold on a coarse tick once settled so a static color costs
+        # ~no CPU. target_fn(st) -> rgb, or None to hold the last frame (unreadable).
         loop = asyncio.get_event_loop()
         start = loop.time()
         displayed = None
         while True:
             try:
                 st = state_fn() or {}
-                level = st.get("level", 100)
-                target = battery_band_color(level)
+                target = target_fn(st)
+                if target is None:
+                    await asyncio.sleep(INDICATOR_IDLE_INTERVAL)
+                    continue
                 if displayed is None:
-                    displayed = target  # snap to the band on entry, no fade from black
-                breathing = bool(st.get("charging")) and bool(st.get("breathe")) and level < 100
+                    displayed = target
+                breathing = breathe_fn(st)
 
-                # Settled and static: hold the band color on a coarse tick (~no CPU).
-                if not breathing and max(abs(displayed[i] - target[i]) for i in range(3)) <= BATTERY_CONVERGE_EPS:
+                if not breathing and max(abs(displayed[i] - target[i]) for i in range(3)) <= INDICATOR_CONVERGE_EPS:
                     displayed = target
                     self._apply_zones([target] * self._zones)
-                    await asyncio.sleep(BATTERY_IDLE_INTERVAL)
+                    await asyncio.sleep(INDICATOR_IDLE_INTERVAL)
                     continue
 
-                # Crossfading and/or breathing: ease toward the band at 30fps.
-                displayed = tuple(_lerp(displayed[i], target[i], BATTERY_EASE) for i in range(3))
-                factor = breathe_factor(loop.time() - start, BATTERY_BREATHE_SPEED) if breathing else 1.0
+                displayed = tuple(_lerp(displayed[i], target[i], INDICATOR_EASE) for i in range(3))
+                factor = breathe_factor(loop.time() - start, INDICATOR_BREATHE_SPEED) if breathing else 1.0
                 frame = tuple(clamp8(c * factor) for c in displayed)
                 self._apply_zones([frame] * self._zones)
                 await asyncio.sleep(FRAME_INTERVAL)
             except asyncio.CancelledError:
                 raise
             except Exception:
-                logger.exception("battery frame failed")
-                await asyncio.sleep(BATTERY_IDLE_INTERVAL)
+                logger.exception("%s frame failed", label)
+                await asyncio.sleep(INDICATOR_IDLE_INTERVAL)
 
     async def _run(self, effect_id, speed, params):
         loop = asyncio.get_event_loop()

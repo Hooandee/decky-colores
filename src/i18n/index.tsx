@@ -29,7 +29,9 @@ const es: Record<string, string> = {
   "mode.effect": "Efecto",
   "mode.ambient": "Ambilight",
   "mode.battery": "Batería",
+  "mode.temperature": "Temperatura",
 
+  "nav.sensors": "Sensores",
   "nav.settings": "Ajustes",
   "settings.language": "Idioma",
   "customize.title": "Personalización",
@@ -103,10 +105,19 @@ const es: Record<string, string> = {
   "ambient.smoothing": "Suavizado",
   "ambient.captureRate": "Tasa de captura",
 
+  "sensors.battery": "Batería",
+  "sensors.temperature": "Temperatura",
+
   "battery.hint": "Las luces muestran el nivel de batería con un color que va del azul al rojo.",
   "battery.level": "{n}%",
   "battery.breathe.label": "Respirar al cargar",
   "battery.breathe.hint": "Mientras se carga, el color respira suavemente.",
+
+  "temperature.hint": "Las luces siguen la temperatura del procesador, del azul en frío al rojo cuando se calienta.",
+  "temperature.reading": "{n} °C",
+  "temperature.noReading": "Sin lectura",
+  "temperature.breathe.label": "Avisar en caliente",
+  "temperature.breathe.hint": "Cuando el procesador se pone muy caliente, el color late como aviso.",
 
   "brightness.label": "Brillo",
 
@@ -185,7 +196,9 @@ const en: Record<string, string> = {
   "mode.effect": "Effect",
   "mode.ambient": "Ambient",
   "mode.battery": "Battery",
+  "mode.temperature": "Temperature",
 
+  "nav.sensors": "Sensors",
   "nav.settings": "Settings",
   "settings.language": "Language",
   "customize.title": "Customization",
@@ -259,10 +272,19 @@ const en: Record<string, string> = {
   "ambient.smoothing": "Smoothing",
   "ambient.captureRate": "Capture rate",
 
+  "sensors.battery": "Battery",
+  "sensors.temperature": "Temperature",
+
   "battery.hint": "The lights show the battery level with a color from blue to red.",
   "battery.level": "{n}%",
   "battery.breathe.label": "Breathe while charging",
   "battery.breathe.hint": "While charging, the color gently breathes.",
+
+  "temperature.hint": "The lights follow the processor temperature, from blue when cool to red when it heats up.",
+  "temperature.reading": "{n} °C",
+  "temperature.noReading": "No reading",
+  "temperature.breathe.label": "Warn when hot",
+  "temperature.breathe.hint": "When the processor gets very hot, the color pulses as a warning.",
 
   "brightness.label": "Brightness",
 

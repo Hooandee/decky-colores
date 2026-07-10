@@ -12,6 +12,7 @@ from settings_store import SettingsStore
 from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
 from power_supply import charger_online, battery_level
+from thermal import apu_temperature
 from saved_gradients import upsert_gradient, remove_gradient
 import self_updater
 from report import collector as report_collector
@@ -37,6 +38,7 @@ DEFAULTS = {
     "charger_only": False,
     "force_control": False,
     "battery_breathe": True,
+    "temperature_breathe": True,
 }
 
 # How often the background watcher samples the AC adapter to react to plug/unplug
@@ -87,6 +89,7 @@ class Plugin:
         self._ac_online = charger_online()
         level = battery_level()
         self._battery_level = 100 if level is None else level
+        self._apu_temp = apu_temperature()
         self._apply_power_led()
         self._ready = True
 
@@ -351,6 +354,8 @@ class Plugin:
             "forceControl": s.get("force_control", False),
             "batteryBreathe": s.get("battery_breathe", True),
             "batteryLevel": getattr(self, "_battery_level", 100),
+            "temperatureBreathe": s.get("temperature_breathe", True),
+            "temperature": getattr(self, "_apu_temp", None),
         }
 
     async def set_power(self, on: bool) -> None:
@@ -379,6 +384,15 @@ class Plugin:
         # The battery loop reads this live via _battery_state, so persisting is
         # enough; no restart needed. Re-apply is a cheap no-op unless idle.
         self._save_and_apply()
+
+    async def set_temperature_breathe(self, on: bool) -> None:
+        self._init()
+        self._settings["temperature_breathe"] = on
+        self._save_and_apply()
+
+    async def get_temperature(self):
+        self._init()
+        return getattr(self, "_apu_temp", None)
 
     async def set_brightness(self, value: int) -> None:
         self._init()
@@ -480,6 +494,12 @@ class Plugin:
             "breathe": self._settings.get("battery_breathe", True),
         }
 
+    def _temperature_state(self) -> dict:
+        return {
+            "temp": getattr(self, "_apu_temp", None),
+            "breathe": self._settings.get("temperature_breathe", True),
+        }
+
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(
             zone_colors, self._settings["brightness"], self._effective_power()
@@ -500,7 +520,7 @@ class Plugin:
         # (per-zone or per-controller). Single-color devices render wave with
         # their native hardware effect instead of collapsing it to a flat color.
         s = self._settings
-        if s["mode"] in ("ambient", "battery"):
+        if s["mode"] in ("ambient", "battery", "temperature"):
             return True
         if s["mode"] == "gradient":
             return not self._controller.supports_per_zone()
@@ -570,6 +590,8 @@ class Plugin:
 
         if s["mode"] == "battery":
             self._engine.start_battery(self._battery_state)
+        elif s["mode"] == "temperature":
+            self._engine.start_temperature(self._temperature_state)
         elif s["mode"] == "effect":
             effect = s["effect"]
             self._engine.start_effect(
@@ -627,6 +649,9 @@ class Plugin:
                 level = battery_level()
                 if level is not None:
                     self._battery_level = level
+                temp = apu_temperature()
+                if temp is not None:
+                    self._apu_temp = temp
                 online = charger_online()
                 if online != getattr(self, "_ac_online", True):
                     self._ac_online = online

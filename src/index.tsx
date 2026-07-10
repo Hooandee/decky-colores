@@ -14,7 +14,7 @@ import { definePlugin } from "@decky/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus, reconnect as apiReconnect } from "./api";
+import { getAmbilightStatus, getTemperature, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -25,15 +25,24 @@ import { TabBar } from "./components/TabBar";
 import { SettingsSection } from "./components/SettingsSection";
 import { Divider } from "./components/Divider";
 import { ColorWheelIcon } from "./components/ColorWheelIcon";
-import { GRADIENT_PRESETS, EFFECT_PRESETS, BATTERY_BANDS, batteryBandColor } from "./palette";
+import {
+  GRADIENT_PRESETS,
+  EFFECT_PRESETS,
+  BATTERY_BANDS,
+  batteryBandColor,
+  TEMPERATURE_BANDS,
+  TEMPERATURE_RANGE,
+  temperatureBandColor,
+} from "./palette";
+import { Tabs } from "./components/Tabs";
 import { I18nProvider, useI18n } from "./i18n";
 import { useUpdate } from "./updater/useUpdate";
 import { AlertDot } from "./updater/AlertDot";
 import { useLayout } from "./nav/store";
 import { visibleIds } from "./nav/layout";
-import { PINNED_TAB, tabMeta, TAB_META } from "./nav/manifest";
+import { PINNED_TAB, tabMeta, TAB_META, SENSOR_TAB, SENSOR_MODES, tabForMode } from "./nav/manifest";
 import { useShoulderNav } from "./nav/useShoulderNav";
-import { readActiveTab, writeActiveTab } from "./nav/activeTab";
+import { readActiveTab, writeActiveTab, readSensorMode, writeSensorMode } from "./nav/activeTab";
 
 function DeviceHeader({ name, color }: { name: string; color: RGB }) {
   const css = rgbToCss(color);
@@ -234,21 +243,31 @@ function EffectSource({
   );
 }
 
-function BatteryPanel({
-  level,
+function SensorMeter({
+  hint,
+  barStops,
+  markerPct,
+  leftLabel,
+  centerLabel,
+  rightLabel,
+  breatheLabel,
+  breatheHint,
   breathe,
   disabled,
   onBreathe,
 }: {
-  level: number;
+  hint: string;
+  barStops: RGB[];
+  markerPct: number | null;
+  leftLabel: string;
+  centerLabel: string;
+  rightLabel: string;
+  breatheLabel: string;
+  breatheHint: string;
   breathe: boolean;
   disabled?: boolean;
   onBreathe: (on: boolean) => void;
 }) {
-  const { t } = useI18n();
-  // Left (0%) -> right (100%): red ... blue. BATTERY_BANDS is high-to-low, so reverse.
-  const barStops = [...BATTERY_BANDS].reverse().map((b) => b.color);
-  const marker = Math.max(0, Math.min(100, level));
   return (
     <>
       <PanelSectionRow>
@@ -260,7 +279,7 @@ function BatteryPanel({
             lineHeight: 1.45,
           }}
         >
-          {t("battery.hint")}
+          {hint}
         </div>
       </PanelSectionRow>
       <PanelSectionRow>
@@ -274,18 +293,20 @@ function BatteryPanel({
               boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
             }}
           >
-            <div
-              style={{
-                position: "absolute",
-                top: -3,
-                bottom: -3,
-                left: `calc(${marker}% - 2px)`,
-                width: 4,
-                borderRadius: 2,
-                background: "#fff",
-                boxShadow: "0 0 4px rgba(0,0,0,0.6)",
-              }}
-            />
+            {markerPct !== null && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: -3,
+                  bottom: -3,
+                  left: `calc(${markerPct}% - 2px)`,
+                  width: 4,
+                  borderRadius: 2,
+                  background: "#fff",
+                  boxShadow: "0 0 4px rgba(0,0,0,0.6)",
+                }}
+              />
+            )}
           </div>
           <div
             style={{
@@ -296,18 +317,16 @@ function BatteryPanel({
               padding: "6px 1px 0",
             }}
           >
-            <span>0%</span>
-            <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
-              {t("battery.level", { n: marker })}
-            </span>
-            <span>100%</span>
+            <span>{leftLabel}</span>
+            <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>{centerLabel}</span>
+            <span>{rightLabel}</span>
           </div>
         </div>
       </PanelSectionRow>
       <PanelSectionRow>
         <ToggleField
-          label={t("battery.breathe.label")}
-          description={t("battery.breathe.hint")}
+          label={breatheLabel}
+          description={breatheHint}
           checked={breathe}
           disabled={disabled}
           onChange={onBreathe}
@@ -318,23 +337,136 @@ function BatteryPanel({
   );
 }
 
+function BatteryPanel({
+  level,
+  breathe,
+  disabled,
+  onBreathe,
+}: {
+  level: number;
+  breathe: boolean;
+  disabled?: boolean;
+  onBreathe: (on: boolean) => void;
+}) {
+  const { t } = useI18n();
+  const marker = Math.max(0, Math.min(100, level));
+  return (
+    <SensorMeter
+      hint={t("battery.hint")}
+      barStops={[...BATTERY_BANDS].reverse().map((b) => b.color)}
+      markerPct={marker}
+      leftLabel="0%"
+      centerLabel={t("battery.level", { n: marker })}
+      rightLabel="100%"
+      breatheLabel={t("battery.breathe.label")}
+      breatheHint={t("battery.breathe.hint")}
+      breathe={breathe}
+      disabled={disabled}
+      onBreathe={onBreathe}
+    />
+  );
+}
+
+function TemperaturePanel({
+  temp,
+  breathe,
+  disabled,
+  onBreathe,
+}: {
+  temp: number | null;
+  breathe: boolean;
+  disabled?: boolean;
+  onBreathe: (on: boolean) => void;
+}) {
+  const { t } = useI18n();
+  const { min, max } = TEMPERATURE_RANGE;
+  const markerPct =
+    temp === null ? null : Math.max(0, Math.min(100, ((temp - min) / (max - min)) * 100));
+  return (
+    <SensorMeter
+      hint={t("temperature.hint")}
+      barStops={[...TEMPERATURE_BANDS].reverse().map((b) => b.color)}
+      markerPct={markerPct}
+      leftLabel={`${min}°`}
+      centerLabel={
+        temp === null ? t("temperature.noReading") : t("temperature.reading", { n: Math.round(temp) })
+      }
+      rightLabel={`${max}°`}
+      breatheLabel={t("temperature.breathe.label")}
+      breatheHint={t("temperature.breathe.hint")}
+      breathe={breathe}
+      disabled={disabled}
+      onBreathe={onBreathe}
+    />
+  );
+}
+
+function SensorsPanel({
+  mode,
+  availableModes,
+  level,
+  temp,
+  batteryBreathe,
+  temperatureBreathe,
+  disabled,
+  onSelectMode,
+  onBatteryBreathe,
+  onTemperatureBreathe,
+}: {
+  mode: Mode;
+  availableModes: Mode[];
+  level: number;
+  temp: number | null;
+  batteryBreathe: boolean;
+  temperatureBreathe: boolean;
+  disabled?: boolean;
+  onSelectMode: (m: Mode) => void;
+  onBatteryBreathe: (on: boolean) => void;
+  onTemperatureBreathe: (on: boolean) => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <>
+      {availableModes.length > 1 && (
+        <PanelSectionRow>
+          <div style={{ padding: "2px 0 6px" }}>
+            <Tabs<Mode>
+              value={mode}
+              tabs={availableModes}
+              onChange={onSelectMode}
+              label={(m) => t(`sensors.${m}` as "sensors.battery" | "sensors.temperature")}
+            />
+          </div>
+        </PanelSectionRow>
+      )}
+      {mode === "temperature" ? (
+        <TemperaturePanel
+          temp={temp}
+          breathe={temperatureBreathe}
+          disabled={disabled}
+          onBreathe={onTemperatureBreathe}
+        />
+      ) : (
+        <BatteryPanel
+          level={level}
+          breathe={batteryBreathe}
+          disabled={disabled}
+          onBreathe={onBatteryBreathe}
+        />
+      )}
+    </>
+  );
+}
+
 function modeIdsFor(caps: Capabilities | null): Mode[] {
   if (!caps || !caps.color) return [];
-  return TAB_META.filter((m) => {
-    switch (m.id) {
-      case "solid":
-      case "effect":
-        return true;
-      case "gradient":
-        return caps.zones >= 1;
-      case "battery":
-        return caps.batteryMode;
-      case "ambient":
-        return caps.ambilight;
-      default:
-        return false;
-    }
-  }).map((m) => m.id as Mode);
+  const modes: Mode[] = ["solid"];
+  if (caps.zones >= 1) modes.push("gradient");
+  modes.push("effect");
+  if (caps.batteryMode) modes.push("battery");
+  if (caps.temperatureMode) modes.push("temperature");
+  if (caps.ambilight) modes.push("ambient");
+  return modes;
 }
 
 function Content() {
@@ -359,11 +491,13 @@ function Content() {
     setPowerLed,
     setForceControl,
     setBatteryBreathe,
+    setTemperatureBreathe,
     reconnect,
   } = useColores();
   const { t, lang } = useI18n();
   const { hasUpdate } = useUpdate(lang);
   const [ambStatus, setAmbStatus] = useState<string>("idle");
+  const [tempReading, setTempReading] = useState<number | null>(null);
   const [viewingSettings, setViewingSettings] = useState<boolean>(
     () => readActiveTab() === PINNED_TAB,
   );
@@ -371,14 +505,35 @@ function Content() {
 
   const caps = state?.capabilities ?? null;
   const modeIds = modeIdsFor(caps);
-  const availableTabIds = [...modeIds, PINNED_TAB];
+  const availableTabSet = new Set(modeIds.map((m) => tabForMode(m)));
+  const availableTabIds = [
+    ...TAB_META.filter((m) => m.id !== PINNED_TAB && availableTabSet.has(m.id)).map((m) => m.id),
+    PINNED_TAB,
+  ];
   const visibleTabIds = visibleIds(availableTabIds, layout.tabs, [PINNED_TAB]);
   const visibleModeCount = visibleTabIds.filter((id) => id !== PINNED_TAB).length;
-  const desiredTab = viewingSettings || !state ? PINNED_TAB : state.mode;
+  const availableSensorModes = SENSOR_MODES.filter((m) => modeIds.includes(m)) as Mode[];
+  const desiredTab = viewingSettings || !state ? PINNED_TAB : tabForMode(state.mode);
   const activeTab = visibleTabIds.includes(desiredTab) ? desiredTab : PINNED_TAB;
+  const currentSensorMode: Mode | null =
+    state && availableSensorModes.includes(state.mode)
+      ? state.mode
+      : (availableSensorModes[0] ?? null);
   const contentMode: Mode | null =
-    activeTab !== PINNED_TAB && modeIds.includes(activeTab as Mode) ? (activeTab as Mode) : null;
+    activeTab === PINNED_TAB
+      ? null
+      : activeTab === SENSOR_TAB
+        ? currentSensorMode
+        : (activeTab as Mode);
   const highlight = activeTab;
+
+  const selectSensorMode = useCallback(
+    (m: Mode) => {
+      writeSensorMode(m);
+      setMode(m);
+    },
+    [setMode],
+  );
 
   const select = useCallback(
     (id: string) => {
@@ -388,10 +543,19 @@ function Content() {
       } else {
         setViewingSettings(false);
         writeActiveTab(id);
-        setMode(id as Mode);
+        if (id === SENSOR_TAB) {
+          const last = readSensorMode();
+          const target =
+            last && availableSensorModes.includes(last as Mode)
+              ? (last as Mode)
+              : availableSensorModes[0];
+          if (target) setMode(target);
+        } else {
+          setMode(id as Mode);
+        }
       }
     },
-    [setMode],
+    [setMode, availableSensorModes],
   );
 
   const ambientActive = state?.mode === "ambient" && state?.power;
@@ -409,6 +573,22 @@ function Content() {
       clearInterval(timer);
     };
   }, [ambientActive]);
+
+  const temperatureActive = state?.mode === "temperature";
+  useEffect(() => {
+    if (!temperatureActive) return;
+    let alive = true;
+    const poll = () =>
+      getTemperature()
+        .then((v) => alive && setTempReading(v))
+        .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [temperatureActive]);
 
   useEffect(() => {
     if (!state?.capabilities.conflictsWithSystemRgb || !state?.forceControl) return;
@@ -468,7 +648,9 @@ function Content() {
     forceControl,
     batteryBreathe,
     batteryLevel,
+    temperatureBreathe,
   } = state;
+  const currentTemp = tempReading ?? state.temperature;
   const hasLeds = capabilities.color || capabilities.brightness;
   const showDeviceControls = hasLeds && (contentMode !== null || visibleModeCount === 0);
 
@@ -495,16 +677,23 @@ function Content() {
     return [color];
   };
 
-  const previewColors: RGB[] =
-    mode === "gradient"
-      ? gradient
-      : mode === "effect"
-        ? effectPreview()
-        : mode === "ambient"
-          ? AMBIENT_HINT
-          : mode === "battery"
-            ? [batteryBandColor(batteryLevel)]
-            : [color];
+  const previewColorsFor = (): RGB[] => {
+    switch (mode) {
+      case "gradient":
+        return gradient;
+      case "effect":
+        return effectPreview();
+      case "ambient":
+        return AMBIENT_HINT;
+      case "battery":
+        return [batteryBandColor(batteryLevel)];
+      case "temperature":
+        return [temperatureBandColor(currentTemp ?? TEMPERATURE_RANGE.min)];
+      default:
+        return [color];
+    }
+  };
+  const previewColors: RGB[] = previewColorsFor();
 
   const tabItems = visibleTabIds.map((id) => {
     const meta = tabMeta(id);
@@ -648,12 +837,19 @@ function Content() {
           </>
         );
       case "battery":
+      case "temperature":
         return (
-          <BatteryPanel
+          <SensorsPanel
+            mode={contentMode}
+            availableModes={availableSensorModes}
             level={batteryLevel}
-            breathe={batteryBreathe}
+            temp={currentTemp}
+            batteryBreathe={batteryBreathe}
+            temperatureBreathe={temperatureBreathe}
             disabled={!power}
-            onBreathe={setBatteryBreathe}
+            onSelectMode={selectSensorMode}
+            onBatteryBreathe={setBatteryBreathe}
+            onTemperatureBreathe={setTemperatureBreathe}
           />
         );
       default:

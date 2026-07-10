@@ -81,6 +81,9 @@ class FakeEngine:
     def start_battery(self, state_fn):
         self.events.append(("battery", state_fn()))
 
+    def start_temperature(self, state_fn):
+        self.events.append(("temperature", state_fn()))
+
 
 class FakeAmbilight:
     def __init__(self):
@@ -422,6 +425,35 @@ def test_battery_mode_gated_off_when_power_off(main_module):
     p._apply()
     assert ("static", [(0, 0, 0)] * p._zones) in p._engine.events
     assert not any(e[0] == "battery" for e in p._engine.events)
+
+
+def test_temperature_mode_starts_temperature_loop(main_module):
+    p = _plugin(main_module, "temperature", hw=False, per_zone=True)
+    p._apu_temp = 73.0
+    p._apply()
+    temp = next(e for e in p._engine.events if e[0] == "temperature")
+    assert temp[1] == {"temp": 73.0, "breathe": True}
+    assert not any(c[0] == "hw_effect" for c in p._controller.calls)
+
+
+def test_temperature_mode_wants_render_loop(main_module):
+    p = _plugin(main_module, "temperature")
+    assert p._wants_render_loop() is True
+
+
+def test_temperature_mode_on_hardware_device_stays_software(main_module):
+    p = _plugin(main_module, "temperature", hw=True, per_zone=False, per_controller=True)
+    p._apu_temp = 91.0
+    p._apply()
+    assert any(e[0] == "temperature" for e in p._engine.events)
+    assert not any(c[0] == "hw_effect" for c in p._controller.calls)
+
+
+def test_temperature_mode_gated_off_when_power_off(main_module):
+    p = _plugin(main_module, "temperature", hw=False, per_zone=True, power=False)
+    p._apply()
+    assert ("static", [(0, 0, 0)] * p._zones) in p._engine.events
+    assert not any(e[0] == "temperature" for e in p._engine.events)
 
 
 def test_battery_breathe_default_is_true(main_module):
