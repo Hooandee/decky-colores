@@ -84,7 +84,8 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
           alignItems: "center",
           justifyContent: "space-between",
           gap: 8,
-          padding: "6px 2px 2px",
+          padding: "2px 2px",
+          marginTop: 12,
         }}
       >
         <span style={{ fontSize: 13, color: "rgba(255,255,255,0.9)" }}>{t("settings.language")}</span>
@@ -146,15 +147,6 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
     ) : null,
 
     <>
-      {unvalidated ? hint(t("report.unvalidated.note")) : null}
-      <PanelSectionRow>
-        <ButtonItem layout="below" bottomSeparator="none" description={t("report.button.desc")} onClick={() => openReportModal()}>
-          {t("report.button")}
-        </ButtonItem>
-      </PanelSectionRow>
-    </>,
-
-    <>
       {sectionTitle(t("customize.title"))}
       <PanelSectionRow>
         <ButtonItem layout="below" bottomSeparator="none" onClick={() => openCustomizeModal(availableTabIds)}>
@@ -162,6 +154,15 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         </ButtonItem>
       </PanelSectionRow>
       {hint(t("customize.button.desc"))}
+    </>,
+
+    <>
+      {unvalidated ? hint(t("report.unvalidated.note")) : null}
+      <PanelSectionRow>
+        <ButtonItem layout="below" bottomSeparator="none" description={t("report.button.desc")} onClick={() => openReportModal()}>
+          {t("report.button")}
+        </ButtonItem>
+      </PanelSectionRow>
     </>,
 
     <>
@@ -182,9 +183,6 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
           </Focusable>
           {madeByAfter}
         </div>
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", padding: "0 2px 4px" }}>{t("about.basedOn")}</div>
       </PanelSectionRow>
     </>,
   ].filter(Boolean);
