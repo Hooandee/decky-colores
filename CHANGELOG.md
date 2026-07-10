@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.17.0...decky-colores-v0.17.1) (2026-07-10)
+
+
+### Bug Fixes / Correcciones
+
+* Polish for the new tabs and Settings: the Settings tab no longer repeats the Power, Charger-only and Brightness controls (those live on the mode tabs), Customize now comes before Report a problem, the spacing between sections was loosened up, and a couple of doubled separator lines on the Battery and Ambilight tabs are gone. ([#39](https://github.com/Hooandee/decky-colores/pull/39)) ([de3b376](https://github.com/Hooandee/decky-colores/commit/de3b3766c6eb56e6870af4258e8768af0fc73186))
+* **ES:** Pulido de las nuevas pestañas y de Ajustes: la pestaña Ajustes ya no repite los controles de Encendido, Solo con cargador y Brillo (viven en las pestañas de modo), Personalizar interfaz ahora va antes de Reportar un problema, se soltó un poco el espaciado entre secciones, y desaparecieron un par de líneas separadoras duplicadas en las pestañas Batería y Ambilight. ([#39](https://github.com/Hooandee/decky-colores/pull/39)) ([de3b376](https://github.com/Hooandee/decky-colores/commit/de3b3766c6eb56e6870af4258e8768af0fc73186))
+
 ## [0.17.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.16.0...decky-colores-v0.17.0) (2026-07-10)
 
 
