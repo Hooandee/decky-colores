@@ -65,6 +65,15 @@ GENERIC = {
     "experimental": ["color", "brightness", "effects", "ambilight"],
 }
 
+VALVE_STEAM_MACHINE = {
+    "driver": "valve_steammachine",
+    "color_order": "rgb",
+    "zones": 17,
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "color_correction": [1.0, 1.0, 1.0],
+    "experimental": [],
+}
+
 # The sysfs RGB node isn't guaranteed on every kernel/Bazzite build for the Ally line.
 # When it's missing, build_device drops to the Aura HID driver instead of "no LEDs".
 ASUS_SYSFS["fallback"] = ASUS_ALLY_HID
@@ -93,6 +102,7 @@ def _profile(base, name, power_led=None):
 
 
 PROFILES = [
+    ("board", "Fremont", _profile(VALVE_STEAM_MACHINE, "Steam Machine")),
     ("board", "RC71L", _profile(ASUS_ALLY_HID, "ROG Ally")),
     ("board", "RC72LA", _profile(ASUS_SYSFS, "ROG Ally X")),
     ("board", "RC73YA", _profile(ASUS_SYSFS, "ROG Xbox Ally")),
