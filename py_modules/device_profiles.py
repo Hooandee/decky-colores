@@ -71,6 +71,7 @@ VALVE_STEAM_MACHINE = {
     "zones": 17,
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
     "color_correction": [1.0, 1.0, 1.0],
+    "conflicts_with_system_rgb": True,
     "experimental": [],
 }
 

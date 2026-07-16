@@ -3,6 +3,16 @@ import glob
 
 from led_device import LedDevice, _clamp8
 
+# Write all LED attributes in the correct order to maximise the window where
+# our values are live before the Steam client (or another tool) overwrites
+# them.  The key insight: write *enabled* first (so the EC keeps the LED
+# engine on), then *effect=manual* (so the EC won't run a firmware
+# animation), then color + brightness last so those are the freshest values.
+#
+# We do NOT cache "last written effect" — the Steam client can silently
+# reset effect to e.g. "rainbow" or "off" at any time, so every apply
+# must unconditionally re-set it.
+
 
 class ValveSteamMachineDevice(LedDevice):
     """Driver for Steam Machine (Fremont) with 17 individually addressable valve-leds."""
@@ -32,6 +42,39 @@ class ValveSteamMachineDevice(LedDevice):
 
         self._led_paths = sorted(paths, key=lambda p: int(p.split("[")[-1].rstrip("]")))
         self._zones = len(self._led_paths)
+
+        # Take exclusive control: stop any running hardware effect immediately
+        if self._led_paths:
+            self._seize_control()
+
+    def _seize_control(self):
+        """Kill any running hardware effect and claim exclusive sysfs control."""
+        for path in self._led_paths:
+            try:
+                enabled_path = os.path.join(path, "enabled")
+                effect_path = os.path.join(path, "effect")
+                intensity_path = os.path.join(path, "multi_intensity")
+
+                # 1. Make sure the LED engine is on
+                try:
+                    with open(enabled_path, "w") as f:
+                        f.write("1")
+                except OSError:
+                    pass
+
+                # 2. Stop any firmware effect
+                with open(effect_path, "w") as f:
+                    f.write("off")
+
+                # 3. Zero out color
+                with open(intensity_path, "w") as f:
+                    f.write("0 0 0")
+
+                # 4. Now set to manual for software control
+                with open(effect_path, "w") as f:
+                    f.write("manual")
+            except OSError:
+                pass
 
     @property
     def available(self):
@@ -75,22 +118,28 @@ class ValveSteamMachineDevice(LedDevice):
                 if i >= len(colors):
                     break
                 r, g, b = self._order(colors[i])
+                enabled_path = os.path.join(path, "enabled")
+                effect_path = os.path.join(path, "effect")
                 intensity_path = os.path.join(path, "multi_intensity")
                 brightness_path = os.path.join(path, "brightness")
-                effect_path = os.path.join(path, "effect")
 
-                # Set to manual mode first (if not already)
+                # Write order matters: enabled -> effect -> color -> brightness
+                # The last write is the most "fresh" when Steam tries to override
+                try:
+                    with open(enabled_path, "w") as f:
+                        f.write("1")
+                except OSError:
+                    pass
+
                 try:
                     with open(effect_path, "w") as f:
                         f.write("manual")
                 except OSError:
                     pass
 
-                # Write color
                 with open(intensity_path, "w") as f:
                     f.write(f"{r} {g} {b}")
 
-                # Write brightness
                 with open(brightness_path, "w") as f:
                     f.write(str(level))
 

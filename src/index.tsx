@@ -873,6 +873,7 @@ function Content() {
               colors={previewColors}
               brightness={brightness}
               power={power}
+              board={device.board}
               label={contentMode === "ambient" ? t("device.preview.ambient") : undefined}
             />
           </div>

@@ -8,6 +8,7 @@ interface DevicePreviewProps {
   brightness: number;
   power: boolean;
   label?: string;
+  board?: string;
 }
 
 const OFF: RGB = { r: 26, g: 26, b: 32 };
@@ -68,14 +69,76 @@ const Ring: FC<{ colors: RGB[]; intensity: number }> = ({ colors, intensity }) =
   );
 };
 
-export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, power, label }) => {
+const LedBar: FC<{ colors: RGB[]; intensity: number }> = ({ colors, intensity }) => {
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 2,
+        justifyContent: "center",
+        padding: "8px 4px",
+      }}
+    >
+      {colors.map((c, i) => {
+        const lit = dim(softenForDisplay(c), intensity > 0 ? Math.max(intensity * 100, 12) : 100);
+        const glow = rgbToCss(lit);
+        return (
+          <div
+            key={i}
+            style={{
+              width: 14,
+              height: 14,
+              borderRadius: "50%",
+              background: rgbToCss(lit),
+              boxShadow: `0 0 ${3 + intensity * 6}px ${glow}`,
+              opacity: 0.45 + intensity * 0.55,
+              transition: "opacity 140ms ease, background 140ms ease, box-shadow 140ms ease",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
+export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, power, label, board }) => {
   const { t } = useI18n();
   const source = power && colors.length ? colors : [OFF];
   const lit = source.map((c) => dim(softenForDisplay(c), power ? Math.max(brightness, 12) : 100));
+  const intensity = power ? brightness / 100 : 0;
+  const isBarDevice = board === "Fremont";
+
+  if (isBarDevice) {
+    return (
+      <div
+        style={{
+          borderRadius: 14,
+          padding: "14px 8px 10px",
+          background:
+            "radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.05), rgba(0,0,0,0) 60%), #060608",
+          boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.05)",
+        }}
+      >
+        <LedBar colors={lit} intensity={intensity} />
+        <div
+          style={{
+            textAlign: "center",
+            fontSize: 11,
+            letterSpacing: "0.14em",
+            textTransform: "uppercase",
+            color: "rgba(255,255,255,0.4)",
+            marginTop: 6,
+          }}
+        >
+          {power ? (label ?? t("device.preview.rings")) : t("device.preview.off")}
+        </div>
+      </div>
+    );
+  }
+
   const half = lit.length > 1 ? Math.ceil(lit.length / 2) : lit.length;
   const leftColors = lit.length > 1 ? lit.slice(0, half) : lit;
   const rightColors = lit.length > 1 ? lit.slice(half) : lit;
-  const intensity = power ? brightness / 100 : 0;
 
   return (
     <div
