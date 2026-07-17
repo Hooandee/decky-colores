@@ -7,9 +7,16 @@ from power_led import PowerLedController
 from power_supply import battery_present
 from thermal import temperature_available
 
+try:
+    from valve_steammachine import ValveSteamMachineDevice
+    VALVE_DRIVER_AVAILABLE = True
+except ImportError:
+    VALVE_DRIVER_AVAILABLE = False
+
 DEVICE_REGISTRY = [
     ("board", "Jupiter", "Steam Deck"),
     ("board", "Galileo", "Steam Deck OLED"),
+    ("board", "Fremont", "Steam Machine"),
     ("board", "RC71L", "ROG Ally"),
     ("board", "RC72LA", "ROG Ally X"),
     ("board", "RC73YA", "ROG Xbox Ally"),
@@ -186,7 +193,7 @@ def _find_rgb_led(leds_dir):
     return None
 
 
-_IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally"}
+_IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally", "valve_steammachine"}
 
 
 def _build_hid_context(profile, ambilight, power_led=None, battery=False, temperature=False):
@@ -214,6 +221,32 @@ def build_device(sysfs_root="/", ambilight=False):
         os.path.join(sysfs_root, "sys/class/hwmon"),
         os.path.join(sysfs_root, "sys/class/thermal"),
     )
+
+    # Handle Valve Steam Machine driver
+    if profile["driver"] == "valve_steammachine":
+        if VALVE_DRIVER_AVAILABLE:
+            correction = profile.get("color_correction", [1.0, 1.0, 1.0])
+            zones = profile.get("zones") or 17
+            device = ValveSteamMachineDevice(
+                zones=zones,
+                max_brightness=255,
+                color_order=profile["color_order"],
+                color_correction=correction,
+            )
+            if device.available:
+                capabilities = build_capabilities(
+                    profile, True, device._zones, 255, ambilight,
+                    power_led, battery, temperature
+                )
+                capabilities["perZone"] = True
+                return {
+                    "info": info,
+                    "capabilities": capabilities,
+                    "device": device,
+                    "power_led": power_led,
+                }
+        # Fallback: try sysfs discovery
+        profile["experimental"] = _all_experimental(profile)
 
     if profile["driver"] in HID_DRIVERS:
         if HID_AVAILABLE:

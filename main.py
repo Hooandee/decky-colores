@@ -662,6 +662,29 @@ class Plugin:
         except Exception as error:  # a sysfs hiccup must never kill the plugin
             decky.logger.warning("Colores: charger watch failed: %s", error)
 
+    def _reassert_manual_mode(self) -> None:
+        """Lightweight re-assert: write enabled=1 + effect=manual on all LEDs without
+        changing colors or brightness. Used during render loops where _apply() would
+        restart the effect from frame 0. Only meaningful for sysfs-based drivers."""
+        dev = getattr(self._controller, "_led_paths", None)
+        if not dev:
+            # For non-sysfs drivers, fall back to a full re-apply (cheap anyway).
+            self._apply()
+            return
+        for path in dev:
+            try:
+                ep = os.path.join(path, "enabled")
+                with open(ep, "w") as f:
+                    f.write("1")
+            except OSError:
+                pass
+            try:
+                fp = os.path.join(path, "effect")
+                with open(fp, "w") as f:
+                    f.write("manual")
+            except OSError:
+                pass
+
     async def _force_control_watch(self) -> None:
         # Another RGB tool (e.g. HHD) keeps reapplying its own colors on its events, so
         # a one-shot reclaim doesn't hold. Re-assert our state on a coarse tick to win it
@@ -674,10 +697,26 @@ class Plugin:
         # toggling the switch on, panel-open (reconnect), and resume. Skipped while a
         # render loop (effect/ambilight) is active: that already rewrites ~30fps, and
         # re-applying would restart it at frame 0. Only created on conflicting devices.
+        #
+        # Steam Machine (Fremont) override: the Steam client owns the EC LED controller
+        # and silently overwrites sysfs values.  For devices flagged
+        # conflicts_with_system_rgb we always re-assert, even during render loops,
+        # at a much tighter interval so our writes "win" the race.
+        conflicts = bool(self._capabilities.get("conflictsWithSystemRgb"))
+        interval = 0.3 if conflicts else FORCE_CONTROL_INTERVAL
         try:
             while True:
-                await asyncio.sleep(FORCE_CONTROL_INTERVAL)
-                if self._settings.get("force_control") and not self._wants_render_loop():
+                await asyncio.sleep(interval)
+                if conflicts:
+                    # Always re-assert — Steam client resets LED state constantly.
+                    # During render loops we still need to keep manual mode alive,
+                    # but _apply() would restart the effect from frame 0. Instead,
+                    # do a lightweight per-LED manual-mode + enabled re-write.
+                    if self._wants_render_loop():
+                        self._reassert_manual_mode()
+                    else:
+                        self._apply()
+                elif self._settings.get("force_control") and not self._wants_render_loop():
                     self._apply()
         except asyncio.CancelledError:
             raise

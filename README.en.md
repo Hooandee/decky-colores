@@ -32,6 +32,7 @@ In this video I show and explain the plugin in depth:
 | ASUS ROG | Ally, Ally X, Xbox Ally, Xbox Ally X | 4 RGB zones around the joystick rings |
 | Lenovo Legion | Go, Go 2, Go S | Per-controller color, reconnect button (see below) |
 | MSI | Claw, Claw 8 AI+ | 9 zones |
+| Valve | Steam Machine | Front LEDs, basic color control |
 
 Not on the list? Colores still tries to use your device by reading whatever LEDs the system exposes. Those features show up marked as experimental: you can try them, but they may not behave well until I get that machine in hand to calibrate it. If there are no controllable LEDs at all, the plugin tells you instead of hanging.
 
@@ -53,6 +54,10 @@ Everything adapts to your handheld. If your machine only has a single global col
 - **Legion Go: controllers disconnect after sleep.** When the handheld sleeps and wakes, the controllers sometimes lose the channel they receive colors on. That's why there's a **Reconnect controllers** button: if the lights stop responding after sleep, press it and they come back. It's not a plugin bug, it's how those controllers behave.
 
 - **Legion Go: one color per controller.** The firmware on these machines doesn't allow multiple colors at once on a single controller, so a gradient shows as a smooth crossfade between colors rather than separate zones. The spiral is also the controller's own firmware rotating effect ("Spiral GO").
+
+- **Steam Machine: LED flickering.** The front LEDs may flicker occasionally. This is a known issue being investigated.
+
+- **Steam Machine: Steam client priority.** On/off and brightness control for the LEDs is currently governed by the Steam client settings. Colores cannot override those preferences yet.
 
 - **Unlisted devices.** Experimental features are exactly that, experimental. If you have a machine that isn't above and want to help add support, open an issue and I will take a look 🙌.
 
