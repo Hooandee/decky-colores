@@ -32,6 +32,7 @@ En este vídeo enseño y explico el plugin a fondo:
 | ASUS ROG | Ally, Ally X, Xbox Ally, Xbox Ally X | 4 zonas RGB en los anillos de los joysticks |
 | Lenovo Legion | Go, Go 2, Go S | Color por mando, botón de reconexión (ver más abajo) |
 | MSI | Claw, Claw 8 AI+ | 9 zonas |
+| Valve | Steam Machine | LEDs frontales, control básico de color |
 
 ¿Tu consola no está en la lista? Colores intenta usarla igualmente leyendo los LEDs que el sistema expone. Verás esas funciones marcadas como experimentales: puedes probarlas, pero puede que no respondan bien hasta que tenga esa máquina entre manos para calibrarla. Si ni siquiera hay LEDs que controlar, el plugin te lo dice y no se queda colgado.
 
@@ -53,6 +54,10 @@ Todo se adapta a tu consola. Si tu máquina solo tiene un color global, no te mu
 - **Legion Go: los mandos se desconectan al suspender.** Cuando la consola se duerme y vuelve, los mandos a veces pierden el canal por el que reciben los colores. Por eso hay un botón **Reconectar mandos**: si las luces dejan de responder después de suspender, púlsalo y vuelven a la vida. No es un fallo del plugin, es cómo se comportan esos mandos.
 
 - **Legion Go: un solo color por mando.** El firmware de estas consolas no permite varios colores a la vez en un mismo mando, así que el degradado se ve como un fundido suave entre colores en lugar de zonas separadas. La espiral, además, es el efecto giratorio propio del firmware ("Espiral GO").
+
+- **Steam Machine: parpadeo de LEDs.** Los LEDs frontales pueden parpadear ocasionalmente. Es un problema conocido que se está investigando.
+
+- **Steam Machine: prioridad del cliente Steam.** El control de encendido/apagado y luminosidad de los LEDs queda subordinado a los ajustes del cliente de Steam. Colores no puede superar esas preferencias todavía.
 
 - **Consolas no listadas.** Las funciones experimentales son justo eso, experimentales. Si tienes una máquina que no aparece arriba y quieres ayudar a darle soporte, abre un issue y lo veo 🙌.
 
