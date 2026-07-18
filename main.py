@@ -42,8 +42,6 @@ DEFAULTS = {
     "force_control": False,
     "battery_breathe": True,
     "temperature_breathe": True,
-    "indicator_on": True,
-    "indicator_level": 100,
     "remember_startup": True,
     "startup_factory": None,
 }
@@ -103,7 +101,6 @@ class Plugin:
         self._battery_level = 100 if level is None else level
         self._apu_temp = apu_temperature()
         self._apply_power_led()
-        self._apply_indicator()
         self._capture_startup_factory()
         self._ready = True
 
@@ -129,7 +126,6 @@ class Plugin:
         self._zones = self._capabilities.get("zones", 1) or 1
         self._controller = ctx["device"]
         self._power_led = ctx.get("power_led")
-        self._indicator = ctx.get("indicator")
         self._cpu_sampler = CpuSampler()
         self._engine = EffectEngine(self._render, self._zones)
         runtime_dir, uid, gid = _user_creds()
@@ -385,8 +381,6 @@ class Plugin:
             "batteryLevel": getattr(self, "_battery_level", 100),
             "temperatureBreathe": s.get("temperature_breathe", True),
             "temperature": getattr(self, "_apu_temp", None),
-            "indicatorOn": s.get("indicator_on", True),
-            "indicatorLevel": s.get("indicator_level", 100),
             "rememberStartup": s.get("remember_startup", True),
         }
 
@@ -432,13 +426,6 @@ class Plugin:
         if value is None:
             value = getattr(self, "_perf_value", None)
         return value
-
-    async def set_indicator(self, on: bool, level: int) -> None:
-        self._init()
-        self._settings["indicator_on"] = on
-        self._settings["indicator_level"] = level
-        self._store.save(self._settings)
-        self._apply_indicator()
 
     async def set_remember_startup(self, on: bool) -> None:
         self._init()
@@ -584,12 +571,6 @@ class Plugin:
     def _clock_state(self) -> dict:
         lt = time.localtime()
         return {"hour": lt.tm_hour + lt.tm_min / 60.0}
-
-    def _apply_indicator(self) -> None:
-        indicator = getattr(self, "_indicator", None)
-        if indicator is None:
-            return
-        indicator.apply(self._settings.get("indicator_on", True), self._settings.get("indicator_level", 100))
 
     def _maybe_persist_startup(self) -> None:
         # Persist ONLY on static-color modes, and DEBOUNCED: dragging the color wheel

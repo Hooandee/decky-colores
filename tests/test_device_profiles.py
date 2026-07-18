@@ -113,7 +113,6 @@ def test_steam_machine_profile_by_board():
     assert p["zones"] == 17
     assert p["layout_kind"] == "bar"
     assert p["conflicts_with_system_rgb"] is True
-    assert p["indicator_led"] is True
     assert p["persistent_startup"] is True
 
 

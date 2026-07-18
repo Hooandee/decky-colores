@@ -178,12 +178,6 @@ export function useColores() {
     );
   };
 
-  const pushIndicator = useThrottle((on: boolean, level: number) => api.setIndicator(on, level), 60);
-  const setIndicator = (indicatorOn: boolean, indicatorLevel: number) => {
-    setState((s) => (s ? { ...s, indicatorOn, indicatorLevel } : s));
-    pushIndicator(indicatorOn, indicatorLevel);
-  };
-
   const setRememberStartup = (rememberStartup: boolean) => {
     setState((s) => (s ? { ...s, rememberStartup } : s));
     api.setRememberStartup(rememberStartup).catch((e) =>
@@ -239,7 +233,6 @@ export function useColores() {
     setExperiment,
     setPowerLed,
     setForceControl,
-    setIndicator,
     setRememberStartup,
     setBatteryBreathe,
     setTemperatureBreathe,

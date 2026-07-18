@@ -252,26 +252,3 @@ class ValveLedsDevice(LedDevice):
         except OSError as error:
             self.last_error = str(error)
             return False
-
-
-class IndicatorLed:
-    def __init__(self, path, max_brightness=100):
-        self._path = path
-        self._max = max_brightness or 100
-        self.last_error = None
-
-    def available(self):
-        return bool(self._path)
-
-    def apply(self, on, level):
-        if not self._path:
-            return False
-        pct = max(0, min(100, int(level)))
-        value = round((pct / 100) * self._max) if on else 0
-        try:
-            with open(os.path.join(self._path, "brightness"), "w") as handle:
-                handle.write(str(value))
-            return True
-        except OSError as error:
-            self.last_error = str(error)
-            return False

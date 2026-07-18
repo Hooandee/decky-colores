@@ -1,7 +1,7 @@
 import os
 
 from device_profiles import resolve_profile
-from led_device import SysfsRgbDevice, NullDevice, ValveLedsDevice, discover_valve_leds, IndicatorLed
+from led_device import SysfsRgbDevice, NullDevice, ValveLedsDevice, discover_valve_leds
 from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device
 from power_led import PowerLedController
 from power_supply import battery_present
@@ -172,7 +172,6 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "clockMode": active["color"],
         "audioMode": active["color"],
         "conflictsWithSystemRgb": bool(profile.get("conflicts_with_system_rgb", False)),
-        "indicatorLed": bool(profile.get("indicator_led", False)),
         "persistentStartup": bool(profile.get("persistent_startup", False)),
         "layoutKind": profile.get("layout_kind", "rings"),
         "layout": build_layout(zones, profile.get("swap_sticks", False), profile.get("layout_kind", "rings")),
@@ -196,23 +195,7 @@ def _find_rgb_led(leds_dir):
     return None
 
 
-def find_indicator_led(leds_dir):
-    try:
-        entries = os.listdir(leds_dir)
-    except OSError:
-        return None
-    for name in sorted(entries):
-        path = os.path.join(leds_dir, name)
-        if (
-            "status" in name
-            and os.path.exists(os.path.join(path, "brightness"))
-            and not os.path.exists(os.path.join(path, "multi_intensity"))
-        ):
-            return path
-    return None
-
-
-_IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally", "valve_leds"}
+_IMPLEMENTED_DRIVERS ={"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally", "valve_leds"}
 
 
 def _build_hid_context(profile, ambilight, power_led=None, battery=False, temperature=False):
@@ -240,17 +223,10 @@ def _build_valve_context(profile, sysfs_root, ambilight, power_led=None, battery
         nodes, max_brightness, profile.get("color_correction", [1.0, 1.0, 1.0]),
         reverse=profile.get("reverse_zones", False),
     )
-    indicator = None
-    if profile.get("indicator_led"):
-        path = find_indicator_led(leds_dir)
-        if path:
-            ind_max = _max_brightness(_read(os.path.join(path, "max_brightness")))
-            indicator = IndicatorLed(path, ind_max)
     capabilities = build_capabilities(
         profile, True, len(nodes), max_brightness, ambilight, power_led, battery, temperature
     )
-    capabilities["indicatorLed"] = bool(indicator and indicator.available())
-    return {"device": device, "capabilities": capabilities, "indicator": indicator}
+    return {"device": device, "capabilities": capabilities}
 
 
 def build_device(sysfs_root="/", ambilight=False):
@@ -284,7 +260,6 @@ def build_device(sysfs_root="/", ambilight=False):
                 "capabilities": valve_ctx["capabilities"],
                 "device": valve_ctx["device"],
                 "power_led": power_led,
-                "indicator": valve_ctx.get("indicator"),
             }
         profile["experimental"] = _all_experimental(profile)
 

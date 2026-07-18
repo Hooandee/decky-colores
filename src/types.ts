@@ -42,7 +42,6 @@ export interface Capabilities {
   clockMode: boolean;
   audioMode: boolean;
   conflictsWithSystemRgb: boolean;
-  indicatorLed: boolean;
   persistentStartup: boolean;
   layoutKind: string;
 }
@@ -101,8 +100,6 @@ export interface ColoresState {
   batteryLevel: number;
   temperatureBreathe: boolean;
   temperature: number | null;
-  indicatorOn: boolean;
-  indicatorLevel: number;
   rememberStartup: boolean;
 }
 

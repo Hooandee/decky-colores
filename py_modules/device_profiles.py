@@ -65,7 +65,6 @@ VALVE_LEDS = {
     "reverse_zones": True,
     "supported_effects": ["breathing", "rainbow", "wave", "cycle", "comet", "sparkle", "ripple", "aurora"],
     "conflicts_with_system_rgb": True,
-    "indicator_led": True,
     "persistent_startup": True,
     "experimental": [],
 }
