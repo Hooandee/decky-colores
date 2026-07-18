@@ -14,7 +14,7 @@ import { definePlugin } from "@decky/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus, getTemperature, reconnect as apiReconnect } from "./api";
+import { getAmbilightStatus, getTemperature, getPerformance, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -33,6 +33,8 @@ import {
   TEMPERATURE_BANDS,
   TEMPERATURE_RANGE,
   temperatureBandColor,
+  PERFORMANCE_STOPS,
+  performanceMeterColors,
 } from "./palette";
 import { Tabs } from "./components/Tabs";
 import { I18nProvider, useI18n } from "./i18n";
@@ -262,11 +264,11 @@ function SensorMeter({
   leftLabel: string;
   centerLabel: string;
   rightLabel: string;
-  breatheLabel: string;
-  breatheHint: string;
-  breathe: boolean;
+  breatheLabel?: string;
+  breatheHint?: string;
+  breathe?: boolean;
   disabled?: boolean;
-  onBreathe: (on: boolean) => void;
+  onBreathe?: (on: boolean) => void;
 }) {
   return (
     <>
@@ -323,16 +325,18 @@ function SensorMeter({
           </div>
         </div>
       </PanelSectionRow>
-      <PanelSectionRow>
-        <ToggleField
-          label={breatheLabel}
-          description={breatheHint}
-          checked={breathe}
-          disabled={disabled}
-          onChange={onBreathe}
-          bottomSeparator="none"
-        />
-      </PanelSectionRow>
+      {onBreathe && (
+        <PanelSectionRow>
+          <ToggleField
+            label={breatheLabel ?? ""}
+            description={breatheHint}
+            checked={!!breathe}
+            disabled={disabled}
+            onChange={onBreathe}
+            bottomSeparator="none"
+          />
+        </PanelSectionRow>
+      )}
     </>
   );
 }
@@ -401,11 +405,27 @@ function TemperaturePanel({
   );
 }
 
+function PerformancePanel({ load, disabled }: { load: number | null; disabled?: boolean }) {
+  const { t } = useI18n();
+  return (
+    <SensorMeter
+      hint={t("performance.hint")}
+      barStops={PERFORMANCE_STOPS}
+      markerPct={load}
+      leftLabel="0%"
+      centerLabel={load === null ? t("performance.noReading") : t("performance.reading", { n: Math.round(load) })}
+      rightLabel="100%"
+      disabled={disabled}
+    />
+  );
+}
+
 function SensorsPanel({
   mode,
   availableModes,
   level,
   temp,
+  load,
   batteryBreathe,
   temperatureBreathe,
   disabled,
@@ -417,6 +437,7 @@ function SensorsPanel({
   availableModes: Mode[];
   level: number;
   temp: number | null;
+  load: number | null;
   batteryBreathe: boolean;
   temperatureBreathe: boolean;
   disabled?: boolean;
@@ -434,12 +455,14 @@ function SensorsPanel({
               value={mode}
               tabs={availableModes}
               onChange={onSelectMode}
-              label={(m) => t(`sensors.${m}` as "sensors.battery" | "sensors.temperature")}
+              label={(m) => t(`sensors.${m}` as "sensors.battery" | "sensors.temperature" | "sensors.performance")}
             />
           </div>
         </PanelSectionRow>
       )}
-      {mode === "temperature" ? (
+      {mode === "performance" ? (
+        <PerformancePanel load={load} disabled={disabled} />
+      ) : mode === "temperature" ? (
         <TemperaturePanel
           temp={temp}
           breathe={temperatureBreathe}
@@ -465,6 +488,7 @@ function modeIdsFor(caps: Capabilities | null): Mode[] {
   modes.push("effect");
   if (caps.batteryMode) modes.push("battery");
   if (caps.temperatureMode) modes.push("temperature");
+  if (caps.performanceMode) modes.push("performance");
   if (caps.ambilight) modes.push("ambient");
   return modes;
 }
@@ -498,6 +522,7 @@ function Content() {
   const { hasUpdate } = useUpdate(lang);
   const [ambStatus, setAmbStatus] = useState<string>("idle");
   const [tempReading, setTempReading] = useState<number | null>(null);
+  const [perfReading, setPerfReading] = useState<number | null>(null);
   const [viewingSettings, setViewingSettings] = useState<boolean>(
     () => readActiveTab() === PINNED_TAB,
   );
@@ -589,6 +614,22 @@ function Content() {
       clearInterval(timer);
     };
   }, [temperatureActive]);
+
+  const performanceActive = state?.mode === "performance" && state?.power;
+  useEffect(() => {
+    if (!performanceActive) return;
+    let alive = true;
+    const poll = () =>
+      getPerformance()
+        .then((v) => alive && setPerfReading(v))
+        .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 1500);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [performanceActive]);
 
   useEffect(() => {
     if (!state?.capabilities.conflictsWithSystemRgb || !state?.forceControl) return;
@@ -689,6 +730,8 @@ function Content() {
         return [batteryBandColor(batteryLevel)];
       case "temperature":
         return [temperatureBandColor(currentTemp ?? TEMPERATURE_RANGE.min)];
+      case "performance":
+        return performanceMeterColors(perfReading ?? 0, capabilities.zones);
       default:
         return [color];
     }
@@ -838,12 +881,14 @@ function Content() {
         );
       case "battery":
       case "temperature":
+      case "performance":
         return (
           <SensorsPanel
             mode={contentMode}
             availableModes={availableSensorModes}
             level={batteryLevel}
             temp={currentTemp}
+            load={perfReading}
             batteryBreathe={batteryBreathe}
             temperatureBreathe={temperatureBreathe}
             disabled={!power}

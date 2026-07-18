@@ -22,6 +22,7 @@ export const setForceControl = callable<[on: boolean], void>("set_force_control"
 export const setBatteryBreathe = callable<[on: boolean], void>("set_battery_breathe");
 export const setTemperatureBreathe = callable<[on: boolean], void>("set_temperature_breathe");
 export const getTemperature = callable<[], number | null>("get_temperature");
+export const getPerformance = callable<[], number | null>("get_performance");
 
 // ── Self-updater ──
 

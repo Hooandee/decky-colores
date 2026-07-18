@@ -226,6 +226,39 @@ export const TEMPERATURE_BANDS: { min: number; color: RGB }[] = [
 
 export const TEMPERATURE_RANGE = { min: 40, max: 95 };
 
+// Performance meter ramp (green -> yellow -> red). Mirrors the backend METER_RAMP
+// (py_modules/effects.py); drives the panel bar and the on-screen fill preview.
+export const PERFORMANCE_STOPS: RGB[] = [
+  { r: 0, g: 230, b: 90 },
+  { r: 255, g: 200, b: 0 },
+  { r: 255, g: 40, b: 0 },
+];
+
+function lerpChannel(a: number, b: number, f: number): number {
+  return Math.round(a + (b - a) * f);
+}
+
+function sampleRamp(stops: RGB[], pos: number): RGB {
+  if (stops.length === 1) return stops[0];
+  const p = Math.max(0, Math.min(1, pos)) * (stops.length - 1);
+  const lo = Math.min(stops.length - 2, Math.floor(p));
+  const f = p - lo;
+  const a = stops[lo];
+  const b = stops[lo + 1];
+  return { r: lerpChannel(a.r, b.r, f), g: lerpChannel(a.g, b.g, f), b: lerpChannel(a.b, b.b, f) };
+}
+
+// Fill preview: LEDs light up to `loadPct`, coloured green->red along the strip.
+export function performanceMeterColors(loadPct: number, zones: number): RGB[] {
+  const n = Math.max(1, zones);
+  const lit = (Math.max(0, Math.min(100, loadPct)) / 100) * n;
+  return Array.from({ length: n }, (_, i) => {
+    const fill = Math.max(0, Math.min(1, lit - i));
+    const ramp = sampleRamp(PERFORMANCE_STOPS, n > 1 ? i / (n - 1) : 0);
+    return { r: Math.round(ramp.r * fill), g: Math.round(ramp.g * fill), b: Math.round(ramp.b * fill) };
+  });
+}
+
 export function temperatureBandColor(temp: number): RGB {
   for (const band of TEMPERATURE_BANDS) {
     if (temp >= band.min) return band.color;

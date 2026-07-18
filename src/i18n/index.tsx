@@ -112,6 +112,7 @@ const es: Record<string, string> = {
 
   "sensors.battery": "Batería",
   "sensors.temperature": "Temperatura",
+  "sensors.performance": "Rendimiento",
 
   "battery.hint": "Las luces muestran el nivel de batería con un color que va del azul al rojo.",
   "battery.level": "{n}%",
@@ -121,6 +122,9 @@ const es: Record<string, string> = {
   "temperature.hint": "Las luces siguen la temperatura del procesador, del azul en frío al rojo cuando se calienta.",
   "temperature.reading": "{n} °C",
   "temperature.noReading": "Sin lectura",
+  "performance.hint": "Las luces se llenan como una barra según la carga de la GPU, de verde a rojo.",
+  "performance.reading": "{n}%",
+  "performance.noReading": "Sin lectura",
   "temperature.breathe.label": "Avisar en caliente",
   "temperature.breathe.hint": "Cuando el procesador se pone muy caliente, el color late como aviso.",
 
@@ -284,6 +288,7 @@ const en: Record<string, string> = {
 
   "sensors.battery": "Battery",
   "sensors.temperature": "Temperature",
+  "sensors.performance": "Performance",
 
   "battery.hint": "The lights show the battery level with a color from blue to red.",
   "battery.level": "{n}%",
@@ -293,6 +298,9 @@ const en: Record<string, string> = {
   "temperature.hint": "The lights follow the processor temperature, from blue when cool to red when it heats up.",
   "temperature.reading": "{n} °C",
   "temperature.noReading": "No reading",
+  "performance.hint": "The lights fill like a bar with GPU load, from green to red.",
+  "performance.reading": "{n}%",
+  "performance.noReading": "No reading",
   "temperature.breathe.label": "Warn when hot",
   "temperature.breathe.hint": "When the processor gets very hot, the color pulses as a warning.",
 

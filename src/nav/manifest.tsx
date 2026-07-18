@@ -11,7 +11,7 @@ export const PINNED_TAB = "settings";
 
 // Container tab: its id is not a backend mode; battery/temperature map onto it.
 export const SENSOR_TAB = "sensors";
-export const SENSOR_MODES = ["battery", "temperature"] as const;
+export const SENSOR_MODES = ["battery", "temperature", "performance"] as const;
 
 export function tabForMode(mode: string): string {
   return (SENSOR_MODES as readonly string[]).includes(mode) ? SENSOR_TAB : mode;
