@@ -232,16 +232,20 @@ def frame_aurora(zones, t, speed):
 METER_RAMP = [(0, 230, 90), (255, 200, 0), (255, 40, 0)]
 
 
+def _fill_bar(zones, fill_of, pos_of):
+    result = []
+    for i in range(zones):
+        fill = max(0.0, min(1.0, fill_of(i)))
+        r, g, b = _sample_stops(METER_RAMP, pos_of(i))
+        result.append((clamp8(r * fill), clamp8(g * fill), clamp8(b * fill)))
+    return result
+
+
 def frame_meter(value01, zones):
     if zones <= 0:
         return []
     lit = max(0.0, min(1.0, value01)) * zones
-    result = []
-    for i in range(zones):
-        fill = max(0.0, min(1.0, lit - i))
-        color = _sample_stops(METER_RAMP, i / (zones - 1) if zones > 1 else 0.0)
-        result.append((clamp8(color[0] * fill), clamp8(color[1] * fill), clamp8(color[2] * fill)))
-    return result
+    return _fill_bar(zones, lambda i: lit - i, lambda i: i / (zones - 1) if zones > 1 else 0.0)
 
 
 CLOCK_KEYS = [
@@ -267,16 +271,9 @@ def clock_color(hour):
 def frame_vu(level, zones):
     if zones <= 0:
         return []
-    level = max(0.0, min(1.0, level))
     center = (zones - 1) / 2.0
-    reach = level * (zones / 2.0)
-    result = []
-    for i in range(zones):
-        d = abs(i - center)
-        fill = max(0.0, min(1.0, reach - d))
-        ramp = _sample_stops(METER_RAMP, d / center if center else 0.0)
-        result.append((clamp8(ramp[0] * fill), clamp8(ramp[1] * fill), clamp8(ramp[2] * fill)))
-    return result
+    reach = max(0.0, min(1.0, level)) * (zones / 2.0)
+    return _fill_bar(zones, lambda i: reach - abs(i - center), lambda i: abs(i - center) / center if center else 0.0)
 
 
 def battery_band_color(level):

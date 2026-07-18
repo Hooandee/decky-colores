@@ -2,14 +2,12 @@ import array
 import asyncio
 import logging
 import math
-import os
 
 from effects import frame_vu
+from run_as_user import user_env, user_cred
 
 logger = logging.getLogger("colores.audio")
 
-# asyncio.create_subprocess_exec is execFile-style (no shell); bound to a name so
-# the args below are always a static list, never a shell string.
 _spawn = asyncio.create_subprocess_exec
 
 RATE = 16000
@@ -48,15 +46,10 @@ class AudioReactive:
         return self._level
 
     def _env(self):
-        env = dict(os.environ)
-        if self._runtime_dir:
-            env["XDG_RUNTIME_DIR"] = self._runtime_dir
-        return env
+        return user_env(self._runtime_dir)
 
     def _cred(self):
-        if self._uid is None:
-            return {}
-        return {"user": self._uid, "group": self._gid}
+        return user_cred(self._uid, self._gid)
 
     def start(self, options=None):
         if self.running:
@@ -81,7 +74,6 @@ class AudioReactive:
             self._proc = None
 
     def _ease(self, target):
-        # Fast attack, slow release — reads like a music VU rather than a raw level.
         alpha = 0.6 if target > self._level else 0.2
         self._level += (target - self._level) * alpha
         return self._level
@@ -111,6 +103,7 @@ class AudioReactive:
             except asyncio.CancelledError:
                 raise
             except Exception:
+                self.status = "no_source"
                 logger.exception("audio loop failed")
             finally:
                 if proc is not None:

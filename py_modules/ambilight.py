@@ -1,7 +1,8 @@
 import asyncio
 import json
 import logging
-import os
+
+from run_as_user import user_env, user_cred
 
 logger = logging.getLogger("colores.ambilight")
 
@@ -97,15 +98,10 @@ class Ambilight:
         return [tuple(color)] * self._zones
 
     def _env(self):
-        env = dict(os.environ)
-        if self._runtime_dir:
-            env["XDG_RUNTIME_DIR"] = self._runtime_dir
-        return env
+        return user_env(self._runtime_dir)
 
     def _cred(self):
-        if self._uid is None:
-            return {}
-        return {"user": self._uid, "group": self._gid}
+        return user_cred(self._uid, self._gid)
 
     async def _find_node(self):
         # Async so the retry loop never blocks the event loop while waiting on pw-dump

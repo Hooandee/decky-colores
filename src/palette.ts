@@ -226,7 +226,6 @@ export const TEMPERATURE_BANDS: { min: number; color: RGB }[] = [
 
 export const TEMPERATURE_RANGE = { min: 40, max: 95 };
 
-// Circadian clock ramp: hour of day -> color. Mirrors the backend CLOCK_KEYS.
 const CLOCK_KEYS: [number, RGB][] = [
   [0, { r: 12, g: 22, b: 64 }],
   [6, { r: 255, g: 120, b: 40 }],
@@ -244,18 +243,12 @@ export function clockColor(hour: number): RGB {
     const [h1, c1] = CLOCK_KEYS[i + 1];
     if (h >= h0 && h <= h1) {
       const f = h1 > h0 ? (h - h0) / (h1 - h0) : 0;
-      return {
-        r: Math.round(c0.r + (c1.r - c0.r) * f),
-        g: Math.round(c0.g + (c1.g - c0.g) * f),
-        b: Math.round(c0.b + (c1.b - c0.b) * f),
-      };
+      return { r: lerpChannel(c0.r, c1.r, f), g: lerpChannel(c0.g, c1.g, f), b: lerpChannel(c0.b, c1.b, f) };
     }
   }
   return CLOCK_KEYS[0][1];
 }
 
-// Performance meter ramp (green -> yellow -> red). Mirrors the backend METER_RAMP
-// (py_modules/effects.py); drives the panel bar and the on-screen fill preview.
 export const PERFORMANCE_STOPS: RGB[] = [
   { r: 0, g: 230, b: 90 },
   { r: 255, g: 200, b: 0 },
@@ -276,29 +269,29 @@ function sampleRamp(stops: RGB[], pos: number): RGB {
   return { r: lerpChannel(a.r, b.r, f), g: lerpChannel(a.g, b.g, f), b: lerpChannel(a.b, b.b, f) };
 }
 
-// Fill preview: LEDs light up to `loadPct`, coloured green->red along the strip.
-export function performanceMeterColors(loadPct: number, zones: number): RGB[] {
+function fillBar(
+  zones: number,
+  fillOf: (i: number, n: number) => number,
+  posOf: (i: number, n: number) => number,
+): RGB[] {
   const n = Math.max(1, zones);
-  const lit = (Math.max(0, Math.min(100, loadPct)) / 100) * n;
   return Array.from({ length: n }, (_, i) => {
-    const fill = Math.max(0, Math.min(1, lit - i));
-    const ramp = sampleRamp(PERFORMANCE_STOPS, n > 1 ? i / (n - 1) : 0);
+    const fill = Math.max(0, Math.min(1, fillOf(i, n)));
+    const ramp = sampleRamp(PERFORMANCE_STOPS, posOf(i, n));
     return { r: Math.round(ramp.r * fill), g: Math.round(ramp.g * fill), b: Math.round(ramp.b * fill) };
   });
 }
 
-// Center-out VU preview (mirrors the backend frame_vu): fills from the middle
-// outward with `level`, green at the center to red at the edges.
+export function performanceMeterColors(loadPct: number, zones: number): RGB[] {
+  const lit = (Math.max(0, Math.min(100, loadPct)) / 100) * Math.max(1, zones);
+  return fillBar(zones, (i) => lit - i, (i, n) => (n > 1 ? i / (n - 1) : 0));
+}
+
 export function audioVuColors(level: number, zones: number): RGB[] {
   const n = Math.max(1, zones);
   const center = (n - 1) / 2;
   const reach = Math.max(0, Math.min(1, level)) * (n / 2);
-  return Array.from({ length: n }, (_, i) => {
-    const d = Math.abs(i - center);
-    const fill = Math.max(0, Math.min(1, reach - d));
-    const ramp = sampleRamp(PERFORMANCE_STOPS, center ? d / center : 0);
-    return { r: Math.round(ramp.r * fill), g: Math.round(ramp.g * fill), b: Math.round(ramp.b * fill) };
-  });
+  return fillBar(zones, (i) => reach - Math.abs(i - center), (i) => (center ? Math.abs(i - center) / center : 0));
 }
 
 export function temperatureBandColor(temp: number): RGB {

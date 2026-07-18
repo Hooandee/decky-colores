@@ -12,15 +12,29 @@ def _read(path):
         return None
 
 
+_GPU_PATH = {}
+
+
+def _clamp_pct(raw):
+    return max(0, min(100, int(raw.strip())))
+
+
 def gpu_busy_percent(drm_root=DRM_ROOT):
+    cached = _GPU_PATH.get(drm_root)
+    if cached:
+        raw = _read(cached)
+        if raw and raw.strip().isdigit():
+            return _clamp_pct(raw)
     try:
         cards = sorted(n for n in os.listdir(drm_root) if n.startswith("card") and n[4:].isdigit())
     except OSError:
         return None
     for card in cards:
-        raw = _read(os.path.join(drm_root, card, "device", "gpu_busy_percent"))
+        path = os.path.join(drm_root, card, "device", "gpu_busy_percent")
+        raw = _read(path)
         if raw and raw.strip().isdigit():
-            return max(0, min(100, int(raw.strip())))
+            _GPU_PATH[drm_root] = path
+            return _clamp_pct(raw)
     return None
 
 
