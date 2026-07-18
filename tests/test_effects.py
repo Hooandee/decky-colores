@@ -8,9 +8,60 @@ from py_modules.effects import (
     frame_gradient_sweep,
     frame_rainbow,
     frame_spiral,
+    frame_comet,
+    frame_sparkle,
+    frame_ripple,
+    frame_aurora,
     hsv_to_rgb,
     interpolate_gradient,
 )
+
+
+def _base(n, color=(200, 100, 50)):
+    return [color] * n
+
+
+def test_comet_returns_one_color_per_zone_and_has_a_peak():
+    frame = frame_comet(_base(17), 0.0, 50)
+    assert len(frame) == 17
+    # At t=0 the comet sits at zone 0, so it is the brightest.
+    assert frame[0] == (200, 100, 50)
+    assert sum(frame[-1]) < sum(frame[0])
+
+
+def test_comet_is_deterministic():
+    assert frame_comet(_base(17), 1.3, 40) == frame_comet(_base(17), 1.3, 40)
+
+
+def test_sparkle_length_and_bounds():
+    frame = frame_sparkle(_base(17, (255, 255, 255)), 2.0, 60)
+    assert len(frame) == 17
+    for c in frame:
+        for ch in c:
+            assert 0 <= ch <= 255
+
+
+def test_sparkle_is_deterministic():
+    assert frame_sparkle(_base(17), 0.7, 50) == frame_sparkle(_base(17), 0.7, 50)
+
+
+def test_ripple_modulates_brightness_along_strip():
+    frame = frame_ripple(_base(17, (100, 100, 100)), 0.0, 50)
+    assert len(frame) == 17
+    assert len({c for c in frame}) > 1  # not uniform — a wave is present
+
+
+def test_aurora_fills_all_zones_with_color():
+    frame = frame_aurora(17, 0.5, 50)
+    assert len(frame) == 17
+    assert all(isinstance(c, tuple) and len(c) == 3 for c in frame)
+
+
+def test_new_effects_handle_zero_zones():
+    assert frame_comet([], 0.0, 50) == []
+    assert frame_sparkle([], 0.0, 50) == []
+    assert frame_ripple([], 0.0, 50) == []
+    assert frame_aurora(0, 0.0, 50) == []
 
 
 def _valid(color):

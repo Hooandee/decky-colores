@@ -873,6 +873,8 @@ function Content() {
               colors={previewColors}
               brightness={brightness}
               power={power}
+              layoutKind={capabilities.layoutKind}
+              segments={capabilities.zones}
               label={contentMode === "ambient" ? t("device.preview.ambient") : undefined}
             />
           </div>
@@ -884,16 +886,18 @@ function Content() {
           <PanelSectionRow>
             <ToggleField label={t("power.label")} checked={power} onChange={setPower} bottomSeparator="none" />
           </PanelSectionRow>
-          <PanelSectionRow>
-            <ToggleField
-              label={t("chargerOnly.label")}
-              description={t("chargerOnly.hint")}
-              checked={chargerOnly}
-              onChange={setChargerOnly}
-              disabled={!power}
-              bottomSeparator="none"
-            />
-          </PanelSectionRow>
+          {capabilities.hasBattery && (
+            <PanelSectionRow>
+              <ToggleField
+                label={t("chargerOnly.label")}
+                description={t("chargerOnly.hint")}
+                checked={chargerOnly}
+                onChange={setChargerOnly}
+                disabled={!power}
+                bottomSeparator="none"
+              />
+            </PanelSectionRow>
+          )}
         </>
       )}
 

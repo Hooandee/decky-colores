@@ -4,6 +4,7 @@ from py_modules.device import build_layout, detect_device, detect_capabilities, 
 import led_device as _led_device_mod
 SysfsRgbDevice = _led_device_mod.SysfsRgbDevice
 NullDevice = _led_device_mod.NullDevice
+ValveLedsDevice = _led_device_mod.ValveLedsDevice
 
 
 def test_build_layout_splits_into_two_sticks():
@@ -29,6 +30,14 @@ def test_build_layout_single_zone():
 
 def test_build_layout_none_when_no_zones():
     assert build_layout(0) == []
+
+
+def test_build_layout_bar_is_single_full_width_group():
+    layout = build_layout(17, layout_kind="bar")
+    assert len(layout) == 1
+    assert layout[0]["kind"] == "bar"
+    assert layout[0]["region"] == [0.0, 0.0, 1.0, 1.0]
+    assert layout[0]["zones"] == list(range(17))
 
 
 def _make_dmi(root, board, product):
@@ -197,6 +206,42 @@ def test_capabilities_expose_conflicts_with_system_rgb():
     profile = resolve_profile("RC71L", "ROG Ally RC71L_RC71L")
     caps = build_capabilities(profile, True, 4, 100, False)
     assert caps["conflictsWithSystemRgb"] is True
+
+
+def _make_valve_bar(root, count=17):
+    for i in range(count):
+        _make_led(root, f"valve-leds[{i}]", {
+            "multi_index": "red green blue", "multi_intensity": "0 0 0",
+            "brightness": "255", "max_brightness": "255", "effect": "normal", "enabled": "0",
+        })
+
+
+def test_build_device_steam_machine_is_valve_bar(tmp_path):
+    _make_dmi(str(tmp_path), "Fremont", "Fremont")
+    _make_valve_bar(str(tmp_path), count=17)
+    ctx = build_device(str(tmp_path))
+    assert ctx["info"]["name"] == "Steam Machine"
+    assert isinstance(ctx["device"], ValveLedsDevice)
+    caps = ctx["capabilities"]
+    assert caps["zones"] == 17
+    assert caps["layoutKind"] == "bar"
+    assert caps["perZone"] is True
+    assert caps["conflictsWithSystemRgb"] is True
+    assert caps["hasBattery"] is False  # desktop console: charger-only gate must be hidden
+    assert caps["indicatorLed"] is True
+    assert caps["persistentStartup"] is True
+    assert caps["states"]["color"] == "supported"
+    assert len(caps["layout"]) == 1 and caps["layout"][0]["kind"] == "bar"
+
+
+def test_build_device_steam_machine_without_driver_degrades(tmp_path):
+    # Kernel build without leds-valve: no valve-leds nodes present.
+    _make_dmi(str(tmp_path), "Fremont", "Fremont")
+    os.makedirs(os.path.join(str(tmp_path), "sys/class/leds"))
+    ctx = build_device(str(tmp_path))
+    assert ctx["info"]["name"] == "Steam Machine"
+    assert isinstance(ctx["device"], NullDevice)
+    assert ctx["capabilities"]["states"]["color"] == "experimental"
 
 
 def test_capabilities_conflicts_defaults_false():

@@ -11,6 +11,7 @@ const es: Record<string, string> = {
 
   "device.noLeds": "No se detectaron LEDs controlables en este dispositivo.",
   "device.preview.rings": "Anillos del joystick",
+  "device.preview.bar": "Barra de luz",
   "device.preview.off": "Apagado",
   "device.preview.ambient": "Siguiendo la pantalla",
 
@@ -96,6 +97,10 @@ const es: Record<string, string> = {
   "effect.wave.label": "Onda",
   "effect.cycle.label": "Ciclo",
   "effect.spiral.label": "Espiral",
+  "effect.comet.label": "Cometa",
+  "effect.sparkle.label": "Destellos",
+  "effect.ripple.label": "Onda suave",
+  "effect.aurora.label": "Aurora",
   "effect.spiral.legion.label": "Espiral GO",
   "effect.spiral.firmwareNote": "Efecto giratorio propio del firmware de tu Legion Go.",
 
@@ -178,6 +183,7 @@ const en: Record<string, string> = {
 
   "device.noLeds": "No controllable LEDs detected on this device.",
   "device.preview.rings": "Joystick rings",
+  "device.preview.bar": "Light bar",
   "device.preview.off": "Off",
   "device.preview.ambient": "Reacting to screen",
 
@@ -263,6 +269,10 @@ const en: Record<string, string> = {
   "effect.wave.label": "Wave",
   "effect.cycle.label": "Cycle",
   "effect.spiral.label": "Spiral",
+  "effect.comet.label": "Comet",
+  "effect.sparkle.label": "Sparkle",
+  "effect.ripple.label": "Ripple",
+  "effect.aurora.label": "Aurora",
   "effect.spiral.legion.label": "Spiral GO",
   "effect.spiral.firmwareNote": "Your Legion Go's built-in rotating firmware effect.",
 

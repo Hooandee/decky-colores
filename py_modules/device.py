@@ -1,7 +1,7 @@
 import os
 
 from device_profiles import resolve_profile
-from led_device import SysfsRgbDevice, NullDevice
+from led_device import SysfsRgbDevice, NullDevice, ValveLedsDevice, discover_valve_leds
 from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device
 from power_led import PowerLedController
 from power_supply import battery_present
@@ -21,6 +21,7 @@ DEVICE_REGISTRY = [
     ("product", "83Q3", "Legion Go S"),
     ("product", "83N0", "Legion Go 2"),
     ("product", "83N1", "Legion Go 2"),
+    ("board", "Fremont", "Steam Machine"),
 ]
 
 
@@ -96,9 +97,11 @@ _STICK_ANCHORS = [
 ]
 
 
-def build_layout(zones, swap_sticks=False):
+def build_layout(zones, swap_sticks=False, layout_kind="rings"):
     if zones <= 0:
         return []
+    if layout_kind == "bar":
+        return [{"name": "Bar", "region": [0.0, 0.0, 1.0, 1.0], "zones": list(range(zones)), "kind": "bar"}]
     if zones == 1:
         return [{"name": "Lights", "region": [0.0, 0.0, 1.0, 1.0], "zones": [0]}]
     groups = list(reversed(_STICK_ANCHORS)) if swap_sticks else _STICK_ANCHORS
@@ -162,10 +165,14 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "states": states,
         "experimental": list(profile.get("experimental", [])),
         "powerLed": bool(power_led and power_led.available()),
+        "hasBattery": bool(battery),
         "batteryMode": bool(battery) and active["color"],
         "temperatureMode": bool(temperature) and active["color"],
         "conflictsWithSystemRgb": bool(profile.get("conflicts_with_system_rgb", False)),
-        "layout": build_layout(zones, profile.get("swap_sticks", False)),
+        "indicatorLed": bool(profile.get("indicator_led", False)),
+        "persistentStartup": bool(profile.get("persistent_startup", False)),
+        "layoutKind": profile.get("layout_kind", "rings"),
+        "layout": build_layout(zones, profile.get("swap_sticks", False), profile.get("layout_kind", "rings")),
     }
 
 
@@ -186,7 +193,7 @@ def _find_rgb_led(leds_dir):
     return None
 
 
-_IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally"}
+_IMPLEMENTED_DRIVERS = {"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally", "valve_leds"}
 
 
 def _build_hid_context(profile, ambilight, power_led=None, battery=False, temperature=False):
@@ -201,6 +208,21 @@ def _build_hid_context(profile, ambilight, power_led=None, battery=False, temper
     capabilities["perZone"] = device.supports_per_zone()
     capabilities["hardwareEffects"] = device.supports_hardware_effects()
     capabilities["reconnectable"] = True
+    return {"device": device, "capabilities": capabilities}
+
+
+def _build_valve_context(profile, sysfs_root, ambilight, power_led=None, battery=False, temperature=False):
+    nodes = discover_valve_leds(os.path.join(sysfs_root, "sys/class/leds"))
+    if not nodes:
+        return None
+    max_brightness = _max_brightness(_read(os.path.join(nodes[0], "max_brightness")))
+    device = ValveLedsDevice(
+        nodes, max_brightness, profile.get("color_correction", [1.0, 1.0, 1.0]),
+        reverse=profile.get("reverse_zones", False),
+    )
+    capabilities = build_capabilities(
+        profile, True, len(nodes), max_brightness, ambilight, power_led, battery, temperature
+    )
     return {"device": device, "capabilities": capabilities}
 
 
@@ -225,6 +247,17 @@ def build_device(sysfs_root="/", ambilight=False):
                     "device": hid_ctx["device"],
                     "power_led": power_led,
                 }
+        profile["experimental"] = _all_experimental(profile)
+
+    if profile["driver"] == "valve_leds":
+        valve_ctx = _build_valve_context(profile, sysfs_root, ambilight, power_led, battery, temperature)
+        if valve_ctx is not None:
+            return {
+                "info": info,
+                "capabilities": valve_ctx["capabilities"],
+                "device": valve_ctx["device"],
+                "power_led": power_led,
+            }
         profile["experimental"] = _all_experimental(profile)
 
     leds_dir = os.path.join(sysfs_root, "sys/class/leds")

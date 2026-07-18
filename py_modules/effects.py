@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import math
+from functools import lru_cache
 
 logger = logging.getLogger("colores.effects")
 
@@ -161,6 +162,73 @@ def frame_gradient_sweep(stops, zones, t, speed):
     return [color for _ in range(zones)]
 
 
+@lru_cache(maxsize=None)
+def _hash01(a, b):
+    x = math.sin(a * 127.1 + b * 311.7) * 43758.5453
+    return x - math.floor(x)
+
+
+def frame_comet(base, t, speed):
+    zones = len(base)
+    if zones <= 0:
+        return []
+    span = zones - 1 if zones > 1 else 1
+    phase = (_freq(speed) * t) % 2.0
+    pos = phase * span if phase <= 1.0 else (2.0 - phase) * span
+    tail = max(1.5, zones * 0.18)
+    result = []
+    for i in range(zones):
+        b = max(0.0, 1.0 - abs(i - pos) / tail)
+        b *= b
+        c = base[i]
+        result.append((clamp8(c[0] * b), clamp8(c[1] * b), clamp8(c[2] * b)))
+    return result
+
+
+def frame_sparkle(base, t, speed):
+    zones = len(base)
+    if zones <= 0:
+        return []
+    f = _freq(speed)
+    floor = 0.10
+    result = []
+    for i in range(zones):
+        ph = (f * 0.8 * t + _hash01(i, 1.0)) % 1.0
+        tw = max(0.0, 1.0 - abs(ph - 0.5) * 2.0) ** 3
+        factor = floor + (1.0 - floor) * tw
+        c = base[i]
+        result.append((clamp8(c[0] * factor), clamp8(c[1] * factor), clamp8(c[2] * factor)))
+    return result
+
+
+def frame_ripple(base, t, speed):
+    zones = len(base)
+    if zones <= 0:
+        return []
+    f = _freq(speed)
+    waves = 2.0
+    result = []
+    for i in range(zones):
+        phase = 2 * math.pi * (f * t - (i / zones) * waves)
+        b = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(phase))
+        c = base[i]
+        result.append((clamp8(c[0] * b), clamp8(c[1] * b), clamp8(c[2] * b)))
+    return result
+
+
+def frame_aurora(zones, t, speed):
+    if zones <= 0:
+        return []
+    f = _freq(speed)
+    result = []
+    for i in range(zones):
+        h = 150.0 + 80.0 * math.sin(2 * math.pi * (f * 0.25 * t + i / zones)) \
+            + 40.0 * math.sin(2 * math.pi * (f * 0.15 * t + i * 2.0 / zones))
+        v = 0.6 + 0.4 * (0.5 + 0.5 * math.sin(2 * math.pi * (f * 0.3 * t + i / zones * 1.5)))
+        result.append(hsv_to_rgb(h % 360.0, 0.85, v))
+    return result
+
+
 def battery_band_color(level):
     for threshold, color in BATTERY_BANDS:
         if level >= threshold:
@@ -253,6 +321,14 @@ class EffectEngine:
             return frame_cycle(self._zones, t, speed)
         if effect_id == "gradient_sweep":
             return frame_gradient_sweep(params.get("stops", [(255, 255, 255)]), self._zones, t, speed)
+        if effect_id == "comet":
+            return frame_comet(prepared if prepared is not None else self._palette(params), t, speed)
+        if effect_id == "sparkle":
+            return frame_sparkle(prepared if prepared is not None else self._palette(params), t, speed)
+        if effect_id == "ripple":
+            return frame_ripple(prepared if prepared is not None else self._palette(params), t, speed)
+        if effect_id == "aurora":
+            return frame_aurora(self._zones, t, speed)
         return [(0, 0, 0) for _ in range(self._zones)]
 
     async def _run_indicator(self, state_fn, target_fn, breathe_fn, label):
@@ -301,6 +377,8 @@ class EffectEngine:
             prepared = interpolate_gradient(
                 params.get("stops", [(255, 0, 0), (0, 0, 255)]), self._zones
             )
+        elif effect_id in ("comet", "sparkle", "ripple"):
+            prepared = self._palette(params)
         while True:
             try:
                 t = loop.time() - start

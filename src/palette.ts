@@ -153,6 +153,47 @@ export const EFFECT_PRESETS: EffectMeta[] = [
       { r: 64, g: 224, b: 120 },
     ],
   },
+  {
+    id: "comet",
+    label: "Comet",
+    needs: "color",
+    description: "A bright dot sweeps back and forth with a fading tail.",
+    colors: [
+      { r: 0, g: 196, b: 255 },
+      { r: 124, g: 92, b: 255 },
+    ],
+  },
+  {
+    id: "sparkle",
+    label: "Sparkle",
+    needs: "color",
+    description: "LEDs twinkle at random over a dim base.",
+    colors: [
+      { r: 255, g: 255, b: 255 },
+      { r: 124, g: 180, b: 255 },
+    ],
+  },
+  {
+    id: "ripple",
+    label: "Ripple",
+    needs: "color",
+    description: "A gentle brightness wave glides softly along the bar.",
+    colors: [
+      { r: 0, g: 180, b: 216 },
+      { r: 144, g: 224, b: 239 },
+    ],
+  },
+  {
+    id: "aurora",
+    label: "Aurora",
+    needs: "none",
+    description: "Flowing greens, blues and purples drift like an aurora.",
+    colors: [
+      { r: 40, g: 224, b: 140 },
+      { r: 0, g: 160, b: 220 },
+      { r: 138, g: 92, b: 255 },
+    ],
+  },
 ];
 
 // Battery mode color bands (blue full -> red empty). Each entry is the inclusive

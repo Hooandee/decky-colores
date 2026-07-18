@@ -14,6 +14,7 @@ export interface ZoneGroup {
   name: string;
   region: number[];
   zones: number[];
+  kind?: string;
 }
 
 export interface Capabilities {
@@ -34,9 +35,13 @@ export interface Capabilities {
   states: Record<string, "supported" | "experimental" | "unsupported">;
   enabledExperiments: string[];
   powerLed: boolean;
+  hasBattery: boolean;
   batteryMode: boolean;
   temperatureMode: boolean;
   conflictsWithSystemRgb: boolean;
+  indicatorLed: boolean;
+  persistentStartup: boolean;
+  layoutKind: string;
 }
 
 export type Mode = "solid" | "gradient" | "effect" | "ambient" | "battery" | "temperature";
@@ -47,7 +52,16 @@ export interface AmbilightState {
   fps: number;
 }
 
-export type EffectId = "breathing" | "rainbow" | "wave" | "cycle" | "spiral";
+export type EffectId =
+  | "breathing"
+  | "rainbow"
+  | "wave"
+  | "cycle"
+  | "spiral"
+  | "comet"
+  | "sparkle"
+  | "ripple"
+  | "aurora";
 
 export interface EffectState {
   id: EffectId;
