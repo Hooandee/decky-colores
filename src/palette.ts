@@ -287,6 +287,20 @@ export function performanceMeterColors(loadPct: number, zones: number): RGB[] {
   });
 }
 
+// Center-out VU preview (mirrors the backend frame_vu): fills from the middle
+// outward with `level`, green at the center to red at the edges.
+export function audioVuColors(level: number, zones: number): RGB[] {
+  const n = Math.max(1, zones);
+  const center = (n - 1) / 2;
+  const reach = Math.max(0, Math.min(1, level)) * (n / 2);
+  return Array.from({ length: n }, (_, i) => {
+    const d = Math.abs(i - center);
+    const fill = Math.max(0, Math.min(1, reach - d));
+    const ramp = sampleRamp(PERFORMANCE_STOPS, center ? d / center : 0);
+    return { r: Math.round(ramp.r * fill), g: Math.round(ramp.g * fill), b: Math.round(ramp.b * fill) };
+  });
+}
+
 export function temperatureBandColor(temp: number): RGB {
   for (const band of TEMPERATURE_BANDS) {
     if (temp >= band.min) return band.color;

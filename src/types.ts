@@ -40,6 +40,7 @@ export interface Capabilities {
   temperatureMode: boolean;
   performanceMode: boolean;
   clockMode: boolean;
+  audioMode: boolean;
   conflictsWithSystemRgb: boolean;
   indicatorLed: boolean;
   persistentStartup: boolean;
@@ -54,7 +55,8 @@ export type Mode =
   | "battery"
   | "temperature"
   | "performance"
-  | "clock";
+  | "clock"
+  | "vu";
 
 export interface AmbilightState {
   saturation: number;

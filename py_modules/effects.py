@@ -264,6 +264,21 @@ def clock_color(hour):
     return CLOCK_KEYS[0][1]
 
 
+def frame_vu(level, zones):
+    if zones <= 0:
+        return []
+    level = max(0.0, min(1.0, level))
+    center = (zones - 1) / 2.0
+    reach = level * (zones / 2.0)
+    result = []
+    for i in range(zones):
+        d = abs(i - center)
+        fill = max(0.0, min(1.0, reach - d))
+        ramp = _sample_stops(METER_RAMP, d / center if center else 0.0)
+        result.append((clamp8(ramp[0] * fill), clamp8(ramp[1] * fill), clamp8(ramp[2] * fill)))
+    return result
+
+
 def battery_band_color(level):
     for threshold, color in BATTERY_BANDS:
         if level >= threshold:

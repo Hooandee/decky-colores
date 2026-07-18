@@ -35,6 +35,9 @@ const es: Record<string, string> = {
   "mode.ambient": "Ambilight",
   "mode.clock": "Reloj",
   "clock.hint": "El color de la barra sigue la hora del día, cálido al amanecer y anochecer, fresco al mediodía. Es automático.",
+  "mode.vu": "Audio",
+  "vu.hint": "La barra reacciona al sonido del sistema en tiempo real, llenándose desde el centro con el volumen.",
+  "vu.noAudio": "No se detecta audio. Pon música o un juego con sonido para ver la barra moverse.",
   "mode.battery": "Batería",
   "mode.temperature": "Temperatura",
 
@@ -219,6 +222,9 @@ const en: Record<string, string> = {
   "mode.ambient": "Ambient",
   "mode.clock": "Clock",
   "clock.hint": "The bar color follows the time of day, warm at sunrise and sunset, cool at midday. It is automatic.",
+  "mode.vu": "Audio",
+  "vu.hint": "The bar reacts to system sound in real time, filling from the center with the volume.",
+  "vu.noAudio": "No audio detected. Play music or a game with sound to see the bar move.",
   "mode.battery": "Battery",
   "mode.temperature": "Temperature",
 

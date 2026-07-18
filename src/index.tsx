@@ -14,7 +14,7 @@ import { definePlugin } from "@decky/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus, getTemperature, getPerformance, reconnect as apiReconnect } from "./api";
+import { getAmbilightStatus, getAudioStatus, getTemperature, getPerformance, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -35,6 +35,7 @@ import {
   temperatureBandColor,
   PERFORMANCE_STOPS,
   performanceMeterColors,
+  audioVuColors,
   clockColor,
 } from "./palette";
 import { Tabs } from "./components/Tabs";
@@ -491,6 +492,7 @@ function modeIdsFor(caps: Capabilities | null): Mode[] {
   if (caps.temperatureMode) modes.push("temperature");
   if (caps.performanceMode) modes.push("performance");
   if (caps.clockMode) modes.push("clock");
+  if (caps.audioMode) modes.push("vu");
   if (caps.ambilight) modes.push("ambient");
   return modes;
 }
@@ -526,6 +528,7 @@ function Content() {
   const { t, lang } = useI18n();
   const { hasUpdate } = useUpdate(lang);
   const [ambStatus, setAmbStatus] = useState<string>("idle");
+  const [audStatus, setAudStatus] = useState<string>("idle");
   const [tempReading, setTempReading] = useState<number | null>(null);
   const [perfReading, setPerfReading] = useState<number | null>(null);
   const [viewingSettings, setViewingSettings] = useState<boolean>(
@@ -619,6 +622,22 @@ function Content() {
       clearInterval(timer);
     };
   }, [temperatureActive]);
+
+  const audioActive = state?.mode === "vu" && state?.power;
+  useEffect(() => {
+    if (!audioActive) return;
+    let alive = true;
+    const poll = () =>
+      getAudioStatus()
+        .then((v) => alive && setAudStatus(v))
+        .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [audioActive]);
 
   const performanceActive = state?.mode === "performance" && state?.power;
   useEffect(() => {
@@ -743,6 +762,8 @@ function Content() {
         const now = new Date();
         return [clockColor(now.getHours() + now.getMinutes() / 60)];
       }
+      case "vu":
+        return audioVuColors(0.6, capabilities.zones);
       default:
         return [color];
     }
@@ -929,6 +950,33 @@ function Content() {
               {t("clock.hint")}
             </div>
           </PanelSectionRow>
+        );
+      case "vu":
+        return (
+          <>
+            {power && audStatus === "no_source" && (
+              <PanelSectionRow>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#ffcf66",
+                    background: "rgba(255, 184, 0, 0.1)",
+                    border: "1px solid rgba(255, 184, 0, 0.3)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {t("vu.noAudio")}
+                </div>
+              </PanelSectionRow>
+            )}
+            <PanelSectionRow>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "4px 2px 8px", lineHeight: 1.45 }}>
+                {t("vu.hint")}
+              </div>
+            </PanelSectionRow>
+          </>
         );
       default:
         return null;

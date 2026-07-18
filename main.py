@@ -12,6 +12,7 @@ from device import build_device
 from settings_store import SettingsStore
 from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
+from audio import AudioReactive
 from power_supply import charger_online, battery_level
 from thermal import apu_temperature
 from performance import gpu_busy_percent, CpuSampler
@@ -120,6 +121,7 @@ class Plugin:
             gid,
             layout=self._capabilities.get("layout"),
         )
+        self._audio = AudioReactive(self._render, self._zones, runtime_dir, uid, gid)
 
     def _reprobe_device(self) -> bool:
         # Recover a controller that wasn't present at load (late USB HID enumeration on
@@ -481,6 +483,10 @@ class Plugin:
         self._init()
         return self._ambilight.status
 
+    async def get_audio_status(self) -> str:
+        self._init()
+        return self._audio.status
+
     async def set_ambilight(self, saturation: int, smoothing: int, fps: int) -> None:
         self._init()
         self._settings["ambilight"] = {
@@ -578,7 +584,7 @@ class Plugin:
         # (per-zone or per-controller). Single-color devices render wave with
         # their native hardware effect instead of collapsing it to a flat color.
         s = self._settings
-        if s["mode"] in ("ambient", "battery", "temperature", "performance", "clock"):
+        if s["mode"] in ("ambient", "battery", "temperature", "performance", "clock", "vu"):
             return True
         if s["mode"] == "gradient":
             return not self._controller.supports_per_zone()
@@ -606,6 +612,7 @@ class Plugin:
     def _apply_hardware(self) -> None:
         s = self._settings
         self._ambilight.stop()
+        self._audio.stop()
         self._engine.stop()
         brightness = s["brightness"]
         power = self._effective_power()
@@ -628,10 +635,12 @@ class Plugin:
         s = self._settings
         if not self._effective_power():
             self._ambilight.stop()
+            self._audio.stop()
             self._engine.set_static([(0, 0, 0)] * self._zones)
             return
 
         if s["mode"] == "ambient":
+            self._audio.stop()
             self._engine.stop()
             amb = s["ambilight"]
             self._ambilight.start(
@@ -645,7 +654,14 @@ class Plugin:
             )
             return
 
+        if s["mode"] == "vu":
+            self._ambilight.stop()
+            self._engine.stop()
+            self._audio.start()
+            return
+
         self._ambilight.stop()
+        self._audio.stop()
 
         if s["mode"] == "battery":
             self._engine.start_battery(self._battery_state)

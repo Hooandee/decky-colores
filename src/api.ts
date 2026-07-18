@@ -13,6 +13,7 @@ export const setEffect = callable<[id: string, speed: number, useGradient: boole
 export const setAmbilight = callable<[saturation: number, smoothing: number, fps: number], void>("set_ambilight");
 export const setAmbilightSampling = callable<[mode: string], void>("set_ambilight_sampling");
 export const getAmbilightStatus = callable<[], string>("get_ambilight_status");
+export const getAudioStatus = callable<[], string>("get_audio_status");
 export const saveGradient = callable<[name: string, stops: number[][]], GradientPreset[]>("save_gradient");
 export const deleteGradient = callable<[name: string], GradientPreset[]>("delete_gradient");
 export const getVersion = callable<[], string>("get_version");

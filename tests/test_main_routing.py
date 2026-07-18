@@ -97,6 +97,18 @@ class FakeAmbilight:
         self.events.append(("start", cfg))
 
 
+class FakeAudio:
+    def __init__(self):
+        self.events = []
+        self.status = "idle"
+
+    def stop(self):
+        self.events.append(("stop",))
+
+    def start(self, options=None):
+        self.events.append(("start", options))
+
+
 def _plugin(
     main_module,
     mode,
@@ -111,6 +123,7 @@ def _plugin(
     p._controller = FakeController(hw, per_zone)
     p._engine = FakeEngine()
     p._ambilight = FakeAmbilight()
+    p._audio = FakeAudio()
     p._zones = 2
     p._capabilities = {
         "zones": 2,
@@ -145,6 +158,20 @@ def test_effective_power_truth_table(main_module, power, charger_only, ac_online
     p._settings["charger_only"] = charger_only
     p._ac_online = ac_online
     assert p._effective_power() is expected
+
+
+def test_vu_mode_starts_audio_capture(main_module):
+    p = _plugin(main_module, "vu", hw=False, per_zone=True)
+    p._apply()
+    assert any(e[0] == "start" for e in p._audio.events)
+    assert ("stop",) in p._ambilight.events
+    assert p._engine.events and p._engine.events[-1][0] == "stop"
+
+
+def test_non_vu_mode_stops_audio(main_module):
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p._apply()
+    assert ("stop",) in p._audio.events
 
 
 def test_charger_only_on_battery_gates_per_zone_off(main_module):

@@ -30,6 +30,17 @@ def test_clock_color_wraps_around_midnight():
     assert clock_color(0) == clock_color(24)
 
 
+def test_vu_silence_is_dark_and_loud_fills_from_center():
+    from py_modules.effects import frame_vu
+    assert all(c == (0, 0, 0) for c in frame_vu(0.0, 17))
+    loud = frame_vu(1.0, 17)
+    assert len(loud) == 17
+    assert sum(loud[8]) > 0  # center lit
+    quiet = frame_vu(0.25, 17)
+    assert sum(quiet[8]) > 0 and quiet[0] == (0, 0, 0)  # center lit, edges dark
+    assert frame_vu(0.5, 0) == []
+
+
 def test_meter_fills_proportionally():
     frame = frame_meter(0.5, 10)
     assert len(frame) == 10
