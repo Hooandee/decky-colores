@@ -12,9 +12,27 @@ from py_modules.effects import (
     frame_sparkle,
     frame_ripple,
     frame_aurora,
+    frame_meter,
     hsv_to_rgb,
     interpolate_gradient,
 )
+
+
+def test_meter_fills_proportionally():
+    frame = frame_meter(0.5, 10)
+    assert len(frame) == 10
+    lit = [c for c in frame if sum(c) > 0]
+    assert len(lit) == 5  # half of 10 zones lit
+
+
+def test_meter_zero_is_dark_and_full_is_all_lit():
+    assert all(c == (0, 0, 0) for c in frame_meter(0.0, 8))
+    assert all(sum(c) > 0 for c in frame_meter(1.0, 8))
+
+
+def test_meter_clamps_and_handles_zero_zones():
+    assert frame_meter(5.0, 4) == frame_meter(1.0, 4)
+    assert frame_meter(0.5, 0) == []
 
 
 def _base(n, color=(200, 100, 50)):

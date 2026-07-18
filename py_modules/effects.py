@@ -229,6 +229,21 @@ def frame_aurora(zones, t, speed):
     return result
 
 
+METER_RAMP = [(0, 230, 90), (255, 200, 0), (255, 40, 0)]
+
+
+def frame_meter(value01, zones):
+    if zones <= 0:
+        return []
+    lit = max(0.0, min(1.0, value01)) * zones
+    result = []
+    for i in range(zones):
+        fill = max(0.0, min(1.0, lit - i))
+        color = _sample_stops(METER_RAMP, i / (zones - 1) if zones > 1 else 0.0)
+        result.append((clamp8(color[0] * fill), clamp8(color[1] * fill), clamp8(color[2] * fill)))
+    return result
+
+
 def battery_band_color(level):
     for threshold, color in BATTERY_BANDS:
         if level >= threshold:
@@ -285,6 +300,15 @@ class EffectEngine:
             lambda st: bool(st.get("breathe")) and st.get("temp") is not None and st["temp"] >= TEMPERATURE_CRITICAL,
             "temperature",
         )
+
+    def start_performance(self, state_fn):
+        sig = ("__performance__",)
+        if self.running and sig == self._sig:
+            return
+        self.stop()
+        self._sig = sig
+        loop = asyncio.get_event_loop()
+        self._task = loop.create_task(self._run_performance(state_fn))
 
     def _start_indicator(self, sig_key, state_fn, target_fn, breathe_fn, label):
         # state_fn() returns the LIVE state each frame, so the loop reacts without a
@@ -388,4 +412,18 @@ class EffectEngine:
                 raise
             except Exception:
                 logger.exception("effect frame failed")
+            await asyncio.sleep(FRAME_INTERVAL)
+
+    async def _run_performance(self, state_fn):
+        displayed = 0.0
+        while True:
+            try:
+                value = state_fn().get("value")
+                target = 0.0 if value is None else max(0.0, min(1.0, value / 100.0))
+                displayed += (target - displayed) * 0.25
+                self._apply_zones(frame_meter(displayed, self._zones))
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("performance frame failed")
             await asyncio.sleep(FRAME_INTERVAL)

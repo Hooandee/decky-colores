@@ -13,6 +13,7 @@ from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
 from power_supply import charger_online, battery_level
 from thermal import apu_temperature
+from performance import gpu_busy_percent, CpuSampler
 from saved_gradients import upsert_gradient, remove_gradient
 import self_updater
 from report import collector as report_collector
@@ -103,6 +104,7 @@ class Plugin:
         self._zones = self._capabilities.get("zones", 1) or 1
         self._controller = ctx["device"]
         self._power_led = ctx.get("power_led")
+        self._cpu_sampler = CpuSampler()
         self._engine = EffectEngine(self._render, self._zones)
         runtime_dir, uid, gid = _user_creds()
         self._ambilight = Ambilight(
@@ -394,6 +396,13 @@ class Plugin:
         self._init()
         return getattr(self, "_apu_temp", None)
 
+    async def get_performance(self):
+        self._init()
+        value = gpu_busy_percent()
+        if value is None:
+            value = getattr(self, "_perf_value", None)
+        return value
+
     async def set_brightness(self, value: int) -> None:
         self._init()
         self._settings["brightness"] = value
@@ -500,6 +509,14 @@ class Plugin:
             "breathe": self._settings.get("temperature_breathe", True),
         }
 
+    def _performance_state(self) -> dict:
+        value = gpu_busy_percent()
+        if value is None:
+            value = self._cpu_sampler.percent()
+        if value is not None:
+            self._perf_value = value
+        return {"value": getattr(self, "_perf_value", None)}
+
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(
             zone_colors, self._settings["brightness"], self._effective_power()
@@ -520,7 +537,7 @@ class Plugin:
         # (per-zone or per-controller). Single-color devices render wave with
         # their native hardware effect instead of collapsing it to a flat color.
         s = self._settings
-        if s["mode"] in ("ambient", "battery", "temperature"):
+        if s["mode"] in ("ambient", "battery", "temperature", "performance"):
             return True
         if s["mode"] == "gradient":
             return not self._controller.supports_per_zone()
@@ -592,6 +609,8 @@ class Plugin:
             self._engine.start_battery(self._battery_state)
         elif s["mode"] == "temperature":
             self._engine.start_temperature(self._temperature_state)
+        elif s["mode"] == "performance":
+            self._engine.start_performance(self._performance_state)
         elif s["mode"] == "effect":
             effect = s["effect"]
             self._engine.start_effect(
