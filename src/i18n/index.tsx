@@ -106,6 +106,8 @@ const es: Record<string, string> = {
 
   "ambient.gameModeBanner": "Aún no hay pantalla que leer. Ambilight funciona en Modo Juego con un juego abierto (no en Escritorio ni Big Picture).",
   "ambient.stickHint": "Las luces siguen la pantalla cerca de cada joystick. La izquierda desde arriba a la izquierda, la derecha desde el centro a la derecha.",
+  "ambient.sampling.columns": "Columnas",
+  "ambient.sampling.bottom_edge": "Borde inferior",
   "ambient.vividness": "Intensidad",
   "ambient.smoothing": "Suavizado",
   "ambient.captureRate": "Tasa de captura",
@@ -282,6 +284,8 @@ const en: Record<string, string> = {
 
   "ambient.gameModeBanner": "No screen to read yet. Ambient works in Game Mode with a game running (not in Desktop or Big Picture).",
   "ambient.stickHint": "Lights follow the screen near each stick. Left from the top-left, right from the mid-right.",
+  "ambient.sampling.columns": "Columns",
+  "ambient.sampling.bottom_edge": "Bottom edge",
   "ambient.vividness": "Vividness",
   "ambient.smoothing": "Smoothing",
   "ambient.captureRate": "Capture rate",

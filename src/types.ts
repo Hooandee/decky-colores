@@ -51,6 +51,7 @@ export interface AmbilightState {
   saturation: number;
   smoothing: number;
   fps: number;
+  sampling: string;
 }
 
 export type EffectId =

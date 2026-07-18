@@ -32,7 +32,7 @@ DEFAULTS = {
     "gradient": [[0, 196, 255], [136, 86, 255]],
     "gradient_speed": 30,
     "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
-    "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
+    "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10, "sampling": "columns"},
     "saved_gradients": [],
     "enabled_experiments": [],
     "power_led_off": False,
@@ -462,7 +462,17 @@ class Plugin:
 
     async def set_ambilight(self, saturation: int, smoothing: int, fps: int) -> None:
         self._init()
-        self._settings["ambilight"] = {"saturation": saturation, "smoothing": smoothing, "fps": fps}
+        self._settings["ambilight"] = {
+            **self._settings.get("ambilight", {}),
+            "saturation": saturation,
+            "smoothing": smoothing,
+            "fps": fps,
+        }
+        self._save_and_apply()
+
+    async def set_ambilight_sampling(self, mode: str) -> None:
+        self._init()
+        self._settings["ambilight"] = {**self._settings.get("ambilight", {}), "sampling": mode}
         self._save_and_apply()
 
     async def set_power_led(self, off: bool) -> None:
@@ -598,6 +608,7 @@ class Plugin:
                     "saturation": amb["saturation"] / 100.0,
                     "smoothing": amb["smoothing"],
                     "fps": amb.get("fps", 10),
+                    "sampling": amb.get("sampling", "columns"),
                     "fallback": tuple(s["color"]),
                 }
             )

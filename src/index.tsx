@@ -509,6 +509,7 @@ function Content() {
     setEffectSpeed,
     setEffectGradient,
     setAmbilight,
+    setAmbilightSampling,
     saveGradient,
     deleteGradient,
     setExperiment,
@@ -837,6 +838,20 @@ function Content() {
                 {t("ambient.stickHint")}
               </div>
             </PanelSectionRow>
+            {capabilities.layoutKind === "bar" && (
+              <PanelSectionRow>
+                <div style={{ padding: "2px 0 10px" }}>
+                  <Tabs<string>
+                    value={ambilight.sampling}
+                    tabs={["columns", "bottom_edge"]}
+                    onChange={setAmbilightSampling}
+                    label={(m) =>
+                      t(`ambient.sampling.${m}` as "ambient.sampling.columns" | "ambient.sampling.bottom_edge")
+                    }
+                  />
+                </div>
+              </PanelSectionRow>
+            )}
             <PanelSectionRow>
               <SliderField
                 label={t("ambient.vividness")}

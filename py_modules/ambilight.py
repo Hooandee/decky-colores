@@ -226,9 +226,14 @@ class Ambilight:
 
     def _update_targets(self, frame):
         sat = float(self._options.get("saturation", 1.4))
+        bottom_edge = self._options.get("sampling") == "bottom_edge"
         for group in self._layout:
             indices = group["zones"]
-            for sub, zone in zip(subdivide(group["region"], len(indices)), indices):
+            region = group["region"]
+            if bottom_edge:
+                x0, y0, x1, y1 = region
+                region = (x0, y1 - (y1 - y0) * 0.28, x1, y1)
+            for sub, zone in zip(subdivide(region, len(indices)), indices):
                 if 0 <= zone < self._zones:
                     self._targets[zone] = boost_saturation(avg_region(frame, CAP_W, CAP_H, sub), sat)
 
