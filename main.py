@@ -44,6 +44,8 @@ DEFAULTS = {
     "temperature_breathe": True,
     "indicator_on": True,
     "indicator_level": 100,
+    "remember_startup": True,
+    "startup_factory": None,
 }
 
 # How often the background watcher samples the AC adapter to react to plug/unplug
@@ -97,7 +99,20 @@ class Plugin:
         self._apu_temp = apu_temperature()
         self._apply_power_led()
         self._apply_indicator()
+        self._capture_startup_factory()
         self._ready = True
+
+    def _capture_startup_factory(self) -> None:
+        # Snapshot the untouched boot color ONCE, before we ever persist a custom one,
+        # so turning "remember at startup" off can hand the bar back to SteamOS.
+        if self._settings.get("startup_factory") is not None:
+            return
+        controller = self._controller
+        if hasattr(controller, "read_startup"):
+            factory = controller.read_startup()
+            if factory:
+                self._settings["startup_factory"] = factory
+                self._store.save(self._settings)
 
     def _build_context(self) -> dict:
         ambilight_available = shutil.which("gst-launch-1.0") is not None
@@ -367,6 +382,7 @@ class Plugin:
             "temperature": getattr(self, "_apu_temp", None),
             "indicatorOn": s.get("indicator_on", True),
             "indicatorLevel": s.get("indicator_level", 100),
+            "rememberStartup": s.get("remember_startup", True),
         }
 
     async def set_power(self, on: bool) -> None:
@@ -419,12 +435,15 @@ class Plugin:
         self._store.save(self._settings)
         self._apply_indicator()
 
-    async def save_startup_color(self) -> bool:
+    async def set_remember_startup(self, on: bool) -> None:
         self._init()
+        self._settings["remember_startup"] = on
         controller = self._controller
-        if hasattr(controller, "save_startup"):
-            return bool(controller.save_startup())
-        return False
+        if on:
+            self._maybe_persist_startup()
+        elif hasattr(controller, "restore_startup"):
+            controller.restore_startup(self._settings.get("startup_factory"))
+        self._store.save(self._settings)
 
     async def set_brightness(self, value: int) -> None:
         self._init()
@@ -435,16 +454,19 @@ class Plugin:
         self._init()
         self._settings["mode"] = mode
         self._save_and_apply()
+        self._maybe_persist_startup()
 
     async def set_solid(self, r: int, g: int, b: int) -> None:
         self._init()
         self._settings["color"] = [r, g, b]
         self._save_and_apply()
+        self._maybe_persist_startup()
 
     async def set_gradient(self, stops: list) -> None:
         self._init()
         self._settings["gradient"] = [list(stop) for stop in stops]
         self._save_and_apply()
+        self._maybe_persist_startup()
 
     async def set_gradient_speed(self, speed: int) -> None:
         self._init()
@@ -563,6 +585,17 @@ class Plugin:
         if indicator is None:
             return
         indicator.apply(self._settings.get("indicator_on", True), self._settings.get("indicator_level", 100))
+
+    def _maybe_persist_startup(self) -> None:
+        # Persist ONLY on discrete static-color changes (solid/gradient), never on the
+        # render loop or brightness drags, to spare the EC flash from per-frame writes.
+        if not self._settings.get("remember_startup"):
+            return
+        if self._settings.get("mode") not in ("solid", "gradient"):
+            return
+        controller = self._controller
+        if hasattr(controller, "save_startup"):
+            controller.save_startup()
 
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(

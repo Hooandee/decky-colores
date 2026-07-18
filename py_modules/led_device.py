@@ -229,6 +229,30 @@ class ValveLedsDevice(LedDevice):
             self.last_error = str(error)
             return False
 
+    def read_startup(self):
+        if not self._nodes:
+            return None
+        try:
+            intensities = [open(path).read().strip() for path in self._startup_paths]
+            level = open(self._brightness_startup_path).read().strip()
+            return {"intensities": intensities, "level": level}
+        except OSError:
+            return None
+
+    def restore_startup(self, saved):
+        if not self._nodes or not saved:
+            return False
+        try:
+            for path, value in zip(self._startup_paths, saved.get("intensities", [])):
+                self._write(path, value)
+            level = saved.get("level")
+            if level is not None and self._brightness_startup_path:
+                self._write(self._brightness_startup_path, str(level))
+            return True
+        except OSError as error:
+            self.last_error = str(error)
+            return False
+
 
 class IndicatorLed:
     def __init__(self, path, max_brightness=100):

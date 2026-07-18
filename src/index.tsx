@@ -520,7 +520,7 @@ function Content() {
     setPowerLed,
     setForceControl,
     setIndicator,
-    saveStartupColor,
+    setRememberStartup,
     setBatteryBreathe,
     setTemperatureBreathe,
     reconnect,
@@ -716,6 +716,7 @@ function Content() {
     temperatureBreathe,
     indicatorOn,
     indicatorLevel,
+    rememberStartup,
   } = state;
   const currentTemp = tempReading ?? state.temperature;
   const hasLeds = capabilities.color || capabilities.brightness;
@@ -1054,9 +1055,13 @@ function Content() {
           )}
           {capabilities.persistentStartup && (
             <PanelSectionRow>
-              <ButtonItem layout="below" onClick={() => saveStartupColor()}>
-                {t("startup.save")}
-              </ButtonItem>
+              <ToggleField
+                label={t("startup.remember")}
+                description={t("startup.remember.hint")}
+                checked={rememberStartup}
+                onChange={setRememberStartup}
+                bottomSeparator="none"
+              />
             </PanelSectionRow>
           )}
         </>

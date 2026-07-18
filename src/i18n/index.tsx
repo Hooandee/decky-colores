@@ -21,7 +21,8 @@ const es: Record<string, string> = {
   "indicator.label": "LED indicador",
   "indicator.hint": "El pequeño LED de estado, separado de la barra. Solo blanco.",
   "indicator.brightness": "Brillo del indicador",
-  "startup.save": "Guardar color de arranque",
+  "startup.remember": "Recordar al arrancar",
+  "startup.remember.hint": "Al fijar un color se guarda para que la barra arranque con él. Si lo apagas, al reiniciar la barra vuelve a SteamOS.",
   "forceControl.label": "Priorizar Colores",
   "forceControl.hint": "Recupera el control de las luces al abrir Colores.",
   "forceControl.notice":
@@ -208,7 +209,8 @@ const en: Record<string, string> = {
   "indicator.label": "Indicator LED",
   "indicator.hint": "The small status LED, separate from the bar. White only.",
   "indicator.brightness": "Indicator brightness",
-  "startup.save": "Save startup color",
+  "startup.remember": "Remember at startup",
+  "startup.remember.hint": "Setting a color saves it so the bar boots with it. Turn off to hand the bar back to SteamOS on the next reboot.",
   "forceControl.label": "Prioritize Colores",
   "forceControl.hint": "Reclaims the lights whenever you open Colores.",
   "forceControl.notice":

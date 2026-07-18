@@ -64,6 +64,10 @@ class FakeController:
         self.reconnected = True
         return True
 
+    def save_startup(self):
+        self.calls.append(("save_startup",))
+        return True
+
 
 class FakeEngine:
     def __init__(self):
@@ -158,6 +162,25 @@ def test_effective_power_truth_table(main_module, power, charger_only, ac_online
     p._settings["charger_only"] = charger_only
     p._ac_online = ac_online
     assert p._effective_power() is expected
+
+
+def test_persist_startup_only_on_static_modes_when_enabled(main_module):
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p._settings["remember_startup"] = True
+    p._maybe_persist_startup()
+    assert ("save_startup",) in p._controller.calls
+
+    # Effect mode: a per-frame frame is not a startup color, so never persist.
+    p2 = _plugin(main_module, "effect", hw=False, per_zone=True)
+    p2._settings["remember_startup"] = True
+    p2._maybe_persist_startup()
+    assert ("save_startup",) not in p2._controller.calls
+
+    # Toggle off: never persist, even in a static mode.
+    p3 = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p3._settings["remember_startup"] = False
+    p3._maybe_persist_startup()
+    assert ("save_startup",) not in p3._controller.calls
 
 
 def test_vu_mode_starts_audio_capture(main_module):

@@ -235,6 +235,25 @@ def test_valve_save_startup_noop_before_any_apply(tmp_path):
     assert device.save_startup() is False
 
 
+def test_valve_read_and_restore_startup_round_trip(tmp_path):
+    leds = _make_valve_bar(tmp_path, count=3)
+    nodes = discover_valve_leds(leds)
+    for i, node in enumerate(nodes):
+        open(os.path.join(node, "multi_intensity_startup"), "w").write(f"{i} 90 255")
+        open(os.path.join(node, "brightness_startup"), "w").write("56")
+    device = ValveLedsDevice(nodes)
+    factory = device.read_startup()
+    assert factory["intensities"][2] == "2 90 255"
+    assert factory["level"] == "56"
+    # A custom color persisted, then restore hands the factory value back.
+    device.apply_zones([(10, 20, 30)], 100, True)
+    device.save_startup()
+    assert _read(os.path.join(nodes[0], "multi_intensity_startup")) == "10 20 30"
+    assert device.restore_startup(factory) is True
+    assert _read(os.path.join(nodes[0], "multi_intensity_startup")) == "0 90 255"
+    assert _read(os.path.join(nodes[0], "brightness_startup")) == "56"
+
+
 def _make_indicator(tmp_path, max_brightness="100"):
     node = os.path.join(str(tmp_path), "status")
     os.makedirs(node)

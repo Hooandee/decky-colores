@@ -184,8 +184,12 @@ export function useColores() {
     pushIndicator(indicatorOn, indicatorLevel);
   };
 
-  const saveStartupColor = () =>
-    api.saveStartupColor().catch((e) => console.error("Colores: saveStartupColor failed", e));
+  const setRememberStartup = (rememberStartup: boolean) => {
+    setState((s) => (s ? { ...s, rememberStartup } : s));
+    api.setRememberStartup(rememberStartup).catch((e) =>
+      console.error("Colores: setRememberStartup failed", e),
+    );
+  };
 
   const setBatteryBreathe = (batteryBreathe: boolean) => {
     setState((s) => (s ? { ...s, batteryBreathe } : s));
@@ -236,7 +240,7 @@ export function useColores() {
     setPowerLed,
     setForceControl,
     setIndicator,
-    saveStartupColor,
+    setRememberStartup,
     setBatteryBreathe,
     setTemperatureBreathe,
     reconnect,

@@ -103,6 +103,7 @@ export interface ColoresState {
   temperature: number | null;
   indicatorOn: boolean;
   indicatorLevel: number;
+  rememberStartup: boolean;
 }
 
 export interface GradientPreset {
