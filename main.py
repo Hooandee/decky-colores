@@ -52,6 +52,11 @@ DEFAULTS = {
 # while the menu is closed. A couple of sysfs reads every few seconds is negligible.
 CHARGER_POLL_INTERVAL = 3.0
 
+# Seconds of quiet before committing a startup color to EC flash. The live color
+# applies immediately (volatile register); only this persisted copy touches flash,
+# so we debounce it — dragging the color wheel must not write flash on every frame.
+STARTUP_PERSIST_DELAY = 1.0
+
 # When "force control" is on, how often we re-assert our LED state to win it back
 # from another RGB tool (e.g. HHD) that keeps reapplying its own colors. A blind
 # re-write, not an ownership check. Only runs on devices that actually conflict.
@@ -587,15 +592,28 @@ class Plugin:
         indicator.apply(self._settings.get("indicator_on", True), self._settings.get("indicator_level", 100))
 
     def _maybe_persist_startup(self) -> None:
-        # Persist ONLY on discrete static-color changes (solid/gradient), never on the
-        # render loop or brightness drags, to spare the EC flash from per-frame writes.
+        # Persist ONLY on static-color modes, and DEBOUNCED: dragging the color wheel
+        # fires set_solid every ~60ms, but the flash write waits for the interaction to
+        # settle (STARTUP_PERSIST_DELAY), so one drag commits to flash once, not ~15x/s.
         if not self._settings.get("remember_startup"):
             return
         if self._settings.get("mode") not in ("solid", "gradient"):
             return
-        controller = self._controller
-        if hasattr(controller, "save_startup"):
-            controller.save_startup()
+        if not hasattr(self._controller, "save_startup"):
+            return
+        task = getattr(self, "_startup_task", None)
+        if task is not None and not task.done():
+            task.cancel()
+        self._startup_task = asyncio.create_task(self._persist_startup_after_delay())
+
+    async def _persist_startup_after_delay(self) -> None:
+        try:
+            await asyncio.sleep(STARTUP_PERSIST_DELAY)
+            self._controller.save_startup()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            decky.logger.warning("Colores: startup persist failed: %s", error)
 
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(
@@ -797,7 +815,7 @@ class Plugin:
             decky.logger.warning("Colores: force-control watch failed: %s", error)
 
     async def _unload(self):
-        for attr in ("_reassert_task", "_charger_task", "_force_control_task"):
+        for attr in ("_reassert_task", "_charger_task", "_force_control_task", "_startup_task"):
             task = getattr(self, attr, None)
             if task:
                 task.cancel()

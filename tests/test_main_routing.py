@@ -164,23 +164,39 @@ def test_effective_power_truth_table(main_module, power, charger_only, ac_online
     assert p._effective_power() is expected
 
 
-def test_persist_startup_only_on_static_modes_when_enabled(main_module):
-    p = _plugin(main_module, "solid", hw=False, per_zone=True)
-    p._settings["remember_startup"] = True
-    p._maybe_persist_startup()
-    assert ("save_startup",) in p._controller.calls
+def test_persist_startup_debounced_and_gated(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "STARTUP_PERSIST_DELAY", 0.01)
 
-    # Effect mode: a per-frame frame is not a startup color, so never persist.
-    p2 = _plugin(main_module, "effect", hw=False, per_zone=True)
-    p2._settings["remember_startup"] = True
-    p2._maybe_persist_startup()
-    assert ("save_startup",) not in p2._controller.calls
+    async def drive():
+        # Static mode + enabled: schedules and commits exactly once after the delay.
+        p = _plugin(main_module, "solid", hw=False, per_zone=True)
+        p._settings["remember_startup"] = True
+        p._maybe_persist_startup()
+        assert p._startup_task is not None
+        await p._startup_task
+        assert p._controller.calls.count(("save_startup",)) == 1
 
-    # Toggle off: never persist, even in a static mode.
-    p3 = _plugin(main_module, "solid", hw=False, per_zone=True)
-    p3._settings["remember_startup"] = False
-    p3._maybe_persist_startup()
-    assert ("save_startup",) not in p3._controller.calls
+        # Debounce: a burst of rapid changes (dragging the color wheel) commits ONCE,
+        # never once per change — this is the flash-wear protection.
+        p._maybe_persist_startup()
+        p._maybe_persist_startup()
+        p._maybe_persist_startup()
+        await p._startup_task
+        assert p._controller.calls.count(("save_startup",)) == 2  # one more, total two
+
+        # Effect mode: a per-frame color is never a startup color.
+        p2 = _plugin(main_module, "effect", hw=False, per_zone=True)
+        p2._settings["remember_startup"] = True
+        p2._maybe_persist_startup()
+        assert getattr(p2, "_startup_task", None) is None
+
+        # Toggle off: never persist, even in a static mode.
+        p3 = _plugin(main_module, "solid", hw=False, per_zone=True)
+        p3._settings["remember_startup"] = False
+        p3._maybe_persist_startup()
+        assert getattr(p3, "_startup_task", None) is None
+
+    asyncio.run(drive())
 
 
 def test_vu_mode_starts_audio_capture(main_module):
