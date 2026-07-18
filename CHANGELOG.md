@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.19.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.18.0...decky-colores-v0.19.0) (2026-07-18)
+
+
+### Features
+
+* ambilight sampling selector (columns / bottom edge) ([631a578](https://github.com/Hooandee/decky-colores/commit/631a57823af89a52d550d2c5a735d7c5fc27698b))
+* audio VU mode (bar reacts to system sound) ([d597dd0](https://github.com/Hooandee/decky-colores/commit/d597dd0e6ed05ab121d76fbba7c646d513d2f925))
+* clock ambient mode (bar color follows time of day) ([2f1c5ab](https://github.com/Hooandee/decky-colores/commit/2f1c5ab0b60047e87f29b25ebf27b94b69cbfd83))
+* indicator LED control and persistent startup color ([7451d3e](https://github.com/Hooandee/decky-colores/commit/7451d3e30a481d471d86623178aaeea9528b381d))
+* performance meter mode (GPU/CPU load as a fill bar) ([8d51d62](https://github.com/Hooandee/decky-colores/commit/8d51d62c1aa6a335737047c6e1456d625f69d989))
+* performance meter UI under the Sensors tab ([59eca97](https://github.com/Hooandee/decky-colores/commit/59eca976bf87a0c1b8326e9668517098cb61f747))
+* remember-at-startup toggle for the Steam Machine bar ([b958898](https://github.com/Hooandee/decky-colores/commit/b95889850f3564261c8ca19894e38bffc1578bf9))
+* Steam Machine (Valve Fremont) LED bar support ([f9000d2](https://github.com/Hooandee/decky-colores/commit/f9000d20bbf9c4f18805af66db7c55bbab95ad81))
+* Steam Machine (Valve Fremont) LED bar support ([7397426](https://github.com/Hooandee/decky-colores/commit/739742618e5c918516353ec680a5bfd06b346fb6))
+
+
+### Bug Fixes
+
+* debounce startup-color flash writes to protect the EC flash ([4387a24](https://github.com/Hooandee/decky-colores/commit/4387a24c34809069d0eecb5a535e3959593555b3))
+* remove indicator LED control (status:white drives no visible LED) ([8e648ca](https://github.com/Hooandee/decky-colores/commit/8e648ca7871315caaf016fc42e88a13870a87a30))
+
 ## [0.18.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.17.1...decky-colores-v0.18.0) (2026-07-10)
 
 
