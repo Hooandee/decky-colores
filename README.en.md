@@ -86,4 +86,7 @@ python -m pytest             # backend tests
 
 ## License
 
-BSD 3-Clause. See [LICENSE](LICENSE).
+GPL-3.0-or-later (copyleft). See [LICENSE](LICENSE). Any fork or distributed
+version must also release its source under the GPL — nobody can make it
+closed-source. Portions adapted from HueSync keep their BSD 3-Clause notice
+(GPL-compatible); see [NOTICE](NOTICE).
