@@ -1,6 +1,6 @@
 import os
 
-from py_modules.device import build_layout, detect_device, detect_capabilities, lookup_name, read_zone_format, build_capabilities, build_device
+from py_modules.device import build_layout, detect_device, detect_capabilities, lookup_name, read_zone_format, build_capabilities, build_device, find_indicator_led
 import led_device as _led_device_mod
 SysfsRgbDevice = _led_device_mod.SysfsRgbDevice
 NullDevice = _led_device_mod.NullDevice
@@ -214,6 +214,7 @@ def _make_valve_bar(root, count=17):
             "multi_index": "red green blue", "multi_intensity": "0 0 0",
             "brightness": "255", "max_brightness": "255", "effect": "normal", "enabled": "0",
         })
+    _make_led(root, "status:white", {"brightness": "0", "max_brightness": "100"})
 
 
 def test_build_device_steam_machine_is_valve_bar(tmp_path):
@@ -230,8 +231,20 @@ def test_build_device_steam_machine_is_valve_bar(tmp_path):
     assert caps["hasBattery"] is False  # desktop console: charger-only gate must be hidden
     assert caps["indicatorLed"] is True
     assert caps["persistentStartup"] is True
+    assert caps["performanceMode"] is True
+    assert ctx["indicator"] is not None and ctx["indicator"].available()
     assert caps["states"]["color"] == "supported"
     assert len(caps["layout"]) == 1 and caps["layout"][0]["kind"] == "bar"
+
+
+def test_find_indicator_led_picks_status_node(tmp_path):
+    root = str(tmp_path)
+    _make_led(root, "status:white", {"brightness": "0", "max_brightness": "100"})
+    _make_led(root, "valve-leds[0]", {"multi_intensity": "0 0 0", "multi_index": "red green blue", "brightness": "0"})
+    _make_led(root, "input1::capslock", {"brightness": "0", "max_brightness": "1"})
+    leds_dir = os.path.join(root, "sys/class/leds")
+    found = find_indicator_led(leds_dir)
+    assert found is not None and found.endswith("status:white")
 
 
 def test_build_device_steam_machine_without_driver_degrades(tmp_path):

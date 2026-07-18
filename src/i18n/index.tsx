@@ -18,6 +18,10 @@ const es: Record<string, string> = {
   "power.label": "Encendido",
   "chargerOnly.label": "Solo con cargador",
   "chargerOnly.hint": "Las luces se encienden solo cuando el cargador está conectado.",
+  "indicator.label": "LED indicador",
+  "indicator.hint": "El pequeño LED de estado, separado de la barra. Solo blanco.",
+  "indicator.brightness": "Brillo del indicador",
+  "startup.save": "Guardar color de arranque",
   "forceControl.label": "Priorizar Colores",
   "forceControl.hint": "Recupera el control de las luces al abrir Colores.",
   "forceControl.notice":
@@ -196,6 +200,10 @@ const en: Record<string, string> = {
   "power.label": "Power",
   "chargerOnly.label": "Only while charging",
   "chargerOnly.hint": "The lights turn on only when the charger is connected.",
+  "indicator.label": "Indicator LED",
+  "indicator.hint": "The small status LED, separate from the bar. White only.",
+  "indicator.brightness": "Indicator brightness",
+  "startup.save": "Save startup color",
   "forceControl.label": "Prioritize Colores",
   "forceControl.hint": "Reclaims the lights whenever you open Colores.",
   "forceControl.notice":

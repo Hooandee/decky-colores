@@ -40,6 +40,8 @@ DEFAULTS = {
     "force_control": False,
     "battery_breathe": True,
     "temperature_breathe": True,
+    "indicator_on": True,
+    "indicator_level": 100,
 }
 
 # How often the background watcher samples the AC adapter to react to plug/unplug
@@ -92,6 +94,7 @@ class Plugin:
         self._battery_level = 100 if level is None else level
         self._apu_temp = apu_temperature()
         self._apply_power_led()
+        self._apply_indicator()
         self._ready = True
 
     def _build_context(self) -> dict:
@@ -104,6 +107,7 @@ class Plugin:
         self._zones = self._capabilities.get("zones", 1) or 1
         self._controller = ctx["device"]
         self._power_led = ctx.get("power_led")
+        self._indicator = ctx.get("indicator")
         self._cpu_sampler = CpuSampler()
         self._engine = EffectEngine(self._render, self._zones)
         runtime_dir, uid, gid = _user_creds()
@@ -358,6 +362,8 @@ class Plugin:
             "batteryLevel": getattr(self, "_battery_level", 100),
             "temperatureBreathe": s.get("temperature_breathe", True),
             "temperature": getattr(self, "_apu_temp", None),
+            "indicatorOn": s.get("indicator_on", True),
+            "indicatorLevel": s.get("indicator_level", 100),
         }
 
     async def set_power(self, on: bool) -> None:
@@ -402,6 +408,20 @@ class Plugin:
         if value is None:
             value = getattr(self, "_perf_value", None)
         return value
+
+    async def set_indicator(self, on: bool, level: int) -> None:
+        self._init()
+        self._settings["indicator_on"] = on
+        self._settings["indicator_level"] = level
+        self._store.save(self._settings)
+        self._apply_indicator()
+
+    async def save_startup_color(self) -> bool:
+        self._init()
+        controller = self._controller
+        if hasattr(controller, "save_startup"):
+            return bool(controller.save_startup())
+        return False
 
     async def set_brightness(self, value: int) -> None:
         self._init()
@@ -526,6 +546,12 @@ class Plugin:
         if value is not None:
             self._perf_value = value
         return {"value": getattr(self, "_perf_value", None)}
+
+    def _apply_indicator(self) -> None:
+        indicator = getattr(self, "_indicator", None)
+        if indicator is None:
+            return
+        indicator.apply(self._settings.get("indicator_on", True), self._settings.get("indicator_level", 100))
 
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(

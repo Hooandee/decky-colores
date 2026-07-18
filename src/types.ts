@@ -90,6 +90,8 @@ export interface ColoresState {
   batteryLevel: number;
   temperatureBreathe: boolean;
   temperature: number | null;
+  indicatorOn: boolean;
+  indicatorLevel: number;
 }
 
 export interface GradientPreset {

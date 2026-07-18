@@ -515,6 +515,8 @@ function Content() {
     setExperiment,
     setPowerLed,
     setForceControl,
+    setIndicator,
+    saveStartupColor,
     setBatteryBreathe,
     setTemperatureBreathe,
     reconnect,
@@ -691,6 +693,8 @@ function Content() {
     batteryBreathe,
     batteryLevel,
     temperatureBreathe,
+    indicatorOn,
+    indicatorLevel,
   } = state;
   const currentTemp = tempReading ?? state.temperature;
   const hasLeds = capabilities.color || capabilities.brightness;
@@ -956,6 +960,41 @@ function Content() {
                 disabled={!power}
                 bottomSeparator="none"
               />
+            </PanelSectionRow>
+          )}
+          {capabilities.indicatorLed && (
+            <>
+              <PanelSectionRow>
+                <ToggleField
+                  label={t("indicator.label")}
+                  description={t("indicator.hint")}
+                  checked={indicatorOn}
+                  onChange={(v) => setIndicator(v, indicatorLevel)}
+                  bottomSeparator="none"
+                />
+              </PanelSectionRow>
+              {indicatorOn && (
+                <PanelSectionRow>
+                  <SliderField
+                    label={t("indicator.brightness")}
+                    value={indicatorLevel}
+                    min={0}
+                    max={100}
+                    step={5}
+                    valueSuffix="%"
+                    showValue
+                    onChange={(v) => setIndicator(indicatorOn, v)}
+                    bottomSeparator="none"
+                  />
+                </PanelSectionRow>
+              )}
+            </>
+          )}
+          {capabilities.persistentStartup && (
+            <PanelSectionRow>
+              <ButtonItem layout="below" onClick={() => saveStartupColor()}>
+                {t("startup.save")}
+              </ButtonItem>
             </PanelSectionRow>
           )}
         </>

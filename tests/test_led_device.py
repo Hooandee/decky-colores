@@ -1,6 +1,6 @@
 import os
 
-from py_modules.led_device import SysfsRgbDevice, ValveLedsDevice, discover_valve_leds
+from py_modules.led_device import SysfsRgbDevice, ValveLedsDevice, discover_valve_leds, IndicatorLed
 
 
 def _make_led(tmp_path, multi_index="rgb rgb rgb rgb"):
@@ -216,3 +216,44 @@ def test_valve_unavailable_without_nodes():
     device = ValveLedsDevice([])
     assert device.available is False
     assert device.apply_zones([(1, 2, 3)], 100, True) is False
+
+
+def test_valve_save_startup_writes_last_applied(tmp_path):
+    leds = _make_valve_bar(tmp_path, count=3)
+    nodes = discover_valve_leds(leds)
+    device = ValveLedsDevice(nodes, max_brightness=255)
+    device.apply_zones([(255, 0, 0), (0, 255, 0), (0, 0, 255)], 100, True)
+    assert device.save_startup() is True
+    assert _read(os.path.join(nodes[0], "multi_intensity_startup")) == "255 0 0"
+    assert _read(os.path.join(nodes[2], "multi_intensity_startup")) == "0 0 255"
+    assert _read(os.path.join(nodes[0], "brightness_startup")) == "255"
+
+
+def test_valve_save_startup_noop_before_any_apply(tmp_path):
+    leds = _make_valve_bar(tmp_path, count=2)
+    device = ValveLedsDevice(discover_valve_leds(leds))
+    assert device.save_startup() is False
+
+
+def _make_indicator(tmp_path, max_brightness="100"):
+    node = os.path.join(str(tmp_path), "status")
+    os.makedirs(node)
+    open(os.path.join(node, "brightness"), "w").write("0")
+    open(os.path.join(node, "max_brightness"), "w").write(max_brightness)
+    return node
+
+
+def test_indicator_apply_scales_and_off(tmp_path):
+    node = _make_indicator(tmp_path)
+    ind = IndicatorLed(node, 100)
+    assert ind.available() is True
+    ind.apply(True, 50)
+    assert _read(os.path.join(node, "brightness")) == "50"
+    ind.apply(False, 50)
+    assert _read(os.path.join(node, "brightness")) == "0"
+
+
+def test_indicator_unavailable_without_path():
+    ind = IndicatorLed(None)
+    assert ind.available() is False
+    assert ind.apply(True, 100) is False

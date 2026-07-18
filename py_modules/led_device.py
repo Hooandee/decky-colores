@@ -143,9 +143,12 @@ class ValveLedsDevice(LedDevice):
         self.last_error = None
         self._ctrl = self._nodes[0] if self._nodes else None
         self._intensity_paths = [os.path.join(p, "multi_intensity") for p in self._write_order]
+        self._startup_paths = [os.path.join(p, "multi_intensity_startup") for p in self._write_order]
         self._scale_path = os.path.join(self._ctrl, "brightness_scale") if self._ctrl else None
+        self._brightness_startup_path = os.path.join(self._ctrl, "brightness_startup") if self._ctrl else None
         self._manual_set = False
         self._last_level = None
+        self._last_intensity = None
 
     @property
     def available(self):
@@ -193,9 +196,13 @@ class ValveLedsDevice(LedDevice):
         level = self._level(brightness, power)
         try:
             self._ensure_manual()
+            values = []
             for path, color in zip(self._intensity_paths, self._fit(zone_colors)):
                 r, g, b = apply_gain(color, self._color_correction)
-                self._write(path, f"{r} {g} {b}")
+                text = f"{r} {g} {b}"
+                self._write(path, text)
+                values.append(text)
+            self._last_intensity = values
             if level != self._last_level:
                 self._write(self._scale_path, str(level))
                 self._last_level = level
@@ -208,3 +215,39 @@ class ValveLedsDevice(LedDevice):
 
     def apply_solid(self, color, brightness, power):
         return self.apply_zones([tuple(color)] * self._zones, brightness, power)
+
+    def save_startup(self):
+        if not self._nodes or self._last_intensity is None:
+            return False
+        try:
+            for path, value in zip(self._startup_paths, self._last_intensity):
+                self._write(path, value)
+            if self._last_level is not None and self._brightness_startup_path:
+                self._write(self._brightness_startup_path, str(self._last_level))
+            return True
+        except OSError as error:
+            self.last_error = str(error)
+            return False
+
+
+class IndicatorLed:
+    def __init__(self, path, max_brightness=100):
+        self._path = path
+        self._max = max_brightness or 100
+        self.last_error = None
+
+    def available(self):
+        return bool(self._path)
+
+    def apply(self, on, level):
+        if not self._path:
+            return False
+        pct = max(0, min(100, int(level)))
+        value = round((pct / 100) * self._max) if on else 0
+        try:
+            with open(os.path.join(self._path, "brightness"), "w") as handle:
+                handle.write(str(value))
+            return True
+        except OSError as error:
+            self.last_error = str(error)
+            return False
