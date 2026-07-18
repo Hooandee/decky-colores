@@ -8,9 +8,101 @@ from py_modules.effects import (
     frame_gradient_sweep,
     frame_rainbow,
     frame_spiral,
+    frame_comet,
+    frame_sparkle,
+    frame_ripple,
+    frame_aurora,
+    frame_meter,
+    clock_color,
     hsv_to_rgb,
     interpolate_gradient,
 )
+
+
+def test_clock_color_is_valid_and_varies_by_hour():
+    for hour in (0, 6, 9, 14, 18, 21, 23.5):
+        c = clock_color(hour)
+        assert len(c) == 3 and all(0 <= ch <= 255 for ch in c)
+    assert clock_color(2) != clock_color(13)  # night differs from midday
+
+
+def test_clock_color_wraps_around_midnight():
+    assert clock_color(0) == clock_color(24)
+
+
+def test_vu_silence_is_dark_and_loud_fills_from_center():
+    from py_modules.effects import frame_vu
+    assert all(c == (0, 0, 0) for c in frame_vu(0.0, 17))
+    loud = frame_vu(1.0, 17)
+    assert len(loud) == 17
+    assert sum(loud[8]) > 0  # center lit
+    quiet = frame_vu(0.25, 17)
+    assert sum(quiet[8]) > 0 and quiet[0] == (0, 0, 0)  # center lit, edges dark
+    assert frame_vu(0.5, 0) == []
+
+
+def test_meter_fills_proportionally():
+    frame = frame_meter(0.5, 10)
+    assert len(frame) == 10
+    lit = [c for c in frame if sum(c) > 0]
+    assert len(lit) == 5  # half of 10 zones lit
+
+
+def test_meter_zero_is_dark_and_full_is_all_lit():
+    assert all(c == (0, 0, 0) for c in frame_meter(0.0, 8))
+    assert all(sum(c) > 0 for c in frame_meter(1.0, 8))
+
+
+def test_meter_clamps_and_handles_zero_zones():
+    assert frame_meter(5.0, 4) == frame_meter(1.0, 4)
+    assert frame_meter(0.5, 0) == []
+
+
+def _base(n, color=(200, 100, 50)):
+    return [color] * n
+
+
+def test_comet_returns_one_color_per_zone_and_has_a_peak():
+    frame = frame_comet(_base(17), 0.0, 50)
+    assert len(frame) == 17
+    # At t=0 the comet sits at zone 0, so it is the brightest.
+    assert frame[0] == (200, 100, 50)
+    assert sum(frame[-1]) < sum(frame[0])
+
+
+def test_comet_is_deterministic():
+    assert frame_comet(_base(17), 1.3, 40) == frame_comet(_base(17), 1.3, 40)
+
+
+def test_sparkle_length_and_bounds():
+    frame = frame_sparkle(_base(17, (255, 255, 255)), 2.0, 60)
+    assert len(frame) == 17
+    for c in frame:
+        for ch in c:
+            assert 0 <= ch <= 255
+
+
+def test_sparkle_is_deterministic():
+    assert frame_sparkle(_base(17), 0.7, 50) == frame_sparkle(_base(17), 0.7, 50)
+
+
+def test_ripple_modulates_brightness_along_strip():
+    frame = frame_ripple(_base(17, (100, 100, 100)), 0.0, 50)
+    assert len(frame) == 17
+    assert len({c for c in frame}) > 1  # not uniform — a wave is present
+
+
+def test_aurora_fills_all_zones_with_color():
+    frame = frame_aurora(17, 0.5, 50)
+    assert len(frame) == 17
+    assert all(isinstance(c, tuple) and len(c) == 3 for c in frame)
+
+
+def test_new_effects_handle_zero_zones():
+    assert frame_comet([], 0.0, 50) == []
+    assert frame_sparkle([], 0.0, 50) == []
+    assert frame_ripple([], 0.0, 50) == []
+    assert frame_aurora(0, 0.0, 50) == []
 
 
 def _valid(color):

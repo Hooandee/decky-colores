@@ -3,6 +3,8 @@ import asyncio
 import py_modules.ambilight as ambilight_mod
 from py_modules.ambilight import (
     Ambilight,
+    CAP_W,
+    CAP_H,
     _gst_command,
     alpha_for,
     avg_region,
@@ -10,6 +12,30 @@ from py_modules.ambilight import (
     lerp,
     subdivide,
 )
+
+
+def _split_frame():
+    # Top half red, bottom half blue.
+    frame = bytearray(CAP_W * CAP_H * 3)
+    for y in range(CAP_H):
+        color = (255, 0, 0) if y < CAP_H // 2 else (0, 0, 255)
+        for x in range(CAP_W):
+            i = (y * CAP_W + x) * 3
+            frame[i], frame[i + 1], frame[i + 2] = color
+    return bytes(frame)
+
+
+def test_bottom_edge_sampling_favors_lower_band():
+    layout = [{"name": "Bar", "region": [0.0, 0.0, 1.0, 1.0], "zones": [0]}]
+    amb = Ambilight(lambda c: None, zones=1, runtime_dir=None, layout=layout)
+    amb._options = {"saturation": 1.0, "sampling": "columns"}
+    amb._update_targets(_split_frame())
+    columns_blue = amb._targets[0][2]
+    amb._options = {"saturation": 1.0, "sampling": "bottom_edge"}
+    amb._update_targets(_split_frame())
+    bottom = amb._targets[0]
+    assert bottom[2] > columns_blue  # bottom-edge is bluer than full-column average
+    assert bottom[2] > bottom[0]  # and blue-dominant
 
 
 def test_run_retries_when_source_missing(monkeypatch):

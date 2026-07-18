@@ -153,6 +153,47 @@ export const EFFECT_PRESETS: EffectMeta[] = [
       { r: 64, g: 224, b: 120 },
     ],
   },
+  {
+    id: "comet",
+    label: "Comet",
+    needs: "color",
+    description: "A bright dot sweeps back and forth with a fading tail.",
+    colors: [
+      { r: 0, g: 196, b: 255 },
+      { r: 124, g: 92, b: 255 },
+    ],
+  },
+  {
+    id: "sparkle",
+    label: "Sparkle",
+    needs: "color",
+    description: "LEDs twinkle at random over a dim base.",
+    colors: [
+      { r: 255, g: 255, b: 255 },
+      { r: 124, g: 180, b: 255 },
+    ],
+  },
+  {
+    id: "ripple",
+    label: "Ripple",
+    needs: "color",
+    description: "A gentle brightness wave glides softly along the bar.",
+    colors: [
+      { r: 0, g: 180, b: 216 },
+      { r: 144, g: 224, b: 239 },
+    ],
+  },
+  {
+    id: "aurora",
+    label: "Aurora",
+    needs: "none",
+    description: "Flowing greens, blues and purples drift like an aurora.",
+    colors: [
+      { r: 40, g: 224, b: 140 },
+      { r: 0, g: 160, b: 220 },
+      { r: 138, g: 92, b: 255 },
+    ],
+  },
 ];
 
 // Battery mode color bands (blue full -> red empty). Each entry is the inclusive
@@ -184,6 +225,74 @@ export const TEMPERATURE_BANDS: { min: number; color: RGB }[] = [
 ];
 
 export const TEMPERATURE_RANGE = { min: 40, max: 95 };
+
+const CLOCK_KEYS: [number, RGB][] = [
+  [0, { r: 12, g: 22, b: 64 }],
+  [6, { r: 255, g: 120, b: 40 }],
+  [9, { r: 170, g: 205, b: 255 }],
+  [14, { r: 255, g: 248, b: 230 }],
+  [18, { r: 255, g: 105, b: 40 }],
+  [21, { r: 40, g: 28, b: 92 }],
+  [24, { r: 12, g: 22, b: 64 }],
+];
+
+export function clockColor(hour: number): RGB {
+  const h = ((hour % 24) + 24) % 24;
+  for (let i = 0; i < CLOCK_KEYS.length - 1; i++) {
+    const [h0, c0] = CLOCK_KEYS[i];
+    const [h1, c1] = CLOCK_KEYS[i + 1];
+    if (h >= h0 && h <= h1) {
+      const f = h1 > h0 ? (h - h0) / (h1 - h0) : 0;
+      return { r: lerpChannel(c0.r, c1.r, f), g: lerpChannel(c0.g, c1.g, f), b: lerpChannel(c0.b, c1.b, f) };
+    }
+  }
+  return CLOCK_KEYS[0][1];
+}
+
+export const PERFORMANCE_STOPS: RGB[] = [
+  { r: 0, g: 230, b: 90 },
+  { r: 255, g: 200, b: 0 },
+  { r: 255, g: 40, b: 0 },
+];
+
+function lerpChannel(a: number, b: number, f: number): number {
+  return Math.round(a + (b - a) * f);
+}
+
+function sampleRamp(stops: RGB[], pos: number): RGB {
+  if (stops.length === 1) return stops[0];
+  const p = Math.max(0, Math.min(1, pos)) * (stops.length - 1);
+  const lo = Math.min(stops.length - 2, Math.floor(p));
+  const f = p - lo;
+  const a = stops[lo];
+  const b = stops[lo + 1];
+  return { r: lerpChannel(a.r, b.r, f), g: lerpChannel(a.g, b.g, f), b: lerpChannel(a.b, b.b, f) };
+}
+
+function fillBar(
+  zones: number,
+  fillOf: (i: number, n: number) => number,
+  posOf: (i: number, n: number) => number,
+): RGB[] {
+  const n = Math.max(1, zones);
+  return Array.from({ length: n }, (_, i) => {
+    const fill = Math.max(0, Math.min(1, fillOf(i, n)));
+    const ramp = sampleRamp(PERFORMANCE_STOPS, posOf(i, n));
+    return { r: Math.round(ramp.r * fill), g: Math.round(ramp.g * fill), b: Math.round(ramp.b * fill) };
+  });
+}
+
+export function performanceMeterColors(loadPct: number, zones: number): RGB[] {
+  const lit = (Math.max(0, Math.min(100, loadPct)) / 100) * Math.max(1, zones);
+  return fillBar(zones, (i) => lit - i, (i, n) => (n > 1 ? i / (n - 1) : 0));
+}
+
+export function audioVuColors(level: number, zones: number): RGB[] {
+  const n = Math.max(1, zones);
+  const center = (n - 1) / 2;
+  const reach = Math.max(0, Math.min(1, level)) * (n / 2);
+  return fillBar(zones, (i) => reach - Math.abs(i - center), (i) => (center ? Math.abs(i - center) / center : 0));
+}
 
 export function temperatureBandColor(temp: number): RGB {
   for (const band of TEMPERATURE_BANDS) {

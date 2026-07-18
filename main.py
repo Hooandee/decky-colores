@@ -3,6 +3,7 @@ import json
 import os
 import pwd
 import shutil
+import time
 
 import decky
 
@@ -11,8 +12,10 @@ from device import build_device
 from settings_store import SettingsStore
 from effects import EffectEngine, interpolate_gradient
 from ambilight import Ambilight
+from audio import AudioReactive
 from power_supply import charger_online, battery_level
 from thermal import apu_temperature
+from performance import gpu_busy_percent, CpuSampler
 from saved_gradients import upsert_gradient, remove_gradient
 import self_updater
 from report import collector as report_collector
@@ -31,7 +34,7 @@ DEFAULTS = {
     "gradient": [[0, 196, 255], [136, 86, 255]],
     "gradient_speed": 30,
     "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
-    "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
+    "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10, "sampling": "columns"},
     "saved_gradients": [],
     "enabled_experiments": [],
     "power_led_off": False,
@@ -39,11 +42,18 @@ DEFAULTS = {
     "force_control": False,
     "battery_breathe": True,
     "temperature_breathe": True,
+    "remember_startup": True,
+    "startup_factory": None,
 }
 
 # How often the background watcher samples the AC adapter to react to plug/unplug
 # while the menu is closed. A couple of sysfs reads every few seconds is negligible.
 CHARGER_POLL_INTERVAL = 3.0
+
+# Seconds of quiet before committing a startup color to EC flash. The live color
+# applies immediately (volatile register); only this persisted copy touches flash,
+# so we debounce it — dragging the color wheel must not write flash on every frame.
+STARTUP_PERSIST_DELAY = 1.0
 
 # When "force control" is on, how often we re-assert our LED state to win it back
 # from another RGB tool (e.g. HHD) that keeps reapplying its own colors. A blind
@@ -91,7 +101,20 @@ class Plugin:
         self._battery_level = 100 if level is None else level
         self._apu_temp = apu_temperature()
         self._apply_power_led()
+        self._capture_startup_factory()
         self._ready = True
+
+    def _capture_startup_factory(self) -> None:
+        # Snapshot the untouched boot color ONCE, before we ever persist a custom one,
+        # so turning "remember at startup" off can hand the bar back to SteamOS.
+        if self._settings.get("startup_factory") is not None:
+            return
+        controller = self._controller
+        if hasattr(controller, "read_startup"):
+            factory = controller.read_startup()
+            if factory:
+                self._settings["startup_factory"] = factory
+                self._store.save(self._settings)
 
     def _build_context(self) -> dict:
         ambilight_available = shutil.which("gst-launch-1.0") is not None
@@ -103,6 +126,7 @@ class Plugin:
         self._zones = self._capabilities.get("zones", 1) or 1
         self._controller = ctx["device"]
         self._power_led = ctx.get("power_led")
+        self._cpu_sampler = CpuSampler()
         self._engine = EffectEngine(self._render, self._zones)
         runtime_dir, uid, gid = _user_creds()
         self._ambilight = Ambilight(
@@ -113,6 +137,7 @@ class Plugin:
             gid,
             layout=self._capabilities.get("layout"),
         )
+        self._audio = AudioReactive(self._render, self._zones, runtime_dir, uid, gid)
 
     def _reprobe_device(self) -> bool:
         # Recover a controller that wasn't present at load (late USB HID enumeration on
@@ -356,6 +381,7 @@ class Plugin:
             "batteryLevel": getattr(self, "_battery_level", 100),
             "temperatureBreathe": s.get("temperature_breathe", True),
             "temperature": getattr(self, "_apu_temp", None),
+            "rememberStartup": s.get("remember_startup", True),
         }
 
     async def set_power(self, on: bool) -> None:
@@ -394,6 +420,23 @@ class Plugin:
         self._init()
         return getattr(self, "_apu_temp", None)
 
+    async def get_performance(self):
+        self._init()
+        value = gpu_busy_percent()
+        if value is None:
+            value = getattr(self, "_perf_value", None)
+        return value
+
+    async def set_remember_startup(self, on: bool) -> None:
+        self._init()
+        self._settings["remember_startup"] = on
+        controller = self._controller
+        if on:
+            self._maybe_persist_startup()
+        elif hasattr(controller, "restore_startup"):
+            controller.restore_startup(self._settings.get("startup_factory"))
+        self._store.save(self._settings)
+
     async def set_brightness(self, value: int) -> None:
         self._init()
         self._settings["brightness"] = value
@@ -403,16 +446,19 @@ class Plugin:
         self._init()
         self._settings["mode"] = mode
         self._save_and_apply()
+        self._maybe_persist_startup()
 
     async def set_solid(self, r: int, g: int, b: int) -> None:
         self._init()
         self._settings["color"] = [r, g, b]
         self._save_and_apply()
+        self._maybe_persist_startup()
 
     async def set_gradient(self, stops: list) -> None:
         self._init()
         self._settings["gradient"] = [list(stop) for stop in stops]
         self._save_and_apply()
+        self._maybe_persist_startup()
 
     async def set_gradient_speed(self, speed: int) -> None:
         self._init()
@@ -451,9 +497,23 @@ class Plugin:
         self._init()
         return self._ambilight.status
 
+    async def get_audio_status(self) -> str:
+        self._init()
+        return self._audio.status
+
     async def set_ambilight(self, saturation: int, smoothing: int, fps: int) -> None:
         self._init()
-        self._settings["ambilight"] = {"saturation": saturation, "smoothing": smoothing, "fps": fps}
+        self._settings["ambilight"] = {
+            **self._settings.get("ambilight", {}),
+            "saturation": saturation,
+            "smoothing": smoothing,
+            "fps": fps,
+        }
+        self._save_and_apply()
+
+    async def set_ambilight_sampling(self, mode: str) -> None:
+        self._init()
+        self._settings["ambilight"] = {**self._settings.get("ambilight", {}), "sampling": mode}
         self._save_and_apply()
 
     async def set_power_led(self, off: bool) -> None:
@@ -500,6 +560,42 @@ class Plugin:
             "breathe": self._settings.get("temperature_breathe", True),
         }
 
+    def _performance_state(self) -> dict:
+        value = gpu_busy_percent()
+        if value is None:
+            value = self._cpu_sampler.percent()
+        if value is not None:
+            self._perf_value = value
+        return {"value": getattr(self, "_perf_value", None)}
+
+    def _clock_state(self) -> dict:
+        lt = time.localtime()
+        return {"hour": lt.tm_hour + lt.tm_min / 60.0}
+
+    def _maybe_persist_startup(self) -> None:
+        # Persist ONLY on static-color modes, and DEBOUNCED: dragging the color wheel
+        # fires set_solid every ~60ms, but the flash write waits for the interaction to
+        # settle (STARTUP_PERSIST_DELAY), so one drag commits to flash once, not ~15x/s.
+        if not self._settings.get("remember_startup"):
+            return
+        if self._settings.get("mode") not in ("solid", "gradient"):
+            return
+        if not hasattr(self._controller, "save_startup"):
+            return
+        task = getattr(self, "_startup_task", None)
+        if task is not None and not task.done():
+            task.cancel()
+        self._startup_task = asyncio.create_task(self._persist_startup_after_delay())
+
+    async def _persist_startup_after_delay(self) -> None:
+        try:
+            await asyncio.sleep(STARTUP_PERSIST_DELAY)
+            self._controller.save_startup()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            decky.logger.warning("Colores: startup persist failed: %s", error)
+
     def _render(self, zone_colors) -> None:
         self._controller.apply_zones(
             zone_colors, self._settings["brightness"], self._effective_power()
@@ -520,7 +616,7 @@ class Plugin:
         # (per-zone or per-controller). Single-color devices render wave with
         # their native hardware effect instead of collapsing it to a flat color.
         s = self._settings
-        if s["mode"] in ("ambient", "battery", "temperature"):
+        if s["mode"] in ("ambient", "battery", "temperature", "performance", "clock", "vu"):
             return True
         if s["mode"] == "gradient":
             return not self._controller.supports_per_zone()
@@ -548,6 +644,7 @@ class Plugin:
     def _apply_hardware(self) -> None:
         s = self._settings
         self._ambilight.stop()
+        self._audio.stop()
         self._engine.stop()
         brightness = s["brightness"]
         power = self._effective_power()
@@ -570,10 +667,12 @@ class Plugin:
         s = self._settings
         if not self._effective_power():
             self._ambilight.stop()
+            self._audio.stop()
             self._engine.set_static([(0, 0, 0)] * self._zones)
             return
 
         if s["mode"] == "ambient":
+            self._audio.stop()
             self._engine.stop()
             amb = s["ambilight"]
             self._ambilight.start(
@@ -581,17 +680,29 @@ class Plugin:
                     "saturation": amb["saturation"] / 100.0,
                     "smoothing": amb["smoothing"],
                     "fps": amb.get("fps", 10),
+                    "sampling": amb.get("sampling", "columns"),
                     "fallback": tuple(s["color"]),
                 }
             )
             return
 
+        if s["mode"] == "vu":
+            self._ambilight.stop()
+            self._engine.stop()
+            self._audio.start()
+            return
+
         self._ambilight.stop()
+        self._audio.stop()
 
         if s["mode"] == "battery":
             self._engine.start_battery(self._battery_state)
         elif s["mode"] == "temperature":
             self._engine.start_temperature(self._temperature_state)
+        elif s["mode"] == "performance":
+            self._engine.start_performance(self._performance_state)
+        elif s["mode"] == "clock":
+            self._engine.start_clock(self._clock_state)
         elif s["mode"] == "effect":
             effect = s["effect"]
             self._engine.start_effect(
@@ -685,7 +796,7 @@ class Plugin:
             decky.logger.warning("Colores: force-control watch failed: %s", error)
 
     async def _unload(self):
-        for attr in ("_reassert_task", "_charger_task", "_force_control_task"):
+        for attr in ("_reassert_task", "_charger_task", "_force_control_task", "_startup_task"):
             task = getattr(self, attr, None)
             if task:
                 task.cancel()

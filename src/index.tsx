@@ -14,7 +14,7 @@ import { definePlugin } from "@decky/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus, getTemperature, reconnect as apiReconnect } from "./api";
+import { getAmbilightStatus, getAudioStatus, getTemperature, getPerformance, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -33,6 +33,10 @@ import {
   TEMPERATURE_BANDS,
   TEMPERATURE_RANGE,
   temperatureBandColor,
+  PERFORMANCE_STOPS,
+  performanceMeterColors,
+  audioVuColors,
+  clockColor,
 } from "./palette";
 import { Tabs } from "./components/Tabs";
 import { I18nProvider, useI18n } from "./i18n";
@@ -262,11 +266,11 @@ function SensorMeter({
   leftLabel: string;
   centerLabel: string;
   rightLabel: string;
-  breatheLabel: string;
-  breatheHint: string;
-  breathe: boolean;
+  breatheLabel?: string;
+  breatheHint?: string;
+  breathe?: boolean;
   disabled?: boolean;
-  onBreathe: (on: boolean) => void;
+  onBreathe?: (on: boolean) => void;
 }) {
   return (
     <>
@@ -323,16 +327,18 @@ function SensorMeter({
           </div>
         </div>
       </PanelSectionRow>
-      <PanelSectionRow>
-        <ToggleField
-          label={breatheLabel}
-          description={breatheHint}
-          checked={breathe}
-          disabled={disabled}
-          onChange={onBreathe}
-          bottomSeparator="none"
-        />
-      </PanelSectionRow>
+      {onBreathe && (
+        <PanelSectionRow>
+          <ToggleField
+            label={breatheLabel ?? ""}
+            description={breatheHint}
+            checked={!!breathe}
+            disabled={disabled}
+            onChange={onBreathe}
+            bottomSeparator="none"
+          />
+        </PanelSectionRow>
+      )}
     </>
   );
 }
@@ -401,11 +407,27 @@ function TemperaturePanel({
   );
 }
 
+function PerformancePanel({ load, disabled }: { load: number | null; disabled?: boolean }) {
+  const { t } = useI18n();
+  return (
+    <SensorMeter
+      hint={t("performance.hint")}
+      barStops={PERFORMANCE_STOPS}
+      markerPct={load}
+      leftLabel="0%"
+      centerLabel={load === null ? t("performance.noReading") : t("performance.reading", { n: Math.round(load) })}
+      rightLabel="100%"
+      disabled={disabled}
+    />
+  );
+}
+
 function SensorsPanel({
   mode,
   availableModes,
   level,
   temp,
+  load,
   batteryBreathe,
   temperatureBreathe,
   disabled,
@@ -417,6 +439,7 @@ function SensorsPanel({
   availableModes: Mode[];
   level: number;
   temp: number | null;
+  load: number | null;
   batteryBreathe: boolean;
   temperatureBreathe: boolean;
   disabled?: boolean;
@@ -434,12 +457,14 @@ function SensorsPanel({
               value={mode}
               tabs={availableModes}
               onChange={onSelectMode}
-              label={(m) => t(`sensors.${m}` as "sensors.battery" | "sensors.temperature")}
+              label={(m) => t(`sensors.${m}` as "sensors.battery" | "sensors.temperature" | "sensors.performance")}
             />
           </div>
         </PanelSectionRow>
       )}
-      {mode === "temperature" ? (
+      {mode === "performance" ? (
+        <PerformancePanel load={load} disabled={disabled} />
+      ) : mode === "temperature" ? (
         <TemperaturePanel
           temp={temp}
           breathe={temperatureBreathe}
@@ -465,6 +490,9 @@ function modeIdsFor(caps: Capabilities | null): Mode[] {
   modes.push("effect");
   if (caps.batteryMode) modes.push("battery");
   if (caps.temperatureMode) modes.push("temperature");
+  if (caps.performanceMode) modes.push("performance");
+  if (caps.clockMode) modes.push("clock");
+  if (caps.audioMode) modes.push("vu");
   if (caps.ambilight) modes.push("ambient");
   return modes;
 }
@@ -485,11 +513,13 @@ function Content() {
     setEffectSpeed,
     setEffectGradient,
     setAmbilight,
+    setAmbilightSampling,
     saveGradient,
     deleteGradient,
     setExperiment,
     setPowerLed,
     setForceControl,
+    setRememberStartup,
     setBatteryBreathe,
     setTemperatureBreathe,
     reconnect,
@@ -497,7 +527,9 @@ function Content() {
   const { t, lang } = useI18n();
   const { hasUpdate } = useUpdate(lang);
   const [ambStatus, setAmbStatus] = useState<string>("idle");
+  const [audStatus, setAudStatus] = useState<string>("idle");
   const [tempReading, setTempReading] = useState<number | null>(null);
+  const [perfReading, setPerfReading] = useState<number | null>(null);
   const [viewingSettings, setViewingSettings] = useState<boolean>(
     () => readActiveTab() === PINNED_TAB,
   );
@@ -590,6 +622,38 @@ function Content() {
     };
   }, [temperatureActive]);
 
+  const audioActive = state?.mode === "vu" && state?.power;
+  useEffect(() => {
+    if (!audioActive) return;
+    let alive = true;
+    const poll = () =>
+      getAudioStatus()
+        .then((v) => alive && setAudStatus(v))
+        .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 2000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [audioActive]);
+
+  const performanceActive = state?.mode === "performance" && state?.power;
+  useEffect(() => {
+    if (!performanceActive) return;
+    let alive = true;
+    const poll = () =>
+      getPerformance()
+        .then((v) => alive && setPerfReading(v))
+        .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 1500);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [performanceActive]);
+
   useEffect(() => {
     if (!state?.capabilities.conflictsWithSystemRgb || !state?.forceControl) return;
     apiReconnect().catch(() => {});
@@ -649,6 +713,7 @@ function Content() {
     batteryBreathe,
     batteryLevel,
     temperatureBreathe,
+    rememberStartup,
   } = state;
   const currentTemp = tempReading ?? state.temperature;
   const hasLeds = capabilities.color || capabilities.brightness;
@@ -689,6 +754,14 @@ function Content() {
         return [batteryBandColor(batteryLevel)];
       case "temperature":
         return [temperatureBandColor(currentTemp ?? TEMPERATURE_RANGE.min)];
+      case "performance":
+        return performanceMeterColors(perfReading ?? 0, capabilities.zones);
+      case "clock": {
+        const now = new Date();
+        return [clockColor(now.getHours() + now.getMinutes() / 60)];
+      }
+      case "vu":
+        return audioVuColors(0.6, capabilities.zones);
       default:
         return [color];
     }
@@ -794,6 +867,20 @@ function Content() {
                 {t("ambient.stickHint")}
               </div>
             </PanelSectionRow>
+            {capabilities.layoutKind === "bar" && (
+              <PanelSectionRow>
+                <div style={{ padding: "2px 0 10px" }}>
+                  <Tabs<string>
+                    value={ambilight.sampling}
+                    tabs={["columns", "bottom_edge"]}
+                    onChange={setAmbilightSampling}
+                    label={(m) =>
+                      t(`ambient.sampling.${m}` as "ambient.sampling.columns" | "ambient.sampling.bottom_edge")
+                    }
+                  />
+                </div>
+              </PanelSectionRow>
+            )}
             <PanelSectionRow>
               <SliderField
                 label={t("ambient.vividness")}
@@ -838,12 +925,14 @@ function Content() {
         );
       case "battery":
       case "temperature":
+      case "performance":
         return (
           <SensorsPanel
             mode={contentMode}
             availableModes={availableSensorModes}
             level={batteryLevel}
             temp={currentTemp}
+            load={perfReading}
             batteryBreathe={batteryBreathe}
             temperatureBreathe={temperatureBreathe}
             disabled={!power}
@@ -851,6 +940,41 @@ function Content() {
             onBatteryBreathe={setBatteryBreathe}
             onTemperatureBreathe={setTemperatureBreathe}
           />
+        );
+      case "clock":
+        return (
+          <PanelSectionRow>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "4px 2px 8px", lineHeight: 1.45 }}>
+              {t("clock.hint")}
+            </div>
+          </PanelSectionRow>
+        );
+      case "vu":
+        return (
+          <>
+            {power && audStatus === "no_source" && (
+              <PanelSectionRow>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#ffcf66",
+                    background: "rgba(255, 184, 0, 0.1)",
+                    border: "1px solid rgba(255, 184, 0, 0.3)",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {t("vu.noAudio")}
+                </div>
+              </PanelSectionRow>
+            )}
+            <PanelSectionRow>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "4px 2px 8px", lineHeight: 1.45 }}>
+                {t("vu.hint")}
+              </div>
+            </PanelSectionRow>
+          </>
         );
       default:
         return null;
@@ -873,6 +997,8 @@ function Content() {
               colors={previewColors}
               brightness={brightness}
               power={power}
+              layoutKind={capabilities.layoutKind}
+              segments={capabilities.zones}
               label={contentMode === "ambient" ? t("device.preview.ambient") : undefined}
             />
           </div>
@@ -884,16 +1010,29 @@ function Content() {
           <PanelSectionRow>
             <ToggleField label={t("power.label")} checked={power} onChange={setPower} bottomSeparator="none" />
           </PanelSectionRow>
-          <PanelSectionRow>
-            <ToggleField
-              label={t("chargerOnly.label")}
-              description={t("chargerOnly.hint")}
-              checked={chargerOnly}
-              onChange={setChargerOnly}
-              disabled={!power}
-              bottomSeparator="none"
-            />
-          </PanelSectionRow>
+          {capabilities.hasBattery && (
+            <PanelSectionRow>
+              <ToggleField
+                label={t("chargerOnly.label")}
+                description={t("chargerOnly.hint")}
+                checked={chargerOnly}
+                onChange={setChargerOnly}
+                disabled={!power}
+                bottomSeparator="none"
+              />
+            </PanelSectionRow>
+          )}
+          {capabilities.persistentStartup && (
+            <PanelSectionRow>
+              <ToggleField
+                label={t("startup.remember")}
+                description={t("startup.remember.hint")}
+                checked={rememberStartup}
+                onChange={setRememberStartup}
+                bottomSeparator="none"
+              />
+            </PanelSectionRow>
+          )}
         </>
       )}
 

@@ -181,7 +181,10 @@ export const GradientModal: FC<GradientModalProps> = ({
   const { t, lang } = useI18n();
   const groups =
     layout.length > 0 ? layout : [{ name: t("gradient.defaultGroup"), region: [], zones: [0, 1] }];
-  const count = Math.max(2, groups.reduce((n, g) => n + g.zones.length, 0));
+  const totalZones = Math.max(2, groups.reduce((n, g) => n + g.zones.length, 0));
+  const isBar = groups.length === 1 && groups[0].kind === "bar";
+  const BAR_STOPS = 5;
+  const count = isBar ? Math.min(BAR_STOPS, totalZones) : totalZones;
   const [stops, setStops] = useState<RGB[]>(() => expandGradient(initial, count));
   const [name, setName] = useState<string>(() => suggestGradientName(lang));
   const [tab, setTab] = useState<Tab>("presets");
@@ -202,18 +205,16 @@ export const GradientModal: FC<GradientModalProps> = ({
         : t("gradient.colorN", { n: i + 1 });
   const groupName = (name: string) =>
     LAYOUT_NAME_KEYS[name] ? t(LAYOUT_NAME_KEYS[name]) : name;
-  const cells = crossfade
-    ? groups.flatMap((group) => group.zones).map((zone, i, all) => ({
-        zone,
-        label: crossfadeLabel(i, all.length),
-      }))
-    : groups.flatMap((group) =>
-        group.zones.map((zone, i) => ({
-          zone,
-          label: group.zones.length > 1 ? `${groupName(group.name)} · ${i + 1}` : groupName(group.name),
-        })),
-      );
-  const tuneColumns = cells.length <= 1 ? 1 : 2;
+  const cells =
+    isBar || crossfade
+      ? Array.from({ length: count }, (_, i) => ({ zone: i, label: crossfadeLabel(i, count) }))
+      : groups.flatMap((group) =>
+          group.zones.map((zone, i) => ({
+            zone,
+            label: group.zones.length > 1 ? `${groupName(group.name)} · ${i + 1}` : groupName(group.name),
+          })),
+        );
+  const tuneColumns = 1;
 
   const setStopAt = (index: number, color: RGB) =>
     setStops((prev) => prev.map((c, i) => (i === index ? color : c)));
@@ -244,7 +245,7 @@ export const GradientModal: FC<GradientModalProps> = ({
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{t("gradient.title")}</div>
           <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 2 }}>
-            {t("gradient.zonesCaption", { n: count })}
+            {t("gradient.zonesCaption", { n: totalZones })}
           </div>
         </div>
 

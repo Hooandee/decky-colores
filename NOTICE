@@ -1,0 +1,15 @@
+Colores
+Copyright (C) 2026 Hooandee
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See the LICENSE file for the full text.
+
+Portions of the per-device lighting engine under py_modules/huesync/ are adapted
+from HueSync (Copyright (c) 2024 honjow) and Steam Deck Homebrew
+(Copyright (c) 2022-2024), originally released under the BSD 3-Clause License.
+That code retains its original BSD 3-Clause notice (see py_modules/huesync/LICENSE
+and py_modules/huesync/NOTICE). The BSD 3-Clause License is compatible with the
+GNU GPL, so the combined work is distributed under the GPL as stated above while
+those portions keep their original attribution.

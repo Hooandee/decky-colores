@@ -104,3 +104,19 @@ def test_ally_x_stays_sysfs_not_hid():  # regression guard: do NOT touch Ally X
         p = resolve_profile(board, "whatever")
         assert p["driver"] == "sysfs", f"{board} must stay sysfs"
         assert p.get("conflicts_with_system_rgb", False) is False
+
+
+def test_steam_machine_profile_by_board():
+    p = resolve_profile("Fremont", "Fremont")
+    assert p["name"] == "Steam Machine"
+    assert p["driver"] == "valve_leds"
+    assert p["zones"] == 17
+    assert p["layout_kind"] == "bar"
+    assert p["conflicts_with_system_rgb"] is True
+    assert p["persistent_startup"] is True
+
+
+def test_steam_machine_preproduction_by_product():
+    p = resolve_profile("", "F7F")
+    assert p["name"] == "Steam Machine"
+    assert p["driver"] == "valve_leds"

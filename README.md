@@ -86,4 +86,7 @@ python -m pytest             # tests del backend
 
 ## Licencia
 
-BSD 3-Clause. Ver [LICENSE](LICENSE).
+GPL-3.0-or-later (copyleft). Ver [LICENSE](LICENSE). Cualquier fork o versión
+distribuida debe publicar también su código bajo la GPL: nadie puede cerrarlo.
+Las porciones adaptadas de HueSync conservan su aviso BSD 3-Clause (compatible
+con la GPL); ver [NOTICE](NOTICE).

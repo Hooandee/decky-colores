@@ -34,12 +34,27 @@ const Keyframes: FC = () => (
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
+    @keyframes ${PREFIX}sweep {
+      0% { left: 0%; }
+      50% { left: 100%; }
+      100% { left: 0%; }
+    }
+    @keyframes ${PREFIX}twinkle {
+      0%, 100% { opacity: 0.15; transform: scale(0.7); }
+      50% { opacity: 1; transform: scale(1); }
+    }
   `}</style>
 );
 
 const stops = (colors: RGB[]): string => {
   const list = colors.length ? colors : [{ r: 120, g: 120, b: 120 }];
   return list.map(rgbToCss).join(", ");
+};
+
+const GRADIENT_ANIM: Partial<Record<EffectId, string>> = {
+  wave: `${PREFIX}travel 3s linear infinite`,
+  ripple: `${PREFIX}travel 4s ease-in-out infinite`,
+  aurora: `${PREFIX}travel 5s linear infinite, ${PREFIX}hue 7s linear infinite`,
 };
 
 const Thumb: FC<{ effect: EffectMeta }> = ({ effect }) => {
@@ -89,7 +104,8 @@ const Thumb: FC<{ effect: EffectMeta }> = ({ effect }) => {
     );
   }
 
-  if (effect.id === "wave") {
+  const gradientAnim = GRADIENT_ANIM[effect.id];
+  if (gradientAnim) {
     return (
       <div
         style={{
@@ -98,9 +114,56 @@ const Thumb: FC<{ effect: EffectMeta }> = ({ effect }) => {
             effect.colors.length ? rgbToCss(effect.colors[0]) : "#888"
           })`,
           backgroundSize: "200% 100%",
-          animation: `${PREFIX}travel 3s linear infinite`,
+          animation: gradientAnim,
         }}
       />
+    );
+  }
+
+  if (effect.id === "comet") {
+    const c = effect.colors[0] ?? { r: 255, g: 255, b: 255 };
+    return (
+      <div style={{ ...base, position: "relative", background: "rgba(0,0,0,0.3)" }}>
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            width: 14,
+            height: 14,
+            marginTop: -7,
+            marginLeft: -7,
+            borderRadius: "50%",
+            background: rgbToCss(c),
+            boxShadow: `0 0 12px ${rgbToCss(c)}`,
+            animation: `${PREFIX}sweep 2.4s ease-in-out infinite`,
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (effect.id === "sparkle") {
+    const c = effect.colors[0] ?? { r: 255, g: 255, b: 255 };
+    const dots = [8, 24, 40, 56, 72, 88];
+    return (
+      <div style={{ ...base, position: "relative", background: "rgba(0,0,0,0.3)" }}>
+        {dots.map((x, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              top: i % 2 ? "32%" : "62%",
+              left: `${x}%`,
+              width: 5,
+              height: 5,
+              borderRadius: "50%",
+              background: rgbToCss(c),
+              boxShadow: `0 0 6px ${rgbToCss(c)}`,
+              animation: `${PREFIX}twinkle ${1.2 + 0.25 * i}s ease-in-out ${0.18 * i}s infinite`,
+            }}
+          />
+        ))}
+      </div>
     );
   }
 

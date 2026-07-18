@@ -57,6 +57,18 @@ LEGION_GO_S_HID = {
     "experimental": [],
 }
 
+VALVE_LEDS = {
+    "driver": "valve_leds",
+    "color_order": "rgb",
+    "zones": 17,
+    "layout_kind": "bar",
+    "reverse_zones": True,
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle", "comet", "sparkle", "ripple", "aurora"],
+    "conflicts_with_system_rgb": True,
+    "persistent_startup": True,
+    "experimental": [],
+}
+
 GENERIC = {
     "driver": "sysfs",
     "color_order": "rgb",
@@ -106,6 +118,8 @@ PROFILES = [
     ("product", "83Q3", _profile(LEGION_GO_S_HID, "Legion Go S", POWER_LED_LPBL)),
     ("product_contains", "Claw 8 AI+", _profile(MSI_HID, "MSI Claw 8 AI+")),
     ("product_contains", "Claw A1M", _profile(MSI_HID, "MSI Claw")),
+    ("board", "Fremont", _profile(VALVE_LEDS, "Steam Machine")),
+    ("product", "F7F", _profile(VALVE_LEDS, "Steam Machine")),
 ]
 
 

@@ -14,6 +14,7 @@ export interface ZoneGroup {
   name: string;
   region: number[];
   zones: number[];
+  kind?: string;
 }
 
 export interface Capabilities {
@@ -34,20 +35,45 @@ export interface Capabilities {
   states: Record<string, "supported" | "experimental" | "unsupported">;
   enabledExperiments: string[];
   powerLed: boolean;
+  hasBattery: boolean;
   batteryMode: boolean;
   temperatureMode: boolean;
+  performanceMode: boolean;
+  clockMode: boolean;
+  audioMode: boolean;
   conflictsWithSystemRgb: boolean;
+  persistentStartup: boolean;
+  layoutKind: string;
 }
 
-export type Mode = "solid" | "gradient" | "effect" | "ambient" | "battery" | "temperature";
+export type Mode =
+  | "solid"
+  | "gradient"
+  | "effect"
+  | "ambient"
+  | "battery"
+  | "temperature"
+  | "performance"
+  | "clock"
+  | "vu";
 
 export interface AmbilightState {
   saturation: number;
   smoothing: number;
   fps: number;
+  sampling: string;
 }
 
-export type EffectId = "breathing" | "rainbow" | "wave" | "cycle" | "spiral";
+export type EffectId =
+  | "breathing"
+  | "rainbow"
+  | "wave"
+  | "cycle"
+  | "spiral"
+  | "comet"
+  | "sparkle"
+  | "ripple"
+  | "aurora";
 
 export interface EffectState {
   id: EffectId;
@@ -74,6 +100,7 @@ export interface ColoresState {
   batteryLevel: number;
   temperatureBreathe: boolean;
   temperature: number | null;
+  rememberStartup: boolean;
 }
 
 export interface GradientPreset {

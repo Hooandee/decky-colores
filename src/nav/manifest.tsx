@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { LuCircle, LuBlend, LuSparkles, LuGauge, LuTv, LuSettings } from "react-icons/lu";
+import { LuCircle, LuBlend, LuSparkles, LuGauge, LuTv, LuSettings, LuClock, LuAudioLines } from "react-icons/lu";
 
 export interface TabMeta {
   id: string;
@@ -11,7 +11,7 @@ export const PINNED_TAB = "settings";
 
 // Container tab: its id is not a backend mode; battery/temperature map onto it.
 export const SENSOR_TAB = "sensors";
-export const SENSOR_MODES = ["battery", "temperature"] as const;
+export const SENSOR_MODES = ["battery", "temperature", "performance"] as const;
 
 export function tabForMode(mode: string): string {
   return (SENSOR_MODES as readonly string[]).includes(mode) ? SENSOR_TAB : mode;
@@ -24,6 +24,8 @@ export const TAB_META: TabMeta[] = [
   { id: "gradient", labelKey: "mode.gradient", icon: <LuBlend size={ICON} /> },
   { id: "effect", labelKey: "mode.effect", icon: <LuSparkles size={ICON} /> },
   { id: SENSOR_TAB, labelKey: "nav.sensors", icon: <LuGauge size={ICON} /> },
+  { id: "clock", labelKey: "mode.clock", icon: <LuClock size={ICON} /> },
+  { id: "vu", labelKey: "mode.vu", icon: <LuAudioLines size={ICON} /> },
   { id: "ambient", labelKey: "mode.ambient", icon: <LuTv size={ICON} /> },
   { id: PINNED_TAB, labelKey: "nav.settings", icon: <LuSettings size={ICON} /> },
 ];

@@ -138,8 +138,15 @@ export function useColores() {
   const setEffectGradient = (useGradient: boolean) => updateEffect({ useGradient });
 
   const setAmbilight = (saturation: number, smoothing: number, fps: number) => {
-    setState((s) => (s ? { ...s, ambilight: { saturation, smoothing, fps } } : s));
+    setState((s) => (s ? { ...s, ambilight: { ...s.ambilight, saturation, smoothing, fps } } : s));
     pushAmbilight(saturation, smoothing, fps);
+  };
+
+  const setAmbilightSampling = (sampling: string) => {
+    setState((s) => (s ? { ...s, ambilight: { ...s.ambilight, sampling } } : s));
+    api.setAmbilightSampling(sampling).catch((e) =>
+      console.error("Colores: setAmbilightSampling failed", e),
+    );
   };
 
   const saveGradient = (name: string, stops: RGB[]) => {
@@ -168,6 +175,13 @@ export function useColores() {
     setState((s) => (s ? { ...s, forceControl } : s));
     api.setForceControl(forceControl).catch((e) =>
       console.error("Colores: setForceControl failed", e),
+    );
+  };
+
+  const setRememberStartup = (rememberStartup: boolean) => {
+    setState((s) => (s ? { ...s, rememberStartup } : s));
+    api.setRememberStartup(rememberStartup).catch((e) =>
+      console.error("Colores: setRememberStartup failed", e),
     );
   };
 
@@ -213,11 +227,13 @@ export function useColores() {
     setEffectSpeed,
     setEffectGradient,
     setAmbilight,
+    setAmbilightSampling,
     saveGradient,
     deleteGradient,
     setExperiment,
     setPowerLed,
     setForceControl,
+    setRememberStartup,
     setBatteryBreathe,
     setTemperatureBreathe,
     reconnect,

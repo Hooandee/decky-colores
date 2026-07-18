@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import math
+from functools import lru_cache
 
 logger = logging.getLogger("colores.effects")
 
@@ -161,6 +162,120 @@ def frame_gradient_sweep(stops, zones, t, speed):
     return [color for _ in range(zones)]
 
 
+@lru_cache(maxsize=None)
+def _hash01(a, b):
+    x = math.sin(a * 127.1 + b * 311.7) * 43758.5453
+    return x - math.floor(x)
+
+
+def frame_comet(base, t, speed):
+    zones = len(base)
+    if zones <= 0:
+        return []
+    span = zones - 1 if zones > 1 else 1
+    phase = (_freq(speed) * t) % 2.0
+    pos = phase * span if phase <= 1.0 else (2.0 - phase) * span
+    tail = max(1.5, zones * 0.18)
+    result = []
+    for i in range(zones):
+        b = max(0.0, 1.0 - abs(i - pos) / tail)
+        b *= b
+        c = base[i]
+        result.append((clamp8(c[0] * b), clamp8(c[1] * b), clamp8(c[2] * b)))
+    return result
+
+
+def frame_sparkle(base, t, speed):
+    zones = len(base)
+    if zones <= 0:
+        return []
+    f = _freq(speed)
+    floor = 0.10
+    result = []
+    for i in range(zones):
+        ph = (f * 0.8 * t + _hash01(i, 1.0)) % 1.0
+        tw = max(0.0, 1.0 - abs(ph - 0.5) * 2.0) ** 3
+        factor = floor + (1.0 - floor) * tw
+        c = base[i]
+        result.append((clamp8(c[0] * factor), clamp8(c[1] * factor), clamp8(c[2] * factor)))
+    return result
+
+
+def frame_ripple(base, t, speed):
+    zones = len(base)
+    if zones <= 0:
+        return []
+    f = _freq(speed)
+    waves = 2.0
+    result = []
+    for i in range(zones):
+        phase = 2 * math.pi * (f * t - (i / zones) * waves)
+        b = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(phase))
+        c = base[i]
+        result.append((clamp8(c[0] * b), clamp8(c[1] * b), clamp8(c[2] * b)))
+    return result
+
+
+def frame_aurora(zones, t, speed):
+    if zones <= 0:
+        return []
+    f = _freq(speed)
+    result = []
+    for i in range(zones):
+        h = 150.0 + 80.0 * math.sin(2 * math.pi * (f * 0.25 * t + i / zones)) \
+            + 40.0 * math.sin(2 * math.pi * (f * 0.15 * t + i * 2.0 / zones))
+        v = 0.6 + 0.4 * (0.5 + 0.5 * math.sin(2 * math.pi * (f * 0.3 * t + i / zones * 1.5)))
+        result.append(hsv_to_rgb(h % 360.0, 0.85, v))
+    return result
+
+
+METER_RAMP = [(0, 230, 90), (255, 200, 0), (255, 40, 0)]
+
+
+def _fill_bar(zones, fill_of, pos_of):
+    result = []
+    for i in range(zones):
+        fill = max(0.0, min(1.0, fill_of(i)))
+        r, g, b = _sample_stops(METER_RAMP, pos_of(i))
+        result.append((clamp8(r * fill), clamp8(g * fill), clamp8(b * fill)))
+    return result
+
+
+def frame_meter(value01, zones):
+    if zones <= 0:
+        return []
+    lit = max(0.0, min(1.0, value01)) * zones
+    return _fill_bar(zones, lambda i: lit - i, lambda i: i / (zones - 1) if zones > 1 else 0.0)
+
+
+CLOCK_KEYS = [
+    (0.0, (12, 22, 64)),
+    (6.0, (255, 120, 40)),
+    (9.0, (170, 205, 255)),
+    (14.0, (255, 248, 230)),
+    (18.0, (255, 105, 40)),
+    (21.0, (40, 28, 92)),
+    (24.0, (12, 22, 64)),
+]
+
+
+def clock_color(hour):
+    h = hour % 24.0
+    for (h0, c0), (h1, c1) in zip(CLOCK_KEYS, CLOCK_KEYS[1:]):
+        if h0 <= h <= h1:
+            f = (h - h0) / (h1 - h0) if h1 > h0 else 0.0
+            return tuple(clamp8(c0[j] + (c1[j] - c0[j]) * f) for j in range(3))
+    return CLOCK_KEYS[0][1]
+
+
+def frame_vu(level, zones):
+    if zones <= 0:
+        return []
+    center = (zones - 1) / 2.0
+    reach = max(0.0, min(1.0, level)) * (zones / 2.0)
+    return _fill_bar(zones, lambda i: reach - abs(i - center), lambda i: abs(i - center) / center if center else 0.0)
+
+
 def battery_band_color(level):
     for threshold, color in BATTERY_BANDS:
         if level >= threshold:
@@ -218,6 +333,24 @@ class EffectEngine:
             "temperature",
         )
 
+    def start_clock(self, state_fn):
+        self._start_indicator(
+            "__clock__",
+            state_fn,
+            lambda st: clock_color(st.get("hour", 12)),
+            lambda st: False,
+            "clock",
+        )
+
+    def start_performance(self, state_fn):
+        sig = ("__performance__",)
+        if self.running and sig == self._sig:
+            return
+        self.stop()
+        self._sig = sig
+        loop = asyncio.get_event_loop()
+        self._task = loop.create_task(self._run_performance(state_fn))
+
     def _start_indicator(self, sig_key, state_fn, target_fn, breathe_fn, label):
         # state_fn() returns the LIVE state each frame, so the loop reacts without a
         # restart. Fixed per-mode signature: a re-apply (e.g. a brightness change) is
@@ -253,6 +386,14 @@ class EffectEngine:
             return frame_cycle(self._zones, t, speed)
         if effect_id == "gradient_sweep":
             return frame_gradient_sweep(params.get("stops", [(255, 255, 255)]), self._zones, t, speed)
+        if effect_id == "comet":
+            return frame_comet(prepared if prepared is not None else self._palette(params), t, speed)
+        if effect_id == "sparkle":
+            return frame_sparkle(prepared if prepared is not None else self._palette(params), t, speed)
+        if effect_id == "ripple":
+            return frame_ripple(prepared if prepared is not None else self._palette(params), t, speed)
+        if effect_id == "aurora":
+            return frame_aurora(self._zones, t, speed)
         return [(0, 0, 0) for _ in range(self._zones)]
 
     async def _run_indicator(self, state_fn, target_fn, breathe_fn, label):
@@ -301,6 +442,8 @@ class EffectEngine:
             prepared = interpolate_gradient(
                 params.get("stops", [(255, 0, 0), (0, 0, 255)]), self._zones
             )
+        elif effect_id in ("comet", "sparkle", "ripple"):
+            prepared = self._palette(params)
         while True:
             try:
                 t = loop.time() - start
@@ -310,4 +453,18 @@ class EffectEngine:
                 raise
             except Exception:
                 logger.exception("effect frame failed")
+            await asyncio.sleep(FRAME_INTERVAL)
+
+    async def _run_performance(self, state_fn):
+        displayed = 0.0
+        while True:
+            try:
+                value = state_fn().get("value")
+                target = 0.0 if value is None else max(0.0, min(1.0, value / 100.0))
+                displayed += (target - displayed) * 0.25
+                self._apply_zones(frame_meter(displayed, self._zones))
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("performance frame failed")
             await asyncio.sleep(FRAME_INTERVAL)
