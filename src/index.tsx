@@ -35,6 +35,7 @@ import {
   temperatureBandColor,
   PERFORMANCE_STOPS,
   performanceMeterColors,
+  clockColor,
 } from "./palette";
 import { Tabs } from "./components/Tabs";
 import { I18nProvider, useI18n } from "./i18n";
@@ -489,6 +490,7 @@ function modeIdsFor(caps: Capabilities | null): Mode[] {
   if (caps.batteryMode) modes.push("battery");
   if (caps.temperatureMode) modes.push("temperature");
   if (caps.performanceMode) modes.push("performance");
+  if (caps.clockMode) modes.push("clock");
   if (caps.ambilight) modes.push("ambient");
   return modes;
 }
@@ -737,6 +739,10 @@ function Content() {
         return [temperatureBandColor(currentTemp ?? TEMPERATURE_RANGE.min)];
       case "performance":
         return performanceMeterColors(perfReading ?? 0, capabilities.zones);
+      case "clock": {
+        const now = new Date();
+        return [clockColor(now.getHours() + now.getMinutes() / 60)];
+      }
       default:
         return [color];
     }
@@ -915,6 +921,14 @@ function Content() {
             onBatteryBreathe={setBatteryBreathe}
             onTemperatureBreathe={setTemperatureBreathe}
           />
+        );
+      case "clock":
+        return (
+          <PanelSectionRow>
+            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "4px 2px 8px", lineHeight: 1.45 }}>
+              {t("clock.hint")}
+            </div>
+          </PanelSectionRow>
         );
       default:
         return null;

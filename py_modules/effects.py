@@ -244,6 +244,26 @@ def frame_meter(value01, zones):
     return result
 
 
+CLOCK_KEYS = [
+    (0.0, (12, 22, 64)),
+    (6.0, (255, 120, 40)),
+    (9.0, (170, 205, 255)),
+    (14.0, (255, 248, 230)),
+    (18.0, (255, 105, 40)),
+    (21.0, (40, 28, 92)),
+    (24.0, (12, 22, 64)),
+]
+
+
+def clock_color(hour):
+    h = hour % 24.0
+    for (h0, c0), (h1, c1) in zip(CLOCK_KEYS, CLOCK_KEYS[1:]):
+        if h0 <= h <= h1:
+            f = (h - h0) / (h1 - h0) if h1 > h0 else 0.0
+            return tuple(clamp8(c0[j] + (c1[j] - c0[j]) * f) for j in range(3))
+    return CLOCK_KEYS[0][1]
+
+
 def battery_band_color(level):
     for threshold, color in BATTERY_BANDS:
         if level >= threshold:
@@ -299,6 +319,15 @@ class EffectEngine:
             lambda st: None if st.get("temp") is None else temperature_band_color(st["temp"]),
             lambda st: bool(st.get("breathe")) and st.get("temp") is not None and st["temp"] >= TEMPERATURE_CRITICAL,
             "temperature",
+        )
+
+    def start_clock(self, state_fn):
+        self._start_indicator(
+            "__clock__",
+            state_fn,
+            lambda st: clock_color(st.get("hour", 12)),
+            lambda st: False,
+            "clock",
         )
 
     def start_performance(self, state_fn):

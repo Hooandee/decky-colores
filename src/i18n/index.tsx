@@ -33,6 +33,8 @@ const es: Record<string, string> = {
   "mode.gradient": "Degradado",
   "mode.effect": "Efecto",
   "mode.ambient": "Ambilight",
+  "mode.clock": "Reloj",
+  "clock.hint": "El color de la barra sigue la hora del día, cálido al amanecer y anochecer, fresco al mediodía. Es automático.",
   "mode.battery": "Batería",
   "mode.temperature": "Temperatura",
 
@@ -215,6 +217,8 @@ const en: Record<string, string> = {
   "mode.gradient": "Gradient",
   "mode.effect": "Effect",
   "mode.ambient": "Ambient",
+  "mode.clock": "Clock",
+  "clock.hint": "The bar color follows the time of day, warm at sunrise and sunset, cool at midday. It is automatic.",
   "mode.battery": "Battery",
   "mode.temperature": "Temperature",
 

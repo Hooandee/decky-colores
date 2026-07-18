@@ -13,9 +13,21 @@ from py_modules.effects import (
     frame_ripple,
     frame_aurora,
     frame_meter,
+    clock_color,
     hsv_to_rgb,
     interpolate_gradient,
 )
+
+
+def test_clock_color_is_valid_and_varies_by_hour():
+    for hour in (0, 6, 9, 14, 18, 21, 23.5):
+        c = clock_color(hour)
+        assert len(c) == 3 and all(0 <= ch <= 255 for ch in c)
+    assert clock_color(2) != clock_color(13)  # night differs from midday
+
+
+def test_clock_color_wraps_around_midnight():
+    assert clock_color(0) == clock_color(24)
 
 
 def test_meter_fills_proportionally():

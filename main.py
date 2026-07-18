@@ -3,6 +3,7 @@ import json
 import os
 import pwd
 import shutil
+import time
 
 import decky
 
@@ -547,6 +548,10 @@ class Plugin:
             self._perf_value = value
         return {"value": getattr(self, "_perf_value", None)}
 
+    def _clock_state(self) -> dict:
+        lt = time.localtime()
+        return {"hour": lt.tm_hour + lt.tm_min / 60.0}
+
     def _apply_indicator(self) -> None:
         indicator = getattr(self, "_indicator", None)
         if indicator is None:
@@ -573,7 +578,7 @@ class Plugin:
         # (per-zone or per-controller). Single-color devices render wave with
         # their native hardware effect instead of collapsing it to a flat color.
         s = self._settings
-        if s["mode"] in ("ambient", "battery", "temperature", "performance"):
+        if s["mode"] in ("ambient", "battery", "temperature", "performance", "clock"):
             return True
         if s["mode"] == "gradient":
             return not self._controller.supports_per_zone()
@@ -648,6 +653,8 @@ class Plugin:
             self._engine.start_temperature(self._temperature_state)
         elif s["mode"] == "performance":
             self._engine.start_performance(self._performance_state)
+        elif s["mode"] == "clock":
+            self._engine.start_clock(self._clock_state)
         elif s["mode"] == "effect":
             effect = s["effect"]
             self._engine.start_effect(

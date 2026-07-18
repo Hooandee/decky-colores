@@ -169,6 +169,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "batteryMode": bool(battery) and active["color"],
         "temperatureMode": bool(temperature) and active["color"],
         "performanceMode": active["color"],
+        "clockMode": active["color"],
         "conflictsWithSystemRgb": bool(profile.get("conflicts_with_system_rgb", False)),
         "indicatorLed": bool(profile.get("indicator_led", False)),
         "persistentStartup": bool(profile.get("persistent_startup", False)),

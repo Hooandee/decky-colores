@@ -226,6 +226,34 @@ export const TEMPERATURE_BANDS: { min: number; color: RGB }[] = [
 
 export const TEMPERATURE_RANGE = { min: 40, max: 95 };
 
+// Circadian clock ramp: hour of day -> color. Mirrors the backend CLOCK_KEYS.
+const CLOCK_KEYS: [number, RGB][] = [
+  [0, { r: 12, g: 22, b: 64 }],
+  [6, { r: 255, g: 120, b: 40 }],
+  [9, { r: 170, g: 205, b: 255 }],
+  [14, { r: 255, g: 248, b: 230 }],
+  [18, { r: 255, g: 105, b: 40 }],
+  [21, { r: 40, g: 28, b: 92 }],
+  [24, { r: 12, g: 22, b: 64 }],
+];
+
+export function clockColor(hour: number): RGB {
+  const h = ((hour % 24) + 24) % 24;
+  for (let i = 0; i < CLOCK_KEYS.length - 1; i++) {
+    const [h0, c0] = CLOCK_KEYS[i];
+    const [h1, c1] = CLOCK_KEYS[i + 1];
+    if (h >= h0 && h <= h1) {
+      const f = h1 > h0 ? (h - h0) / (h1 - h0) : 0;
+      return {
+        r: Math.round(c0.r + (c1.r - c0.r) * f),
+        g: Math.round(c0.g + (c1.g - c0.g) * f),
+        b: Math.round(c0.b + (c1.b - c0.b) * f),
+      };
+    }
+  }
+  return CLOCK_KEYS[0][1];
+}
+
 // Performance meter ramp (green -> yellow -> red). Mirrors the backend METER_RAMP
 // (py_modules/effects.py); drives the panel bar and the on-screen fill preview.
 export const PERFORMANCE_STOPS: RGB[] = [

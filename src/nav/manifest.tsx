@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { LuCircle, LuBlend, LuSparkles, LuGauge, LuTv, LuSettings } from "react-icons/lu";
+import { LuCircle, LuBlend, LuSparkles, LuGauge, LuTv, LuSettings, LuClock } from "react-icons/lu";
 
 export interface TabMeta {
   id: string;
@@ -24,6 +24,7 @@ export const TAB_META: TabMeta[] = [
   { id: "gradient", labelKey: "mode.gradient", icon: <LuBlend size={ICON} /> },
   { id: "effect", labelKey: "mode.effect", icon: <LuSparkles size={ICON} /> },
   { id: SENSOR_TAB, labelKey: "nav.sensors", icon: <LuGauge size={ICON} /> },
+  { id: "clock", labelKey: "mode.clock", icon: <LuClock size={ICON} /> },
   { id: "ambient", labelKey: "mode.ambient", icon: <LuTv size={ICON} /> },
   { id: PINNED_TAB, labelKey: "nav.settings", icon: <LuSettings size={ICON} /> },
 ];

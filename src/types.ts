@@ -39,13 +39,22 @@ export interface Capabilities {
   batteryMode: boolean;
   temperatureMode: boolean;
   performanceMode: boolean;
+  clockMode: boolean;
   conflictsWithSystemRgb: boolean;
   indicatorLed: boolean;
   persistentStartup: boolean;
   layoutKind: string;
 }
 
-export type Mode = "solid" | "gradient" | "effect" | "ambient" | "battery" | "temperature" | "performance";
+export type Mode =
+  | "solid"
+  | "gradient"
+  | "effect"
+  | "ambient"
+  | "battery"
+  | "temperature"
+  | "performance"
+  | "clock";
 
 export interface AmbilightState {
   saturation: number;
