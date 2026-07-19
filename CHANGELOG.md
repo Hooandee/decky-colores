@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.19.0...decky-colores-v0.20.0) (2026-07-19)
+
+
+### Features / Novedades
+
+* Full controller navigation: a visible accent ring now highlights whatever button or control the cursor is on, all across the panel and every dialog, so you can use the plugin end to end with just the controller. You can also pick your own accent color from a palette under Customize — it recolors the focus ring and the tab highlights instantly, and it's remembered. ([#58](https://github.com/Hooandee/decky-colores/pull/58)) ([a748e2c](https://github.com/Hooandee/decky-colores/commit/a748e2c0562a065e79b42ce14896159aa82436bb))
+* **ES:** Navegación total con el mando: ahora un anillo de acento resalta el botón o control donde está el cursor, por todo el panel y en cada ventana, para que uses el plugin de principio a fin solo con el mando. Además puedes elegir tu propio color de acento desde una paleta en Personalización: recolorea al instante el anillo de foco y el resaltado de las pestañas, y se recuerda. ([#58](https://github.com/Hooandee/decky-colores/pull/58)) ([a748e2c](https://github.com/Hooandee/decky-colores/commit/a748e2c0562a065e79b42ce14896159aa82436bb))
+
 ## [0.19.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.18.0...decky-colores-v0.19.0) (2026-07-18)
 
 
