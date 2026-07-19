@@ -1,6 +1,7 @@
 import { CSSProperties } from "react";
+import { FALLBACK_ACCENT_RGB } from "../accent";
 
-const ACCENT = "#5b8cff";
+const ACCENT = `rgb(var(--colores-accent-rgb, ${FALLBACK_ACCENT_RGB}))`;
 
 export const segmentGroupStyle: CSSProperties = {
   display: "flex",

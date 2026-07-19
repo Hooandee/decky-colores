@@ -1,4 +1,4 @@
-import { FC, ReactNode } from "react";
+import { FC, ReactNode, useEffect, useRef } from "react";
 import { Focusable } from "@decky/ui";
 import { segmentGroupStyle, segmentItemStyle } from "./segmented";
 import { MarqueeText } from "./MarqueeText";
@@ -17,6 +17,17 @@ interface TabBarProps {
 }
 
 export const TabBar: FC<TabBarProps> = ({ tabs, activeId, onSelect }) => {
+  const activeTabRef = useRef<HTMLDivElement>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    const el = activeTabRef.current;
+    if (el?.isConnected && el.ownerDocument.hasFocus()) el.focus();
+  }, [activeId]);
+
   return (
     <Focusable style={segmentGroupStyle}>
       {tabs.map((tab) => {
@@ -24,6 +35,7 @@ export const TabBar: FC<TabBarProps> = ({ tabs, activeId, onSelect }) => {
         return (
           <Focusable
             key={tab.id}
+            ref={active ? activeTabRef : undefined}
             style={{
               ...segmentItemStyle(active),
               flex: active ? 1 : "0 0 auto",

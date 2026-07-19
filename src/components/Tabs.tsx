@@ -1,6 +1,8 @@
 import { Focusable } from "@decky/ui";
+import { FALLBACK_ACCENT_RGB } from "../accent";
 
-const ACCENT = "#5b8cff";
+const ACCENT_BG = `rgb(var(--colores-accent-rgb, ${FALLBACK_ACCENT_RGB}))`;
+const ACCENT_HALO = `rgba(var(--colores-accent-rgb, ${FALLBACK_ACCENT_RGB}), 0.4)`;
 
 export function Tabs<T extends string>({
   value,
@@ -41,9 +43,9 @@ export function Tabs<T extends string>({
               fontSize: 11.5,
               fontWeight: active ? 700 : 500,
               color: active ? "#fff" : "rgba(255,255,255,0.55)",
-              background: active ? `linear-gradient(180deg, ${ACCENT}, #3f6ae0)` : "transparent",
+              background: active ? ACCENT_BG : "transparent",
               boxShadow: active
-                ? `0 0 12px ${ACCENT}66, inset 0 0 0 1px rgba(255,255,255,0.18)`
+                ? `0 0 12px ${ACCENT_HALO}, inset 0 0 0 1px rgba(255,255,255,0.18)`
                 : "none",
               cursor: "pointer",
               transition: "background 140ms ease, box-shadow 140ms ease, color 140ms ease",

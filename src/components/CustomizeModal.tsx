@@ -1,11 +1,63 @@
 import { FC, ReactNode } from "react";
 import { ModalRoot, showModal, Focusable, ButtonItem } from "@decky/ui";
-import { LuChevronUp, LuChevronDown, LuEye, LuEyeOff, LuLock } from "react-icons/lu";
+import { LuChevronUp, LuChevronDown, LuEye, LuEyeOff, LuLock, LuCheck } from "react-icons/lu";
 
 import { useI18n } from "../i18n";
 import { tabMeta, PINNED_TAB } from "../nav/manifest";
 import { orderIds, move, toggle } from "../nav/layout";
 import { useLayout, saveLayout, resetLayout } from "../nav/store";
+import { FocusRoot } from "./FocusRoot";
+import { ACCENTS } from "../accent";
+import { useAccent, setAccent } from "../useAccent";
+
+const AccentPicker: FC = () => {
+  const { t } = useI18n();
+  const active = useAccent();
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          fontSize: 11,
+          color: "rgba(255,255,255,0.45)",
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+        }}
+      >
+        {t("customize.accent")}
+      </div>
+      <div role="radiogroup" aria-label={t("customize.accent")} style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {ACCENTS.map((a) => {
+          const on = a.id === active.id;
+          return (
+            <Focusable
+              key={a.id}
+              role="radio"
+              aria-checked={on}
+              aria-label={t(`accent.${a.id}`)}
+              onActivate={() => setAccent(a.id)}
+              onClick={() => setAccent(a.id)}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 999,
+                background: a.hex,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                boxShadow: on
+                  ? `0 0 0 2px #0a0a0d, 0 0 0 4px ${a.hex}`
+                  : "inset 0 0 0 1px rgba(255,255,255,0.07)",
+              }}
+            >
+              {on && <LuCheck size={18} color="#fff" />}
+            </Focusable>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const iconBtn = (dim: boolean): React.CSSProperties => ({
   display: "flex",
@@ -111,6 +163,8 @@ const CustomizeBody: FC<{ availableIds: string[] }> = ({ availableIds }) => {
     >
       <div style={{ fontSize: 16, color: "rgba(255,255,255,0.95)" }}>{t("customize.title")}</div>
 
+      <AccentPicker />
+
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {order.map((id, i) => {
           const meta = tabMeta(id);
@@ -146,7 +200,9 @@ const CustomizeModal: FC<{ availableIds: string[]; closeModal?: () => void }> = 
   closeModal,
 }) => (
   <ModalRoot closeModal={closeModal} bAllowFullSize>
-    <CustomizeBody availableIds={availableIds} />
+    <FocusRoot>
+      <CustomizeBody availableIds={availableIds} />
+    </FocusRoot>
   </ModalRoot>
 );
 

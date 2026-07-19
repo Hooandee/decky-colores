@@ -11,6 +11,7 @@ import { hsvToRgb, rgbToHsv, rgbToCss, gradientCss, expandGradient } from "../co
 import { GRADIENT_PRESETS, harmoniousGradient, randomGradient, suggestGradientName } from "../palette";
 import { useI18n } from "../i18n";
 import { Tabs } from "./Tabs";
+import { FocusRoot } from "./FocusRoot";
 
 interface GradientModalProps {
   initial: RGB[];
@@ -241,6 +242,7 @@ export const GradientModal: FC<GradientModalProps> = ({
 
   return (
     <ModalRoot closeModal={closeModal} onCancel={closeModal} onOK={apply}>
+      <FocusRoot>
       <Focusable style={{ display: "flex", flexDirection: "column", gap: 14, padding: 4 }}>
         <div>
           <div style={{ fontSize: 18, fontWeight: 800, color: "#fff" }}>{t("gradient.title")}</div>
@@ -361,6 +363,7 @@ export const GradientModal: FC<GradientModalProps> = ({
           </Focusable>
         )}
       </Focusable>
+      </FocusRoot>
     </ModalRoot>
   );
 };
