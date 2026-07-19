@@ -22,6 +22,7 @@ import { ColorEditor } from "./components/ColorEditor";
 import { EffectsGallery } from "./components/EffectsGallery";
 import { GradientModal } from "./components/GradientModal";
 import { TabBar } from "./components/TabBar";
+import { FocusRoot } from "./components/FocusRoot";
 import { SettingsSection } from "./components/SettingsSection";
 import { Divider } from "./components/Divider";
 import { ColorWheelIcon } from "./components/ColorWheelIcon";
@@ -1109,7 +1110,9 @@ export default definePlugin(() => {
     content: (
       <ErrorBoundary>
         <I18nProvider>
-          <Content />
+          <FocusRoot>
+            <Content />
+          </FocusRoot>
         </I18nProvider>
       </ErrorBoundary>
     ),

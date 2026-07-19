@@ -2,6 +2,8 @@ import { FC, useEffect, useState } from "react";
 import { ModalRoot, showModal, Focusable, DialogButton, TextField } from "@decky/ui";
 
 import { I18nProvider, useI18n } from "../i18n";
+import { FocusRoot } from "./FocusRoot";
+import { FALLBACK_ACCENT_RGB } from "../accent";
 import { getState, submitReport, ReportResult } from "../api";
 import {
   REPORT_CATEGORIES,
@@ -12,7 +14,8 @@ import {
 
 type Phase = "form" | "sending" | "done" | "error";
 
-const ACCENT = "#58a6ff";
+const ACCENT = `rgb(var(--colores-accent-rgb, ${FALLBACK_ACCENT_RGB}))`;
+const ACCENT_TINT = `rgba(var(--colores-accent-rgb, ${FALLBACK_ACCENT_RGB}), 0.12)`;
 const MUTED = "rgba(255,255,255,0.55)";
 const HAIRLINE = "rgba(255,255,255,0.14)";
 
@@ -31,7 +34,7 @@ const CategoryChip: FC<{ label: string; on: boolean; onClick: () => void }> = ({
       padding: "8px 12px",
       borderRadius: 8,
       boxShadow: `inset 0 0 0 1px ${on ? ACCENT : HAIRLINE}`,
-      background: on ? "rgba(88,166,255,0.12)" : "transparent",
+      background: on ? ACCENT_TINT : "transparent",
       fontSize: 14,
       color: "rgba(255,255,255,0.92)",
       flex: "1 1 45%",
@@ -233,9 +236,11 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
 
 const ReportModal: FC<{ closeModal?: () => void }> = ({ closeModal }) => (
   <ModalRoot closeModal={closeModal} bAllowFullSize>
-    <I18nProvider>
-      <ReportBody closeModal={closeModal} />
-    </I18nProvider>
+    <FocusRoot>
+      <I18nProvider>
+        <ReportBody closeModal={closeModal} />
+      </I18nProvider>
+    </FocusRoot>
   </ModalRoot>
 );
 
