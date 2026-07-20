@@ -103,6 +103,7 @@ private fun ScreenContent(
         Text(
             text = detected?.friendlyName ?: stringResource(R.string.device_unknown),
             style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.SemiBold,
         )
         if (detected == null) {
