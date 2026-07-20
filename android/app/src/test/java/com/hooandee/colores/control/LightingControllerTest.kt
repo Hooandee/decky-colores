@@ -32,6 +32,7 @@ class LightingControllerTest {
         data class Write(val colors: List<RgbColor>, val brightness: Int, val power: Boolean)
 
         val writes = mutableListOf<Write>()
+        var invalidations = 0
 
         @Volatile
         var failOnce = false
@@ -60,7 +61,9 @@ class LightingControllerTest {
             power: Boolean,
         ): Boolean = applyZones(List(2) { color }, brightness, power)
 
-        override fun invalidate() {}
+        override fun invalidate() {
+            invalidations++
+        }
     }
 
     private class FakeBattery(
@@ -237,6 +240,24 @@ class LightingControllerTest {
             runCurrent()
             assertFalse(controller.snapshot.value.bound)
             assertNull(controller.snapshot.value.batteryLevelPercent)
+        }
+
+    @Test
+    fun `reassert invalidates the device and resends a static frame`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(device), LightingIntent(mode = AppMode.COLOR, staticColors = listOf(RgbColor(7, 7, 7), RgbColor(7, 7, 7))))
+            advanceTimeBy(100)
+            runCurrent()
+            val before = device.writes.size
+
+            controller.reassert()
+            advanceTimeBy(100)
+            runCurrent()
+            assertTrue(device.invalidations >= 1)
+            assertTrue("static frame resent after reassert", device.writes.size > before)
+            assertEquals(RgbColor(7, 7, 7), device.writes.last().colors.first())
         }
 
     @Test

@@ -264,7 +264,7 @@ class ColoresViewModel(
     }
 
     fun onScreenOn() {
-        if (mutableState.value.canWrite) pushColorsToController()
+        if (mutableState.value.canWrite) controller.reassert()
     }
 
     fun setAppMode(mode: AppMode) {

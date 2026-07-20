@@ -147,6 +147,11 @@ class LightingController(
 
     fun unbind() = send(Command.Unbind)
 
+    /** Force a full hardware resend, e.g. after screen-on when the vendor service
+     *  may have flattened the LEDs. Invalidates the device cache so the next write
+     *  re-sends every zone. */
+    fun reassert() = send(Command.Reassert)
+
     fun setMode(mode: AppMode) = send(Command.SetMode(mode))
 
     fun setEffect(effectId: String) = send(Command.SetEffect(effectId))
@@ -176,6 +181,7 @@ class LightingController(
         when (command) {
             is Command.Bind -> onBind(command)
             Command.Unbind -> onUnbind()
+            Command.Reassert -> onReassert()
             is Command.SetMode -> mutateIntent { it.copy(mode = command.mode) }
             is Command.SetEffect -> mutateIntent { it.copy(effectId = command.effectId) }
             is Command.SetSpeed -> mutateIntent { it.copy(speed = command.speed.coerceIn(0, 100)) }
@@ -212,6 +218,12 @@ class LightingController(
         watchJob = null
         binding = null
         publishSnapshot()
+    }
+
+    private suspend fun onReassert() {
+        val binding = binding ?: return
+        runCatching { binding.device.invalidate() }
+        if (!intent.mode.isDynamic) applyStatic()
     }
 
     private suspend fun onReading(command: Command.WatchReading) {
@@ -416,6 +428,8 @@ class LightingController(
         data class Bind(val binding: LightingBinding, val intent: LightingIntent) : Command
 
         data object Unbind : Command
+
+        data object Reassert : Command
 
         data class SetMode(val mode: AppMode) : Command
 
