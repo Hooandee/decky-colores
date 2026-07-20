@@ -54,7 +54,7 @@ class EffectsService : Service() {
         return builder
             .setContentTitle(getString(R.string.service_notification_title))
             .setContentText(getString(R.string.service_notification_text))
-            .setSmallIcon(applicationInfo.icon)
+            .setSmallIcon(R.drawable.ic_stat_colores)
             .setOngoing(true)
             .build()
     }
