@@ -29,6 +29,8 @@ fun ColoresScreen(
                 onRestore = viewModel::restoreGradientPreset,
                 onSave = viewModel::saveGradient,
                 onDelete = viewModel::deleteGradient,
+                onColorChange = viewModel::setEditingColor,
+                onSaturationChange = viewModel::setSaturation,
             ),
     )
 }

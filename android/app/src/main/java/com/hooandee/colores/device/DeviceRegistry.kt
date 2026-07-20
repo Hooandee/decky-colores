@@ -1,6 +1,7 @@
 package com.hooandee.colores.device
 
 import com.hooandee.colores.led.SettingsProviderDescriptor
+import com.hooandee.colores.led.Htr3212Descriptor
 import org.json.JSONArray
 
 data class DeviceCapabilities(
@@ -46,6 +47,20 @@ class DeviceRegistry internal constructor(
                             val capabilities = entry.getJSONObject("capabilities")
                             val brightnessRange = led.getJSONArray("brightnessRange")
                             val zones = led.getInt("zones")
+                            val htr3212 =
+                                led.optJSONObject("htr3212")?.let { hardware ->
+                                    Htr3212Descriptor(
+                                        leftBus = hardware.getInt("leftBus"),
+                                        rightBus = hardware.getInt("rightBus"),
+                                        address = hardware.getInt("address"),
+                                        leftOrder = hardware.getIntList("leftOrder"),
+                                        rightOrder = hardware.getIntList("rightOrder"),
+                                    ).also {
+                                        require(it.address in 0..0x7f)
+                                        require(it.leftOrder.sorted() == listOf(0, 1, 2, 3))
+                                        require(it.rightOrder.sorted() == listOf(0, 1, 2, 3))
+                                    }
+                                }
                             val previewProfileId = entry.optString("previewProfile").takeIf(String::isNotBlank)
                             AndroidDeviceDefinition(
                                 models = android.getStringList("model"),
@@ -80,6 +95,7 @@ class DeviceRegistry internal constructor(
                                                         led.optString("requiresPermission").takeIf(String::isNotBlank)
                                                     },
                                                 vendorService = led.getString("vendorService"),
+                                                htr3212 = htr3212,
                                             ),
                                         previewProfileId = previewProfileId,
                                         previewCalibration = previewProfileId?.let(previewProfiles::get),
@@ -108,6 +124,11 @@ private fun String.matches(value: String): Boolean = trim().equals(value.trim(),
 private fun org.json.JSONObject.getStringList(key: String): List<String> {
     val values = getJSONArray(key)
     return (0 until values.length()).map { values.getString(it) }
+}
+
+private fun org.json.JSONObject.getIntList(key: String): List<Int> {
+    val values = getJSONArray(key)
+    return (0 until values.length()).map(values::getInt)
 }
 
 private fun org.json.JSONObject.toLedPreviewCalibration() =

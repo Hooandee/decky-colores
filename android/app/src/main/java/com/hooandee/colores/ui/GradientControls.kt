@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -60,6 +58,8 @@ data class GradientActions(
     val onRestore: () -> Unit,
     val onSave: (String) -> Unit,
     val onDelete: (String) -> Unit,
+    val onColorChange: (RgbColor) -> Unit,
+    val onSaturationChange: (Float) -> Unit,
 )
 
 @Composable
@@ -99,7 +99,7 @@ fun GradientControls(
     val gradient = state.gradient
     val projection = state.ledColorProjection
     val projectedStops = gradient.stops.map(projection::display)
-    var saveName by rememberSaveable { mutableStateOf("") }
+    var editorOpen by rememberSaveable { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         GradientPreviewBar(projectedStops)
@@ -125,63 +125,26 @@ fun GradientControls(
                 )
             }
         }
-        SectionLabel(stringResource(R.string.gradient_stops))
-        LazyRow(
-            modifier = Modifier.fillMaxWidth().focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        OutlinedButton(
+            onClick = { editorOpen = true },
+            enabled = state.canWrite,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = RoundedCornerShape(16.dp),
         ) {
-            items(gradient.stops.size) { index ->
-                StopTile(
-                    label = zoneLabel(state.detected?.id, index, gradient.stops.size),
-                    color = projection.display(gradient.stops[index]),
-                    selected = gradient.selectedStopIndex == index,
-                    onClick = { actions.onStopChange(index) },
-                )
-            }
+            Text(stringResource(R.string.gradient_edit_custom), fontWeight = FontWeight.SemiBold)
         }
-        Row(
-            modifier = Modifier.fillMaxWidth().focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedButton(onClick = actions.onReverse, modifier = Modifier.weight(1f)) {
-                Text(stringResource(R.string.gradient_reverse))
-            }
-            OutlinedButton(
-                onClick = actions.onRestore,
-                enabled = gradient.selectedPresetId != null,
-                modifier = Modifier.weight(1f),
-            ) {
-                Text(stringResource(R.string.gradient_restore))
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth().focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = saveName,
-                onValueChange = { saveName = it },
-                modifier = Modifier.weight(1f),
-                label = { Text(stringResource(R.string.gradient_name)) },
-                singleLine = true,
-            )
-            Button(
-                onClick = {
-                    actions.onSave(saveName)
-                    saveName = ""
-                },
-                enabled = saveName.isNotBlank(),
-                modifier = Modifier.height(56.dp),
-            ) {
-                Text(stringResource(R.string.gradient_save))
-            }
-        }
+    }
+    if (editorOpen) {
+        GradientEditorDialog(
+            state = state,
+            actions = actions,
+            onDismiss = { editorOpen = false },
+        )
     }
 }
 
 @Composable
-private fun GradientPreviewBar(colors: List<RgbColor>) {
+internal fun GradientPreviewBar(colors: List<RgbColor>) {
     val shown = colors.ifEmpty { listOf(RgbColor(34, 35, 43), RgbColor(34, 35, 43)) }
     Box(
         modifier =
@@ -259,7 +222,7 @@ private fun SavedGradientTile(
 }
 
 @Composable
-private fun StopTile(
+internal fun StopTile(
     label: String,
     color: RgbColor,
     selected: Boolean,
@@ -294,7 +257,7 @@ private fun StopTile(
 }
 
 @Composable
-private fun SectionLabel(label: String) {
+internal fun SectionLabel(label: String) {
     Text(
         text = label,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -319,16 +282,4 @@ private fun presetLabel(id: String): String =
         "ice" -> stringResource(R.string.gradient_preset_ice)
         "candy" -> stringResource(R.string.gradient_preset_candy)
         else -> id
-    }
-
-@Composable
-private fun zoneLabel(
-    deviceId: String?,
-    index: Int,
-    count: Int,
-): String =
-    if (deviceId == "retroid-pocket-5" && count == 2) {
-        if (index == 0) stringResource(R.string.gradient_zone_left) else stringResource(R.string.gradient_zone_right)
-    } else {
-        stringResource(R.string.gradient_zone_number, index + 1)
     }

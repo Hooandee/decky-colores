@@ -19,16 +19,23 @@ class DeviceRegistryTest {
               "model": ["Retroid Pocket 5"],
               "device": ["kona"],
               "led": {
-                "driver": "settings_provider",
+                "driver": "htr3212",
                 "transport": "pserver",
                 "colorKey": "joystick_led_light_picker_color",
                 "colorFormat": "argb_hex_csv",
                 "brightnessKey": "led_light_brightness_percent",
                 "brightnessRange": [0.0, 1.0],
                 "enableKeys": ["joystick_light_enabled", "left_joystick_light_enabled", "right_joystick_light_enabled"],
-                "zones": 2,
+                "zones": 8,
                 "requiresPermission": null,
-                "vendorService": "com.rp.gameassistant"
+                "vendorService": "com.rp.gameassistant",
+                "htr3212": {
+                  "leftBus": 1,
+                  "rightBus": 0,
+                  "address": 60,
+                  "leftOrder": [0, 1, 3, 2],
+                  "rightOrder": [1, 2, 3, 0]
+                }
               }
             },
             "linux": null,
@@ -101,13 +108,19 @@ class DeviceRegistryTest {
         assertTrue(match.capabilities.color)
         assertTrue(match.capabilities.brightness)
         assertTrue(match.capabilities.perZone)
-        assertEquals(2, match.capabilities.zones)
-        assertEquals("settings_provider", match.led.driver)
+        assertEquals(8, match.capabilities.zones)
+        assertEquals("htr3212", match.led.driver)
         assertEquals("pserver", match.led.transport)
         assertNull(match.led.requiresPermission)
         assertEquals("joystick_led_light_picker_color", match.led.colorKey)
         assertEquals(0.0f, match.led.brightnessRange.start)
         assertEquals(1.0f, match.led.brightnessRange.endInclusive)
+        requireNotNull(match.led.htr3212)
+        assertEquals(1, match.led.htr3212.leftBus)
+        assertEquals(0, match.led.htr3212.rightBus)
+        assertEquals(60, match.led.htr3212.address)
+        assertEquals(listOf(0, 1, 3, 2), match.led.htr3212.leftOrder)
+        assertEquals(listOf(1, 2, 3, 0), match.led.htr3212.rightOrder)
     }
 
     @Test

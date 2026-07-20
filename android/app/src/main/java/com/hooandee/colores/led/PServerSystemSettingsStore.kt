@@ -40,7 +40,7 @@ internal class PServerSystemSettingsStore(
 }
 
 @SuppressLint("DiscouragedPrivateApi", "PrivateApi")
-private class AndroidPServerCommandExecutor : PServerCommandExecutor {
+internal class AndroidPServerCommandExecutor : PServerCommandExecutor {
     @Volatile
     private var binder: IBinder? = findBinder()
 

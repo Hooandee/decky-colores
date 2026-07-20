@@ -7,6 +7,7 @@ import com.hooandee.colores.gradient.DeviceGradientPreferences
 import com.hooandee.colores.gradient.LightingMode
 import com.hooandee.colores.gradient.SavedGradient
 import com.hooandee.colores.led.RgbColor
+import com.hooandee.colores.led.LedState
 
 data class GradientUiState(
     val mode: LightingMode = LightingMode.COLOR,
@@ -56,6 +57,13 @@ data class GradientUiState(
 fun DeviceCapabilities.supportsGradient(deviceSupportsPerZone: Boolean): Boolean =
     color && perZone && zones >= 2 && deviceSupportsPerZone
 
+fun LedState.syncWithGradient(gradient: GradientUiState): LedState =
+    if (gradient.mode == LightingMode.GRADIENT && gradient.stops.isNotEmpty()) {
+        copy(zoneColors = gradient.stops)
+    } else {
+        this
+    }
+
 fun hydrateGradientUiState(
     liveColors: List<RgbColor>,
     preferences: DeviceGradientPreferences,
@@ -63,7 +71,11 @@ fun hydrateGradientUiState(
     zones: Int,
     supported: Boolean,
 ): GradientUiState {
-    val source = liveColors.ifEmpty { preferences.currentStops }
+    val persistedGradient =
+        supported &&
+            preferences.mode == LightingMode.GRADIENT &&
+            preferences.currentStops.isNotEmpty()
+    val source = if (persistedGradient) preferences.currentStops else liveColors.ifEmpty { preferences.currentStops }
     return GradientUiState(
         mode = preferences.mode.takeIf { supported } ?: LightingMode.COLOR,
         stops = GradientInterpolator.interpolate(source, zones),

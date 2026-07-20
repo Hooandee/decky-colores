@@ -11,11 +11,12 @@ import com.hooandee.colores.gradient.GradientInterpolator
 import com.hooandee.colores.gradient.GradientPreferences
 import com.hooandee.colores.gradient.GradientPreset
 import com.hooandee.colores.gradient.GradientPresetRepository
+import com.hooandee.colores.gradient.GradientResumePolicy
 import com.hooandee.colores.gradient.LightingMode
 import com.hooandee.colores.led.LedDevice
+import com.hooandee.colores.led.LedDeviceFactory
 import com.hooandee.colores.led.LedState
 import com.hooandee.colores.led.RgbColor
-import com.hooandee.colores.led.SettingsProviderLedDevice
 import com.hooandee.colores.permission.WriteSettingsPermission
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -85,15 +86,13 @@ class ColoresViewModel(
                 if (detected != null && detected.id == mutableState.value.detected?.id) {
                     ledDevice
                 } else {
-                    detected
-                        ?.takeIf { it.led.driver == "settings_provider" }
-                        ?.let {
-                            SettingsProviderLedDevice(
-                                context,
-                                it.led,
-                                scope = CoroutineScope(viewModelScope.coroutineContext + Dispatchers.IO),
-                            )
-                        }
+                    detected?.let {
+                        LedDeviceFactory.create(
+                            context,
+                            it.led,
+                            scope = CoroutineScope(viewModelScope.coroutineContext + Dispatchers.IO),
+                        )
+                    }
                 }
             ledDevice = device
             val controlAccess =
@@ -119,30 +118,58 @@ class ColoresViewModel(
             val storedGradient =
                 detected?.let { withContext(Dispatchers.IO) { gradientPreferences.load(it.id) } }
                     ?: DeviceGradientPreferences()
-            mutableState.value =
+            val hydratedGradient =
+                hydrateGradientUiState(
+                    liveColors = liveState?.zoneColors.orEmpty(),
+                    preferences = storedGradient,
+                    presets = gradientPresets,
+                    zones = zones,
+                    supported = gradientSupported,
+                ).let { gradient ->
+                    if (gradient.stops.isEmpty()) gradient.copy(stops = shownState.zoneColors) else gradient
+                }
+            val refreshedState =
                 mutableState.value.copy(
                     loading = false,
                     detected = detected,
                     controlAccess = controlAccess,
-                    ledState = shownState,
+                    ledState = shownState.syncWithGradient(hydratedGradient),
                     ledPreviewEnabled =
                         detected
                             ?.takeIf { it.previewCalibration != null }
                             ?.let { ledPreviewPreferences.isEnabled(it.id) }
                             ?: false,
                     gradientAvailable = gradientSupported,
-                    gradient =
-                        hydrateGradientUiState(
-                            liveColors = liveState?.zoneColors.orEmpty(),
-                            preferences = storedGradient,
-                            presets = gradientPresets,
-                            zones = zones,
-                            supported = gradientSupported,
-                        ).let { gradient ->
-                            if (gradient.stops.isEmpty()) gradient.copy(stops = shownState.zoneColors) else gradient
-                        },
+                    gradient = hydratedGradient,
                 )
+            mutableState.value = refreshedState
+            if (
+                GradientResumePolicy.shouldReapply(
+                    mode = refreshedState.gradient.mode,
+                    stops = refreshedState.gradient.stops,
+                    gradientAvailable = refreshedState.gradientAvailable,
+                    canWrite = refreshedState.canWrite,
+                )
+            ) {
+                reapplyGradient()
+            }
         }
+    }
+
+    fun reapplyGradient() {
+        val current = mutableState.value
+        if (
+            !GradientResumePolicy.shouldReapply(
+                mode = current.gradient.mode,
+                stops = current.gradient.stops,
+                gradientAvailable = current.gradientAvailable,
+                canWrite = current.canWrite,
+            )
+        ) {
+            return
+        }
+        ledDevice?.invalidate()
+        applyGradient()
     }
 
     fun setPower(power: Boolean) = updateLedState { it.copy(power = power) }

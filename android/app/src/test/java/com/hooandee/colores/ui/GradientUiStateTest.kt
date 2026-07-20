@@ -6,6 +6,7 @@ import com.hooandee.colores.gradient.DeviceGradientPreferences
 import com.hooandee.colores.gradient.LightingMode
 import com.hooandee.colores.gradient.SavedGradient
 import com.hooandee.colores.led.RgbColor
+import com.hooandee.colores.led.LedState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -75,7 +76,7 @@ class GradientUiStateTest {
     }
 
     @Test
-    fun `hydration uses live LED colors without losing persisted library state`() {
+    fun `gradient hydration keeps persisted stops when live hardware only exposes fallback colors`() {
         val saved = listOf(SavedGradient("Guardado", listOf(green, blue)))
         val preferences =
             DeviceGradientPreferences(
@@ -94,10 +95,39 @@ class GradientUiStateTest {
                 supported = true,
             )
 
-        assertEquals(listOf(red, blue), state.stops)
+        assertEquals(listOf(green, green), state.stops)
         assertEquals(LightingMode.GRADIENT, state.mode)
         assertEquals("primary", state.selectedPresetId)
         assertEquals(saved, state.savedGradients)
+    }
+
+    @Test
+    fun `color mode hydration uses live LED colors`() {
+        val state =
+            hydrateGradientUiState(
+                liveColors = listOf(red, blue),
+                preferences = DeviceGradientPreferences(mode = LightingMode.COLOR, currentStops = listOf(green, green)),
+                presets = listOf(preset),
+                zones = 2,
+                supported = true,
+            )
+
+        assertEquals(listOf(red, blue), state.stops)
+        assertEquals(LightingMode.COLOR, state.mode)
+    }
+
+    @Test
+    fun `hydrated gradient replaces fallback colors in live LED state`() {
+        val fallback = LedState(List(4) { red } + List(4) { blue }, brightness = 73, power = true)
+        val stops = (1..8).map { RgbColor(it, it + 10, it + 20) }
+        val gradient = GradientUiState(mode = LightingMode.GRADIENT, stops = stops)
+
+        val synced = fallback.syncWithGradient(gradient)
+
+        assertEquals(stops, synced.zoneColors)
+        assertEquals(73, synced.brightness)
+        assertTrue(synced.power)
+        assertEquals(stops, synced.copy(brightness = 40).zoneColors)
     }
 
     @Test

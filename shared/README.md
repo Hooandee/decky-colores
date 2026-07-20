@@ -23,6 +23,8 @@ La raíz es una lista de dispositivos. Cada entrada requiere:
 
 El bloque `android` puede declarar listas `model`, `device` y un objeto `led`. Para `settings_provider`, `led` requiere `driver`, `transport`, `colorKey`, `colorFormat`, `brightnessKey`, `brightnessRange`, `enableKeys`, `zones`, `requiresPermission` y `vendorService`. `transport` admite `direct` y `pserver`; `requiresPermission` es `null` cuando el transporte no necesita una concesión del usuario. `colorFormat` admite actualmente `argb_hex_csv`. No se debe inferir sysfs cuando no aparezca en el descriptor.
 
+El driver `htr3212` conserva esos campos para el estado oficial de brillo, encendido y color de respaldo, y añade un bloque `htr3212` con `leftBus`, `rightBus`, `address`, `leftOrder` y `rightOrder`. Las listas de orden traducen cada zona lógica del joystick, en orden arriba/izquierda/abajo/derecha, al grupo físico `0..3` del controlador. Deben ser permutaciones completas y calibradas en el dispositivo real.
+
 Una entrada puede declarar `previewProfile` para aproximar en la interfaz la apariencia de sus LEDs físicos. Si la referencia falta o no se resuelve, la plataforma muestra el RGB exacto y no ofrece la vista calibrada.
 
 ## `led-preview-profiles.json`
