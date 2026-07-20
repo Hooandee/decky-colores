@@ -28,5 +28,30 @@
     "linux": null,
     "capabilities": { "color": true, "brightness": true, "perZone": true },
     "previewProfile": "retroid-stick-ring-rp5-v1"
+  },
+  {
+    "id": "ayn-thor",
+    "friendlyName": "AYN Thor",
+    "android": {
+      "model": ["AYN Thor", "AYN_Thor"],
+      "device": [],
+      "led": {
+        "driver": "sysfs_rgb",
+        "transport": "direct",
+        "colorFormat": "sysfs_channels",
+        "zones": 1,
+        "requiresPermission": null,
+        "sysfs": {
+          "basePath": "/sys/class/leds",
+          "red": "red",
+          "green": "green",
+          "blue": "blue",
+          "maxBrightness": 255
+        }
+      }
+    },
+    "linux": null,
+    "capabilities": { "color": true, "brightness": true, "perZone": false },
+    "previewProfile": null
   }
 ]

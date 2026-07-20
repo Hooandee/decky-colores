@@ -12,6 +12,7 @@ internal object LedDeviceFactory {
         when (descriptor.driver) {
             "settings_provider" -> SettingsProviderLedDevice(context, descriptor, scope)
             "htr3212" -> Htr3212LedDevice(context, descriptor, scope)
+            "sysfs_rgb" -> descriptor.sysfs?.let { SysfsPerChannelRgbDevice(descriptor, scope) }
             else -> null
         }
 }

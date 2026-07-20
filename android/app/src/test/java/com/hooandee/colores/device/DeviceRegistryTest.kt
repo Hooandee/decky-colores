@@ -232,6 +232,60 @@ class DeviceRegistryTest {
         assertTrue(match?.previewCalibration != null)
     }
 
+    @Test
+    fun `production registry resolves the AYN Thor sysfs rgb descriptor`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+
+        val match =
+            registry.match(
+                AndroidDeviceIdentity(
+                    model = "AYN Thor",
+                    device = "kalama",
+                    manufacturer = "AYN",
+                    productProperties = emptyMap(),
+                ),
+            )
+
+        requireNotNull(match)
+        assertEquals("ayn-thor", match.id)
+        assertEquals("sysfs_rgb", match.led.driver)
+        assertEquals(1, match.capabilities.zones)
+        assertFalse(match.capabilities.perZone)
+        assertNull(match.led.requiresPermission)
+        requireNotNull(match.led.sysfs)
+        assertEquals("red", match.led.sysfs.red)
+        assertEquals("green", match.led.sysfs.green)
+        assertEquals("blue", match.led.sysfs.blue)
+        assertEquals(255, match.led.sysfs.maxBrightness)
+    }
+
+    @Test
+    fun `a plain kalama device is not identified as the AYN Thor`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+
+        val match =
+            registry.match(
+                AndroidDeviceIdentity(
+                    model = "Some Phone",
+                    device = "kalama",
+                    manufacturer = "Other",
+                    productProperties = emptyMap(),
+                ),
+            )
+
+        assertNull(match)
+    }
+
     private fun rp5Identity() =
         AndroidDeviceIdentity(
             model = "Retroid Pocket 5",

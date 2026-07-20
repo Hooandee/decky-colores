@@ -2,6 +2,7 @@ package com.hooandee.colores.device
 
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.Htr3212Descriptor
+import com.hooandee.colores.led.SysfsRgbDescriptor
 import org.json.JSONArray
 
 data class DeviceCapabilities(
@@ -45,8 +46,18 @@ class DeviceRegistry internal constructor(
                             val android = entry.getJSONObject("android")
                             val led = android.getJSONObject("led")
                             val capabilities = entry.getJSONObject("capabilities")
-                            val brightnessRange = led.getJSONArray("brightnessRange")
+                            val brightnessRange = led.optJSONArray("brightnessRange")
                             val zones = led.getInt("zones")
+                            val sysfs =
+                                led.optJSONObject("sysfs")?.let { node ->
+                                    SysfsRgbDescriptor(
+                                        basePath = node.optString("basePath", "/sys/class/leds"),
+                                        red = node.getString("red"),
+                                        green = node.getString("green"),
+                                        blue = node.getString("blue"),
+                                        maxBrightness = node.optInt("maxBrightness", 255),
+                                    ).also { require(it.maxBrightness > 0) }
+                                }
                             val htr3212 =
                                 led.optJSONObject("htr3212")?.let { hardware ->
                                     Htr3212Descriptor(
@@ -80,13 +91,14 @@ class DeviceRegistry internal constructor(
                                             SettingsProviderDescriptor(
                                                 driver = led.getString("driver"),
                                                 transport = led.optString("transport", "direct"),
-                                                colorKey = led.getString("colorKey"),
-                                                colorFormat = led.getString("colorFormat"),
-                                                brightnessKey = led.getString("brightnessKey"),
+                                                colorKey = led.optString("colorKey"),
+                                                colorFormat = led.optString("colorFormat"),
+                                                brightnessKey = led.optString("brightnessKey"),
                                                 brightnessRange =
-                                                    brightnessRange.getDouble(0).toFloat()..
-                                                        brightnessRange.getDouble(1).toFloat(),
-                                                enableKeys = led.getStringList("enableKeys"),
+                                                    brightnessRange?.let {
+                                                        it.getDouble(0).toFloat()..it.getDouble(1).toFloat()
+                                                    } ?: (0f..1f),
+                                                enableKeys = led.optStringList("enableKeys"),
                                                 zones = zones,
                                                 requiresPermission =
                                                     if (led.isNull("requiresPermission")) {
@@ -94,8 +106,9 @@ class DeviceRegistry internal constructor(
                                                     } else {
                                                         led.optString("requiresPermission").takeIf(String::isNotBlank)
                                                     },
-                                                vendorService = led.getString("vendorService"),
+                                                vendorService = led.optString("vendorService"),
                                                 htr3212 = htr3212,
+                                                sysfs = sysfs,
                                             ),
                                         previewProfileId = previewProfileId,
                                         previewCalibration = previewProfileId?.let(previewProfiles::get),
@@ -125,6 +138,9 @@ private fun org.json.JSONObject.getStringList(key: String): List<String> {
     val values = getJSONArray(key)
     return (0 until values.length()).map { values.getString(it) }
 }
+
+private fun org.json.JSONObject.optStringList(key: String): List<String> =
+    optJSONArray(key)?.let { values -> (0 until values.length()).map { values.getString(it) } } ?: emptyList()
 
 private fun org.json.JSONObject.getIntList(key: String): List<Int> {
     val values = getJSONArray(key)
