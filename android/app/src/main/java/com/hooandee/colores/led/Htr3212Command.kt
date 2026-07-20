@@ -34,7 +34,7 @@ internal object Htr3212Command {
 
     private fun Int.hexByte(): String = "0x%02x".format(this)
 
-    private const val RGB_START_REGISTER = 0x0d
+    private const val RGB_START_REGISTER = 0x01
     private const val CHANNELS_PER_GROUP = 3
     private const val APPLY_REGISTER = 0x25
 }

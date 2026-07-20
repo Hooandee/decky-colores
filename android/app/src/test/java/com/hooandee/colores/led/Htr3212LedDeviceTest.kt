@@ -48,11 +48,11 @@ class Htr3212LedDeviceTest {
             assertEquals("1,1", store.values["enabled"])
             assertEquals(2, executor.commands.size)
             assertTrue(executor.commands[0].startsWith("i2cset -f -y 1 0x3c"))
-            assertTrue(executor.commands[0].contains("0x16 0x03 i"))
-            assertTrue(executor.commands[0].contains("0x13 0x04 i"))
+            assertTrue(executor.commands[0].contains("0x0a 0x03 i"))
+            assertTrue(executor.commands[0].contains("0x07 0x04 i"))
             assertTrue(executor.commands[1].startsWith("i2cset -f -y 0 0x3c"))
-            assertTrue(executor.commands[1].contains("0x10 0x05 i"))
-            assertTrue(executor.commands[1].contains("0x0d 0x08 i"))
+            assertTrue(executor.commands[1].contains("0x04 0x05 i"))
+            assertTrue(executor.commands[1].contains("0x01 0x08 i"))
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -190,7 +190,7 @@ class Htr3212LedDeviceTest {
             runCurrent()
 
             assertEquals(5, executor.commands.size)
-            assertTrue(executor.commands[3].contains("0x10 0x5a i"))
+            assertTrue(executor.commands[3].contains("0x04 0x5a i"))
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
