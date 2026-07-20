@@ -233,7 +233,7 @@ class DeviceRegistryTest {
     }
 
     @Test
-    fun `production registry resolves the AYN Thor sysfs rgb descriptor`() {
+    fun `production registry resolves the AYN Thor vendor settings descriptor`() {
         val shared = File("../../shared")
         val registry =
             DeviceRegistry.parse(
@@ -253,15 +253,14 @@ class DeviceRegistryTest {
 
         requireNotNull(match)
         assertEquals("ayn-thor", match.id)
-        assertEquals("sysfs_rgb", match.led.driver)
-        assertEquals(1, match.capabilities.zones)
-        assertFalse(match.capabilities.perZone)
+        assertEquals("settings_provider", match.led.driver)
+        assertEquals("pserver", match.led.transport)
+        assertEquals(2, match.capabilities.zones)
+        assertTrue(match.capabilities.perZone)
+        assertEquals("joystick_led_light_picker_color", match.led.colorKey)
         assertNull(match.led.requiresPermission)
-        requireNotNull(match.led.sysfs)
-        assertEquals("red", match.led.sysfs.red)
-        assertEquals("green", match.led.sysfs.green)
-        assertEquals("blue", match.led.sysfs.blue)
-        assertEquals(255, match.led.sysfs.maxBrightness)
+        assertEquals(listOf("joystick_light_enabled"), match.led.enableKeys)
+        assertEquals("com.odin.gameassistant", match.led.vendorService)
     }
 
     @Test
