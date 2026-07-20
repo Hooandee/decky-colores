@@ -3,8 +3,28 @@ package com.hooandee.colores.ui
 import com.hooandee.colores.device.LedPreviewCalibration
 import com.hooandee.colores.device.LedPreviewHuePoint
 import com.hooandee.colores.led.RgbColor
+import kotlin.math.PI
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.roundToInt
+
+fun RgbColor.forLedPreview(
+    profile: LedPreviewCalibration?,
+    enabled: Boolean,
+): RgbColor = if (enabled && profile != null) applyPreviewCalibration(profile) else this
+
+fun colorWheelDisplayAt(
+    normalizedX: Float,
+    normalizedY: Float,
+    profile: LedPreviewCalibration?,
+    enabled: Boolean,
+): RgbColor? {
+    val saturation = hypot(normalizedX, normalizedY)
+    if (saturation > 1f) return null
+    val hue = ((atan2(normalizedY, normalizedX) * 180f / PI.toFloat()) + 360f) % 360f
+    return HsvColor(hue, saturation, 1f).toRgbColor().forLedPreview(profile, enabled)
+}
 
 fun RgbColor.applyPreviewCalibration(profile: LedPreviewCalibration?): RgbColor {
     if (profile == null) return this

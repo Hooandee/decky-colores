@@ -6,6 +6,8 @@ import com.hooandee.colores.led.RgbColor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.cos
+import kotlin.math.sin
 
 class LedPreviewColorTest {
     private val rp5 =
@@ -36,6 +38,34 @@ class LedPreviewColorTest {
         val color = RgbColor(255, 56, 0)
 
         assertEquals(color, color.applyPreviewCalibration(null))
+    }
+
+    @Test
+    fun `preview helper preserves exact color when disabled or uncalibrated`() {
+        val source = RgbColor(255, 153, 0)
+
+        assertEquals(source, source.forLedPreview(rp5, enabled = false))
+        assertEquals(source, source.forLedPreview(null, enabled = true))
+    }
+
+    @Test
+    fun `calibrated wheel projects orange coordinate to observed yellow hue`() {
+        val angle = Math.toRadians(36.0)
+
+        val result =
+            colorWheelDisplayAt(
+                normalizedX = cos(angle).toFloat(),
+                normalizedY = sin(angle).toFloat(),
+                profile = rp5,
+                enabled = true,
+            )
+
+        assertTrue(requireNotNull(result).toHsvColor().hue in 52f..60f)
+    }
+
+    @Test
+    fun `wheel rejects coordinates outside its circle`() {
+        assertEquals(null, colorWheelDisplayAt(1f, 1f, rp5, enabled = true))
     }
 
     @Test
