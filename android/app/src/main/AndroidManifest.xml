@@ -6,7 +6,8 @@
     <application
         android:allowBackup="true"
         android:label="@string/app_name"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Colores">
         <activity
             android:name=".MainActivity"
             android:exported="true">

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Colores</string>
+    <string name="device_unknown">Unknown device</string>
+    <string name="no_leds_title">No controllable LEDs</string>
+    <string name="no_leds_description">This device does not have a verified control surface yet.</string>
+    <string name="capability_color">Color</string>
+    <string name="capability_brightness">Brightness</string>
+    <string name="capability_zones">%1$d zones</string>
+    <string name="permission_title">Permission required</string>
+    <string name="permission_description">Colores needs permission to modify the system settings that control the LEDs.</string>
+    <string name="permission_button">Grant permission</string>
+    <string name="power_title">Power</string>
+    <string name="power_description">Turn both stick lights on or off.</string>
+    <string name="color_title">Color</string>
+    <string name="same_color">Same color on both sticks</string>
+    <string name="both_sticks">Both sticks</string>
+    <string name="left_stick">Left</string>
+    <string name="right_stick">Right</string>
+    <string name="brightness_title">Brightness</string>
+    <string name="brightness_value">%1$d%%</string>
+</resources>

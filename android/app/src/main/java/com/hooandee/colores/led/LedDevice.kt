@@ -6,9 +6,17 @@ data class RgbColor(
     val blue: Int,
 )
 
+data class LedState(
+    val zoneColors: List<RgbColor>,
+    val brightness: Int,
+    val power: Boolean,
+)
+
 interface LedDevice {
     val available: Boolean
     val supportsPerZone: Boolean
+
+    suspend fun readState(): LedState
 
     suspend fun applyZones(
         colors: List<RgbColor>,

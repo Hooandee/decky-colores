@@ -3,32 +3,29 @@ package com.hooandee.colores
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.activity.viewModels
+import com.hooandee.colores.permission.WriteSettingsPermission
+import com.hooandee.colores.ui.ColoresScreen
+import com.hooandee.colores.ui.ColoresTheme
+import com.hooandee.colores.ui.ColoresViewModel
 
 class MainActivity : ComponentActivity() {
+    private val viewModel by viewModels<ColoresViewModel>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ColoresApp()
-        }
-    }
-}
-
-@Composable
-private fun ColoresApp() {
-    MaterialTheme {
-        Surface(modifier = Modifier.fillMaxSize()) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(text = stringResource(R.string.app_name))
+            ColoresTheme {
+                ColoresScreen(
+                    viewModel = viewModel,
+                    onGrantPermission = { startActivity(WriteSettingsPermission.createGrantIntent(this)) },
+                )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.refresh()
     }
 }
