@@ -3,7 +3,13 @@ name: CI
 on:
   push:
     branches: ["**"]
+    paths-ignore:
+      - "android/**"
+      - "windows/**"
   pull_request:
+    paths-ignore:
+      - "android/**"
+      - "windows/**"
 
 jobs:
   backend-tests:
