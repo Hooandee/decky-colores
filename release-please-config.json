@@ -4,7 +4,14 @@
   "bootstrap-sha": "a764eaf57baed9ec22705cb48ad979d10d01257f",
   "packages": {
     ".": {
-      "exclude-paths": ["android", "shared", "windows"]
+      "exclude-paths": [
+        ".github",
+        "android",
+        "release-please-config.json",
+        "shared",
+        "tests/test_release_routing.py",
+        "windows"
+      ]
     }
   }
 }
