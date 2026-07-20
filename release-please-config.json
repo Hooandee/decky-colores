@@ -2,14 +2,14 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "release-type": "node",
   "bootstrap-sha": "a764eaf57baed9ec22705cb48ad979d10d01257f",
+  "last-release-sha": "af885f14f8756734a72bfac876084585bf4ad056",
   "packages": {
     ".": {
       "exclude-paths": [
         ".github",
         "android",
-        "release-please-config.json",
         "shared",
-        "tests/test_release_routing.py",
+        "tests",
         "windows"
       ]
     }
