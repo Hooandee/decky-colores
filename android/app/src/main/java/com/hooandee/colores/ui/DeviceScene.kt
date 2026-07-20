@@ -181,11 +181,10 @@ private fun StickTarget(
     ledPreviewEnabled: Boolean,
     onClick: () -> Unit,
 ) {
-    val exactColor = color.toComposeColor()
-    val calibratedColor = color.applyPreviewCalibration(previewCalibration).toComposeColor()
+    val shownColor = color.forLedPreview(previewCalibration, ledPreviewEnabled).toComposeColor()
     val displayedColor by
         animateColorAsState(
-            targetValue = if (ledPreviewEnabled) calibratedColor else exactColor,
+            targetValue = shownColor,
             animationSpec = tween(durationMillis = 180),
             label = "LED preview color",
         )

@@ -12,6 +12,7 @@
     <string name="status_connected">Conectado</string>
     <string name="power_title">Encendido</string>
     <string name="color_title">Color</string>
+    <string name="rgb_sent_value">RGB enviado · %1$s</string>
     <string name="preview_title">Tus sticks</string>
     <string name="preview_hint">Elige qué luz quieres ajustar</string>
     <string name="led_preview_toggle">Vista LED</string>

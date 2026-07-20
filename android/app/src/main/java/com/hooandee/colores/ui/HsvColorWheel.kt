@@ -1,5 +1,6 @@
 package com.hooandee.colores.ui
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -14,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
@@ -22,9 +24,11 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.hooandee.colores.device.LedPreviewCalibration
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -36,6 +40,8 @@ import kotlin.math.sin
 fun HsvColorWheel(
     color: RgbColor,
     enabled: Boolean,
+    previewCalibration: LedPreviewCalibration?,
+    ledPreviewEnabled: Boolean,
     contentDescription: String,
     onColorChange: (RgbColor) -> Unit,
     modifier: Modifier = Modifier,
@@ -43,11 +49,26 @@ fun HsvColorWheel(
     val hsv = color.toHsvColor()
     var focused by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
+    var wheelPixelSize by remember { mutableStateOf(0) }
+    val calibratedWheel =
+        remember(wheelPixelSize, previewCalibration, ledPreviewEnabled) {
+            previewCalibration
+                ?.takeIf { ledPreviewEnabled && wheelPixelSize > 0 }
+                ?.let { profile ->
+                    Bitmap.createBitmap(
+                        calibratedColorWheelPixels(wheelPixelSize, profile),
+                        wheelPixelSize,
+                        wheelPixelSize,
+                        Bitmap.Config.ARGB_8888,
+                    ).asImageBitmap()
+                }
+        }
     Canvas(
         modifier =
             modifier
                 .sizeIn(maxWidth = 232.dp, maxHeight = 232.dp)
                 .aspectRatio(1f)
+                .onSizeChanged { wheelPixelSize = minOf(it.width, it.height) }
                 .semantics { this.contentDescription = contentDescription }
                 .onFocusChanged {
                     focused = it.isFocused
@@ -101,30 +122,38 @@ fun HsvColorWheel(
     ) {
         val radius = size.minDimension / 2f
         val center = this.center
-        drawCircle(
-            brush =
-                Brush.sweepGradient(
-                    listOf(
-                        Color.Red,
-                        Color.Yellow,
-                        Color.Green,
-                        Color.Cyan,
-                        Color.Blue,
-                        Color.Magenta,
-                        Color.Red,
+        if (calibratedWheel != null) {
+            drawImage(
+                image = calibratedWheel,
+                topLeft = Offset(center.x - calibratedWheel.width / 2f, center.y - calibratedWheel.height / 2f),
+                alpha = if (enabled) 1f else 0.4f,
+            )
+        } else {
+            drawCircle(
+                brush =
+                    Brush.sweepGradient(
+                        listOf(
+                            Color.Red,
+                            Color.Yellow,
+                            Color.Green,
+                            Color.Cyan,
+                            Color.Blue,
+                            Color.Magenta,
+                            Color.Red,
+                        ),
+                        center,
                     ),
-                    center,
-                ),
-            radius = radius,
-            center = center,
-            alpha = if (enabled) 1f else 0.4f,
-        )
-        drawCircle(
-            brush = Brush.radialGradient(listOf(Color.White, Color.Transparent), center, radius),
-            radius = radius,
-            center = center,
-            alpha = if (enabled) 1f else 0.4f,
-        )
+                radius = radius,
+                center = center,
+                alpha = if (enabled) 1f else 0.4f,
+            )
+            drawCircle(
+                brush = Brush.radialGradient(listOf(Color.White, Color.Transparent), center, radius),
+                radius = radius,
+                center = center,
+                alpha = if (enabled) 1f else 0.4f,
+            )
+        }
         val angle = hsv.hue * PI.toFloat() / 180f
         val thumb =
             Offset(

@@ -29,14 +29,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.platform.LocalDensity
 import com.hooandee.colores.R
+import com.hooandee.colores.device.LedPreviewCalibration
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.roundToInt
 
@@ -99,6 +100,8 @@ fun ColorControlPanel(
                             HsvColorWheel(
                                 color = state.editingColor,
                                 enabled = state.canWrite,
+                                previewCalibration = state.detected?.previewCalibration,
+                                ledPreviewEnabled = state.ledPreviewEnabled,
                                 contentDescription = stringResource(R.string.color_wheel_description),
                                 onColorChange = onColorChange,
                             )
@@ -123,6 +126,8 @@ fun ColorControlPanel(
                         current = state.editingColor,
                         mixed = state.mixedTarget,
                         enabled = state.canWrite,
+                        previewCalibration = state.detected?.previewCalibration,
+                        ledPreviewEnabled = state.ledPreviewEnabled,
                         onColorChange = onColorChange,
                     )
                 }
@@ -187,6 +192,11 @@ private fun targetLabel(target: EditTarget): String =
 
 @Composable
 private fun CurrentColor(state: ColoresUiState) {
+    val shownColor =
+        state.editingColor.forLedPreview(
+            profile = state.detected?.previewCalibration,
+            enabled = state.ledPreviewEnabled,
+        )
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -203,7 +213,7 @@ private fun CurrentColor(state: ColoresUiState) {
                     if (state.mixedTarget) {
                         stringResource(R.string.target_mixed)
                     } else {
-                        state.editingColor.toHexString()
+                        stringResource(R.string.rgb_sent_value, state.editingColor.toHexString())
                     },
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.labelMedium,
@@ -211,7 +221,7 @@ private fun CurrentColor(state: ColoresUiState) {
         }
         Surface(
             modifier = Modifier.size(34.dp),
-            color = state.editingColor.toComposeColor(),
+            color = shownColor.toComposeColor(),
             shape = CircleShape,
             border = BorderStroke(2.dp, Color.White.copy(alpha = 0.72f)),
         ) {}
@@ -223,6 +233,8 @@ private fun QuickColors(
     current: RgbColor,
     mixed: Boolean,
     enabled: Boolean,
+    previewCalibration: LedPreviewCalibration?,
+    ledPreviewEnabled: Boolean,
     onColorChange: (RgbColor) -> Unit,
 ) {
     Row(
@@ -241,6 +253,7 @@ private fun QuickColors(
         ) {
             QUICK_COLORS.forEach { color ->
                 val selected = !mixed && current == color
+                val shownColor = color.forLedPreview(previewCalibration, ledPreviewEnabled)
                 val description = stringResource(R.string.hex_color, color.toHexString())
                 Surface(
                     onClick = { onColorChange(color) },
@@ -258,7 +271,7 @@ private fun QuickColors(
                     Box(contentAlignment = Alignment.Center) {
                         Surface(
                             modifier = Modifier.size(32.dp),
-                            color = color.toComposeColor(),
+                            color = shownColor.toComposeColor(),
                             shape = CircleShape,
                             border =
                                 BorderStroke(

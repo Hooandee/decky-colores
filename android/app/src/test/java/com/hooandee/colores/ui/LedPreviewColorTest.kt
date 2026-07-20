@@ -69,6 +69,28 @@ class LedPreviewColorTest {
     }
 
     @Test
+    fun `calibrated wheel pixels stay transparent outside the circle`() {
+        val pixels = calibratedColorWheelPixels(size = 101, profile = rp5)
+
+        assertEquals(0, pixels.first())
+        assertEquals(0, pixels.last())
+    }
+
+    @Test
+    fun `calibrated wheel pixels project their visible hue`() {
+        val size = 101
+        val center = (size - 1) / 2f
+        val radius = size / 2f
+        val angle = Math.toRadians(36.0)
+        val x = (center + cos(angle) * radius * 0.9).toInt()
+        val y = (center + sin(angle) * radius * 0.9).toInt()
+        val pixel = calibratedColorWheelPixels(size, rp5)[y * size + x]
+        val color = RgbColor(pixel shr 16 and 0xFF, pixel shr 8 and 0xFF, pixel and 0xFF)
+
+        assertTrue(color.toHsvColor().hue in 52f..60f)
+    }
+
+    @Test
     fun `RP5 profile maps orange to the observed yellow hue without mutating the source`() {
         val source = RgbColor(255, 153, 0)
         val result = source.applyPreviewCalibration(rp5)
