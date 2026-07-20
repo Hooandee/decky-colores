@@ -85,4 +85,9 @@ class DashboardModelTest {
         assertEquals(red, edited.zoneColors[0])
         assertEquals(0.4f, edited.zoneColors[1].toHsvColor().saturation, 0.02f)
     }
+
+    @Test
+    fun `hex color is uppercase and channel padded`() {
+        assertEquals("#01020F", RgbColor(1, 2, 15).toHexString())
+    }
 }

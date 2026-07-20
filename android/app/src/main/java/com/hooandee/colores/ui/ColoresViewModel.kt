@@ -29,10 +29,16 @@ data class ColoresUiState(
             brightness = 100,
             power = true,
         ),
-    val sameColor: Boolean = true,
+    val editTarget: EditTarget = EditTarget.BOTH,
 ) {
     val canWrite: Boolean
         get() = controlAccess == ControlAccess.ENABLED
+
+    val editingColor: RgbColor
+        get() = ledState.colorForEditing(editTarget)
+
+    val mixedTarget: Boolean
+        get() = editTarget == EditTarget.BOTH && ledState.hasMixedColors
 }
 
 class ColoresViewModel(
@@ -91,7 +97,6 @@ class ColoresViewModel(
                     detected = detected,
                     controlAccess = controlAccess,
                     ledState = liveState ?: mutableState.value.ledState.fitZones(detected?.capabilities?.zones ?: 2),
-                    sameColor = liveState?.zoneColors?.distinct()?.size?.let { it <= 1 } ?: mutableState.value.sameColor,
                 )
         }
     }
@@ -100,27 +105,15 @@ class ColoresViewModel(
 
     fun setBrightness(brightness: Int) = updateLedState { it.copy(brightness = brightness.coerceIn(0, 100)) }
 
-    fun setSameColor(same: Boolean) {
-        val current = mutableState.value
-        val colors =
-            if (same) {
-                List(current.ledState.zoneColors.size) { current.ledState.zoneColors.first() }
-            } else {
-                current.ledState.zoneColors
-            }
-        mutableState.value = current.copy(sameColor = same, ledState = current.ledState.copy(zoneColors = colors))
-        applyCurrentState()
+    fun selectTarget(target: EditTarget) {
+        mutableState.value = mutableState.value.copy(editTarget = target)
     }
 
-    fun setSolidColor(color: RgbColor) =
-        updateLedState { state -> state.copy(zoneColors = List(state.zoneColors.size) { color }) }
+    fun setEditingColor(color: RgbColor) =
+        updateLedState { state -> state.withTargetColor(mutableState.value.editTarget, color) }
 
-    fun setZoneColor(
-        index: Int,
-        color: RgbColor,
-    ) = updateLedState { state ->
-        state.copy(zoneColors = state.zoneColors.mapIndexed { zone, existing -> if (zone == index) color else existing })
-    }
+    fun setSaturation(saturation: Float) =
+        updateLedState { state -> state.withTargetSaturation(mutableState.value.editTarget, saturation) }
 
     private fun updateLedState(transform: (LedState) -> LedState) {
         val current = mutableState.value
@@ -133,11 +126,7 @@ class ColoresViewModel(
         val current = mutableState.value
         val device = ledDevice ?: return
         viewModelScope.launch {
-            if (current.sameColor) {
-                device.applySolid(current.ledState.zoneColors.first(), current.ledState.brightness, current.ledState.power)
-            } else {
-                device.applyZones(current.ledState.zoneColors, current.ledState.brightness, current.ledState.power)
-            }
+            device.applyZones(current.ledState.zoneColors, current.ledState.brightness, current.ledState.power)
         }
     }
 }

@@ -108,3 +108,10 @@ fun HsvColor.toRgbColor(): RgbColor {
         blue = ((channels.third + offset) * 255f).roundToInt().coerceIn(0, 255),
     )
 }
+
+fun RgbColor.toHexString(): String =
+    "#%02X%02X%02X".format(
+        red.coerceIn(0, 255),
+        green.coerceIn(0, 255),
+        blue.coerceIn(0, 255),
+    )
