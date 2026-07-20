@@ -22,7 +22,6 @@ data class SettingsProviderDescriptor(
     val requiresPermission: String?,
     val vendorService: String,
     val htr3212: Htr3212Descriptor? = null,
-    val sysfs: SysfsRgbDescriptor? = null,
 )
 
 data class Htr3212Descriptor(
@@ -31,14 +30,7 @@ data class Htr3212Descriptor(
     val address: Int,
     val leftOrder: List<Int>,
     val rightOrder: List<Int>,
-)
-
-data class SysfsRgbDescriptor(
-    val basePath: String,
-    val red: String,
-    val green: String,
-    val blue: String,
-    val maxBrightness: Int,
+    val rgbStartRegister: Int = 0x01,
 )
 
 class SettingsProviderLedDevice internal constructor(

@@ -74,6 +74,27 @@ class Htr3212CommandTest {
     }
 
     @Test
+    fun `AYN Thor start register offsets the color registers to 0x0d`() {
+        val command =
+            Htr3212Command.build(
+                bus = 3,
+                address = 0x3c,
+                colors = listOf(RgbColor(0x10, 0x20, 0x30)),
+                logicalToDriverOrder = listOf(0),
+                previous = null,
+                rgbStartRegister = 0x0d,
+            )
+
+        assertEquals(
+            "i2cset -f -y 3 0x3c 0x0d 0x10 i && " +
+                "i2cset -f -y 3 0x3c 0x0e 0x20 i && " +
+                "i2cset -f -y 3 0x3c 0x0f 0x30 i && " +
+                "i2cset -f -y 3 0x3c 0x25 0x00 i",
+            command,
+        )
+    }
+
+    @Test
     fun `unchanged frame produces no command`() {
         val colors = List(4) { RgbColor(1, 2, 3) }
 

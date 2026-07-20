@@ -213,7 +213,7 @@ internal class Htr3212LedDevice internal constructor(
         logicalToDriverOrder: List<Int>,
         previous: List<RgbColor>?,
     ): Boolean =
-        Htr3212Command.build(bus, address, colors, logicalToDriverOrder, previous)
+        Htr3212Command.build(bus, address, colors, logicalToDriverOrder, previous, hardware?.rgbStartRegister ?: 0x01)
             ?.let(executor::execute)
             ?: true
 

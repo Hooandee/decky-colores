@@ -253,14 +253,31 @@ class DeviceRegistryTest {
 
         requireNotNull(match)
         assertEquals("ayn-thor", match.id)
-        assertEquals("settings_provider", match.led.driver)
+        assertEquals("htr3212", match.led.driver)
         assertEquals("pserver", match.led.transport)
-        assertEquals(2, match.capabilities.zones)
+        assertEquals(8, match.capabilities.zones)
         assertTrue(match.capabilities.perZone)
         assertEquals("joystick_led_light_picker_color", match.led.colorKey)
         assertNull(match.led.requiresPermission)
         assertEquals(listOf("joystick_light_enabled"), match.led.enableKeys)
         assertEquals("com.odin.gameassistant", match.led.vendorService)
+        requireNotNull(match.led.htr3212)
+        assertEquals(3, match.led.htr3212.leftBus)
+        assertEquals(6, match.led.htr3212.rightBus)
+        assertEquals(60, match.led.htr3212.address)
+        assertEquals(0x0d, match.led.htr3212.rgbStartRegister)
+    }
+
+    @Test
+    fun `RP5 keeps the default rgb start register`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+        val match = registry.match(rp5Identity())
+        assertEquals(0x01, match?.led?.htr3212?.rgbStartRegister)
     }
 
     @Test

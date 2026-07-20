@@ -36,16 +36,24 @@
       "model": ["AYN Thor", "AYN_Thor"],
       "device": [],
       "led": {
-        "driver": "settings_provider",
+        "driver": "htr3212",
         "transport": "pserver",
         "colorKey": "joystick_led_light_picker_color",
         "colorFormat": "argb_hex_csv",
         "brightnessKey": "led_light_brightness_percent",
         "brightnessRange": [0.0, 1.0],
         "enableKeys": ["joystick_light_enabled"],
-        "zones": 2,
+        "zones": 8,
         "requiresPermission": null,
-        "vendorService": "com.odin.gameassistant"
+        "vendorService": "com.odin.gameassistant",
+        "htr3212": {
+          "leftBus": 3,
+          "rightBus": 6,
+          "address": 60,
+          "leftOrder": [0, 1, 2, 3],
+          "rightOrder": [0, 1, 2, 3],
+          "rgbStartRegister": 13
+        }
       }
     },
     "linux": null,

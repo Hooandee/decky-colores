@@ -7,12 +7,13 @@ internal object Htr3212Command {
         colors: List<RgbColor>,
         logicalToDriverOrder: List<Int>,
         previous: List<RgbColor>?,
+        rgbStartRegister: Int = RGB_START_REGISTER,
     ): String? {
         val commands =
             colors.mapIndexedNotNull { logicalIndex, color ->
                 if (previous?.getOrNull(logicalIndex) == color) return@mapIndexedNotNull null
                 val driverGroup = logicalToDriverOrder.getOrNull(logicalIndex) ?: return@mapIndexedNotNull null
-                val register = RGB_START_REGISTER + driverGroup * CHANNELS_PER_GROUP
+                val register = rgbStartRegister + driverGroup * CHANNELS_PER_GROUP
                 listOf(
                     registerCommand(bus, address, register, color.red),
                     registerCommand(bus, address, register + 1, color.green),
