@@ -90,4 +90,12 @@ class DashboardModelTest {
     fun `hex color is uppercase and channel padded`() {
         assertEquals("#01020F", RgbColor(1, 2, 15).toHexString())
     }
+
+    @Test
+    fun `gradient preview uses first and last colors on devices with many zones`() {
+        val colors = listOf(red, green, RgbColor(255, 255, 0), blue)
+
+        assertEquals(red to blue, LedState(colors, 100, true).previewEndpointColors(gradientMode = true))
+        assertEquals(red to green, LedState(colors, 100, true).previewEndpointColors(gradientMode = false))
+    }
 }

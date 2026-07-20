@@ -39,6 +39,12 @@ Los estados permitidos son `validated`, probado de extremo a extremo; `implement
 
 Una modificación de comportamiento común actualiza el contrato o golden vector y cada plataforma consumidora. Un cambio de transporte, permisos, ciclo de vida o UI se implementa únicamente en el runtime nativo afectado. Un fichero de `shared/` nunca sustituye esa implementación.
 
+## `gradients.json`
+
+La raíz requiere `schemaVersion` y una lista `presets`. Cada preset contiene un `id` estable en minúsculas y una lista no vacía `colors` de colores RGB. El contrato no contiene nombres visibles: cada plataforma localiza los identificadores en su propia interfaz.
+
+El orden de `colors` define las paradas del gradiente. Cada runtime interpola esas paradas al número real de zonas del dispositivo mediante `golden/gradient.json`.
+
 ## `bands.json`
 
 La raíz contiene `battery` y `temperature`. Cada grupo requiere una `unit` y una lista `bands` ordenada de mayor a menor. Cada banda tiene un umbral inclusivo `min` y un `color` RGB. El último umbral debe cubrir el valor mínimo esperado.

@@ -14,6 +14,12 @@ enum class EditTarget {
 val LedState.hasMixedColors: Boolean
     get() = zoneColors.distinct().size > 1
 
+fun LedState.previewEndpointColors(gradientMode: Boolean): Pair<RgbColor, RgbColor> {
+    val first = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255)
+    val second = if (gradientMode) zoneColors.lastOrNull() ?: first else zoneColors.getOrElse(1) { first }
+    return first to second
+}
+
 fun LedState.colorForEditing(target: EditTarget): RgbColor {
     val first = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255)
     return when (target) {

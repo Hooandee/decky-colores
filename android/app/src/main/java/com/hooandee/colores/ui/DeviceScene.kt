@@ -48,6 +48,7 @@ fun DeviceScene(
     projection: LedColorProjection,
     onLedPreviewChange: (Boolean) -> Unit,
     onTargetChange: (EditTarget) -> Unit,
+    showBoth: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val ledPreviewLabel = stringResource(R.string.led_preview_toggle)
@@ -127,41 +128,43 @@ fun DeviceScene(
                     )
                 }
             }
-            Spacer(Modifier.height(16.dp))
-            Surface(
-                onClick = { onTargetChange(EditTarget.BOTH) },
-                enabled = enabled,
-                modifier = Modifier.heightIn(min = 48.dp),
-                color =
-                    if (selectedTarget == EditTarget.BOTH) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        Color(0xFF181920)
-                    },
-                contentColor =
-                    if (selectedTarget == EditTarget.BOTH) {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                shape = RoundedCornerShape(999.dp),
-                border =
-                    BorderStroke(
-                        width = if (selectedTarget == EditTarget.BOTH) 2.dp else 1.dp,
-                        color =
-                            if (selectedTarget == EditTarget.BOTH) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                Color.White.copy(alpha = 0.08f)
-                            },
-                    ),
-            ) {
-                Text(
-                    text = stringResource(R.string.target_both),
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            if (showBoth) {
+                Spacer(Modifier.height(16.dp))
+                Surface(
+                    onClick = { onTargetChange(EditTarget.BOTH) },
+                    enabled = enabled,
+                    modifier = Modifier.heightIn(min = 48.dp),
+                    color =
+                        if (selectedTarget == EditTarget.BOTH) {
+                            MaterialTheme.colorScheme.primaryContainer
+                        } else {
+                            Color(0xFF181920)
+                        },
+                    contentColor =
+                        if (selectedTarget == EditTarget.BOTH) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                    shape = RoundedCornerShape(999.dp),
+                    border =
+                        BorderStroke(
+                            width = if (selectedTarget == EditTarget.BOTH) 2.dp else 1.dp,
+                            color =
+                                if (selectedTarget == EditTarget.BOTH) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    Color.White.copy(alpha = 0.08f)
+                                },
+                        ),
+                ) {
+                    Text(
+                        text = stringResource(R.string.target_both),
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
             Spacer(Modifier.weight(1f))
         }

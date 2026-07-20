@@ -19,5 +19,16 @@ fun ColoresScreen(
         onSaturationChange = viewModel::setSaturation,
         onBrightnessChange = viewModel::setBrightness,
         onLedPreviewChange = viewModel::setLedPreviewEnabled,
+        gradientActions =
+            GradientActions(
+                onModeChange = viewModel::setLightingMode,
+                onStopChange = viewModel::selectGradientStop,
+                onPresetChange = viewModel::selectGradientPreset,
+                onSavedChange = viewModel::selectSavedGradient,
+                onReverse = viewModel::reverseGradient,
+                onRestore = viewModel::restoreGradientPreset,
+                onSave = viewModel::saveGradient,
+                onDelete = viewModel::deleteGradient,
+            ),
     )
 }

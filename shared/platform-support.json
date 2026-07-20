@@ -34,8 +34,8 @@
     },
     {
       "id": "gradient",
-      "contracts": ["golden/gradient.json"],
-      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+      "contracts": ["gradients.json", "golden/gradient.json"],
+      "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
     },
     {
       "id": "software_effects",

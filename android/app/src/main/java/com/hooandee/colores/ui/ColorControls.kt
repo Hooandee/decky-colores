@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
+import com.hooandee.colores.gradient.LightingMode
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.roundToInt
 
@@ -61,6 +62,7 @@ fun ColorControlPanel(
     onColorChange: (RgbColor) -> Unit,
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
+    gradientActions: GradientActions,
     modifier: Modifier = Modifier,
 ) {
     val projection = state.ledColorProjection
@@ -82,12 +84,24 @@ fun ColorControlPanel(
                         .padding(horizontal = 18.dp, vertical = 14.dp),
             ) {
                 if (colorEnabled) {
-                    TargetSelector(
-                        target = state.editTarget,
-                        perZone = perZone,
-                        enabled = state.canWrite,
-                        onTargetChange = onTargetChange,
-                    )
+                    if (state.gradientAvailable) {
+                        LightingModeSelector(
+                            mode = state.gradient.mode,
+                            enabled = state.canWrite,
+                            onModeChange = gradientActions.onModeChange,
+                        )
+                        Spacer(Modifier.height(10.dp))
+                    }
+                    if (state.gradient.mode == LightingMode.GRADIENT) {
+                        GradientControls(state = state, actions = gradientActions)
+                    } else {
+                        TargetSelector(
+                            target = state.editTarget,
+                            perZone = perZone,
+                            enabled = state.canWrite,
+                            onTargetChange = onTargetChange,
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth().height(colorAreaHeight),

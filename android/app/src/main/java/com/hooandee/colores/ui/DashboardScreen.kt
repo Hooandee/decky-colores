@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hooandee.colores.R
+import com.hooandee.colores.gradient.LightingMode
 import com.hooandee.colores.led.RgbColor
 
 @Composable
@@ -44,6 +45,7 @@ fun DashboardScreen(
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
     onLedPreviewChange: (Boolean) -> Unit,
+    gradientActions: GradientActions,
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -101,6 +103,7 @@ fun DashboardScreen(
                         onSaturationChange = onSaturationChange,
                         onBrightnessChange = onBrightnessChange,
                         onLedPreviewChange = onLedPreviewChange,
+                        gradientActions = gradientActions,
                         modifier = Modifier.weight(1f),
                     )
             }
@@ -195,11 +198,33 @@ private fun DashboardBody(
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
     onLedPreviewChange: (Boolean) -> Unit,
+    gradientActions: GradientActions,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val left = state.ledState.zoneColors.firstOrNull() ?: state.editingColor
-        val right = state.ledState.zoneColors.getOrElse(1) { left }
+        val gradientMode = state.gradient.mode == LightingMode.GRADIENT
+        val (left, right) = state.ledState.previewEndpointColors(gradientMode)
+        val sceneTarget =
+            if (gradientMode) {
+                when (state.gradient.selectedStopIndex) {
+                    0 -> EditTarget.LEFT
+                    state.gradient.stops.lastIndex -> EditTarget.RIGHT
+                    else -> EditTarget.BOTH
+                }
+            } else {
+                state.editTarget
+            }
+        val sceneTargetChange: (EditTarget) -> Unit = { target ->
+            if (gradientMode) {
+                when (target) {
+                    EditTarget.LEFT -> gradientActions.onStopChange(0)
+                    EditTarget.RIGHT -> gradientActions.onStopChange(state.gradient.stops.lastIndex)
+                    EditTarget.BOTH -> Unit
+                }
+            } else {
+                onTargetChange(target)
+            }
+        }
         if (maxWidth >= 760.dp) {
             Row(
                 modifier = Modifier.fillMaxSize(),
@@ -208,13 +233,14 @@ private fun DashboardBody(
                 DeviceScene(
                     leftColor = left,
                     rightColor = right,
-                    selectedTarget = state.editTarget,
+                    selectedTarget = sceneTarget,
                     power = state.ledState.power,
                     enabled = state.canWrite && colorEnabled,
                     perZone = perZone,
                     projection = state.ledColorProjection,
                     onLedPreviewChange = onLedPreviewChange,
-                    onTargetChange = onTargetChange,
+                    onTargetChange = sceneTargetChange,
+                    showBoth = !gradientMode,
                     modifier = Modifier.weight(0.88f).fillMaxHeight(),
                 )
                 ColorControlPanel(
@@ -226,6 +252,7 @@ private fun DashboardBody(
                     onColorChange = onColorChange,
                     onSaturationChange = onSaturationChange,
                     onBrightnessChange = onBrightnessChange,
+                    gradientActions = gradientActions,
                     modifier = Modifier.weight(1.12f).fillMaxHeight(),
                 )
             }
@@ -237,13 +264,14 @@ private fun DashboardBody(
                 DeviceScene(
                     leftColor = left,
                     rightColor = right,
-                    selectedTarget = state.editTarget,
+                    selectedTarget = sceneTarget,
                     power = state.ledState.power,
                     enabled = state.canWrite && colorEnabled,
                     perZone = perZone,
                     projection = state.ledColorProjection,
                     onLedPreviewChange = onLedPreviewChange,
-                    onTargetChange = onTargetChange,
+                    onTargetChange = sceneTargetChange,
+                    showBoth = !gradientMode,
                     modifier = Modifier.fillMaxWidth().height(380.dp),
                 )
                 ColorControlPanel(
@@ -255,6 +283,7 @@ private fun DashboardBody(
                     onColorChange = onColorChange,
                     onSaturationChange = onSaturationChange,
                     onBrightnessChange = onBrightnessChange,
+                    gradientActions = gradientActions,
                     modifier = Modifier.fillMaxWidth().height(430.dp),
                 )
             }
