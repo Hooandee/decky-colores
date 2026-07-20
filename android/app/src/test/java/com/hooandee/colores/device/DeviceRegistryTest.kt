@@ -30,7 +30,16 @@ class DeviceRegistryTest {
               }
             },
             "linux": null,
-            "capabilities": { "color": true, "brightness": true, "perZone": true }
+            "capabilities": { "color": true, "brightness": true, "perZone": true },
+            "previewCalibration": {
+              "saturationScale": 0.84,
+              "whiteMix": 0.08,
+              "redGain": 1.0,
+              "greenGain": 1.08,
+              "blueGain": 1.0,
+              "valueGamma": 0.95,
+              "glowAlpha": 0.22
+            }
           }
         ]
         """.trimIndent()
@@ -78,6 +87,30 @@ class DeviceRegistryTest {
     }
 
     @Test
+    fun `returns optional LED preview calibration`() {
+        val match = DeviceRegistry.parse(registryJson).match(rp5Identity())
+
+        requireNotNull(match)
+        requireNotNull(match.previewCalibration)
+        assertEquals(0.84f, match.previewCalibration.saturationScale)
+        assertEquals(0.08f, match.previewCalibration.whiteMix)
+        assertEquals(1.08f, match.previewCalibration.greenGain)
+        assertEquals(0.22f, match.previewCalibration.glowAlpha)
+    }
+
+    @Test
+    fun `missing LED preview calibration remains optional`() {
+        val withoutProfile =
+            registryJson.replace(
+                Regex("""\s*,\s*"previewCalibration"\s*:\s*\{[^}]*}"""),
+                "",
+            )
+        val match = DeviceRegistry.parse(withoutProfile).match(rp5Identity())
+
+        assertNull(match?.previewCalibration)
+    }
+
+    @Test
     fun `does not identify another kona device as the RP5`() {
         val match =
             DeviceRegistry.parse(registryJson).match(
@@ -99,4 +132,12 @@ class DeviceRegistryTest {
         assertTrue(registry.devices.isEmpty())
         assertFalse(registry.hasControllableDevices)
     }
+
+    private fun rp5Identity() =
+        AndroidDeviceIdentity(
+            model = "Retroid Pocket 5",
+            device = "kona",
+            manufacturer = "Moorechip",
+            productProperties = emptyMap(),
+        )
 }

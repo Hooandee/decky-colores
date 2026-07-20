@@ -16,6 +16,7 @@ data class DetectedAndroidDevice(
     val friendlyName: String,
     val capabilities: DeviceCapabilities,
     val led: com.hooandee.colores.led.SettingsProviderDescriptor,
+    val previewCalibration: LedPreviewCalibration?,
 )
 
 class AndroidDeviceDetector(

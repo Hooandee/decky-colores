@@ -76,6 +76,8 @@ class DeviceRegistry internal constructor(
                                                     },
                                                 vendorService = led.getString("vendorService"),
                                             ),
+                                        previewCalibration =
+                                            entry.optJSONObject("previewCalibration")?.toLedPreviewCalibration(),
                                     ),
                             )
                         }.getOrNull()
@@ -90,4 +92,25 @@ private fun String.matches(value: String): Boolean = trim().equals(value.trim(),
 private fun org.json.JSONObject.getStringList(key: String): List<String> {
     val values = getJSONArray(key)
     return (0 until values.length()).map { values.getString(it) }
+}
+
+private fun org.json.JSONObject.toLedPreviewCalibration() =
+    LedPreviewCalibration(
+        saturationScale = boundedFloat("saturationScale", 1f, 0f, 1.5f),
+        whiteMix = boundedFloat("whiteMix", 0f, 0f, 1f),
+        redGain = boundedFloat("redGain", 1f, 0f, 2f),
+        greenGain = boundedFloat("greenGain", 1f, 0f, 2f),
+        blueGain = boundedFloat("blueGain", 1f, 0f, 2f),
+        valueGamma = boundedFloat("valueGamma", 1f, 0.1f, 3f),
+        glowAlpha = boundedFloat("glowAlpha", 0f, 0f, 1f),
+    )
+
+private fun org.json.JSONObject.boundedFloat(
+    key: String,
+    default: Float,
+    minimum: Float,
+    maximum: Float,
+): Float {
+    val value = optDouble(key, default.toDouble()).toFloat()
+    return if (value.isFinite()) value.coerceIn(minimum, maximum) else default
 }

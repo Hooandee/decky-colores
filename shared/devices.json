@@ -19,6 +19,15 @@
       }
     },
     "linux": null,
-    "capabilities": { "color": true, "brightness": true, "perZone": true }
+    "capabilities": { "color": true, "brightness": true, "perZone": true },
+    "previewCalibration": {
+      "saturationScale": 0.84,
+      "whiteMix": 0.08,
+      "redGain": 1.0,
+      "greenGain": 1.08,
+      "blueGain": 1.0,
+      "valueGamma": 0.95,
+      "glowAlpha": 0.22
+    }
   }
 ]
