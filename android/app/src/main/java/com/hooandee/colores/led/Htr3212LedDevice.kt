@@ -5,12 +5,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 internal class Htr3212LedDevice internal constructor(
     private val descriptor: SettingsProviderDescriptor,
     private val store: SystemSettingsStore,
     private val executor: PServerCommandExecutor,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
     private val settleVendor: suspend () -> Unit,
 ) : LedDevice {
     constructor(
@@ -35,6 +36,8 @@ internal class Htr3212LedDevice internal constructor(
     private var cachedVendorState: LedState? = null
     private var cachedLeft: List<RgbColor>? = null
     private var cachedRight: List<RgbColor>? = null
+    private var latestRequestedState: LedState? = null
+    private var directReassertToken = 0L
 
     override val available: Boolean
         get() =
@@ -65,6 +68,7 @@ internal class Htr3212LedDevice internal constructor(
             cachedVendorState = vendorState
             cachedLeft = null
             cachedRight = null
+            directReassertToken += 1
         }
         return expanded
     }
@@ -73,7 +77,11 @@ internal class Htr3212LedDevice internal constructor(
         colors: List<RgbColor>,
         brightness: Int,
         power: Boolean,
-    ): Boolean = writer.submit(LedState(colors.fitHtrZones(), brightness.coerceIn(0, 100), power))
+    ): Boolean {
+        val state = LedState(colors.fitHtrZones(), brightness.coerceIn(0, 100), power)
+        synchronized(cacheLock) { latestRequestedState = state }
+        return writer.submit(state)
+    }
 
     override suspend fun applySolid(
         color: RgbColor,
@@ -87,12 +95,17 @@ internal class Htr3212LedDevice internal constructor(
             cachedVendorState = null
             cachedLeft = null
             cachedRight = null
+            latestRequestedState = null
+            directReassertToken += 1
         }
     }
 
     private suspend fun writeState(state: LedState): Boolean {
         val hardware = hardware ?: return false
         val cache = cacheSnapshot()
+        synchronized(cacheLock) {
+            if (cacheGeneration == cache.generation) latestRequestedState = state
+        }
         val vendorState = state.toVendorState()
         val vendorResult = writeVendorState(vendorState, cache.vendorState)
         if (!vendorResult.succeeded) return false
@@ -115,7 +128,23 @@ internal class Htr3212LedDevice internal constructor(
             right = right.takeIf { rightSucceeded },
         )
         val succeeded = leftSucceeded && rightSucceeded
+        if (vendorResult.changed) scheduleDirectReassert(cache.generation)
         return succeeded
+    }
+
+    private fun scheduleDirectReassert(generation: Long) {
+        val token = synchronized(cacheLock) { ++directReassertToken }
+        scope.launch {
+            delay(VENDOR_REASSERT_MS)
+            val latest =
+                synchronized(cacheLock) {
+                    if (cacheGeneration != generation || directReassertToken != token) return@synchronized null
+                    cachedLeft = null
+                    cachedRight = null
+                    latestRequestedState
+                } ?: return@launch
+            writer.submit(latest)
+        }
     }
 
     private fun writeVendorState(
@@ -209,6 +238,7 @@ internal class Htr3212LedDevice internal constructor(
         const val TOTAL_ZONES = STICKS * ZONES_PER_STICK
         const val WRITE_INTERVAL_MS = 80L
         const val VENDOR_SETTLE_MS = 120L
+        const val VENDOR_REASSERT_MS = 1_200L
     }
 }
 

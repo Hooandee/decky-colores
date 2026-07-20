@@ -151,6 +151,92 @@ class Htr3212LedDeviceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `vendor repaint is corrected by a delayed full hardware resend`() =
+        runTest {
+            val store = FakeHtrSettingsStore()
+            val executor = FakePServerExecutor()
+            val device = device(store, executor)
+            val colors = (1..8).map { RgbColor(it, it + 10, it + 20) }
+
+            device.applyZones(colors, brightness = 60, power = true)
+            runCurrent()
+            assertEquals(2, executor.commands.size)
+
+            advanceTimeBy(2_000)
+            runCurrent()
+
+            assertEquals(4, executor.commands.size)
+            assertTrue(executor.commands.takeLast(2).all { command -> command.count { it == '&' } == 24 })
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `delayed hardware resend uses the newest zone colors`() =
+        runTest {
+            val store = FakeHtrSettingsStore()
+            val executor = FakePServerExecutor()
+            val device = device(store, executor)
+            val initial = (1..8).map { RgbColor(it, it + 10, it + 20) }
+            val updated = initial.toMutableList().also { it[1] = RgbColor(90, 91, 92) }
+
+            device.applyZones(initial, brightness = 60, power = true)
+            runCurrent()
+            advanceTimeBy(80)
+            device.applyZones(updated, brightness = 60, power = true)
+            runCurrent()
+            assertEquals(3, executor.commands.size)
+
+            advanceTimeBy(2_000)
+            runCurrent()
+
+            assertEquals(5, executor.commands.size)
+            assertTrue(executor.commands[3].contains("0x10 0x5a i"))
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `successive vendor updates collapse to one delayed hardware resend`() =
+        runTest {
+            val store = FakeHtrSettingsStore()
+            val executor = FakePServerExecutor()
+            val device = device(store, executor)
+            val initial = (1..8).map { RgbColor(it, it + 10, it + 20) }
+            val updated = initial.toMutableList().also { it[0] = RgbColor(90, 91, 92) }
+
+            device.applyZones(initial, brightness = 60, power = true)
+            runCurrent()
+            advanceTimeBy(80)
+            device.applyZones(updated, brightness = 60, power = true)
+            runCurrent()
+            assertEquals(4, executor.commands.size)
+
+            advanceTimeBy(2_000)
+            runCurrent()
+
+            assertEquals(6, executor.commands.size)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `delayed hardware resend survives an initial direct write failure`() =
+        runTest {
+            val store = FakeHtrSettingsStore()
+            val executor = FakePServerExecutor(failuresRemaining = 1)
+            val device = device(store, executor)
+            val colors = (1..8).map { RgbColor(it, it + 10, it + 20) }
+
+            device.applyZones(colors, brightness = 60, power = true)
+            runCurrent()
+            assertEquals(2, executor.commands.size)
+
+            advanceTimeBy(2_000)
+            runCurrent()
+
+            assertEquals(5, executor.commands.size)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `invalidate during a hardware write prevents stale cache publication`() =
         runTest {
             val store = FakeHtrSettingsStore()
