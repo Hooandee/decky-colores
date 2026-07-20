@@ -3,6 +3,8 @@
   "release-type": "node",
   "bootstrap-sha": "a764eaf57baed9ec22705cb48ad979d10d01257f",
   "packages": {
-    ".": {}
+    ".": {
+      "exclude-paths": ["android", "shared"]
+    }
   }
 }
