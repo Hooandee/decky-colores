@@ -21,7 +21,6 @@ fun ColoresScreen(
         onLedPreviewChange = viewModel::setLedPreviewEnabled,
         gradientActions =
             GradientActions(
-                onModeChange = viewModel::setLightingMode,
                 onStopChange = viewModel::selectGradientStop,
                 onPresetChange = viewModel::selectGradientPreset,
                 onSavedChange = viewModel::selectSavedGradient,
@@ -31,6 +30,15 @@ fun ColoresScreen(
                 onDelete = viewModel::deleteGradient,
                 onColorChange = viewModel::setEditingColor,
                 onSaturationChange = viewModel::setSaturation,
+            ),
+        modeActions =
+            ModeActions(
+                onModeChange = viewModel::setAppMode,
+                onSensorModeChange = viewModel::selectSensorMode,
+                onEffectSelect = viewModel::selectEffect,
+                onSpeedChange = viewModel::setSpeed,
+                onChargerOnlyChange = viewModel::setChargerOnly,
+                onBatteryBreatheChange = viewModel::setBatteryBreathe,
             ),
     )
 }

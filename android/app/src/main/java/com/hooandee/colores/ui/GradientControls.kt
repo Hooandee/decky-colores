@@ -19,9 +19,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -45,12 +42,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
 import com.hooandee.colores.gradient.GradientPreset
-import com.hooandee.colores.gradient.LightingMode
 import com.hooandee.colores.gradient.SavedGradient
 import com.hooandee.colores.led.RgbColor
 
 data class GradientActions(
-    val onModeChange: (LightingMode) -> Unit,
     val onStopChange: (Int) -> Unit,
     val onPresetChange: (GradientPreset) -> Unit,
     val onSavedChange: (String) -> Unit,
@@ -61,35 +56,6 @@ data class GradientActions(
     val onColorChange: (RgbColor) -> Unit,
     val onSaturationChange: (Float) -> Unit,
 )
-
-@Composable
-fun LightingModeSelector(
-    mode: LightingMode,
-    enabled: Boolean,
-    onModeChange: (LightingMode) -> Unit,
-) {
-    val modes = LightingMode.entries
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().focusGroup()) {
-        modes.forEachIndexed { index, item ->
-            SegmentedButton(
-                modifier = Modifier.height(48.dp),
-                selected = mode == item,
-                onClick = { onModeChange(item) },
-                enabled = enabled,
-                shape = SegmentedButtonDefaults.itemShape(index, modes.size),
-                label = {
-                    Text(
-                        if (item == LightingMode.COLOR) {
-                            stringResource(R.string.mode_color)
-                        } else {
-                            stringResource(R.string.mode_gradient)
-                        },
-                    )
-                },
-            )
-        }
-    }
-}
 
 @Composable
 fun GradientControls(

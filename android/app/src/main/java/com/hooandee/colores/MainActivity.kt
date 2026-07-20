@@ -22,7 +22,7 @@ class MainActivity : ComponentActivity() {
                 context: Context?,
                 intent: Intent?,
             ) {
-                if (intent?.action == Intent.ACTION_SCREEN_ON) viewModel.reapplyGradient()
+                if (intent?.action == Intent.ACTION_SCREEN_ON) viewModel.onScreenOn()
             }
         }
 

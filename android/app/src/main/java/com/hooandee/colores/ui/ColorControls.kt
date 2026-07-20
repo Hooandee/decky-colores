@@ -84,14 +84,6 @@ fun ColorControlPanel(
                         .padding(horizontal = 18.dp, vertical = 14.dp),
             ) {
                 if (colorEnabled) {
-                    if (state.gradientAvailable) {
-                        LightingModeSelector(
-                            mode = state.gradient.mode,
-                            enabled = state.canWrite,
-                            onModeChange = gradientActions.onModeChange,
-                        )
-                        Spacer(Modifier.height(10.dp))
-                    }
                     if (state.gradient.mode == LightingMode.GRADIENT) {
                         GradientControls(state = state, actions = gradientActions)
                     } else {
