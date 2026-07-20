@@ -3,6 +3,8 @@ package com.hooandee.colores.ui
 import com.hooandee.colores.device.LedPreviewCalibration
 import com.hooandee.colores.device.LedPreviewHuePoint
 import com.hooandee.colores.led.RgbColor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -115,6 +117,15 @@ class LedPreviewColorTest {
 
         assertTrue(color.toHsvColor().hue in 52f..60f)
     }
+
+    @Test
+    fun `asynchronous wheel rendering preserves projected pixels`() =
+        runBlocking {
+            assertEquals(
+                calibratedColorWheelPixels(size = 31, projection = activeProjection).toList(),
+                renderColorWheelPixels(size = 31, projection = activeProjection, dispatcher = Dispatchers.Unconfined).toList(),
+            )
+        }
 
     @Test
     fun `RP5 profile maps orange to the observed yellow hue without mutating the source`() {

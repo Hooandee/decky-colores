@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -29,6 +30,9 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.led.RgbColor
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -48,18 +52,19 @@ fun HsvColorWheel(
     var focused by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
     var wheelPixelSize by remember { mutableStateOf(0) }
-    val calibratedWheel =
-        remember(wheelPixelSize, projection) {
-            projection
-                .takeIf { it.active && wheelPixelSize > 0 }
-                ?.let {
+    val calibratedWheel by
+        produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wheelPixelSize, projection) {
+            value = null
+            if (projection.active && wheelPixelSize > 0) {
+                val pixels = renderColorWheelPixels(wheelPixelSize, projection)
+                value =
                     Bitmap.createBitmap(
-                        calibratedColorWheelPixels(wheelPixelSize, projection),
+                        pixels,
                         wheelPixelSize,
                         wheelPixelSize,
                         Bitmap.Config.ARGB_8888,
                     ).asImageBitmap()
-                }
+            }
         }
     Canvas(
         modifier =
@@ -120,10 +125,11 @@ fun HsvColorWheel(
     ) {
         val radius = size.minDimension / 2f
         val center = this.center
-        if (calibratedWheel != null) {
+        val wheel = calibratedWheel
+        if (wheel != null) {
             drawImage(
-                image = calibratedWheel,
-                topLeft = Offset(center.x - calibratedWheel.width / 2f, center.y - calibratedWheel.height / 2f),
+                image = wheel,
+                topLeft = Offset(center.x - wheel.width / 2f, center.y - wheel.height / 2f),
                 alpha = if (enabled) 1f else 0.4f,
             )
         } else {
@@ -170,3 +176,9 @@ fun HsvColorWheel(
         }
     }
 }
+
+internal suspend fun renderColorWheelPixels(
+    size: Int,
+    projection: LedColorProjection,
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
+): IntArray = withContext(dispatcher) { calibratedColorWheelPixels(size, projection) }

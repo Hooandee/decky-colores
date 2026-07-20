@@ -50,6 +50,7 @@ fun DeviceScene(
     onTargetChange: (EditTarget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val ledPreviewLabel = stringResource(R.string.led_preview_toggle)
     Surface(
         modifier = modifier,
         color = Color(0xFF101116),
@@ -83,13 +84,14 @@ fun DeviceScene(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = stringResource(R.string.led_preview_toggle),
+                            text = ledPreviewLabel,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.labelMedium,
                         )
                         Switch(
                             checked = projection.active,
                             onCheckedChange = onLedPreviewChange,
+                            modifier = Modifier.semantics { contentDescription = ledPreviewLabel },
                         )
                     }
                 }

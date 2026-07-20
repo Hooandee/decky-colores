@@ -112,33 +112,31 @@ private fun org.json.JSONObject.getStringList(key: String): List<String> {
 
 private fun org.json.JSONObject.toLedPreviewCalibration() =
     LedPreviewCalibration(
-        saturationScale = boundedFloat("saturationScale", 1f, 0f, 1.5f),
-        whiteMix = boundedFloat("whiteMix", 0f, 0f, 1f),
-        redGain = boundedFloat("redGain", 1f, 0f, 2f),
-        greenGain = boundedFloat("greenGain", 1f, 0f, 2f),
-        blueGain = boundedFloat("blueGain", 1f, 0f, 2f),
-        valueGamma = boundedFloat("valueGamma", 1f, 0.1f, 3f),
-        glowAlpha = boundedFloat("glowAlpha", 0f, 0f, 1f),
+        saturationScale = requiredBoundedFloat("saturationScale", 0f, 1.5f),
+        whiteMix = requiredBoundedFloat("whiteMix", 0f, 1f),
+        redGain = requiredBoundedFloat("redGain", 0f, 2f),
+        greenGain = requiredBoundedFloat("greenGain", 0f, 2f),
+        blueGain = requiredBoundedFloat("blueGain", 0f, 2f),
+        valueGamma = requiredBoundedFloat("valueGamma", 0.1f, 3f),
+        glowAlpha = requiredBoundedFloat("glowAlpha", 0f, 1f),
         hueMap =
-            optJSONArray("hueMap")?.let { points ->
-                (0 until points.length()).mapNotNull { index ->
-                    runCatching {
-                        val point = points.getJSONObject(index)
-                        LedPreviewHuePoint(
-                            input = point.boundedFloat("input", 0f, 0f, 360f),
-                            output = point.boundedFloat("output", 0f, 0f, 360f),
-                        )
-                    }.getOrNull()
+            getJSONArray("hueMap").let { points ->
+                (0 until points.length()).map { index ->
+                    val point = points.getJSONObject(index)
+                    LedPreviewHuePoint(
+                        input = point.requiredBoundedFloat("input", 0f, 360f),
+                        output = point.requiredBoundedFloat("output", 0f, 360f),
+                    )
                 }
-            }.orEmpty(),
+            },
     )
 
-private fun org.json.JSONObject.boundedFloat(
+private fun org.json.JSONObject.requiredBoundedFloat(
     key: String,
-    default: Float,
     minimum: Float,
     maximum: Float,
 ): Float {
-    val value = optDouble(key, default.toDouble()).toFloat()
-    return if (value.isFinite()) value.coerceIn(minimum, maximum) else default
+    val value = getDouble(key).toFloat()
+    require(value.isFinite() && value in minimum..maximum)
+    return value
 }

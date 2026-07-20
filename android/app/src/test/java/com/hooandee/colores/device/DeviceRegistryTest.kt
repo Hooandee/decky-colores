@@ -1,5 +1,6 @@
 package com.hooandee.colores.device
 
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -153,6 +154,14 @@ class DeviceRegistryTest {
     }
 
     @Test
+    fun `invalid LED preview profile is discarded atomically`() {
+        val malformed = previewProfilesJson.replace("\"whiteMix\"", "\"whiteMi\"")
+        val match = DeviceRegistry.parse(registryJson, malformed).match(rp5Identity())
+
+        assertNull(match?.previewCalibration)
+    }
+
+    @Test
     fun `two devices can share the same resolved LED preview profile`() {
         val registry = DeviceRegistry.parse(registryJson, previewProfilesJson)
         val rp5 = requireNotNull(registry.match(rp5Identity()))
@@ -193,6 +202,21 @@ class DeviceRegistryTest {
 
         assertTrue(registry.devices.isEmpty())
         assertFalse(registry.hasControllableDevices)
+    }
+
+    @Test
+    fun `production registry resolves the RP5 preview profile`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+
+        val match = registry.match(rp5Identity())
+
+        assertEquals("retroid-stick-ring-rp5-v1", match?.previewProfileId)
+        assertTrue(match?.previewCalibration != null)
     }
 
     private fun rp5Identity() =
