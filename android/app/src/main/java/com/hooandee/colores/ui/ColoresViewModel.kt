@@ -30,6 +30,7 @@ data class ColoresUiState(
             power = true,
         ),
     val editTarget: EditTarget = EditTarget.BOTH,
+    val ledPreviewEnabled: Boolean = false,
 ) {
     val canWrite: Boolean
         get() = controlAccess == ControlAccess.ENABLED
@@ -49,6 +50,7 @@ class ColoresViewModel(
 
     private var ledDevice: LedDevice? = null
     private var refreshJob: Job? = null
+    private val ledPreviewPreferences = LedPreviewPreferences(application)
 
     init {
         refresh()
@@ -97,6 +99,11 @@ class ColoresViewModel(
                     detected = detected,
                     controlAccess = controlAccess,
                     ledState = liveState ?: mutableState.value.ledState.fitZones(detected?.capabilities?.zones ?: 2),
+                    ledPreviewEnabled =
+                        detected
+                            ?.takeIf { it.previewCalibration != null }
+                            ?.let { ledPreviewPreferences.isEnabled(it.id) }
+                            ?: false,
                 )
         }
     }
@@ -114,6 +121,13 @@ class ColoresViewModel(
 
     fun setSaturation(saturation: Float) =
         updateLedState { state -> state.withTargetSaturation(mutableState.value.editTarget, saturation) }
+
+    fun setLedPreviewEnabled(enabled: Boolean) {
+        val current = mutableState.value
+        val device = current.detected?.takeIf { it.previewCalibration != null } ?: return
+        mutableState.value = current.copy(ledPreviewEnabled = enabled)
+        ledPreviewPreferences.setEnabled(device.id, enabled)
+    }
 
     private fun updateLedState(transform: (LedState) -> LedState) {
         val current = mutableState.value
