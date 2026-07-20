@@ -1,0 +1,170 @@
+[
+  {
+    "id": "meter-half-eight-zones",
+    "operation": "performance_meter",
+    "input": {
+      "value": 0.5,
+      "zones": 8
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 0,
+          "g": 230,
+          "b": 90
+        },
+        {
+          "r": 73,
+          "g": 221,
+          "b": 64
+        },
+        {
+          "r": 146,
+          "g": 213,
+          "b": 39
+        },
+        {
+          "r": 219,
+          "g": 204,
+          "b": 13
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        }
+      ]
+    }
+  },
+  {
+    "id": "meter-full-four-zones",
+    "operation": "performance_meter",
+    "input": {
+      "value": 1.0,
+      "zones": 4
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 0,
+          "g": 230,
+          "b": 90
+        },
+        {
+          "r": 170,
+          "g": 210,
+          "b": 30
+        },
+        {
+          "r": 255,
+          "g": 147,
+          "b": 0
+        },
+        {
+          "r": 255,
+          "g": 40,
+          "b": 0
+        }
+      ]
+    }
+  },
+  {
+    "id": "meter-empty-four-zones",
+    "operation": "performance_meter",
+    "input": {
+      "value": 0.0,
+      "zones": 4
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        }
+      ]
+    }
+  },
+  {
+    "id": "meter-quarter-eight-zones",
+    "operation": "performance_meter",
+    "input": {
+      "value": 0.25,
+      "zones": 8
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 0,
+          "g": 230,
+          "b": 90
+        },
+        {
+          "r": 73,
+          "g": 221,
+          "b": 64
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 0
+        }
+      ]
+    }
+  }
+]

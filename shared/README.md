@@ -64,10 +64,20 @@ La raíz es una lista de presets. Cada preset requiere:
 
 Las plataformas deben localizar las cadenas que muestran al usuario. Los valores de `id`, `needs`, `defaultSpeed` y `colors` forman parte del contrato compartido.
 
+Los ficheros de `golden/` son listas de vectores deterministas generados desde la implementación de referencia de Decky (`py_modules/effects.py`). Cada plataforma valida su motor contra los mismos vectores; así se bloquea la deriva entre Python y Kotlin. Ningún vector depende del reloj ni del hardware.
+
 ## `golden/gradient.json`
 
-Un vector de gradiente requiere `id`, `operation: "interpolate_gradient"`, `input.stops`, `input.zones` y `expected.colors`. La salida contiene exactamente un color por zona y usa redondeo al entero más cercano igual que el backend actual.
+Lista de vectores. Cada vector requiere `id`, `operation: "interpolate_gradient"`, `input.stops`, `input.zones` y `expected.colors`. La salida contiene exactamente un color por zona y usa redondeo al entero más cercano con desempate al par, igual que el backend.
 
 ## `golden/effect-frame.json`
 
-Un vector de frame requiere `id`, `operation: "effect_frame"`, `input.effectId`, `input.timeSeconds`, `input.speed`, `input.base` y `expected.colors`. `base` y `expected.colors` contienen un color por zona. El vector debe ser determinista y no depender del reloj ni de hardware.
+Lista de vectores. Cada vector requiere `id`, `operation: "effect_frame"`, `input.effectId`, `input.timeSeconds`, `input.speed`, `input.zones` y `expected.colors`. Según el efecto, el input añade `base` (paleta por zona para efectos que necesitan color) o `stops` (paradas del gradiente para `wave` y `spiral`). Los efectos que no necesitan color no llevan ninguno de los dos.
+
+## `golden/clock.json`
+
+Lista de vectores. Cada vector requiere `id`, `operation: "clock_color"`, `input.hour` (hora local en 0..24 con la fracción de minutos) y `expected.color`. Interpola linealmente los puntos horarios del reloj.
+
+## `golden/meter.json`
+
+Lista de vectores. Cada vector requiere `id`, `operation: "performance_meter"`, `input.value` (0..1), `input.zones` y `expected.colors`. Reproduce la barra de nivel verde a rojo del modo rendimiento.

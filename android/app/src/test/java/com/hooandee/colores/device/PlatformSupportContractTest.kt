@@ -21,6 +21,8 @@ class PlatformSupportContractTest {
             "software_effects",
             "battery_mode",
             "temperature_mode",
+            "performance_mode",
+            "clock_mode",
             "charger_only",
             "ambilight",
             "audio_vu",

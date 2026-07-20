@@ -2,8 +2,9 @@ package com.hooandee.colores.gradient
 
 import com.hooandee.colores.led.RgbColor
 import java.io.File
-import org.json.JSONObject
+import org.json.JSONArray
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GradientInterpolatorTest {
@@ -11,14 +12,19 @@ class GradientInterpolatorTest {
     private val blue = RgbColor(0, 0, 255)
 
     @Test
-    fun `matches the shared red blue four-zone golden vector`() {
-        val root = JSONObject(File("../../shared/golden/gradient.json").readText())
-        val input = root.getJSONObject("input")
-        val expected = root.getJSONObject("expected").getJSONArray("colors").colors()
+    fun `matches every shared interpolate_gradient golden vector`() {
+        val vectors = JSONArray(File("../../shared/golden/gradient.json").readText())
+        assertTrue(vectors.length() > 0)
+        repeat(vectors.length()) { index ->
+            val vector = vectors.getJSONObject(index)
+            assertEquals("interpolate_gradient", vector.getString("operation"))
+            val input = vector.getJSONObject("input")
+            val expected = vector.getJSONObject("expected").getJSONArray("colors").colors()
 
-        val actual = GradientInterpolator.interpolate(input.getJSONArray("stops").colors(), input.getInt("zones"))
+            val actual = GradientInterpolator.interpolate(input.getJSONArray("stops").colors(), input.getInt("zones"))
 
-        assertEquals(expected, actual)
+            assertEquals("vector ${vector.getString("id")}", expected, actual)
+        }
     }
 
     @Test
@@ -63,7 +69,7 @@ class GradientInterpolatorTest {
     }
 }
 
-private fun org.json.JSONArray.colors(): List<RgbColor> =
+private fun JSONArray.colors(): List<RgbColor> =
     (0 until length()).map { index ->
         getJSONObject(index).let { color ->
             RgbColor(color.getInt("r"), color.getInt("g"), color.getInt("b"))

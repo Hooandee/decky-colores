@@ -1,19 +1,396 @@
-{
-  "id": "breathing-two-zones-at-zero",
-  "operation": "effect_frame",
-  "input": {
-    "effectId": "breathing",
-    "timeSeconds": 0.0,
-    "speed": 50,
-    "base": [
-      { "r": 200, "g": 100, "b": 50 },
-      { "r": 200, "g": 100, "b": 50 }
-    ]
+[
+  {
+    "id": "breathing-two-zones-at-zero",
+    "operation": "effect_frame",
+    "input": {
+      "effectId": "breathing",
+      "timeSeconds": 0.0,
+      "speed": 50,
+      "zones": 2,
+      "base": [
+        {
+          "r": 200,
+          "g": 100,
+          "b": 50
+        },
+        {
+          "r": 200,
+          "g": 100,
+          "b": 50
+        }
+      ]
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 115,
+          "g": 57,
+          "b": 29
+        },
+        {
+          "r": 115,
+          "g": 57,
+          "b": 29
+        }
+      ]
+    }
   },
-  "expected": {
-    "colors": [
-      { "r": 115, "g": 57, "b": 29 },
-      { "r": 115, "g": 57, "b": 29 }
-    ]
+  {
+    "id": "breathing-eight-zones-at-zero",
+    "operation": "effect_frame",
+    "input": {
+      "effectId": "breathing",
+      "timeSeconds": 0.0,
+      "speed": 50,
+      "zones": 8,
+      "base": [
+        {
+          "r": 255,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 255,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 255
+        },
+        {
+          "r": 255,
+          "g": 255,
+          "b": 0
+        },
+        {
+          "r": 255,
+          "g": 0,
+          "b": 255
+        },
+        {
+          "r": 0,
+          "g": 255,
+          "b": 255
+        },
+        {
+          "r": 255,
+          "g": 255,
+          "b": 255
+        },
+        {
+          "r": 40,
+          "g": 120,
+          "b": 200
+        }
+      ]
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 147,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 147,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 147
+        },
+        {
+          "r": 147,
+          "g": 147,
+          "b": 0
+        },
+        {
+          "r": 147,
+          "g": 0,
+          "b": 147
+        },
+        {
+          "r": 0,
+          "g": 147,
+          "b": 147
+        },
+        {
+          "r": 147,
+          "g": 147,
+          "b": 147
+        },
+        {
+          "r": 23,
+          "g": 69,
+          "b": 115
+        }
+      ]
+    }
+  },
+  {
+    "id": "rainbow-four-zones-at-zero",
+    "operation": "effect_frame",
+    "input": {
+      "effectId": "rainbow",
+      "timeSeconds": 0.0,
+      "speed": 50,
+      "zones": 4
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 255,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 255,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 255,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 255,
+          "g": 0,
+          "b": 0
+        }
+      ]
+    }
+  },
+  {
+    "id": "wave-red-blue-four-zones-t-half-speed-50",
+    "operation": "effect_frame",
+    "input": {
+      "effectId": "wave",
+      "timeSeconds": 0.5,
+      "speed": 50,
+      "zones": 4,
+      "stops": [
+        {
+          "r": 255,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 255
+        }
+      ]
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 121,
+          "g": 0,
+          "b": 134
+        },
+        {
+          "r": 57,
+          "g": 0,
+          "b": 198
+        },
+        {
+          "r": 249,
+          "g": 0,
+          "b": 6
+        },
+        {
+          "r": 185,
+          "g": 0,
+          "b": 70
+        }
+      ]
+    }
+  },
+  {
+    "id": "wave-red-blue-four-zones-t-half-speed-100",
+    "operation": "effect_frame",
+    "input": {
+      "effectId": "wave",
+      "timeSeconds": 0.5,
+      "speed": 100,
+      "zones": 4,
+      "stops": [
+        {
+          "r": 255,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 0,
+          "b": 255
+        }
+      ]
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 255,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 191,
+          "g": 0,
+          "b": 64
+        },
+        {
+          "r": 128,
+          "g": 0,
+          "b": 128
+        },
+        {
+          "r": 64,
+          "g": 0,
+          "b": 191
+        }
+      ]
+    }
+  },
+  {
+    "id": "spiral-four-stops-eight-zones-t-half",
+    "operation": "effect_frame",
+    "input": {
+      "effectId": "spiral",
+      "timeSeconds": 0.5,
+      "speed": 50,
+      "zones": 8,
+      "stops": [
+        {
+          "r": 255,
+          "g": 0,
+          "b": 128
+        },
+        {
+          "r": 124,
+          "g": 92,
+          "b": 255
+        },
+        {
+          "r": 0,
+          "g": 196,
+          "b": 255
+        },
+        {
+          "r": 64,
+          "g": 224,
+          "b": 120
+        }
+      ]
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 30,
+          "g": 173,
+          "b": 251
+        },
+        {
+          "r": 15,
+          "g": 202,
+          "b": 224
+        },
+        {
+          "r": 42,
+          "g": 214,
+          "b": 166
+        },
+        {
+          "r": 102,
+          "g": 179,
+          "b": 122
+        },
+        {
+          "r": 244,
+          "g": 8,
+          "b": 139
+        },
+        {
+          "r": 188,
+          "g": 47,
+          "b": 193
+        },
+        {
+          "r": 132,
+          "g": 88,
+          "b": 241
+        },
+        {
+          "r": 78,
+          "g": 131,
+          "b": 255
+        }
+      ]
+    }
+  },
+  {
+    "id": "comet-one-zone-at-zero",
+    "operation": "effect_frame",
+    "input": {
+      "effectId": "comet",
+      "timeSeconds": 0.0,
+      "speed": 50,
+      "zones": 1,
+      "base": [
+        {
+          "r": 0,
+          "g": 196,
+          "b": 255
+        }
+      ]
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 0,
+          "g": 196,
+          "b": 255
+        }
+      ]
+    }
+  },
+  {
+    "id": "cycle-four-zones-at-zero",
+    "operation": "effect_frame",
+    "input": {
+      "effectId": "cycle",
+      "timeSeconds": 0.0,
+      "speed": 50,
+      "zones": 4
+    },
+    "expected": {
+      "colors": [
+        {
+          "r": 255,
+          "g": 0,
+          "b": 0
+        },
+        {
+          "r": 128,
+          "g": 255,
+          "b": 0
+        },
+        {
+          "r": 0,
+          "g": 255,
+          "b": 255
+        },
+        {
+          "r": 128,
+          "g": 0,
+          "b": 255
+        }
+      ]
+    }
   }
-}
+]
