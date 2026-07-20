@@ -18,13 +18,14 @@ class DeviceRegistryTest {
               "device": ["kona"],
               "led": {
                 "driver": "settings_provider",
+                "transport": "pserver",
                 "colorKey": "joystick_led_light_picker_color",
                 "colorFormat": "argb_hex_csv",
                 "brightnessKey": "led_light_brightness_percent",
                 "brightnessRange": [0.0, 1.0],
                 "enableKeys": ["joystick_light_enabled", "left_joystick_light_enabled", "right_joystick_light_enabled"],
                 "zones": 2,
-                "requiresPermission": "android.permission.WRITE_SETTINGS",
+                "requiresPermission": null,
                 "vendorService": "com.rp.gameassistant"
               }
             },
@@ -54,6 +55,8 @@ class DeviceRegistryTest {
         assertTrue(match.capabilities.perZone)
         assertEquals(2, match.capabilities.zones)
         assertEquals("settings_provider", match.led.driver)
+        assertEquals("pserver", match.led.transport)
+        assertNull(match.led.requiresPermission)
         assertEquals("joystick_led_light_picker_color", match.led.colorKey)
         assertEquals(0.0f, match.led.brightnessRange.start)
         assertEquals(1.0f, match.led.brightnessRange.endInclusive)

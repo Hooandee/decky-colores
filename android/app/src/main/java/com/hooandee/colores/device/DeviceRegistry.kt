@@ -59,6 +59,7 @@ class DeviceRegistry internal constructor(
                                         led =
                                             SettingsProviderDescriptor(
                                                 driver = led.getString("driver"),
+                                                transport = led.optString("transport", "direct"),
                                                 colorKey = led.getString("colorKey"),
                                                 colorFormat = led.getString("colorFormat"),
                                                 brightnessKey = led.getString("brightnessKey"),
@@ -67,7 +68,12 @@ class DeviceRegistry internal constructor(
                                                         brightnessRange.getDouble(1).toFloat(),
                                                 enableKeys = led.getStringList("enableKeys"),
                                                 zones = zones,
-                                                requiresPermission = led.getString("requiresPermission"),
+                                                requiresPermission =
+                                                    if (led.isNull("requiresPermission")) {
+                                                        null
+                                                    } else {
+                                                        led.optString("requiresPermission").takeIf(String::isNotBlank)
+                                                    },
                                                 vendorService = led.getString("vendorService"),
                                             ),
                                     ),

@@ -110,8 +110,10 @@ private fun ScreenContent(
             return@Column
         }
         CapabilityChips(detected.capabilities)
-        if (!state.canWrite) {
-            PermissionCard(onGrantPermission)
+        when (state.controlAccess) {
+            ControlAccess.USER_PERMISSION_REQUIRED -> PermissionCard(onGrantPermission)
+            ControlAccess.SERVICE_UNAVAILABLE -> ControlServiceUnavailableCard()
+            ControlAccess.ENABLED -> Unit
         }
         val controlsModifier = Modifier.alpha(if (state.canWrite) 1f else 0.42f)
         SectionCard(modifier = controlsModifier) {
@@ -156,6 +158,29 @@ private fun ScreenContent(
                     enabled = state.canWrite,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun ControlServiceUnavailableCard() {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        shape = RoundedCornerShape(24.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.control_service_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(R.string.control_service_description),
+                color = MaterialTheme.colorScheme.onErrorContainer,
+            )
         }
     }
 }

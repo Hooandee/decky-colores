@@ -10,6 +10,8 @@
     <string name="permission_title">Permiso necesario</string>
     <string name="permission_description">Colores necesita permiso para modificar los ajustes del sistema que controlan los LEDs.</string>
     <string name="permission_button">Conceder permiso</string>
+    <string name="control_service_title">Control no disponible</string>
+    <string name="control_service_description">El servicio de control del fabricante no está disponible en este dispositivo.</string>
     <string name="power_title">Encendido</string>
     <string name="power_description">Enciende o apaga la iluminación de ambos sticks.</string>
     <string name="color_title">Color</string>

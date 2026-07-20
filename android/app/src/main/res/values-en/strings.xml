@@ -10,6 +10,8 @@
     <string name="permission_title">Permission required</string>
     <string name="permission_description">Colores needs permission to modify the system settings that control the LEDs.</string>
     <string name="permission_button">Grant permission</string>
+    <string name="control_service_title">Control unavailable</string>
+    <string name="control_service_description">The manufacturer control service is not available on this device.</string>
     <string name="power_title">Power</string>
     <string name="power_description">Turn both stick lights on or off.</string>
     <string name="color_title">Color</string>

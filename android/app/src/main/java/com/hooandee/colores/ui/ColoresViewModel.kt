@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
 data class ColoresUiState(
     val loading: Boolean = true,
     val detected: DetectedAndroidDevice? = null,
-    val canWrite: Boolean = false,
+    val controlAccess: ControlAccess = ControlAccess.SERVICE_UNAVAILABLE,
     val ledState: LedState =
         LedState(
             zoneColors = listOf(RgbColor(93, 81, 255), RgbColor(93, 81, 255)),
@@ -30,7 +30,10 @@ data class ColoresUiState(
             power = true,
         ),
     val sameColor: Boolean = true,
-)
+) {
+    val canWrite: Boolean
+        get() = controlAccess == ControlAccess.ENABLED
+}
 
 class ColoresViewModel(
     application: Application,
@@ -50,7 +53,7 @@ class ColoresViewModel(
         refreshJob = viewModelScope.launch {
             val context = getApplication<Application>()
             val detected = withContext(Dispatchers.IO) { AndroidDeviceDetector(context).detect() }
-            val canWrite = WriteSettingsPermission.canWrite(context)
+            val userPermissionGranted = WriteSettingsPermission.canWrite(context)
             val device =
                 if (detected != null && detected.id == mutableState.value.detected?.id) {
                     ledDevice
@@ -66,8 +69,18 @@ class ColoresViewModel(
                         }
                 }
             ledDevice = device
+            val controlAccess =
+                detected
+                    ?.let {
+                        ControlAccess.resolve(
+                            descriptor = it.led,
+                            deviceAvailable = device?.available == true,
+                            userPermissionGranted = userPermissionGranted,
+                        )
+                    }
+                    ?: ControlAccess.SERVICE_UNAVAILABLE
             val liveState =
-                if (canWrite && device != null) {
+                if (controlAccess == ControlAccess.ENABLED && device != null) {
                     withContext(Dispatchers.IO) { runCatching { device.readState() }.getOrNull() }
                 } else {
                     null
@@ -76,7 +89,7 @@ class ColoresViewModel(
                 mutableState.value.copy(
                     loading = false,
                     detected = detected,
-                    canWrite = canWrite,
+                    controlAccess = controlAccess,
                     ledState = liveState ?: mutableState.value.ledState.fitZones(detected?.capabilities?.zones ?: 2),
                     sameColor = liveState?.zoneColors?.distinct()?.size?.let { it <= 1 } ?: mutableState.value.sameColor,
                 )
