@@ -8,6 +8,24 @@ import org.junit.Test
 
 class PlatformSupportContractTest {
     private val shared = File("../../shared")
+    private val sharedRoot = shared.canonicalFile.toPath()
+    private val requiredFeatures =
+        setOf(
+            "device_detection",
+            "solid_color",
+            "per_zone_color",
+            "brightness",
+            "power",
+            "visual_led_projection",
+            "gradient",
+            "software_effects",
+            "battery_mode",
+            "temperature_mode",
+            "charger_only",
+            "ambilight",
+            "audio_vu",
+            "hardware_effects",
+        )
 
     @Test
     fun `platform support registry has unique features and valid references`() {
@@ -32,9 +50,12 @@ class PlatformSupportContractTest {
                 assertTrue(platforms.getString(platform) in statuses)
             }
             feature.getJSONArray("contracts").strings().forEach { path ->
-                assertTrue("Missing shared contract: $path", shared.resolve(path).isFile)
+                val contract = shared.resolve(path).canonicalFile
+                assertTrue("Contract escapes shared: $path", contract.toPath().startsWith(sharedRoot))
+                assertTrue("Missing shared contract: $path", contract.isFile)
             }
         }
+        assertEquals(requiredFeatures, ids)
     }
 }
 
