@@ -3,6 +3,7 @@ package com.hooandee.colores.device
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -31,7 +32,40 @@ class DeviceRegistryTest {
             },
             "linux": null,
             "capabilities": { "color": true, "brightness": true, "perZone": true },
-            "previewCalibration": {
+            "previewProfile": "retroid-stick-ring-rp5-v1"
+          },
+          {
+            "id": "shared-led-test-device",
+            "friendlyName": "Shared LED Test Device",
+            "android": {
+              "model": ["Shared LED Test Device"],
+              "device": ["shared-led-test"],
+              "led": {
+                "driver": "settings_provider",
+                "transport": "pserver",
+                "colorKey": "joystick_led_light_picker_color",
+                "colorFormat": "argb_hex_csv",
+                "brightnessKey": "led_light_brightness_percent",
+                "brightnessRange": [0.0, 1.0],
+                "enableKeys": ["joystick_light_enabled", "left_joystick_light_enabled", "right_joystick_light_enabled"],
+                "zones": 2,
+                "requiresPermission": null,
+                "vendorService": "com.rp.gameassistant"
+              }
+            },
+            "linux": null,
+            "capabilities": { "color": true, "brightness": true, "perZone": true },
+            "previewProfile": "retroid-stick-ring-rp5-v1"
+          }
+        ]
+        """.trimIndent()
+
+    private val previewProfilesJson =
+        """
+        [
+          {
+            "id": "retroid-stick-ring-rp5-v1",
+            "calibration": {
               "saturationScale": 0.84,
               "whiteMix": 0.08,
               "redGain": 1.0,
@@ -51,7 +85,7 @@ class DeviceRegistryTest {
     @Test
     fun `matches the RP5 and returns capabilities and LED descriptor`() {
         val match =
-            DeviceRegistry.parse(registryJson).match(
+            DeviceRegistry.parse(registryJson, previewProfilesJson).match(
                 AndroidDeviceIdentity(
                     model = "Retroid Pocket 5",
                     device = "kona",
@@ -78,7 +112,7 @@ class DeviceRegistryTest {
     @Test
     fun `matching is case insensitive and trims identity values`() {
         val match =
-            DeviceRegistry.parse(registryJson).match(
+            DeviceRegistry.parse(registryJson, previewProfilesJson).match(
                 AndroidDeviceIdentity(
                     model = "  retroid pocket 5 ",
                     device = "KONA",
@@ -92,9 +126,10 @@ class DeviceRegistryTest {
 
     @Test
     fun `returns optional LED preview calibration`() {
-        val match = DeviceRegistry.parse(registryJson).match(rp5Identity())
+        val match = DeviceRegistry.parse(registryJson, previewProfilesJson).match(rp5Identity())
 
         requireNotNull(match)
+        assertEquals("retroid-stick-ring-rp5-v1", match.previewProfileId)
         requireNotNull(match.previewCalibration)
         assertEquals(0.84f, match.previewCalibration.saturationScale)
         assertEquals(0.08f, match.previewCalibration.whiteMix)
@@ -110,21 +145,37 @@ class DeviceRegistryTest {
     }
 
     @Test
-    fun `missing LED preview calibration remains optional`() {
-        val withoutProfile =
-            registryJson.replace(
-                Regex("""\s*,\s*"previewCalibration"\s*:\s*\{[^}]*}"""),
-                "",
-            )
-        val match = DeviceRegistry.parse(withoutProfile).match(rp5Identity())
+    fun `unknown LED preview profile remains optional`() {
+        val unknownProfile = registryJson.replace("retroid-stick-ring-rp5-v1", "missing-profile")
+        val match = DeviceRegistry.parse(unknownProfile, previewProfilesJson).match(rp5Identity())
 
         assertNull(match?.previewCalibration)
     }
 
     @Test
+    fun `two devices can share the same resolved LED preview profile`() {
+        val registry = DeviceRegistry.parse(registryJson, previewProfilesJson)
+        val rp5 = requireNotNull(registry.match(rp5Identity()))
+        val shared =
+            requireNotNull(
+                registry.match(
+                    AndroidDeviceIdentity(
+                        model = "Shared LED Test Device",
+                        device = "shared-led-test",
+                        manufacturer = "Test",
+                        productProperties = emptyMap(),
+                    ),
+                ),
+            )
+
+        assertEquals(rp5.previewProfileId, shared.previewProfileId)
+        assertSame(rp5.previewCalibration, shared.previewCalibration)
+    }
+
+    @Test
     fun `does not identify another kona device as the RP5`() {
         val match =
-            DeviceRegistry.parse(registryJson).match(
+            DeviceRegistry.parse(registryJson, previewProfilesJson).match(
                 AndroidDeviceIdentity(
                     model = "Other handheld",
                     device = "kona",
@@ -138,7 +189,7 @@ class DeviceRegistryTest {
 
     @Test
     fun `malformed registry degrades to an empty registry`() {
-        val registry = DeviceRegistry.parse("{not-json")
+        val registry = DeviceRegistry.parse("{not-json", previewProfilesJson)
 
         assertTrue(registry.devices.isEmpty())
         assertFalse(registry.hasControllableDevices)

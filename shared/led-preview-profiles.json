@@ -1,0 +1,25 @@
+[
+  {
+    "id": "retroid-stick-ring-rp5-v1",
+    "calibration": {
+      "saturationScale": 0.98,
+      "whiteMix": 0.02,
+      "redGain": 1.0,
+      "greenGain": 1.0,
+      "blueGain": 1.0,
+      "valueGamma": 0.9,
+      "glowAlpha": 0.28,
+      "hueMap": [
+        { "input": 0, "output": 0 },
+        { "input": 13, "output": 30 },
+        { "input": 36, "output": 56 },
+        { "input": 60, "output": 60 },
+        { "input": 120, "output": 120 },
+        { "input": 180, "output": 180 },
+        { "input": 240, "output": 240 },
+        { "input": 300, "output": 300 },
+        { "input": 347, "output": 315 }
+      ]
+    }
+  }
+]

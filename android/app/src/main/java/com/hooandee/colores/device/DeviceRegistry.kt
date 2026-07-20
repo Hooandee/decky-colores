@@ -30,9 +30,13 @@ class DeviceRegistry internal constructor(
         }?.detected
 
     companion object {
-        fun parse(json: String): DeviceRegistry =
+        fun parse(
+            devicesJson: String,
+            previewProfilesJson: String,
+        ): DeviceRegistry =
             runCatching {
-                val root = JSONArray(json)
+                val previewProfiles = parsePreviewProfiles(previewProfilesJson)
+                val root = JSONArray(devicesJson)
                 val definitions =
                     (0 until root.length()).mapNotNull { index ->
                         runCatching {
@@ -42,6 +46,7 @@ class DeviceRegistry internal constructor(
                             val capabilities = entry.getJSONObject("capabilities")
                             val brightnessRange = led.getJSONArray("brightnessRange")
                             val zones = led.getInt("zones")
+                            val previewProfileId = entry.optString("previewProfile").takeIf(String::isNotBlank)
                             AndroidDeviceDefinition(
                                 models = android.getStringList("model"),
                                 devices = android.getStringList("device"),
@@ -76,8 +81,8 @@ class DeviceRegistry internal constructor(
                                                     },
                                                 vendorService = led.getString("vendorService"),
                                             ),
-                                        previewCalibration =
-                                            entry.optJSONObject("previewCalibration")?.toLedPreviewCalibration(),
+                                        previewProfileId = previewProfileId,
+                                        previewCalibration = previewProfileId?.let(previewProfiles::get),
                                     ),
                             )
                         }.getOrNull()
@@ -86,6 +91,17 @@ class DeviceRegistry internal constructor(
             }.getOrElse { DeviceRegistry(emptyList()) }
     }
 }
+
+private fun parsePreviewProfiles(json: String): Map<String, LedPreviewCalibration> =
+    runCatching {
+        val root = JSONArray(json)
+        (0 until root.length()).mapNotNull { index ->
+            runCatching {
+                val entry = root.getJSONObject(index)
+                entry.getString("id") to entry.getJSONObject("calibration").toLedPreviewCalibration()
+            }.getOrNull()
+        }.toMap()
+    }.getOrDefault(emptyMap())
 
 private fun String.matches(value: String): Boolean = trim().equals(value.trim(), ignoreCase = true)
 

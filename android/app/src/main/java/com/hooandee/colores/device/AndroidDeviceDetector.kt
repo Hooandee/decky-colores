@@ -16,6 +16,7 @@ data class DetectedAndroidDevice(
     val friendlyName: String,
     val capabilities: DeviceCapabilities,
     val led: com.hooandee.colores.led.SettingsProviderDescriptor,
+    val previewProfileId: String?,
     val previewCalibration: LedPreviewCalibration?,
 )
 
@@ -36,8 +37,10 @@ class AndroidDeviceDetector(
 
     fun detect(): DetectedAndroidDevice? =
         runCatching {
-            val registryJson = context.assets.open("devices.json").bufferedReader().use { it.readText() }
-            DeviceRegistry.parse(registryJson).match(readIdentity())
+            DeviceRegistry.parse(
+                devicesJson = context.readAsset("devices.json"),
+                previewProfilesJson = context.readAsset("led-preview-profiles.json"),
+            ).match(readIdentity())
         }.getOrNull()
 
     private fun readProperty(name: String): String =
@@ -63,3 +66,5 @@ class AndroidDeviceDetector(
             )
     }
 }
+
+private fun Context.readAsset(name: String): String = assets.open(name).bufferedReader().use { it.readText() }

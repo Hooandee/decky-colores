@@ -1,6 +1,6 @@
 # Datos compartidos de Colores
 
-`shared/` contiene datos neutrales y vectores deterministas para mantener alineadas las implementaciones Decky y Android. No contiene código ejecutable. En F0 Android empaqueta estos ficheros como assets, pero todavía no los interpreta; Decky no cambia hasta F2.
+`shared/` contiene datos neutrales y vectores deterministas para mantener alineadas las implementaciones Decky y Android. No contiene código ejecutable. Android empaqueta y consume estos ficheros como assets; Decky no cambia hasta su fase de integración.
 
 ## Tipos comunes
 
@@ -17,10 +17,17 @@ La raíz es una lista de dispositivos. Cada entrada requiere:
 - `android`: identidad y superficie de control Android, o `null`.
 - `linux`: identidad Linux, o `null`.
 - `capabilities`: booleanos `color`, `brightness` y `perZone`.
+- `previewProfile`: identificador opcional de `led-preview-profiles.json`.
 
 El bloque `android` puede declarar listas `model`, `device` y un objeto `led`. Para `settings_provider`, `led` requiere `driver`, `transport`, `colorKey`, `colorFormat`, `brightnessKey`, `brightnessRange`, `enableKeys`, `zones`, `requiresPermission` y `vendorService`. `transport` admite `direct` y `pserver`; `requiresPermission` es `null` cuando el transporte no necesita una concesión del usuario. `colorFormat` admite actualmente `argb_hex_csv`. No se debe inferir sysfs cuando no aparezca en el descriptor.
 
-Una entrada puede declarar `previewCalibration` para aproximar en la interfaz la apariencia de sus LEDs físicos. Este bloque nunca modifica el color enviado al hardware. Sus campos son `saturationScale` entre 0 y 1.5, `whiteMix` entre 0 y 1, `redGain`, `greenGain` y `blueGain` entre 0 y 2, `valueGamma` entre 0.1 y 3, `glowAlpha` entre 0 y 1 y `hueMap`, una lista de anclas `input` y `output` en grados que interpola la deriva de tono observada. Si no existe, la plataforma muestra el RGB exacto y no ofrece la vista calibrada.
+Una entrada puede declarar `previewProfile` para aproximar en la interfaz la apariencia de sus LEDs físicos. Si la referencia falta o no se resuelve, la plataforma muestra el RGB exacto y no ofrece la vista calibrada.
+
+## `led-preview-profiles.json`
+
+La raíz es una lista de perfiles visuales reutilizables. Cada perfil requiere un `id` estable y un objeto `calibration`. Sus campos son `saturationScale` entre 0 y 1.5, `whiteMix` entre 0 y 1, `redGain`, `greenGain` y `blueGain` entre 0 y 2, `valueGamma` entre 0.1 y 3, `glowAlpha` entre 0 y 1 y `hueMap`, una lista de anclas `input` y `output` en grados que interpola la deriva de tono observada.
+
+Un perfil puede ser referenciado por varias máquinas únicamente cuando la respuesta perceptual de sus LEDs se ha validado en hardware. Compartir fabricante, carcasa o disposición no basta. La calibración solo cambia lo dibujado y nunca el RGB enviado al dispositivo.
 
 ## `bands.json`
 
