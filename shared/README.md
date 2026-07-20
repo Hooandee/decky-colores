@@ -2,6 +2,8 @@
 
 `shared/` contiene datos neutrales y vectores deterministas para mantener alineadas las implementaciones Decky y Android. No contiene código ejecutable. Android empaqueta y consume estos ficheros como assets; Decky no cambia hasta su fase de integración.
 
+Cada nueva plataforma implementa su propio runtime, drivers y UI nativa. Windows podrá añadirse como otro consumidor sin convertir esta carpeta en una librería ejecutable.
+
 ## Tipos comunes
 
 Un color RGB es un objeto con `r`, `g` y `b`. Cada canal es un entero entre 0 y 255.
@@ -28,6 +30,14 @@ Una entrada puede declarar `previewProfile` para aproximar en la interfaz la apa
 La raíz es una lista de perfiles visuales reutilizables. Cada perfil requiere un `id` estable y un objeto `calibration`. Sus campos son `saturationScale` entre 0 y 1.5, `whiteMix` entre 0 y 1, `redGain`, `greenGain` y `blueGain` entre 0 y 2, `valueGamma` entre 0.1 y 3, `glowAlpha` entre 0 y 1 y `hueMap`, una lista de anclas `input` y `output` en grados que interpola la deriva de tono observada.
 
 Un perfil puede ser referenciado por varias máquinas únicamente cuando la respuesta perceptual de sus LEDs se ha validado en hardware. Compartir fabricante, carcasa o disposición no basta. La calibración solo cambia lo dibujado y nunca el RGB enviado al dispositivo.
+
+## `platform-support.json`
+
+Registra las funciones del producto, los contratos compartidos que consumen y su estado en `decky`, `android` y `windows`. Es la fuente tracked para decidir el alcance de una feature antes de implementarla.
+
+Los estados permitidos son `validated`, probado de extremo a extremo; `implemented`, terminado pero pendiente de validación final; `planned`, aprobado para una fase próxima; `deferred`, posible trabajo futuro sin compromiso actual; y `unsupported`, no disponible deliberadamente. El estado sigue condicionado por las capacidades y dispositivos validados de cada plataforma: `validated` no significa que todo el hardware soporte esa función.
+
+Una modificación de comportamiento común actualiza el contrato o golden vector y cada plataforma consumidora. Un cambio de transporte, permisos, ciclo de vida o UI se implementa únicamente en el runtime nativo afectado. Un fichero de `shared/` nunca sustituye esa implementación.
 
 ## `bands.json`
 
