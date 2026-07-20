@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "statuses": ["validated", "implemented", "planned", "deferred", "unsupported"],
+  "features": [
+    {
+      "id": "device_detection",
+      "contracts": ["devices.json"],
+      "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
+    },
+    {
+      "id": "solid_color",
+      "contracts": ["devices.json"],
+      "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
+    },
+    {
+      "id": "per_zone_color",
+      "contracts": ["devices.json"],
+      "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
+    },
+    {
+      "id": "brightness",
+      "contracts": ["devices.json"],
+      "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
+    },
+    {
+      "id": "power",
+      "contracts": ["devices.json"],
+      "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
+    },
+    {
+      "id": "visual_led_projection",
+      "contracts": ["devices.json", "led-preview-profiles.json"],
+      "platforms": { "decky": "unsupported", "android": "validated", "windows": "deferred" }
+    },
+    {
+      "id": "gradient",
+      "contracts": ["golden/gradient.json"],
+      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+    },
+    {
+      "id": "software_effects",
+      "contracts": ["effects.json", "golden/effect-frame.json"],
+      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+    },
+    {
+      "id": "battery_mode",
+      "contracts": ["bands.json"],
+      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+    },
+    {
+      "id": "temperature_mode",
+      "contracts": ["bands.json"],
+      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+    },
+    {
+      "id": "charger_only",
+      "contracts": [],
+      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+    },
+    {
+      "id": "ambilight",
+      "contracts": [],
+      "platforms": { "decky": "validated", "android": "deferred", "windows": "deferred" }
+    },
+    {
+      "id": "audio_vu",
+      "contracts": [],
+      "platforms": { "decky": "validated", "android": "deferred", "windows": "deferred" }
+    },
+    {
+      "id": "hardware_effects",
+      "contracts": ["devices.json"],
+      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+    }
+  ]
+}

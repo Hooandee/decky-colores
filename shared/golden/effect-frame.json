@@ -1,0 +1,19 @@
+{
+  "id": "breathing-two-zones-at-zero",
+  "operation": "effect_frame",
+  "input": {
+    "effectId": "breathing",
+    "timeSeconds": 0.0,
+    "speed": 50,
+    "base": [
+      { "r": 200, "g": 100, "b": 50 },
+      { "r": 200, "g": 100, "b": 50 }
+    ]
+  },
+  "expected": {
+    "colors": [
+      { "r": 115, "g": 57, "b": 29 },
+      { "r": 115, "g": 57, "b": 29 }
+    ]
+  }
+}

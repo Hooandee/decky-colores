@@ -6,7 +6,32 @@ on:
   pull_request:
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      decky: ${{ steps.scope.outputs.decky }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            BASE_SHA=$(git merge-base "$HEAD_SHA" "origin/$DEFAULT_BRANCH")
+          fi
+          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- . ':(exclude)android/**' ':(exclude)windows/**'; then
+            echo "decky=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "decky=true" >> "$GITHUB_OUTPUT"
+          fi
+
   backend-tests:
+    needs: changes
+    if: needs.changes.outputs.decky == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,6 +43,8 @@ jobs:
       - run: python -m pytest -v
 
   frontend-build:
+    needs: changes
+    if: needs.changes.outputs.decky == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

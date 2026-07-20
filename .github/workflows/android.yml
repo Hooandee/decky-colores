@@ -1,0 +1,52 @@
+name: Android CI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "android/**"
+      - "shared/**"
+      - ".github/workflows/android.yml"
+  pull_request:
+    paths:
+      - "android/**"
+      - "shared/**"
+      - ".github/workflows/android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle.kts
+            android/gradle/wrapper/gradle-wrapper.properties
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36.1" "build-tools;36.0.0"
+
+      - name: Build, test and lint
+        run: ./gradlew --no-daemon assembleDebug testDebugUnitTest lint
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Colores-Android-debug-${{ github.sha }}
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
