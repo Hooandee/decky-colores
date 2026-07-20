@@ -16,6 +16,15 @@ interface LedDevice {
     val available: Boolean
     val supportsPerZone: Boolean
 
+    /**
+     * Recommended delay between dynamic-mode frames. The RP5 transport conflates
+     * writes at roughly 80 ms, so the render loop paces itself to this instead of
+     * generating frames that would be dropped. Centralized here so it stays
+     * per-device tunable and measurable.
+     */
+    val recommendedFrameIntervalMs: Long
+        get() = 80L
+
     suspend fun readState(): LedState
 
     suspend fun applyZones(

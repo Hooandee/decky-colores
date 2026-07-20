@@ -66,4 +66,55 @@
     <string name="gradient_preset_ember">Ember</string>
     <string name="gradient_preset_ice">Ice</string>
     <string name="gradient_preset_candy">Candy</string>
+
+    <string name="nav_color">Color</string>
+    <string name="nav_gradient">Gradient</string>
+    <string name="nav_effects">Effects</string>
+    <string name="nav_sensors">Sensors</string>
+    <string name="nav_clock">Clock</string>
+
+    <string name="effects_title">Effect</string>
+    <string name="effect_speed">Speed</string>
+    <string name="effect_uses_color">Uses the selected color</string>
+    <string name="effect_uses_gradient">Uses the current gradient</string>
+    <string name="effect_uses_none">Built-in palette</string>
+    <string name="effect_breathing">Breathing</string>
+    <string name="effect_rainbow">Rainbow</string>
+    <string name="effect_wave">Wave</string>
+    <string name="effect_cycle">Cycle</string>
+    <string name="effect_spiral">Spiral</string>
+    <string name="effect_comet">Comet</string>
+    <string name="effect_sparkle">Sparkle</string>
+    <string name="effect_ripple">Ripple</string>
+    <string name="effect_aurora">Aurora</string>
+
+    <string name="sensor_battery">Battery</string>
+    <string name="sensor_temperature">Temperature</string>
+    <string name="sensor_performance">Performance</string>
+    <string name="battery_title">Battery</string>
+    <string name="battery_description">The color shows the remaining battery.</string>
+    <string name="battery_level_value">%1$d%%</string>
+    <string name="battery_charging">Charging</string>
+    <string name="battery_breathe">Breathe while charging</string>
+    <string name="temperature_title">Temperature</string>
+    <string name="temperature_description">The color shows the system temperature.</string>
+    <string name="temperature_value">%1$s °C</string>
+    <string name="temperature_unavailable_title">Temperature unavailable</string>
+    <string name="temperature_unavailable_description">No readable temperature sensor was found on this device.</string>
+    <string name="performance_title">Performance</string>
+    <string name="performance_description">The bar shows the system load.</string>
+    <string name="performance_source_gpu">Showing GPU</string>
+    <string name="performance_source_cpu">Showing CPU</string>
+    <string name="performance_unavailable_title">Performance unavailable</string>
+    <string name="performance_unavailable_description">No readable load source was found on this device.</string>
+    <string name="clock_title">Clock</string>
+    <string name="clock_description">The color follows the time of day.</string>
+
+    <string name="charger_only_title">Only while charging</string>
+    <string name="charger_only_description">LEDs turn on only while the device is charging.</string>
+
+    <string name="service_channel_name">Lighting</string>
+    <string name="service_channel_description">Keeps effects and automatic modes running.</string>
+    <string name="service_notification_title">Colores active</string>
+    <string name="service_notification_text">Keeping your lighting running.</string>
 </resources>

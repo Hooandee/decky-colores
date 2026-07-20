@@ -66,4 +66,55 @@
     <string name="gradient_preset_ember">Brasa</string>
     <string name="gradient_preset_ice">Hielo</string>
     <string name="gradient_preset_candy">Caramelo</string>
+
+    <string name="nav_color">Color</string>
+    <string name="nav_gradient">Gradiente</string>
+    <string name="nav_effects">Efectos</string>
+    <string name="nav_sensors">Sensores</string>
+    <string name="nav_clock">Reloj</string>
+
+    <string name="effects_title">Efecto</string>
+    <string name="effect_speed">Velocidad</string>
+    <string name="effect_uses_color">Usa el color seleccionado</string>
+    <string name="effect_uses_gradient">Usa el gradiente actual</string>
+    <string name="effect_uses_none">Paleta propia del efecto</string>
+    <string name="effect_breathing">Respiración</string>
+    <string name="effect_rainbow">Arcoíris</string>
+    <string name="effect_wave">Ola</string>
+    <string name="effect_cycle">Ciclo</string>
+    <string name="effect_spiral">Espiral</string>
+    <string name="effect_comet">Cometa</string>
+    <string name="effect_sparkle">Destello</string>
+    <string name="effect_ripple">Onda</string>
+    <string name="effect_aurora">Aurora</string>
+
+    <string name="sensor_battery">Batería</string>
+    <string name="sensor_temperature">Temperatura</string>
+    <string name="sensor_performance">Rendimiento</string>
+    <string name="battery_title">Batería</string>
+    <string name="battery_description">El color indica la batería restante.</string>
+    <string name="battery_level_value">%1$d%%</string>
+    <string name="battery_charging">Cargando</string>
+    <string name="battery_breathe">Respirar al cargar</string>
+    <string name="temperature_title">Temperatura</string>
+    <string name="temperature_description">El color indica la temperatura del sistema.</string>
+    <string name="temperature_value">%1$s °C</string>
+    <string name="temperature_unavailable_title">Temperatura no disponible</string>
+    <string name="temperature_unavailable_description">No se encontró un sensor de temperatura legible en este dispositivo.</string>
+    <string name="performance_title">Rendimiento</string>
+    <string name="performance_description">La barra indica la carga del sistema.</string>
+    <string name="performance_source_gpu">Mostrando GPU</string>
+    <string name="performance_source_cpu">Mostrando CPU</string>
+    <string name="performance_unavailable_title">Rendimiento no disponible</string>
+    <string name="performance_unavailable_description">No se encontró una fuente de carga legible en este dispositivo.</string>
+    <string name="clock_title">Reloj</string>
+    <string name="clock_description">El color sigue la hora del día.</string>
+
+    <string name="charger_only_title">Solo mientras carga</string>
+    <string name="charger_only_description">Los LEDs se encienden solo cuando el dispositivo está cargando.</string>
+
+    <string name="service_channel_name">Iluminación</string>
+    <string name="service_channel_description">Mantiene activos los efectos y modos automáticos.</string>
+    <string name="service_notification_title">Colores activo</string>
+    <string name="service_notification_text">Manteniendo la iluminación en marcha.</string>
 </resources>
