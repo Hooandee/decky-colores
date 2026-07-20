@@ -1,14 +1,17 @@
 name: Android CI
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - "android/**"
       - "shared/**"
+      - ".github/workflows/android.yml"
   pull_request:
     paths:
       - "android/**"
       - "shared/**"
+      - ".github/workflows/android.yml"
 
 permissions:
   contents: read
@@ -40,9 +43,10 @@ jobs:
       - name: Build, test and lint
         run: ./gradlew --no-daemon assembleDebug testDebugUnitTest lint
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
         with:
-          name: Colores-Android-debug
+          name: Colores-Android-debug-${{ github.sha }}
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
