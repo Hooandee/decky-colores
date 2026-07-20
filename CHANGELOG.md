@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.20.0...decky-colores-v0.20.1) (2026-07-20)
+
+
+### Reverts
+
+* keep Decky release configuration unchanged ([9f0950c](https://github.com/Hooandee/decky-colores/commit/9f0950cdee8c3ee25ca1a7a1eed7cc4230cc4d28))
+
 ## [0.20.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.19.0...decky-colores-v0.20.0) (2026-07-19)
 
 
