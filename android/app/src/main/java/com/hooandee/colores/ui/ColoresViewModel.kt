@@ -40,6 +40,9 @@ data class ColoresUiState(
 
     val mixedTarget: Boolean
         get() = editTarget == EditTarget.BOTH && ledState.hasMixedColors
+
+    val ledColorProjection: LedColorProjection
+        get() = LedColorProjection(detected?.previewCalibration, ledPreviewEnabled)
 }
 
 class ColoresViewModel(

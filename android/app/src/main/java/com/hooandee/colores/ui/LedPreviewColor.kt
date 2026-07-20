@@ -9,26 +9,37 @@ import kotlin.math.hypot
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
-fun RgbColor.forLedPreview(
-    profile: LedPreviewCalibration?,
-    enabled: Boolean,
-): RgbColor = if (enabled && profile != null) applyPreviewCalibration(profile) else this
+data class LedColorProjection(
+    val profile: LedPreviewCalibration?,
+    val enabled: Boolean,
+) {
+    val available: Boolean
+        get() = profile != null
+
+    val active: Boolean
+        get() = available && enabled
+
+    val glowAlpha: Float
+        get() = if (active) profile?.glowAlpha ?: 0f else 0f
+
+    fun display(color: RgbColor): RgbColor =
+        if (active) color.applyPreviewCalibration(profile) else color
+}
 
 fun colorWheelDisplayAt(
     normalizedX: Float,
     normalizedY: Float,
-    profile: LedPreviewCalibration?,
-    enabled: Boolean,
+    projection: LedColorProjection,
 ): RgbColor? {
     val saturation = hypot(normalizedX, normalizedY)
     if (saturation > 1f) return null
     val hue = ((atan2(normalizedY, normalizedX) * 180f / PI.toFloat()) + 360f) % 360f
-    return HsvColor(hue, saturation, 1f).toRgbColor().forLedPreview(profile, enabled)
+    return projection.display(HsvColor(hue, saturation, 1f).toRgbColor())
 }
 
 fun calibratedColorWheelPixels(
     size: Int,
-    profile: LedPreviewCalibration,
+    projection: LedColorProjection,
 ): IntArray {
     if (size <= 0) return IntArray(0)
     val center = (size - 1) / 2f
@@ -39,8 +50,7 @@ fun calibratedColorWheelPixels(
         colorWheelDisplayAt(
             normalizedX = (x - center) / radius,
             normalizedY = (y - center) / radius,
-            profile = profile,
-            enabled = true,
+            projection = projection,
         )?.let { color ->
             0xFF000000.toInt() or (color.red shl 16) or (color.green shl 8) or color.blue
         } ?: 0

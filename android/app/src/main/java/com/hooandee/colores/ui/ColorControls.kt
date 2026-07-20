@@ -37,7 +37,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
-import com.hooandee.colores.device.LedPreviewCalibration
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.roundToInt
 
@@ -64,6 +63,8 @@ fun ColorControlPanel(
     onBrightnessChange: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val projection = state.ledColorProjection
+    val editingHsv = state.editingColor.toHsvColor()
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface,
@@ -100,8 +101,7 @@ fun ColorControlPanel(
                             HsvColorWheel(
                                 color = state.editingColor,
                                 enabled = state.canWrite,
-                                previewCalibration = state.detected?.previewCalibration,
-                                ledPreviewEnabled = state.ledPreviewEnabled,
+                                projection = projection,
                                 contentDescription = stringResource(R.string.color_wheel_description),
                                 onColorChange = onColorChange,
                             )
@@ -110,11 +110,11 @@ fun ColorControlPanel(
                             modifier = Modifier.weight(1.1f),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            CurrentColor(state)
+                            CurrentColor(state, projection)
                             LabeledSlider(
                                 label = stringResource(R.string.saturation_title),
-                                valueLabel = "${(state.editingColor.toHsvColor().saturation * 100f).roundToInt()}%",
-                                value = state.editingColor.toHsvColor().saturation,
+                                valueLabel = "${(editingHsv.saturation * 100f).roundToInt()}%",
+                                value = editingHsv.saturation,
                                 onValueChange = onSaturationChange,
                                 valueRange = 0f..1f,
                                 enabled = state.canWrite,
@@ -126,8 +126,7 @@ fun ColorControlPanel(
                         current = state.editingColor,
                         mixed = state.mixedTarget,
                         enabled = state.canWrite,
-                        previewCalibration = state.detected?.previewCalibration,
-                        ledPreviewEnabled = state.ledPreviewEnabled,
+                        projection = projection,
                         onColorChange = onColorChange,
                     )
                 }
@@ -191,12 +190,11 @@ private fun targetLabel(target: EditTarget): String =
     }
 
 @Composable
-private fun CurrentColor(state: ColoresUiState) {
-    val shownColor =
-        state.editingColor.forLedPreview(
-            profile = state.detected?.previewCalibration,
-            enabled = state.ledPreviewEnabled,
-        )
+private fun CurrentColor(
+    state: ColoresUiState,
+    projection: LedColorProjection,
+) {
+    val shownColor = projection.display(state.editingColor)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -233,8 +231,7 @@ private fun QuickColors(
     current: RgbColor,
     mixed: Boolean,
     enabled: Boolean,
-    previewCalibration: LedPreviewCalibration?,
-    ledPreviewEnabled: Boolean,
+    projection: LedColorProjection,
     onColorChange: (RgbColor) -> Unit,
 ) {
     Row(
@@ -253,7 +250,7 @@ private fun QuickColors(
         ) {
             QUICK_COLORS.forEach { color ->
                 val selected = !mixed && current == color
-                val shownColor = color.forLedPreview(previewCalibration, ledPreviewEnabled)
+                val shownColor = projection.display(color)
                 val description = stringResource(R.string.hex_color, color.toHexString())
                 Surface(
                     onClick = { onColorChange(color) },

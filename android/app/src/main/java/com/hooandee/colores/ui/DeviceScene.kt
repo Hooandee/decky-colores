@@ -35,7 +35,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
-import com.hooandee.colores.device.LedPreviewCalibration
 import com.hooandee.colores.led.RgbColor
 
 @Composable
@@ -46,8 +45,7 @@ fun DeviceScene(
     power: Boolean,
     enabled: Boolean,
     perZone: Boolean,
-    previewCalibration: LedPreviewCalibration?,
-    ledPreviewEnabled: Boolean,
+    projection: LedColorProjection,
     onLedPreviewChange: (Boolean) -> Unit,
     onTargetChange: (EditTarget) -> Unit,
     modifier: Modifier = Modifier,
@@ -79,7 +77,7 @@ fun DeviceScene(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                if (previewCalibration != null) {
+                if (projection.available) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -90,7 +88,7 @@ fun DeviceScene(
                             style = MaterialTheme.typography.labelMedium,
                         )
                         Switch(
-                            checked = ledPreviewEnabled,
+                            checked = projection.active,
                             onCheckedChange = onLedPreviewChange,
                         )
                     }
@@ -113,8 +111,7 @@ fun DeviceScene(
                         selected = selectedTarget == EditTarget.LEFT,
                         power = power,
                         enabled = enabled && perZone,
-                        previewCalibration = previewCalibration,
-                        ledPreviewEnabled = ledPreviewEnabled,
+                        projection = projection,
                         onClick = { onTargetChange(EditTarget.LEFT) },
                     )
                     StickTarget(
@@ -123,8 +120,7 @@ fun DeviceScene(
                         selected = selectedTarget == EditTarget.RIGHT,
                         power = power,
                         enabled = enabled && perZone,
-                        previewCalibration = previewCalibration,
-                        ledPreviewEnabled = ledPreviewEnabled,
+                        projection = projection,
                         onClick = { onTargetChange(EditTarget.RIGHT) },
                     )
                 }
@@ -177,11 +173,10 @@ private fun StickTarget(
     selected: Boolean,
     power: Boolean,
     enabled: Boolean,
-    previewCalibration: LedPreviewCalibration?,
-    ledPreviewEnabled: Boolean,
+    projection: LedColorProjection,
     onClick: () -> Unit,
 ) {
-    val shownColor = color.forLedPreview(previewCalibration, ledPreviewEnabled).toComposeColor()
+    val shownColor = projection.display(color).toComposeColor()
     val displayedColor by
         animateColorAsState(
             targetValue = shownColor,
@@ -190,7 +185,7 @@ private fun StickTarget(
         )
     val glowAlpha by
         animateFloatAsState(
-            targetValue = if (ledPreviewEnabled) previewCalibration?.glowAlpha ?: 0f else 0f,
+            targetValue = projection.glowAlpha,
             animationSpec = tween(durationMillis = 180),
             label = "LED preview glow",
         )

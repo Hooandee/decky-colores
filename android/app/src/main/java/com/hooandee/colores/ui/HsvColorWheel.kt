@@ -28,7 +28,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.hooandee.colores.device.LedPreviewCalibration
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -40,8 +39,7 @@ import kotlin.math.sin
 fun HsvColorWheel(
     color: RgbColor,
     enabled: Boolean,
-    previewCalibration: LedPreviewCalibration?,
-    ledPreviewEnabled: Boolean,
+    projection: LedColorProjection,
     contentDescription: String,
     onColorChange: (RgbColor) -> Unit,
     modifier: Modifier = Modifier,
@@ -51,12 +49,12 @@ fun HsvColorWheel(
     var editing by remember { mutableStateOf(false) }
     var wheelPixelSize by remember { mutableStateOf(0) }
     val calibratedWheel =
-        remember(wheelPixelSize, previewCalibration, ledPreviewEnabled) {
-            previewCalibration
-                ?.takeIf { ledPreviewEnabled && wheelPixelSize > 0 }
-                ?.let { profile ->
+        remember(wheelPixelSize, projection) {
+            projection
+                .takeIf { it.active && wheelPixelSize > 0 }
+                ?.let {
                     Bitmap.createBitmap(
-                        calibratedColorWheelPixels(wheelPixelSize, profile),
+                        calibratedColorWheelPixels(wheelPixelSize, projection),
                         wheelPixelSize,
                         wheelPixelSize,
                         Bitmap.Config.ARGB_8888,

@@ -4,6 +4,7 @@ import com.hooandee.colores.device.LedPreviewCalibration
 import com.hooandee.colores.device.LedPreviewHuePoint
 import com.hooandee.colores.led.RgbColor
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.cos
@@ -33,6 +34,8 @@ class LedPreviewColorTest {
                 ),
         )
 
+    private val activeProjection = LedColorProjection(rp5, enabled = true)
+
     @Test
     fun `missing profile preserves exact color`() {
         val color = RgbColor(255, 56, 0)
@@ -41,11 +44,35 @@ class LedPreviewColorTest {
     }
 
     @Test
-    fun `preview helper preserves exact color when disabled or uncalibrated`() {
+    fun `projection is unavailable and exact without a device profile`() {
+        val projection = LedColorProjection(profile = null, enabled = true)
         val source = RgbColor(255, 153, 0)
 
-        assertEquals(source, source.forLedPreview(rp5, enabled = false))
-        assertEquals(source, source.forLedPreview(null, enabled = true))
+        assertFalse(projection.available)
+        assertFalse(projection.active)
+        assertEquals(0f, projection.glowAlpha)
+        assertEquals(source, projection.display(source))
+    }
+
+    @Test
+    fun `projection stays exact while its persisted toggle is disabled`() {
+        val projection = LedColorProjection(profile = rp5, enabled = false)
+        val source = RgbColor(255, 153, 0)
+
+        assertTrue(projection.available)
+        assertFalse(projection.active)
+        assertEquals(0f, projection.glowAlpha)
+        assertEquals(source, projection.display(source))
+    }
+
+    @Test
+    fun `active projection centralizes calibrated color and glow`() {
+        val projection = LedColorProjection(profile = rp5, enabled = true)
+        val source = RgbColor(255, 153, 0)
+
+        assertTrue(projection.active)
+        assertEquals(rp5.glowAlpha, projection.glowAlpha)
+        assertTrue(projection.display(source).toHsvColor().hue in 52f..60f)
     }
 
     @Test
@@ -56,8 +83,7 @@ class LedPreviewColorTest {
             colorWheelDisplayAt(
                 normalizedX = cos(angle).toFloat(),
                 normalizedY = sin(angle).toFloat(),
-                profile = rp5,
-                enabled = true,
+                projection = activeProjection,
             )
 
         assertTrue(requireNotNull(result).toHsvColor().hue in 52f..60f)
@@ -65,12 +91,12 @@ class LedPreviewColorTest {
 
     @Test
     fun `wheel rejects coordinates outside its circle`() {
-        assertEquals(null, colorWheelDisplayAt(1f, 1f, rp5, enabled = true))
+        assertEquals(null, colorWheelDisplayAt(1f, 1f, activeProjection))
     }
 
     @Test
     fun `calibrated wheel pixels stay transparent outside the circle`() {
-        val pixels = calibratedColorWheelPixels(size = 101, profile = rp5)
+        val pixels = calibratedColorWheelPixels(size = 101, projection = activeProjection)
 
         assertEquals(0, pixels.first())
         assertEquals(0, pixels.last())
@@ -84,7 +110,7 @@ class LedPreviewColorTest {
         val angle = Math.toRadians(36.0)
         val x = (center + cos(angle) * radius * 0.9).toInt()
         val y = (center + sin(angle) * radius * 0.9).toInt()
-        val pixel = calibratedColorWheelPixels(size, rp5)[y * size + x]
+        val pixel = calibratedColorWheelPixels(size, activeProjection)[y * size + x]
         val color = RgbColor(pixel shr 16 and 0xFF, pixel shr 8 and 0xFF, pixel and 0xFF)
 
         assertTrue(color.toHsvColor().hue in 52f..60f)
