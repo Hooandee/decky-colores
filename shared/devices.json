@@ -1,0 +1,23 @@
+[
+  {
+    "id": "retroid-pocket-5",
+    "friendlyName": "Retroid Pocket 5",
+    "android": {
+      "model": ["Retroid Pocket 5"],
+      "device": ["kona"],
+      "led": {
+        "driver": "settings_provider",
+        "colorKey": "joystick_led_light_picker_color",
+        "colorFormat": "argb_hex_csv",
+        "brightnessKey": "led_light_brightness_percent",
+        "brightnessRange": [0.0, 1.0],
+        "enableKeys": ["joystick_light_enabled", "left_joystick_light_enabled", "right_joystick_light_enabled"],
+        "zones": 2,
+        "requiresPermission": "android.permission.WRITE_SETTINGS",
+        "vendorService": "com.rp.gameassistant"
+      }
+    },
+    "linux": null,
+    "capabilities": { "color": true, "brightness": true, "perZone": true }
+  }
+]

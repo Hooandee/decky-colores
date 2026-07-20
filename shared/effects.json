@@ -1,0 +1,74 @@
+[
+  {
+    "id": "breathing",
+    "label": "Breathing",
+    "needs": "color",
+    "defaultSpeed": 50,
+    "description": "A single color gently fades in and out.",
+    "colors": [{ "r": 124, "g": 77, "b": 255 }, { "r": 38, "g": 23, "b": 79 }]
+  },
+  {
+    "id": "rainbow",
+    "label": "Rainbow",
+    "needs": "none",
+    "defaultSpeed": 50,
+    "description": "Smoothly cycles through the full color spectrum.",
+    "colors": [{ "r": 255, "g": 0, "b": 0 }, { "r": 0, "g": 255, "b": 0 }, { "r": 0, "g": 0, "b": 255 }]
+  },
+  {
+    "id": "wave",
+    "label": "Wave",
+    "needs": "gradient",
+    "defaultSpeed": 50,
+    "description": "Colors ripple across the ring like a moving wave.",
+    "colors": [{ "r": 0, "g": 180, "b": 216 }, { "r": 144, "g": 224, "b": 239 }, { "r": 0, "g": 119, "b": 182 }]
+  },
+  {
+    "id": "cycle",
+    "label": "Cycle",
+    "needs": "none",
+    "defaultSpeed": 50,
+    "description": "Steps through a sequence of vivid solid colors.",
+    "colors": [{ "r": 255, "g": 64, "b": 129 }, { "r": 255, "g": 196, "b": 0 }, { "r": 41, "g": 182, "b": 246 }]
+  },
+  {
+    "id": "spiral",
+    "label": "Spiral",
+    "needs": "gradient",
+    "defaultSpeed": 50,
+    "description": "A gradient that spins around the ring.",
+    "colors": [{ "r": 255, "g": 0, "b": 128 }, { "r": 124, "g": 92, "b": 255 }, { "r": 0, "g": 196, "b": 255 }, { "r": 64, "g": 224, "b": 120 }]
+  },
+  {
+    "id": "comet",
+    "label": "Comet",
+    "needs": "color",
+    "defaultSpeed": 50,
+    "description": "A bright dot sweeps back and forth with a fading tail.",
+    "colors": [{ "r": 0, "g": 196, "b": 255 }, { "r": 124, "g": 92, "b": 255 }]
+  },
+  {
+    "id": "sparkle",
+    "label": "Sparkle",
+    "needs": "color",
+    "defaultSpeed": 50,
+    "description": "LEDs twinkle at random over a dim base.",
+    "colors": [{ "r": 255, "g": 255, "b": 255 }, { "r": 124, "g": 180, "b": 255 }]
+  },
+  {
+    "id": "ripple",
+    "label": "Ripple",
+    "needs": "color",
+    "defaultSpeed": 50,
+    "description": "A gentle brightness wave glides softly along the bar.",
+    "colors": [{ "r": 0, "g": 180, "b": 216 }, { "r": 144, "g": 224, "b": 239 }]
+  },
+  {
+    "id": "aurora",
+    "label": "Aurora",
+    "needs": "none",
+    "defaultSpeed": 50,
+    "description": "Flowing greens, blues and purples drift like an aurora.",
+    "colors": [{ "r": 40, "g": 224, "b": 140 }, { "r": 0, "g": 160, "b": 220 }, { "r": 138, "g": 92, "b": 255 }]
+  }
+]
