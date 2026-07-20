@@ -1,5 +1,8 @@
 package com.hooandee.colores.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,8 +21,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -30,6 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
+import com.hooandee.colores.device.LedPreviewCalibration
 import com.hooandee.colores.led.RgbColor
 
 @Composable
@@ -40,6 +46,9 @@ fun DeviceScene(
     power: Boolean,
     enabled: Boolean,
     perZone: Boolean,
+    previewCalibration: LedPreviewCalibration?,
+    ledPreviewEnabled: Boolean,
+    onLedPreviewChange: (Boolean) -> Unit,
     onTargetChange: (EditTarget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -53,17 +62,39 @@ fun DeviceScene(
             modifier = Modifier.fillMaxSize().padding(22.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = stringResource(R.string.preview_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = stringResource(R.string.preview_hint),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.preview_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = stringResource(R.string.preview_hint),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (previewCalibration != null) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.led_preview_toggle),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                        Switch(
+                            checked = ledPreviewEnabled,
+                            onCheckedChange = onLedPreviewChange,
+                        )
+                    }
+                }
             }
             Spacer(Modifier.weight(1f))
             Surface(
@@ -82,6 +113,8 @@ fun DeviceScene(
                         selected = selectedTarget == EditTarget.LEFT,
                         power = power,
                         enabled = enabled && perZone,
+                        previewCalibration = previewCalibration,
+                        ledPreviewEnabled = ledPreviewEnabled,
                         onClick = { onTargetChange(EditTarget.LEFT) },
                     )
                     StickTarget(
@@ -90,6 +123,8 @@ fun DeviceScene(
                         selected = selectedTarget == EditTarget.RIGHT,
                         power = power,
                         enabled = enabled && perZone,
+                        previewCalibration = previewCalibration,
+                        ledPreviewEnabled = ledPreviewEnabled,
                         onClick = { onTargetChange(EditTarget.RIGHT) },
                     )
                 }
@@ -142,8 +177,25 @@ private fun StickTarget(
     selected: Boolean,
     power: Boolean,
     enabled: Boolean,
+    previewCalibration: LedPreviewCalibration?,
+    ledPreviewEnabled: Boolean,
     onClick: () -> Unit,
 ) {
+    val exactColor = color.toComposeColor()
+    val calibratedColor = color.applyPreviewCalibration(previewCalibration).toComposeColor()
+    val displayedColor by
+        animateColorAsState(
+            targetValue = if (ledPreviewEnabled) calibratedColor else exactColor,
+            animationSpec = tween(durationMillis = 180),
+            label = "LED preview color",
+        )
+    val glowAlpha by
+        animateFloatAsState(
+            targetValue = if (ledPreviewEnabled) previewCalibration?.glowAlpha ?: 0f else 0f,
+            animationSpec = tween(durationMillis = 180),
+            label = "LED preview glow",
+        )
+    val powerAlpha = if (power) 1f else 0.18f
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(9.dp),
@@ -175,10 +227,20 @@ private fun StickTarget(
                 Box(
                     modifier =
                         Modifier
+                            .size(82.dp)
+                            .border(
+                                width = 8.dp,
+                                color = displayedColor.copy(alpha = glowAlpha * powerAlpha),
+                                shape = CircleShape,
+                            ),
+                )
+                Box(
+                    modifier =
+                        Modifier
                             .size(72.dp)
                             .border(
                                 width = 11.dp,
-                                color = color.toComposeColor().copy(alpha = if (power) 1f else 0.18f),
+                                color = displayedColor.copy(alpha = powerAlpha),
                                 shape = CircleShape,
                             )
                             .background(Color(0xFF16171D), CircleShape),

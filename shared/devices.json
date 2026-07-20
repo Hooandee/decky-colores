@@ -21,13 +21,24 @@
     "linux": null,
     "capabilities": { "color": true, "brightness": true, "perZone": true },
     "previewCalibration": {
-      "saturationScale": 0.84,
-      "whiteMix": 0.08,
+      "saturationScale": 0.98,
+      "whiteMix": 0.02,
       "redGain": 1.0,
-      "greenGain": 1.08,
+      "greenGain": 1.0,
       "blueGain": 1.0,
-      "valueGamma": 0.95,
-      "glowAlpha": 0.22
+      "valueGamma": 0.9,
+      "glowAlpha": 0.28,
+      "hueMap": [
+        { "input": 0, "output": 0 },
+        { "input": 13, "output": 30 },
+        { "input": 36, "output": 56 },
+        { "input": 60, "output": 60 },
+        { "input": 120, "output": 120 },
+        { "input": 180, "output": 180 },
+        { "input": 240, "output": 240 },
+        { "input": 300, "output": 300 },
+        { "input": 347, "output": 315 }
+      ]
     }
   }
 ]

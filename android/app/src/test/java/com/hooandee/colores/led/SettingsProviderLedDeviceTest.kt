@@ -10,6 +10,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SettingsProviderLedDeviceTest {
+    @Test
+    fun `reading persisted state never writes it back`() =
+        runTest {
+            val store = FakeSettingsStore()
+            store.values["color"] = "#FFFF0038,#FFFF9900"
+            store.values["brightness"] = "1.0"
+            store.values["enabled"] = "1,1"
+            val device = SettingsProviderLedDevice(descriptor, store, backgroundScope)
+
+            assertEquals(
+                LedState(
+                    zoneColors = listOf(RgbColor(255, 0, 56), RgbColor(255, 153, 0)),
+                    brightness = 100,
+                    power = true,
+                ),
+                device.readState(),
+            )
+            assertTrue(store.writes.isEmpty())
+        }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun `writes RP5 colors brightness and power through descriptor keys`() =
@@ -81,11 +101,13 @@ private class FakeSettingsStore(
     var failWrites: Boolean = false,
 ) : SystemSettingsStore {
     val values = mutableMapOf<String, String>()
+    val writes = mutableListOf<Pair<String, String>>()
 
     override fun get(key: String): String? = values[key]
 
     override fun put(key: String, value: String): Boolean {
         if (failWrites) return false
+        writes += key to value
         values[key] = value
         return true
     }

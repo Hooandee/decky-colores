@@ -103,6 +103,18 @@ private fun org.json.JSONObject.toLedPreviewCalibration() =
         blueGain = boundedFloat("blueGain", 1f, 0f, 2f),
         valueGamma = boundedFloat("valueGamma", 1f, 0.1f, 3f),
         glowAlpha = boundedFloat("glowAlpha", 0f, 0f, 1f),
+        hueMap =
+            optJSONArray("hueMap")?.let { points ->
+                (0 until points.length()).mapNotNull { index ->
+                    runCatching {
+                        val point = points.getJSONObject(index)
+                        LedPreviewHuePoint(
+                            input = point.boundedFloat("input", 0f, 0f, 360f),
+                            output = point.boundedFloat("output", 0f, 0f, 360f),
+                        )
+                    }.getOrNull()
+                }
+            }.orEmpty(),
     )
 
 private fun org.json.JSONObject.boundedFloat(

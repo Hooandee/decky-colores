@@ -18,5 +18,6 @@ fun ColoresScreen(
         onColorChange = viewModel::setEditingColor,
         onSaturationChange = viewModel::setSaturation,
         onBrightnessChange = viewModel::setBrightness,
+        onLedPreviewChange = viewModel::setLedPreviewEnabled,
     )
 }

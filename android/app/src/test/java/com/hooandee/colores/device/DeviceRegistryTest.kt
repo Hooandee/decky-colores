@@ -38,7 +38,11 @@ class DeviceRegistryTest {
               "greenGain": 1.08,
               "blueGain": 1.0,
               "valueGamma": 0.95,
-              "glowAlpha": 0.22
+              "glowAlpha": 0.22,
+              "hueMap": [
+                { "input": 36, "output": 56 },
+                { "input": 347, "output": 315 }
+              ]
             }
           }
         ]
@@ -96,6 +100,13 @@ class DeviceRegistryTest {
         assertEquals(0.08f, match.previewCalibration.whiteMix)
         assertEquals(1.08f, match.previewCalibration.greenGain)
         assertEquals(0.22f, match.previewCalibration.glowAlpha)
+        assertEquals(
+            listOf(
+                LedPreviewHuePoint(36f, 56f),
+                LedPreviewHuePoint(347f, 315f),
+            ),
+            match.previewCalibration.hueMap,
+        )
     }
 
     @Test

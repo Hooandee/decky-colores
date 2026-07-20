@@ -43,6 +43,7 @@ fun DashboardScreen(
     onColorChange: (RgbColor) -> Unit,
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
+    onLedPreviewChange: (Boolean) -> Unit,
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -99,6 +100,7 @@ fun DashboardScreen(
                         onColorChange = onColorChange,
                         onSaturationChange = onSaturationChange,
                         onBrightnessChange = onBrightnessChange,
+                        onLedPreviewChange = onLedPreviewChange,
                         modifier = Modifier.weight(1f),
                     )
             }
@@ -192,6 +194,7 @@ private fun DashboardBody(
     onColorChange: (RgbColor) -> Unit,
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
+    onLedPreviewChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
@@ -209,6 +212,9 @@ private fun DashboardBody(
                     power = state.ledState.power,
                     enabled = state.canWrite && colorEnabled,
                     perZone = perZone,
+                    previewCalibration = state.detected?.previewCalibration,
+                    ledPreviewEnabled = state.ledPreviewEnabled,
+                    onLedPreviewChange = onLedPreviewChange,
                     onTargetChange = onTargetChange,
                     modifier = Modifier.weight(0.88f).fillMaxHeight(),
                 )
@@ -236,6 +242,9 @@ private fun DashboardBody(
                     power = state.ledState.power,
                     enabled = state.canWrite && colorEnabled,
                     perZone = perZone,
+                    previewCalibration = state.detected?.previewCalibration,
+                    ledPreviewEnabled = state.ledPreviewEnabled,
+                    onLedPreviewChange = onLedPreviewChange,
                     onTargetChange = onTargetChange,
                     modifier = Modifier.fillMaxWidth().height(380.dp),
                 )

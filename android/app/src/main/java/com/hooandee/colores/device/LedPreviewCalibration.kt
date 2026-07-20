@@ -8,4 +8,10 @@ data class LedPreviewCalibration(
     val blueGain: Float,
     val valueGamma: Float,
     val glowAlpha: Float,
+    val hueMap: List<LedPreviewHuePoint> = emptyList(),
+)
+
+data class LedPreviewHuePoint(
+    val input: Float,
+    val output: Float,
 )

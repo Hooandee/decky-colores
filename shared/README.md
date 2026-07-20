@@ -20,7 +20,7 @@ La raíz es una lista de dispositivos. Cada entrada requiere:
 
 El bloque `android` puede declarar listas `model`, `device` y un objeto `led`. Para `settings_provider`, `led` requiere `driver`, `transport`, `colorKey`, `colorFormat`, `brightnessKey`, `brightnessRange`, `enableKeys`, `zones`, `requiresPermission` y `vendorService`. `transport` admite `direct` y `pserver`; `requiresPermission` es `null` cuando el transporte no necesita una concesión del usuario. `colorFormat` admite actualmente `argb_hex_csv`. No se debe inferir sysfs cuando no aparezca en el descriptor.
 
-Una entrada puede declarar `previewCalibration` para aproximar en la interfaz la apariencia de sus LEDs físicos. Este bloque nunca modifica el color enviado al hardware. Sus campos son `saturationScale` entre 0 y 1.5, `whiteMix` entre 0 y 1, `redGain`, `greenGain` y `blueGain` entre 0 y 2, `valueGamma` entre 0.1 y 3, y `glowAlpha` entre 0 y 1. Si no existe, la plataforma muestra el RGB exacto y no ofrece la vista calibrada.
+Una entrada puede declarar `previewCalibration` para aproximar en la interfaz la apariencia de sus LEDs físicos. Este bloque nunca modifica el color enviado al hardware. Sus campos son `saturationScale` entre 0 y 1.5, `whiteMix` entre 0 y 1, `redGain`, `greenGain` y `blueGain` entre 0 y 2, `valueGamma` entre 0.1 y 3, `glowAlpha` entre 0 y 1 y `hueMap`, una lista de anclas `input` y `output` en grados que interpola la deriva de tono observada. Si no existe, la plataforma muestra el RGB exacto y no ofrece la vista calibrada.
 
 ## `bands.json`
 

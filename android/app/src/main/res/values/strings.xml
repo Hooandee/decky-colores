@@ -14,6 +14,7 @@
     <string name="color_title">Color</string>
     <string name="preview_title">Tus sticks</string>
     <string name="preview_hint">Elige qué luz quieres ajustar</string>
+    <string name="led_preview_toggle">Vista LED</string>
     <string name="target_title">Controlar</string>
     <string name="target_both">Ambos</string>
     <string name="target_left">Izquierdo</string>
