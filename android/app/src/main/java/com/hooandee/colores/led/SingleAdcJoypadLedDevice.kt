@@ -31,7 +31,7 @@ class SingleAdcJoypadLedDevice internal constructor(
     override val supportsPerZone: Boolean = false
 
     override val hardwareEffects: List<HardwareEffect> =
-        EFFECTS.map { HardwareEffect(it.id, it.needsColor, it.defaultSpeed, it.previewColors) }
+        EFFECTS.map { HardwareEffect(it.id, it.colorStops, it.defaultSpeed, it.previewColors) }
 
     override suspend fun readState(): LedState {
         val color =
@@ -52,16 +52,19 @@ class SingleAdcJoypadLedDevice internal constructor(
         brightness: Int,
         power: Boolean,
     ): Boolean =
-        writer.submit(
-            Frame(
-                color = colors.firstOrNull() ?: RgbColor(255, 255, 255),
-                brightness = brightness.coerceIn(0, 100),
-                power = power,
-                ledMode = STATIC_MODE,
-                speed = 0,
-                colored = true,
-            ),
-        )
+        (colors.firstOrNull() ?: RgbColor(255, 255, 255)).let { c ->
+            writer.submit(
+                Frame(
+                    color = c,
+                    secondColor = c,
+                    brightness = brightness.coerceIn(0, 100),
+                    power = power,
+                    ledMode = STATIC_MODE,
+                    speed = 0,
+                    colored = true,
+                ),
+            )
+        }
 
     override suspend fun applySolid(
         color: RgbColor,
@@ -71,20 +74,23 @@ class SingleAdcJoypadLedDevice internal constructor(
 
     override suspend fun applyHardwareEffect(
         effectId: String,
-        color: RgbColor,
+        colors: List<RgbColor>,
         brightness: Int,
         speed: Int,
         power: Boolean,
     ): Boolean {
         val spec = EFFECTS.firstOrNull { it.id == effectId } ?: return false
+        val first = colors.firstOrNull() ?: RgbColor(255, 255, 255)
+        val second = colors.getOrNull(1) ?: first
         return writer.submit(
             Frame(
-                color = color,
+                color = first,
+                secondColor = second,
                 brightness = brightness.coerceIn(0, 100),
                 power = power,
                 ledMode = spec.ledMode,
                 speed = mapSpeed(speed),
-                colored = spec.needsColor,
+                colored = spec.colorStops > 0,
             ),
         )
     }
@@ -108,13 +114,14 @@ class SingleAdcJoypadLedDevice internal constructor(
         put("custum_rgb_r", c.red.coerceIn(0, 255))
         put("custum_rgb_g", c.green.coerceIn(0, 255))
         put("custum_rgb_b", c.blue.coerceIn(0, 255))
-        val zone = if (frame.colored) c else RgbColor(0, 0, 0)
-        put("Led_rgb_r1", zone.red.coerceIn(0, 255))
-        put("Led_rgb_g1", zone.green.coerceIn(0, 255))
-        put("Led_rgb_b1", zone.blue.coerceIn(0, 255))
-        put("Led_rgb_r2", zone.red.coerceIn(0, 255))
-        put("Led_rgb_g2", zone.green.coerceIn(0, 255))
-        put("Led_rgb_b2", zone.blue.coerceIn(0, 255))
+        val zone1 = if (frame.colored) c else RgbColor(0, 0, 0)
+        val zone2 = if (frame.colored) frame.secondColor else RgbColor(0, 0, 0)
+        put("Led_rgb_r1", zone1.red.coerceIn(0, 255))
+        put("Led_rgb_g1", zone1.green.coerceIn(0, 255))
+        put("Led_rgb_b1", zone1.blue.coerceIn(0, 255))
+        put("Led_rgb_r2", zone2.red.coerceIn(0, 255))
+        put("Led_rgb_g2", zone2.green.coerceIn(0, 255))
+        put("Led_rgb_b2", zone2.blue.coerceIn(0, 255))
         put("led_level", frame.brightness)
         put("led_speed", frame.speed)
         put("led_mode", frame.ledMode)
@@ -134,6 +141,7 @@ class SingleAdcJoypadLedDevice internal constructor(
 
     private data class Frame(
         val color: RgbColor,
+        val secondColor: RgbColor,
         val brightness: Int,
         val power: Boolean,
         val ledMode: Int,
@@ -144,7 +152,7 @@ class SingleAdcJoypadLedDevice internal constructor(
     private data class EffectSpec(
         val id: String,
         val ledMode: Int,
-        val needsColor: Boolean,
+        val colorStops: Int,
         val defaultSpeed: Int,
         val previewColors: List<RgbColor>,
     )
@@ -159,11 +167,11 @@ class SingleAdcJoypadLedDevice internal constructor(
 
         val EFFECTS =
             listOf(
-                EffectSpec("breathing", ledMode = 2, needsColor = true, defaultSpeed = 50, previewColors = listOf(RgbColor(93, 81, 255))),
-                EffectSpec("rainbow", ledMode = 3, needsColor = false, defaultSpeed = 50, previewColors = RAINBOW),
-                EffectSpec("marquee", ledMode = 4, needsColor = false, defaultSpeed = 50, previewColors = RAINBOW),
-                EffectSpec("chasing", ledMode = 5, needsColor = true, defaultSpeed = 50, previewColors = listOf(RgbColor(93, 81, 255))),
-                EffectSpec("gaming", ledMode = 6, needsColor = false, defaultSpeed = 50, previewColors = RAINBOW),
+                EffectSpec("breathing", ledMode = 2, colorStops = 2, defaultSpeed = 50, previewColors = listOf(RgbColor(255, 0, 0), RgbColor(0, 0, 255))),
+                EffectSpec("rainbow", ledMode = 3, colorStops = 0, defaultSpeed = 50, previewColors = RAINBOW),
+                EffectSpec("marquee", ledMode = 4, colorStops = 0, defaultSpeed = 50, previewColors = RAINBOW),
+                EffectSpec("chasing", ledMode = 5, colorStops = 2, defaultSpeed = 50, previewColors = listOf(RgbColor(255, 0, 0), RgbColor(0, 0, 255))),
+                EffectSpec("gaming", ledMode = 6, colorStops = 0, defaultSpeed = 50, previewColors = RAINBOW),
             )
     }
 }

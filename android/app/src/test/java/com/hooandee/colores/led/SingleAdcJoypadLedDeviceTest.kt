@@ -49,30 +49,55 @@ class SingleAdcJoypadLedDeviceTest {
             assertNull(access.values["$base/custum_rgb_r"])
         }
 
+    private val allNodes =
+        nodes + setOf("$base/led_speed", "$base/Led_rgb_r1", "$base/Led_rgb_g1", "$base/Led_rgb_b1", "$base/Led_rgb_r2", "$base/Led_rgb_g2", "$base/Led_rgb_b2")
+
     @Test
-    fun `colored hardware effect writes its led mode, speed and color`() =
+    fun `two color hardware effect writes a distinct colour per zone slot`() =
         runTest {
-            val access = FakeJoypadAccess(nodes + setOf("$base/led_speed", "$base/Led_rgb_r1", "$base/Led_rgb_g1", "$base/Led_rgb_b1", "$base/Led_rgb_r2", "$base/Led_rgb_g2", "$base/Led_rgb_b2"))
+            val access = FakeJoypadAccess(allNodes)
             val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
 
-            assertTrue(device.applyHardwareEffect("breathing", RgbColor(10, 20, 30), brightness = 100, speed = 100, power = true))
+            assertTrue(
+                device.applyHardwareEffect(
+                    "breathing",
+                    listOf(RgbColor(10, 20, 30), RgbColor(40, 50, 60)),
+                    brightness = 100,
+                    speed = 100,
+                    power = true,
+                ),
+            )
             runCurrent()
 
             assertEquals("2", access.values["$base/led_mode"])
             assertEquals("8", access.values["$base/led_speed"])
-            assertEquals("10", access.values["$base/custum_rgb_r"])
             assertEquals("10", access.values["$base/Led_rgb_r1"])
-            assertEquals("30", access.values["$base/Led_rgb_b2"])
+            assertEquals("20", access.values["$base/Led_rgb_g1"])
+            assertEquals("40", access.values["$base/Led_rgb_r2"])
+            assertEquals("60", access.values["$base/Led_rgb_b2"])
             assertEquals("1", access.values["$base/led_set"])
+        }
+
+    @Test
+    fun `single colour list mirrors the colour to both zone slots`() =
+        runTest {
+            val access = FakeJoypadAccess(allNodes)
+            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
+
+            device.applyHardwareEffect("chasing", listOf(RgbColor(9, 8, 7)), brightness = 100, speed = 0, power = true)
+            runCurrent()
+
+            assertEquals("9", access.values["$base/Led_rgb_r1"])
+            assertEquals("9", access.values["$base/Led_rgb_r2"])
         }
 
     @Test
     fun `fixed hardware effect zeroes the zone colors`() =
         runTest {
-            val access = FakeJoypadAccess(nodes + setOf("$base/led_speed", "$base/Led_rgb_r1", "$base/Led_rgb_g1", "$base/Led_rgb_b1", "$base/Led_rgb_r2", "$base/Led_rgb_g2", "$base/Led_rgb_b2"))
+            val access = FakeJoypadAccess(allNodes)
             val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
 
-            device.applyHardwareEffect("marquee", RgbColor(255, 0, 0), brightness = 100, speed = 50, power = true)
+            device.applyHardwareEffect("marquee", listOf(RgbColor(255, 0, 0)), brightness = 100, speed = 50, power = true)
             runCurrent()
 
             assertEquals("4", access.values["$base/led_mode"])
@@ -84,11 +109,11 @@ class SingleAdcJoypadLedDeviceTest {
         runTest {
             val access = FakeJoypadAccess(nodes)
             val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
-            assertFalse(device.applyHardwareEffect("nope", RgbColor(1, 2, 3), 100, 50, true))
+            assertFalse(device.applyHardwareEffect("nope", listOf(RgbColor(1, 2, 3)), 100, 50, true))
         }
 
     @Test
-    fun `exposes anbernic hardware effects`() {
+    fun `exposes anbernic hardware effects with two colour stops for the coloured ones`() {
         val device =
             SingleAdcJoypadLedDevice(
                 SingleAdcJoypadDescriptor(base),
@@ -96,8 +121,9 @@ class SingleAdcJoypadLedDeviceTest {
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
             )
         assertEquals(listOf("breathing", "rainbow", "marquee", "chasing", "gaming"), device.hardwareEffects.map { it.id })
-        assertTrue(device.hardwareEffects.first { it.id == "breathing" }.needsColor)
-        assertFalse(device.hardwareEffects.first { it.id == "marquee" }.needsColor)
+        assertEquals(2, device.hardwareEffects.first { it.id == "breathing" }.colorStops)
+        assertEquals(2, device.hardwareEffects.first { it.id == "chasing" }.colorStops)
+        assertEquals(0, device.hardwareEffects.first { it.id == "marquee" }.colorStops)
     }
 
     @Test

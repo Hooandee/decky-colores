@@ -208,7 +208,7 @@ private fun EffectsPanel(
     )
     when (state.currentEffect?.need ?: EffectNeed.COLOR) {
         EffectNeed.GRADIENT ->
-            if (state.gradientAvailable) {
+            if (state.gradientEditable) {
                 Text(
                     text = stringResource(R.string.effect_uses_gradient),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -14,10 +14,13 @@ data class LedState(
 
 data class HardwareEffect(
     val id: String,
-    val needsColor: Boolean,
+    val colorStops: Int,
     val defaultSpeed: Int,
     val colors: List<RgbColor>,
-)
+) {
+    val needsColor: Boolean
+        get() = colorStops > 0
+}
 
 interface LedDevice {
     val available: Boolean
@@ -45,7 +48,7 @@ interface LedDevice {
 
     suspend fun applyHardwareEffect(
         effectId: String,
-        color: RgbColor,
+        colors: List<RgbColor>,
         brightness: Int,
         speed: Int,
         power: Boolean,

@@ -86,9 +86,17 @@ data class ColoresUiState(
     val currentEffect: EffectPreset?
         get() = effects.firstOrNull { it.id == effectId }
 
+    val gradientEditable: Boolean
+        get() = gradientAvailable || (mode == AppMode.EFFECT && currentEffect?.need == EffectNeed.GRADIENT)
+
+    val editingGradientStops: Boolean
+        get() =
+            (gradient.mode == LightingMode.GRADIENT && gradientAvailable) ||
+                (mode == AppMode.EFFECT && currentEffect?.need == EffectNeed.GRADIENT)
+
     val editingColor: RgbColor
         get() =
-            if (gradient.mode == LightingMode.GRADIENT) {
+            if (editingGradientStops) {
                 gradient.selectedStop ?: ledState.colorForEditing(editTarget)
             } else {
                 ledState.colorForEditing(editTarget)
@@ -198,7 +206,12 @@ class ColoresViewModel(
                         device.hardwareEffects.map {
                             EffectPreset(
                                 id = it.id,
-                                need = if (it.needsColor) EffectNeed.COLOR else EffectNeed.NONE,
+                                need =
+                                    when {
+                                        it.colorStops >= 2 -> EffectNeed.GRADIENT
+                                        it.colorStops == 1 -> EffectNeed.COLOR
+                                        else -> EffectNeed.NONE
+                                    },
                                 defaultSpeed = it.defaultSpeed,
                                 colors = it.colors,
                             )
@@ -222,8 +235,11 @@ class ColoresViewModel(
                         zones = zones,
                         supported = gradientSupported,
                     ).let { gradient ->
-                        if (gradient.stops.isEmpty()) {
-                            gradient.copy(stops = List(zones) { RgbColor(93, 81, 255) })
+                        val minStops = if (device.hardwareEffects.any { it.colorStops >= 2 }) 2 else 1
+                        if (gradient.stops.size < minStops) {
+                            val fallback = gradient.stops.firstOrNull() ?: RgbColor(93, 81, 255)
+                            val padded = List(maxOf(zones, minStops)) { gradient.stops.getOrNull(it) ?: fallback }
+                            gradient.copy(stops = padded)
                         } else {
                             gradient
                         }
@@ -371,7 +387,7 @@ class ColoresViewModel(
 
     fun setEditingColor(color: RgbColor) {
         val current = mutableState.value
-        if (current.gradient.mode == LightingMode.GRADIENT) {
+        if (current.editingGradientStops) {
             updateGradient(current.gradient.replaceSelectedStop(color), apply = true, debounce = true)
         } else {
             updateLedState(debounce = true) { state -> state.withTargetColor(current.editTarget, color) }
@@ -380,7 +396,7 @@ class ColoresViewModel(
 
     fun setSaturation(saturation: Float) {
         val current = mutableState.value
-        if (current.gradient.mode == LightingMode.GRADIENT) {
+        if (current.editingGradientStops) {
             val changed = current.editingColor.toHsvColor().copy(saturation = saturation.coerceIn(0f, 1f)).toRgbColor()
             updateGradient(current.gradient.replaceSelectedStop(changed), apply = true, debounce = true)
         } else {
@@ -390,25 +406,25 @@ class ColoresViewModel(
 
     fun selectGradientStop(index: Int) {
         val current = mutableState.value
-        if (!current.gradientAvailable) return
+        if (!current.gradientEditable) return
         mutableState.update { it.copy(gradient = it.gradient.selectStop(index)) }
     }
 
     fun selectGradientPreset(preset: GradientPreset) {
         val current = mutableState.value
-        val zones = current.detected?.capabilities?.zones ?: return
-        if (!current.gradientAvailable) return
-        updateGradient(current.gradient.selectPreset(preset, zones), apply = true)
+        if (current.detected == null) return
+        if (!current.gradientEditable) return
+        updateGradient(current.gradient.selectPreset(preset, current.gradientStopCount()), apply = true)
     }
 
     fun selectSavedGradient(name: String) {
         val current = mutableState.value
         val saved = current.gradient.savedGradients.firstOrNull { it.name == name } ?: return
-        val zones = current.detected?.capabilities?.zones ?: return
+        if (current.detected == null) return
         updateGradient(
             current.gradient.copy(
                 mode = LightingMode.GRADIENT,
-                stops = GradientInterpolator.interpolate(saved.stops, zones),
+                stops = GradientInterpolator.interpolate(saved.stops, current.gradientStopCount()),
                 selectedStopIndex = 0,
                 selectedPresetId = null,
             ),
@@ -418,8 +434,8 @@ class ColoresViewModel(
 
     fun restoreGradientPreset() {
         val current = mutableState.value
-        val zones = current.detected?.capabilities?.zones ?: return
-        val restored = current.gradient.restorePreset(zones)
+        if (current.detected == null) return
+        val restored = current.gradient.restorePreset(current.gradientStopCount())
         if (restored == current.gradient) return
         updateGradient(restored, apply = true)
     }
@@ -465,7 +481,7 @@ class ColoresViewModel(
     ) {
         val current = mutableState.value
         val zones = current.detected?.capabilities?.zones ?: return
-        if (!current.canWrite || !current.gradientAvailable) return
+        if (!current.canWrite || !current.gradientEditable) return
         val colors = GradientInterpolator.interpolate(gradient.stops, zones)
         mutableState.update { it.copy(gradient = gradient, ledState = it.ledState.copy(zoneColors = colors)) }
         if (apply) {
@@ -538,6 +554,13 @@ private const val COLOR_COMMIT_DEBOUNCE_MS = 120L
 
 private fun AppMode.coerceAvailable(gradientSupported: Boolean): AppMode =
     if (this == AppMode.GRADIENT && !gradientSupported) AppMode.COLOR else this
+
+private fun ColoresUiState.gradientStopCount(): Int =
+    if (mode == AppMode.EFFECT && currentEffect?.need == EffectNeed.GRADIENT) {
+        2
+    } else {
+        detected?.capabilities?.zones ?: 2
+    }
 
 private fun android.content.Context.readAsset(name: String): String =
     assets.open(name).bufferedReader().use { it.readText() }

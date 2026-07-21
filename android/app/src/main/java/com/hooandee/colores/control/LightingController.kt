@@ -281,10 +281,17 @@ class LightingController(
         effectId: String,
     ) {
         val effective = effectivePower()
+        val stops = binding.device.hardwareEffects.firstOrNull { it.id == effectId }?.colorStops ?: 1
+        val palette = intent.gradientStops.ifEmpty { listOf(intent.solidColor) }
+        val colors =
+            when {
+                stops >= 2 -> listOf(palette.first(), palette.last())
+                else -> listOf(intent.solidColor)
+            }
         runCatching {
-            binding.device.applyHardwareEffect(effectId, intent.solidColor, intent.brightness, intent.speed, effective)
+            binding.device.applyHardwareEffect(effectId, colors, intent.brightness, intent.speed, effective)
         }.rethrowCancellation()
-        lastFrame = if (effective) List(binding.zones) { intent.solidColor } else List(binding.zones) { RgbColor(0, 0, 0) }
+        lastFrame = if (effective) List(binding.zones) { colors.first() } else List(binding.zones) { RgbColor(0, 0, 0) }
         publishSnapshot()
     }
 
