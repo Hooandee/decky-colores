@@ -69,7 +69,6 @@ class SettingsProviderLedDevice internal constructor(
                 power = descriptor.enableKeys.mapNotNull(store::get).joinToString(",").ifBlank { null },
                 descriptor = descriptor,
             )
-        cachedState = state
         return state
     }
 
@@ -103,7 +102,7 @@ class SettingsProviderLedDevice internal constructor(
             }
         }
         if (previous?.power != state.power) {
-            val values = SettingsProviderCodec.encodePower(state.power, descriptor.zones)
+            val values = SettingsProviderCodec.encodePower(state.power, descriptor.zones, descriptor.enableKeys.size)
             descriptor.enableKeys.zip(values).forEach { (key, value) ->
                 if (!store.put(key, value)) succeeded = false
             }
@@ -168,9 +167,11 @@ internal object SettingsProviderCodec {
     fun encodePower(
         power: Boolean,
         zones: Int,
+        keyCount: Int = 3,
     ): List<String> {
         val value = if (power) "1" else "0"
-        return listOf(List(zones) { value }.joinToString(","), value, value)
+        val master = List(zones) { value }.joinToString(",")
+        return List(keyCount.coerceAtLeast(1)) { index -> if (index == 0) master else value }
     }
 
     fun decode(

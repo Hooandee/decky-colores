@@ -55,6 +55,25 @@ class SettingsProviderLedDeviceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `asserts every enable key on the first write after reading a heterogeneous state`() =
+        runTest {
+            val store = FakeSettingsStore()
+            store.values["enabled"] = "1"
+            store.values["left"] = "1"
+            store.values["right"] = "0"
+            val device = SettingsProviderLedDevice(descriptor, store, backgroundScope)
+
+            device.readState()
+            device.applyZones(listOf(RgbColor(1, 2, 3), RgbColor(4, 5, 6)), brightness = 80, power = true)
+            runCurrent()
+
+            assertEquals("1,1", store.values["enabled"])
+            assertEquals("1", store.values["left"])
+            assertEquals("1", store.values["right"])
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `is unavailable when its settings transport is unavailable`() =
         runTest {
             val device = SettingsProviderLedDevice(descriptor, FakeSettingsStore(available = false), backgroundScope)

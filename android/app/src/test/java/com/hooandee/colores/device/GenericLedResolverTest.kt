@@ -31,6 +31,7 @@ class GenericLedResolverTest {
         assertEquals("pserver", led.transport)
         assertNull(led.requiresPermission)
         assertEquals("joystick_led_light_picker_color", led.colorKey)
+        assertTrue(led.enableKeys.containsAll(listOf("left_handle_light_enabled", "right_handle_light_enabled")))
     }
 
     @Test
