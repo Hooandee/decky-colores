@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -58,79 +60,89 @@ fun DeviceScene(
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(32.dp),
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(22.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val compact = maxHeight < 320.dp
+            val ringSize = if (compact) (maxHeight * 0.34f).coerceIn(52.dp, 112.dp) else 112.dp
+            val scenePadding = if (compact) 14.dp else 22.dp
+            Column(
+                modifier = Modifier.fillMaxSize().padding(scenePadding),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.preview_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = stringResource(R.string.preview_hint),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.preview_title),
+                            style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        if (!compact) {
+                            Text(
+                                text = stringResource(R.string.preview_hint),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                    if (projection.available) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = ledPreviewLabel,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                            Switch(
+                                checked = projection.active,
+                                onCheckedChange = onLedPreviewChange,
+                                modifier = Modifier.semantics { contentDescription = ledPreviewLabel },
+                            )
+                        }
+                    }
                 }
-                if (projection.available) {
+                Spacer(Modifier.weight(1f))
+                Surface(
+                    color = Color(0xFF181920),
+                    shape = RoundedCornerShape(999.dp),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+                ) {
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = if (compact) 12.dp else 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(18.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text(
-                            text = ledPreviewLabel,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelMedium,
+                        StickTarget(
+                            label = stringResource(R.string.stick_left),
+                            color = leftColor,
+                            selected = selectedTarget == EditTarget.LEFT,
+                            power = power,
+                            enabled = enabled && perZone,
+                            diameter = ringSize,
+                            showLabel = !compact,
+                            projection = projection,
+                            onClick = { onTargetChange(EditTarget.LEFT) },
                         )
-                        Switch(
-                            checked = projection.active,
-                            onCheckedChange = onLedPreviewChange,
-                            modifier = Modifier.semantics { contentDescription = ledPreviewLabel },
+                        StickTarget(
+                            label = stringResource(R.string.stick_right),
+                            color = rightColor,
+                            selected = selectedTarget == EditTarget.RIGHT,
+                            power = power,
+                            enabled = enabled && perZone,
+                            diameter = ringSize,
+                            showLabel = !compact,
+                            projection = projection,
+                            onClick = { onTargetChange(EditTarget.RIGHT) },
                         )
                     }
                 }
-            }
-            Spacer(Modifier.weight(1f))
-            Surface(
-                color = Color(0xFF181920),
-                shape = RoundedCornerShape(999.dp),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(18.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    StickTarget(
-                        label = stringResource(R.string.stick_left),
-                        color = leftColor,
-                        selected = selectedTarget == EditTarget.LEFT,
-                        power = power,
-                        enabled = enabled && perZone,
-                        projection = projection,
-                        onClick = { onTargetChange(EditTarget.LEFT) },
-                    )
-                    StickTarget(
-                        label = stringResource(R.string.stick_right),
-                        color = rightColor,
-                        selected = selectedTarget == EditTarget.RIGHT,
-                        power = power,
-                        enabled = enabled && perZone,
-                        projection = projection,
-                        onClick = { onTargetChange(EditTarget.RIGHT) },
-                    )
-                }
-            }
-            if (showBoth) {
-                Spacer(Modifier.height(16.dp))
-                Surface(
+                if (showBoth) {
+                    Spacer(Modifier.height(if (compact) 10.dp else 16.dp))
+                    Surface(
                     onClick = { onTargetChange(EditTarget.BOTH) },
                     enabled = enabled,
                     modifier = Modifier.heightIn(min = 48.dp),
@@ -165,8 +177,9 @@ fun DeviceScene(
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
+                }
+                Spacer(Modifier.weight(1f))
             }
-            Spacer(Modifier.weight(1f))
         }
     }
 }
@@ -178,6 +191,8 @@ private fun StickTarget(
     selected: Boolean,
     power: Boolean,
     enabled: Boolean,
+    diameter: Dp,
+    showLabel: Boolean,
     projection: LedColorProjection,
     onClick: () -> Unit,
 ) {
@@ -195,6 +210,11 @@ private fun StickTarget(
             label = "LED preview glow",
         )
     val powerAlpha = if (power) 1f else 0.18f
+    val glowSize = diameter * (82f / 112f)
+    val glowBorder = diameter * (8f / 112f)
+    val ringSize = diameter * (72f / 112f)
+    val ringBorder = diameter * (11f / 112f)
+    val hubSize = diameter * (28f / 112f)
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(9.dp),
@@ -204,7 +224,7 @@ private fun StickTarget(
             enabled = enabled,
             modifier =
                 Modifier
-                    .size(112.dp)
+                    .size(diameter)
                     .semantics {
                         contentDescription = label
                         this.selected = selected
@@ -226,9 +246,9 @@ private fun StickTarget(
                 Box(
                     modifier =
                         Modifier
-                            .size(82.dp)
+                            .size(glowSize)
                             .border(
-                                width = 8.dp,
+                                width = glowBorder,
                                 color = displayedColor.copy(alpha = glowAlpha * powerAlpha),
                                 shape = CircleShape,
                             ),
@@ -236,9 +256,9 @@ private fun StickTarget(
                 Box(
                     modifier =
                         Modifier
-                            .size(72.dp)
+                            .size(ringSize)
                             .border(
-                                width = 11.dp,
+                                width = ringBorder,
                                 color = displayedColor.copy(alpha = powerAlpha),
                                 shape = CircleShape,
                             )
@@ -247,17 +267,19 @@ private fun StickTarget(
                 Box(
                     modifier =
                         Modifier
-                            .size(28.dp)
+                            .size(hubSize)
                             .background(Color(0xFF252630), CircleShape),
                 )
             }
         }
-        Text(
-            text = label,
-            color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
+        if (showLabel) {
+            Text(
+                text = label,
+                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            )
+        }
     }
 }
 
