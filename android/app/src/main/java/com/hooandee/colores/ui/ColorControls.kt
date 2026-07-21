@@ -103,7 +103,7 @@ fun ColorControlPanel(
                                 modifier = Modifier.weight(0.9f).fillMaxHeight(),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                HsvColorWheel(
+                                RingColorPicker(
                                     color = state.editingColor,
                                     enabled = state.canWrite,
                                     projection = projection,

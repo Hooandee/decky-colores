@@ -368,7 +368,7 @@ private fun GradientColorPane(
                 modifier = Modifier.fillMaxWidth().height(236.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                HsvColorWheel(
+                RingColorPicker(
                     color = color,
                     enabled = state.canWrite,
                     projection = state.ledColorProjection,

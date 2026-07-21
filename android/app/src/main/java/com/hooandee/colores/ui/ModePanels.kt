@@ -248,7 +248,7 @@ private fun EffectColorEditor(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(modifier = Modifier.weight(0.9f).fillMaxSize(), contentAlignment = Alignment.Center) {
-            HsvColorWheel(
+            RingColorPicker(
                 color = state.editingColor,
                 enabled = state.canWrite,
                 projection = state.ledColorProjection,
