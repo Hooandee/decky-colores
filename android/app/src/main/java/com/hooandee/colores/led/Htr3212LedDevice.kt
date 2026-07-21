@@ -172,7 +172,7 @@ internal class Htr3212LedDevice internal constructor(
         }
         if (previous?.power != state.power) {
             changed = true
-            val values = SettingsProviderCodec.encodePower(state.power, STICKS)
+            val values = SettingsProviderCodec.encodePower(state.power, STICKS, descriptor.enableKeys.size)
             descriptor.enableKeys.zip(values).forEach { (key, value) ->
                 if (!store.put(key, value)) succeeded = false
             }

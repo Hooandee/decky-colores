@@ -1,5 +1,6 @@
 package com.hooandee.colores.device
 
+import com.hooandee.colores.led.SettingsProviderDescriptor
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -109,18 +110,19 @@ class DeviceRegistryTest {
         assertTrue(match.capabilities.brightness)
         assertTrue(match.capabilities.perZone)
         assertEquals(8, match.capabilities.zones)
-        assertEquals("htr3212", match.led.driver)
-        assertEquals("pserver", match.led.transport)
-        assertNull(match.led.requiresPermission)
-        assertEquals("joystick_led_light_picker_color", match.led.colorKey)
-        assertEquals(0.0f, match.led.brightnessRange.start)
-        assertEquals(1.0f, match.led.brightnessRange.endInclusive)
-        requireNotNull(match.led.htr3212)
-        assertEquals(1, match.led.htr3212.leftBus)
-        assertEquals(0, match.led.htr3212.rightBus)
-        assertEquals(60, match.led.htr3212.address)
-        assertEquals(listOf(0, 1, 3, 2), match.led.htr3212.leftOrder)
-        assertEquals(listOf(1, 2, 3, 0), match.led.htr3212.rightOrder)
+        val led = match.led as SettingsProviderDescriptor
+        assertEquals("htr3212", led.driver)
+        assertEquals("pserver", led.transport)
+        assertNull(led.requiresPermission)
+        assertEquals("joystick_led_light_picker_color", led.colorKey)
+        assertEquals(0.0f, led.brightnessRange.start)
+        assertEquals(1.0f, led.brightnessRange.endInclusive)
+        requireNotNull(led.htr3212)
+        assertEquals(1, led.htr3212.leftBus)
+        assertEquals(0, led.htr3212.rightBus)
+        assertEquals(60, led.htr3212.address)
+        assertEquals(listOf(0, 1, 3, 2), led.htr3212.leftOrder)
+        assertEquals(listOf(1, 2, 3, 0), led.htr3212.rightOrder)
     }
 
     @Test
@@ -253,19 +255,20 @@ class DeviceRegistryTest {
 
         requireNotNull(match)
         assertEquals("ayn-thor", match.id)
-        assertEquals("htr3212", match.led.driver)
-        assertEquals("pserver", match.led.transport)
+        val led = match.led as SettingsProviderDescriptor
+        assertEquals("htr3212", led.driver)
+        assertEquals("pserver", led.transport)
         assertEquals(8, match.capabilities.zones)
         assertTrue(match.capabilities.perZone)
-        assertEquals("joystick_led_light_picker_color", match.led.colorKey)
-        assertNull(match.led.requiresPermission)
-        assertEquals(listOf("joystick_light_enabled"), match.led.enableKeys)
-        assertEquals("com.odin.gameassistant", match.led.vendorService)
-        requireNotNull(match.led.htr3212)
-        assertEquals(3, match.led.htr3212.leftBus)
-        assertEquals(6, match.led.htr3212.rightBus)
-        assertEquals(60, match.led.htr3212.address)
-        assertEquals(0x0d, match.led.htr3212.rgbStartRegister)
+        assertEquals("joystick_led_light_picker_color", led.colorKey)
+        assertNull(led.requiresPermission)
+        assertEquals(listOf("joystick_light_enabled"), led.enableKeys)
+        assertEquals("com.odin.gameassistant", led.vendorService)
+        requireNotNull(led.htr3212)
+        assertEquals(3, led.htr3212.leftBus)
+        assertEquals(6, led.htr3212.rightBus)
+        assertEquals(60, led.htr3212.address)
+        assertEquals(0x0d, led.htr3212.rgbStartRegister)
     }
 
     @Test
@@ -277,7 +280,57 @@ class DeviceRegistryTest {
                 previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
             )
         val match = registry.match(rp5Identity())
-        assertEquals(0x01, match?.led?.htr3212?.rgbStartRegister)
+        assertEquals(0x01, (match?.led as? SettingsProviderDescriptor)?.htr3212?.rgbStartRegister)
+    }
+
+    @Test
+    fun `production registry parses the RP5 grid layout with one cell per zone`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+
+        val layout = registry.match(rp5Identity())?.gridLayout
+        requireNotNull(layout)
+        assertEquals(8, layout.size)
+        assertEquals(listOf(0, 0, 0, 0, 1, 1, 1, 1), layout.map { it.stick })
+        assertEquals("top", layout.first().position)
+    }
+
+    @Test
+    fun `a registry entry without a grid layout leaves it null`() {
+        val match = DeviceRegistry.parse(registryJson, previewProfilesJson).match(rp5Identity())
+        assertNull(match?.gridLayout)
+    }
+
+    @Test
+    fun `a grid layout whose length mismatches the zone count is discarded`() {
+        val injected =
+            registryJson.replaceFirst(
+                "\"device\": [\"kona\"],",
+                "\"device\": [\"kona\"], \"gridLayout\": [ { \"row\": 0, \"col\": 0, \"position\": \"top\" } ],",
+            )
+
+        val match = DeviceRegistry.parse(injected, previewProfilesJson).match(rp5Identity())
+        assertNull(match?.gridLayout)
+    }
+
+    @Test
+    fun `a grid layout with an invalid position token is discarded`() {
+        val injected =
+            registryJson.replaceFirst(
+                "\"device\": [\"shared-led-test\"],",
+                "\"device\": [\"shared-led-test\"], \"gridLayout\": [ " +
+                    "{ \"row\": 0, \"col\": 0, \"position\": \"nowhere\" }, { \"row\": 0, \"col\": 1, \"position\": \"left\" } ],",
+            )
+
+        val match =
+            DeviceRegistry.parse(injected, previewProfilesJson).match(
+                AndroidDeviceIdentity("Shared LED Test Device", "shared-led-test", "Test", emptyMap()),
+            )
+        assertNull(match?.gridLayout)
     }
 
     @Test

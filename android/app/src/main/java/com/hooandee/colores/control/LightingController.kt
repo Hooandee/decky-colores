@@ -11,6 +11,7 @@ import com.hooandee.colores.engine.PerformanceRenderer
 import com.hooandee.colores.engine.Renderer
 import com.hooandee.colores.engine.StatusTargets
 import com.hooandee.colores.gradient.GradientInterpolator
+import com.hooandee.colores.led.HardwareEffect
 import com.hooandee.colores.led.LedDevice
 import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.sensor.BatterySource
@@ -220,7 +221,7 @@ class LightingController(
     private suspend fun onReassert() {
         val binding = binding ?: return
         runCatching { binding.device.invalidate() }
-        if (!intent.mode.isDynamic) applyStatic()
+        applyCurrent(binding, manageRenderJob = false)
     }
 
     private suspend fun onReading(command: Command.WatchReading) {
@@ -229,8 +230,8 @@ class LightingController(
         batteryLevel = command.levelPercent
         batteryPresent = command.present
         temperatureCelsius = command.temperatureCelsius
-        if (effectivePower() != previousEffective && !intent.mode.isDynamic) {
-            applyStatic()
+        if (effectivePower() != previousEffective) {
+            binding?.let { applyCurrent(it, manageRenderJob = false) }
         }
         publishSnapshot()
     }
@@ -242,15 +243,50 @@ class LightingController(
 
     private fun effectivePower(): Boolean = intent.power && (!intent.chargerOnly || charging)
 
+    private fun hardwareEffect(binding: LightingBinding): HardwareEffect? =
+        if (intent.mode == AppMode.EFFECT) {
+            binding.device.hardwareEffects.firstOrNull { it.id == intent.effectId }
+        } else {
+            null
+        }
+
     private suspend fun reconcile() {
         val binding = binding ?: run { publishSnapshot(); return }
         updateService()
-        if (intent.mode.isDynamic) {
-            ensureRenderJob(binding)
-        } else {
-            stopRenderJob()
-            applyStatic()
+        applyCurrent(binding, manageRenderJob = true)
+        publishSnapshot()
+    }
+
+    private suspend fun applyCurrent(
+        binding: LightingBinding,
+        manageRenderJob: Boolean,
+    ) {
+        val hwEffect = hardwareEffect(binding)
+        when {
+            hwEffect != null -> {
+                if (manageRenderJob) stopRenderJob()
+                applyHardwareEffect(binding, hwEffect)
+            }
+            intent.mode.isDynamic -> if (manageRenderJob) ensureRenderJob(binding)
+            else -> {
+                if (manageRenderJob) stopRenderJob()
+                applyStatic()
+            }
         }
+    }
+
+    private suspend fun applyHardwareEffect(
+        binding: LightingBinding,
+        effect: HardwareEffect,
+    ) {
+        val effective = effectivePower()
+        val palette = intent.gradientStops.ifEmpty { listOf(intent.solidColor) }
+        val colors =
+            if (effect.colorStops >= 2) listOf(palette.first(), palette.last()) else listOf(intent.solidColor)
+        runCatching {
+            binding.device.applyHardwareEffect(effect.id, colors, intent.brightness, intent.speed, effective)
+        }.rethrowCancellation()
+        lastFrame = if (effective) List(binding.zones) { colors.first() } else List(binding.zones) { RgbColor(0, 0, 0) }
         publishSnapshot()
     }
 

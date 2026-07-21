@@ -1,6 +1,9 @@
 package com.hooandee.colores.ui
 
+import com.hooandee.colores.led.LedDescriptor
 import com.hooandee.colores.led.SettingsProviderDescriptor
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
+import com.hooandee.colores.led.SysfsRgbDescriptor
 
 enum class ControlAccess {
     ENABLED,
@@ -10,14 +13,16 @@ enum class ControlAccess {
 
     companion object {
         fun resolve(
-            descriptor: SettingsProviderDescriptor,
+            descriptor: LedDescriptor,
             deviceAvailable: Boolean,
             userPermissionGranted: Boolean,
         ): ControlAccess =
             when {
                 !deviceAvailable -> SERVICE_UNAVAILABLE
-                descriptor.transport == "pserver" -> ENABLED
-                descriptor.requiresPermission == null || userPermissionGranted -> ENABLED
+                descriptor is SysfsRgbDescriptor || descriptor is SingleAdcJoypadDescriptor -> ENABLED
+                descriptor is SettingsProviderDescriptor && descriptor.transport == "pserver" -> ENABLED
+                descriptor is SettingsProviderDescriptor &&
+                    (descriptor.requiresPermission == null || userPermissionGranted) -> ENABLED
                 else -> USER_PERMISSION_REQUIRED
             }
     }

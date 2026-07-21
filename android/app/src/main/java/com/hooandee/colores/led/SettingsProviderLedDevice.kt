@@ -10,6 +10,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+sealed interface LedDescriptor
+
 data class SettingsProviderDescriptor(
     val driver: String,
     val transport: String = "direct",
@@ -22,7 +24,7 @@ data class SettingsProviderDescriptor(
     val requiresPermission: String?,
     val vendorService: String,
     val htr3212: Htr3212Descriptor? = null,
-)
+) : LedDescriptor
 
 data class Htr3212Descriptor(
     val leftBus: Int,
@@ -67,7 +69,6 @@ class SettingsProviderLedDevice internal constructor(
                 power = descriptor.enableKeys.mapNotNull(store::get).joinToString(",").ifBlank { null },
                 descriptor = descriptor,
             )
-        cachedState = state
         return state
     }
 
@@ -101,7 +102,7 @@ class SettingsProviderLedDevice internal constructor(
             }
         }
         if (previous?.power != state.power) {
-            val values = SettingsProviderCodec.encodePower(state.power, descriptor.zones)
+            val values = SettingsProviderCodec.encodePower(state.power, descriptor.zones, descriptor.enableKeys.size)
             descriptor.enableKeys.zip(values).forEach { (key, value) ->
                 if (!store.put(key, value)) succeeded = false
             }
@@ -166,9 +167,11 @@ internal object SettingsProviderCodec {
     fun encodePower(
         power: Boolean,
         zones: Int,
+        keyCount: Int = 3,
     ): List<String> {
         val value = if (power) "1" else "0"
-        return listOf(List(zones) { value }.joinToString(","), value, value)
+        val master = List(zones) { value }.joinToString(",")
+        return List(keyCount.coerceAtLeast(1)) { index -> if (index == 0) master else value }
     }
 
     fun decode(
@@ -240,7 +243,3 @@ internal class ConflatedLedWriter<T>(
     fun submit(value: T): Boolean = channel.trySend(value).isSuccess
 }
 
-private fun List<RgbColor>.fitZones(zones: Int): List<RgbColor> {
-    val fallback = firstOrNull() ?: RgbColor(255, 255, 255)
-    return List(zones.coerceAtLeast(1)) { index -> getOrNull(index) ?: fallback }
-}

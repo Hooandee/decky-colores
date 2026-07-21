@@ -208,7 +208,7 @@ private fun EffectsPanel(
     )
     when (state.currentEffect?.need ?: EffectNeed.COLOR) {
         EffectNeed.GRADIENT ->
-            if (state.gradientAvailable) {
+            if (state.gradientEditable) {
                 Text(
                     text = stringResource(R.string.effect_uses_gradient),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -534,5 +534,8 @@ private fun effectLabel(id: String): String =
         "sparkle" -> stringResource(R.string.effect_sparkle)
         "ripple" -> stringResource(R.string.effect_ripple)
         "aurora" -> stringResource(R.string.effect_aurora)
+        "marquee" -> stringResource(R.string.effect_marquee)
+        "chasing" -> stringResource(R.string.effect_chasing)
+        "gaming" -> stringResource(R.string.effect_gaming)
         else -> id
     }

@@ -1,10 +1,45 @@
 package com.hooandee.colores.ui
 
 import com.hooandee.colores.led.SettingsProviderDescriptor
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
+import com.hooandee.colores.led.SysfsColorKind
+import com.hooandee.colores.led.SysfsRgbDescriptor
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ControlAccessTest {
+    @Test
+    fun `writable joypad enables controls without a permission`() {
+        assertEquals(
+            ControlAccess.ENABLED,
+            ControlAccess.resolve(SingleAdcJoypadDescriptor("/n"), deviceAvailable = true, userPermissionGranted = false),
+        )
+    }
+
+    @Test
+    fun `writable sysfs node enables controls without a permission`() {
+        assertEquals(
+            ControlAccess.ENABLED,
+            ControlAccess.resolve(
+                SysfsRgbDescriptor("/n", zones = 1, maxBrightness = 255, kind = SysfsColorKind.RGB_CHANNELS),
+                deviceAvailable = true,
+                userPermissionGranted = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `non writable sysfs node is unavailable`() {
+        assertEquals(
+            ControlAccess.SERVICE_UNAVAILABLE,
+            ControlAccess.resolve(
+                SysfsRgbDescriptor("/n", zones = 1, maxBrightness = 255, kind = SysfsColorKind.RGB_CHANNELS),
+                deviceAvailable = false,
+                userPermissionGranted = true,
+            ),
+        )
+    }
+
     @Test
     fun `PServer enables controls without a user permission`() {
         assertEquals(

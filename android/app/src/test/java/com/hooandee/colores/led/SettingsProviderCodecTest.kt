@@ -33,6 +33,15 @@ class SettingsProviderCodecTest {
     }
 
     @Test
+    fun `encodePower emits one value per key, master first then scalars`() {
+        assertEquals(listOf("1,1"), SettingsProviderCodec.encodePower(true, 2, keyCount = 1))
+        assertEquals(
+            listOf("1,1", "1", "1", "1", "1"),
+            SettingsProviderCodec.encodePower(true, 2, keyCount = 5),
+        )
+    }
+
+    @Test
     fun `decodes current RP5 settings`() {
         val state =
             SettingsProviderCodec.decode(

@@ -63,6 +63,7 @@ class DeviceRegistry internal constructor(
                                     }
                                 }
                             val previewProfileId = entry.optString("previewProfile").takeIf(String::isNotBlank)
+                            val gridLayout = parseGridLayout(android.optJSONArray("gridLayout"), zones)
                             AndroidDeviceDefinition(
                                 models = android.getStringList("model"),
                                 devices = android.getStringList("device"),
@@ -100,6 +101,7 @@ class DeviceRegistry internal constructor(
                                             ),
                                         previewProfileId = previewProfileId,
                                         previewCalibration = previewProfileId?.let(previewProfiles::get),
+                                        gridLayout = gridLayout,
                                     ),
                             )
                         }.getOrNull()
@@ -107,6 +109,36 @@ class DeviceRegistry internal constructor(
                 DeviceRegistry(definitions)
             }.getOrElse { DeviceRegistry(emptyList()) }
     }
+}
+
+private val GRID_POSITIONS =
+    setOf("top", "left", "bottom", "right", "top_left", "top_right", "bottom_left", "bottom_right")
+
+private fun parseGridLayout(
+    array: org.json.JSONArray?,
+    zones: Int,
+): List<LedGridCell>? {
+    if (array == null) return null
+    return runCatching {
+        val cells =
+            (0 until array.length()).map { index ->
+                val cell = array.getJSONObject(index)
+                val position =
+                    if (cell.isNull("position")) {
+                        null
+                    } else {
+                        cell.getString("position").lowercase().also { require(it in GRID_POSITIONS) }
+                    }
+                LedGridCell(
+                    stick = if (cell.isNull("stick")) null else cell.getInt("stick"),
+                    row = cell.getInt("row"),
+                    col = cell.getInt("col"),
+                    position = position,
+                )
+            }
+        require(cells.size == zones)
+        cells
+    }.getOrNull()
 }
 
 private fun parsePreviewProfiles(json: String): Map<String, LedPreviewCalibration> =

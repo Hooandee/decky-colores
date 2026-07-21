@@ -91,6 +91,9 @@
     <string name="effect_sparkle">Destello</string>
     <string name="effect_ripple">Onda</string>
     <string name="effect_aurora">Aurora</string>
+    <string name="effect_marquee">Marquesina</string>
+    <string name="effect_chasing">Persecución</string>
+    <string name="effect_gaming">Juego</string>
 
     <string name="sensor_battery">Batería</string>
     <string name="sensor_temperature">Temperatura</string>

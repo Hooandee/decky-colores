@@ -23,7 +23,17 @@
           "leftOrder": [0, 1, 3, 2],
           "rightOrder": [1, 2, 3, 0]
         }
-      }
+      },
+      "gridLayout": [
+        { "stick": 0, "row": 0, "col": 0, "position": "top" },
+        { "stick": 0, "row": 0, "col": 1, "position": "left" },
+        { "stick": 0, "row": 1, "col": 0, "position": "bottom" },
+        { "stick": 0, "row": 1, "col": 1, "position": "right" },
+        { "stick": 1, "row": 0, "col": 0, "position": "top" },
+        { "stick": 1, "row": 0, "col": 1, "position": "left" },
+        { "stick": 1, "row": 1, "col": 0, "position": "bottom" },
+        { "stick": 1, "row": 1, "col": 1, "position": "right" }
+      ]
     },
     "linux": null,
     "capabilities": { "color": true, "brightness": true, "perZone": true },
@@ -54,7 +64,17 @@
           "rightOrder": [0, 1, 2, 3],
           "rgbStartRegister": 13
         }
-      }
+      },
+      "gridLayout": [
+        { "stick": 0, "row": 0, "col": 0, "position": "top_left" },
+        { "stick": 0, "row": 1, "col": 0, "position": "bottom_left" },
+        { "stick": 0, "row": 1, "col": 1, "position": "bottom_right" },
+        { "stick": 0, "row": 0, "col": 1, "position": "top_right" },
+        { "stick": 1, "row": 1, "col": 0, "position": "bottom_left" },
+        { "stick": 1, "row": 0, "col": 0, "position": "top_left" },
+        { "stick": 1, "row": 0, "col": 1, "position": "top_right" },
+        { "stick": 1, "row": 1, "col": 1, "position": "bottom_right" }
+      ]
     },
     "linux": null,
     "capabilities": { "color": true, "brightness": true, "perZone": true },
