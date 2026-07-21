@@ -28,19 +28,16 @@ class GradientEditorModelTest {
         val zones = gradientEditorZones("ayn-thor", 8)
 
         assertEquals(List(4) { 0 } + List(4) { 1 }, zones.map { it.stick })
-        // Left ring: rows are flipped relative to the right (physically mirrored).
         val left = zones.take(4)
         assertEquals(GradientZonePosition.TOP_LEFT, left[0].position)
         assertEquals(0 to 0, left[0].row to left[0].col)
         assertEquals(GradientZonePosition.BOTTOM_LEFT, left[1].position)
         assertEquals(1 to 0, left[1].row to left[1].col)
-        // Right ring: idx0=bottom-left, idx1=top-left, idx2=top-right, idx3=bottom-right.
         val right = zones.drop(4)
         assertEquals(GradientZonePosition.BOTTOM_LEFT, right[0].position)
         assertEquals(1 to 0, right[0].row to right[0].col)
         assertEquals(GradientZonePosition.TOP_LEFT, right[1].position)
         assertEquals(0 to 0, right[1].row to right[1].col)
-        // every cell in a stick is unique (a real 2x2 grid)
         assertEquals(4, left.map { it.row to it.col }.toSet().size)
         assertEquals(4, right.map { it.row to it.col }.toSet().size)
     }

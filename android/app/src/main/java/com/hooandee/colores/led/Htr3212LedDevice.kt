@@ -158,10 +158,6 @@ internal class Htr3212LedDevice internal constructor(
     ): VendorWriteResult {
         var succeeded = true
         var changed = false
-        // Colours are driven per-zone over i2c. The vendor colour key is only seeded
-        // once after (re)claim to trigger the vendor's channel init; rewriting it on
-        // every edit makes the vendor service re-flatten both sticks to its two-colour
-        // fallback, fighting the per-zone writes.
         if (seedColor && previous?.zoneColors != state.zoneColors) {
             changed = true
             if (!store.put(descriptor.colorKey, SettingsProviderCodec.encodeColors(state.zoneColors, STICKS))) {

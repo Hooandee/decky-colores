@@ -19,11 +19,6 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
 
-/**
- * Pure, deterministic frame math ported from py_modules/effects.py. No Android
- * dependencies and no wall clock: every function is a function of its inputs, so
- * the shared golden vectors lock this to the Decky reference implementation.
- */
 object Effects {
     fun frame(
         effectId: String,

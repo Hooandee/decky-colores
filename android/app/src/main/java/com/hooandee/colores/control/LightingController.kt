@@ -97,12 +97,6 @@ object NoopServiceGate : ServiceGate {
     override fun stop() {}
 }
 
-/**
- * The single logical owner of an [LedDevice]. Every hardware write flows through
- * here, so nothing else races the device. State mutations and reconciliation run on
- * one command coroutine (single-writer), while the render and watch coroutines only
- * read an immutable [intent] snapshot and hand frames back to the device writer.
- */
 class LightingController(
     private val scope: CoroutineScope,
     private val serviceGate: ServiceGate = NoopServiceGate,
@@ -147,9 +141,6 @@ class LightingController(
 
     fun unbind() = send(Command.Unbind)
 
-    /** Force a full hardware resend, e.g. after screen-on when the vendor service
-     *  may have flattened the LEDs. Invalidates the device cache so the next write
-     *  re-sends every zone. */
     fun reassert() = send(Command.Reassert)
 
     fun setMode(mode: AppMode) = send(Command.SetMode(mode))

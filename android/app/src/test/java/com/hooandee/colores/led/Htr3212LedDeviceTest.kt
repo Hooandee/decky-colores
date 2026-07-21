@@ -142,9 +142,6 @@ class Htr3212LedDeviceTest {
             device.applyZones(initial, brightness = 60, power = true)
             runCurrent()
             advanceTimeBy(80)
-            // zone 0 is the vendor's left fallback colour; editing it must NOT rewrite the
-            // vendor color key (which would make the vendor flatten both sticks), only the
-            // one changed zone over i2c.
             device.applyZones(initial.toMutableList().also { it[0] = RgbColor(90, 91, 92) }, brightness = 60, power = true)
             runCurrent()
 

@@ -11,12 +11,6 @@ import android.os.Build
 import android.os.IBinder
 import com.hooandee.colores.R
 
-/**
- * Keeps the process (and the app-scoped render loop it hosts) alive while a dynamic
- * or automatic lighting mode is active, so the LEDs keep animating with the activity
- * closed or the screen off. The frame loop itself lives in the app-scoped
- * LightingController; this service only holds the foreground lifetime.
- */
 class EffectsService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 

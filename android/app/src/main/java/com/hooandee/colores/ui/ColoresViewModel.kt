@@ -461,10 +461,6 @@ class ColoresViewModel(
         }
     }
 
-    // Applies colour edits when the user pauses instead of on every drag frame: the UI
-    // state updates live (wheel, preview, gradient bar) but the hardware write and the
-    // preference write only fire after a short quiet window, avoiding transport
-    // saturation. Discrete actions (presets, reverse, restore) commit immediately.
     private fun scheduleCommit(
         debounce: Boolean,
         action: () -> Unit,

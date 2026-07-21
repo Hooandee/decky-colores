@@ -6,17 +6,11 @@ import com.hooandee.colores.engine.FrameMath.lerp
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.abs
 
-/** One rendered frame plus the delay the loop should wait before the next tick. */
 data class RenderTick(
     val colors: List<RgbColor>,
     val nextDelayMs: Long,
 )
 
-/**
- * A dynamic lighting source. `render` is called with a monotonic seconds clock and
- * returns the frame to write plus its own recommended cadence, so pacing stays with
- * the source (fast for effects, coarse when a status indicator has settled).
- */
 interface Renderer {
     fun render(nowSeconds: Double): RenderTick
 }
@@ -42,12 +36,6 @@ class EffectRenderer(
     }
 }
 
-/**
- * Shared renderer for the status indicators (battery, temperature, clock): snap to
- * the band on entry, ease toward the target while crossfading or breathing, and
- * hold on a coarse idle tick once settled so a static colour costs almost no work.
- * `target` returning null means "unreadable" so the last frame is held.
- */
 class IndicatorRenderer(
     private val zones: Int,
     private val frameIntervalMs: Long,

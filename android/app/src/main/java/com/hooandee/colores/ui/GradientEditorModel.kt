@@ -25,10 +25,6 @@ private data class Cell(
     val position: GradientZonePosition,
 )
 
-// Physical placement of the 4 logical zones within a stick, as a 2x2 grid. Calibrated
-// on hardware per model so the editor grid matches what the user sees on the ring. The
-// AYN Thor's two sticks are mirrored on the vertical axis: on the left ring the rows
-// are flipped relative to the right ring.
 private val AYN_THOR_LEFT_CELLS =
     listOf(
         Cell(0, 0, GradientZonePosition.TOP_LEFT),
@@ -67,7 +63,6 @@ internal fun gradientEditorZones(
             GradientEditorZone(index = index, stick = index / 4, row = cell.row, col = cell.col, position = cell.position)
         }
     }
-    // Fallback: a single wrapped grid, at most four columns per row, no scrolling.
     return List(count) { index ->
         GradientEditorZone(index = index, stick = null, row = index / 4, col = index % 4, position = null)
     }

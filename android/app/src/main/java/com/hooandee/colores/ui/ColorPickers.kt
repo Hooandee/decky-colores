@@ -29,12 +29,6 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
-/**
- * Hue ring that mirrors the joystick ring: drag around the band to set the hue. The
- * band sits inset from a subtle outer outline (a little breathing room for elegance),
- * and the centre is a small orb that shows the live colour with a slow pulsing halo.
- * Saturation is set by the shared slider below the picker.
- */
 @Composable
 fun RingColorPicker(
     color: RgbColor,

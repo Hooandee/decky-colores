@@ -14,12 +14,6 @@ data class StoredLighting(
     val batteryBreathe: Boolean = true,
 )
 
-/**
- * Persists the user's top-level lighting intent per device (mode, effect, speed,
- * the solid colour used by colour-need effects, and the sensor / charger toggles),
- * so recreating the activity or process restores the intent rather than collapsing
- * a dynamic mode into a solid colour. Gradient stops live in GradientPreferences.
- */
 class LightingPreferences(
     private val read: (String) -> String?,
     private val write: (String, String) -> Unit,

@@ -2,11 +2,6 @@ package com.hooandee.colores.engine
 
 import com.hooandee.colores.led.RgbColor
 
-/**
- * Pure decision helpers for the status-indicator modes, mirroring the closures in
- * py_modules/effects.py `start_battery` / `start_temperature`. A null target means
- * the value is unreadable so the renderer holds its last frame.
- */
 object StatusTargets {
     fun batteryTarget(
         levelPercent: Int?,

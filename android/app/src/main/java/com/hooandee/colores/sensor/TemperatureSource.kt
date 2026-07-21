@@ -13,12 +13,6 @@ interface TemperatureSource {
     fun readCelsius(): Double?
 }
 
-/**
- * Reads the standard Linux/Android thermal-zone interface. This is NOT the x86
- * hwmon layout from the Decky backend; it only trusts `/sys/class/thermal` zones
- * that read a plausible Celsius value, and reports unavailable otherwise so the UI
- * can hide the mode instead of showing a fabricated temperature.
- */
 class SysfsThermalSource(
     private val readZones: () -> List<ThermalZoneRaw>,
 ) : TemperatureSource {

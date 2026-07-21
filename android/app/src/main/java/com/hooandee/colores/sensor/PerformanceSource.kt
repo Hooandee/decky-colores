@@ -11,15 +11,9 @@ interface PerformanceSource {
     val metric: PerformanceMetric
     val available: Boolean
 
-    /** Load as a percentage 0..100, or null until a delta / valid reading exists. */
     fun read(): Double?
 }
 
-/**
- * Total CPU load from /proc/stat deltas. Universal on Android/Linux and readable
- * without root, so it is the explicit fallback when no GPU busy node is exposed.
- * The first read seeds the baseline and returns null.
- */
 class CpuStatPerformanceSource(
     private val readStat: () -> String? = { runCatching { File("/proc/stat").readText() }.getOrNull() },
 ) : PerformanceSource {
@@ -54,11 +48,6 @@ class CpuStatPerformanceSource(
     }
 }
 
-/**
- * Adreno/kgsl GPU busy percentage. Treated strictly as a probe: it is only used
- * when the node exists and reads a plausible value, never assumed present. Nothing
- * here hardcodes a Qualcomm path as universal truth.
- */
 class KgslGpuPerformanceSource(
     private val readBusy: () -> String? = {
         KGSL_NODES.asSequence()
