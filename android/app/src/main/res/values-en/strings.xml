@@ -37,6 +37,7 @@
     <string name="gradient_restore">Restore preset</string>
     <string name="gradient_name">Gradient name</string>
     <string name="gradient_save">Save</string>
+    <string name="gradient_save_title">Save gradient</string>
     <string name="gradient_edit_custom">Edit custom gradient</string>
     <string name="gradient_editor_title">Custom gradient</string>
     <string name="gradient_editor_live_hint">Changes are applied instantly</string>
@@ -49,6 +50,10 @@
     <string name="gradient_position_left">Left</string>
     <string name="gradient_position_bottom">Bottom</string>
     <string name="gradient_position_right">Right</string>
+    <string name="gradient_position_top_left">Top left</string>
+    <string name="gradient_position_top_right">Top right</string>
+    <string name="gradient_position_bottom_left">Bottom left</string>
+    <string name="gradient_position_bottom_right">Bottom right</string>
     <string name="gradient_delete">Delete</string>
     <string name="gradient_delete_named">Delete %1$s</string>
     <string name="gradient_zone_left">Left</string>

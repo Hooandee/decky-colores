@@ -12,13 +12,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -33,12 +32,19 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -142,60 +148,117 @@ private fun GradientZonesPane(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (zones.all { it.stick != null }) {
-                GradientZoneGroup(
-                    label = stringResource(R.string.gradient_stick_left),
-                    zones = zones.filter { it.stick == GradientStick.LEFT },
-                    state = state,
-                    actions = actions,
-                )
-                GradientZoneGroup(
-                    label = stringResource(R.string.gradient_stick_right),
-                    zones = zones.filter { it.stick == GradientStick.RIGHT },
-                    state = state,
-                    actions = actions,
-                )
+            if (zones.any { it.stick != null }) {
+                zones.groupBy { it.stick }.toSortedMap(compareBy { it ?: -1 }).forEach { (stick, stickZones) ->
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SectionLabel(stickLabel(stick))
+                        ZoneGrid(stickZones, state, actions)
+                    }
+                }
             } else {
                 SectionLabel(stringResource(R.string.gradient_stops))
-                ZoneRow(zones, state, actions)
+                ZoneGrid(zones, state, actions)
             }
         }
     }
 }
 
 @Composable
-private fun GradientZoneGroup(
-    label: String,
+private fun ZoneGrid(
     zones: List<GradientEditorZone>,
     state: ColoresUiState,
     actions: GradientActions,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        SectionLabel(label)
-        ZoneRow(zones, state, actions)
+    val rows = (zones.maxOfOrNull { it.row } ?: 0) + 1
+    val cols = (zones.maxOfOrNull { it.col } ?: 0) + 1
+    Column(modifier = Modifier.focusGroup(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        repeat(rows) { row ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                repeat(cols) { col ->
+                    val zone = zones.firstOrNull { it.row == row && it.col == col }
+                    if (zone != null) {
+                        ZoneCell(zone, state, actions, Modifier.weight(1f))
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun ZoneRow(
-    zones: List<GradientEditorZone>,
+private fun ZoneCell(
+    zone: GradientEditorZone,
     state: ColoresUiState,
     actions: GradientActions,
+    modifier: Modifier,
 ) {
-    val projection = state.ledColorProjection
-    LazyRow(
-        modifier = Modifier.fillMaxWidth().focusGroup(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val selected = state.gradient.selectedStopIndex == zone.index
+    val color = state.ledColorProjection.display(state.gradient.stops[zone.index])
+    val description = zoneCellDescription(zone)
+    var focused by remember { mutableStateOf(false) }
+    Surface(
+        onClick = { actions.onStopChange(zone.index) },
+        modifier =
+            modifier
+                .heightIn(min = 76.dp)
+                .onFocusChanged { focused = it.isFocused }
+                .semantics {
+                    this.selected = selected
+                    this.role = Role.RadioButton
+                    contentDescription = description
+                },
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color(0xFF181920),
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = RoundedCornerShape(16.dp),
+        border =
+            BorderStroke(
+                if (selected || focused) 2.dp else 1.dp,
+                if (focused) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = if (selected) 0.55f else 0.1f),
+            ),
     ) {
-        items(zones, key = { it.index }) { zone ->
-            StopTile(
-                label = zoneShortLabel(zone),
-                color = projection.display(state.gradient.stops[zone.index]),
-                selected = state.gradient.selectedStopIndex == zone.index,
-                onClick = { actions.onStopChange(zone.index) },
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp, horizontal = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Surface(
+                modifier = Modifier.size(30.dp),
+                color = color.toComposeColor(),
+                shape = RoundedCornerShape(999.dp),
+                border = BorderStroke(2.dp, Color.White.copy(alpha = 0.5f)),
+            ) {}
+            Text(
+                text = zoneShortLabel(zone),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
             )
         }
     }
+}
+
+@Composable
+private fun stickLabel(stick: Int?): String =
+    when (stick) {
+        0 -> stringResource(R.string.gradient_stick_left)
+        1 -> stringResource(R.string.gradient_stick_right)
+        else -> stringResource(R.string.gradient_stops)
+    }
+
+@Composable
+private fun zoneCellDescription(zone: GradientEditorZone): String {
+    val stick =
+        when (zone.stick) {
+            0 -> stringResource(R.string.gradient_stick_left)
+            1 -> stringResource(R.string.gradient_stick_right)
+            else -> null
+        }
+    val position = zone.position?.let { positionLabel(it) } ?: stringResource(R.string.gradient_zone_number, zone.index + 1)
+    return if (stick != null) "$stick · $position" else position
 }
 
 @Composable
@@ -219,8 +282,51 @@ private fun GradientColorPane(
     ) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = Color(0xFF181920),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    SectionLabel(stringResource(R.string.gradient_save_title))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().focusGroup(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        OutlinedTextField(
+                            value = saveName,
+                            onValueChange = { saveName = it },
+                            modifier = Modifier.weight(1f).widthIn(min = 160.dp),
+                            label = { Text(stringResource(R.string.gradient_name)) },
+                            singleLine = true,
+                        )
+                        Button(
+                            onClick = {
+                                actions.onSave(saveName)
+                                saveName = ""
+                            },
+                            enabled = saveName.isNotBlank(),
+                            modifier = Modifier.height(56.dp),
+                        ) {
+                            Text(stringResource(R.string.gradient_save))
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = actions.onRestore,
+                        enabled = state.gradient.selectedPresetId != null,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.gradient_restore))
+                    }
+                }
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -254,7 +360,7 @@ private fun GradientColorPane(
                 }
             }
             Box(
-                modifier = Modifier.fillMaxWidth().height(188.dp),
+                modifier = Modifier.fillMaxWidth().height(236.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 HsvColorWheel(
@@ -278,44 +384,6 @@ private fun GradientColorPane(
                 valueRange = 0f..1f,
                 enabled = state.canWrite,
             )
-            Row(
-                modifier = Modifier.fillMaxWidth().focusGroup(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OutlinedButton(onClick = actions.onReverse, modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.gradient_reverse))
-                }
-                OutlinedButton(
-                    onClick = actions.onRestore,
-                    enabled = state.gradient.selectedPresetId != null,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text(stringResource(R.string.gradient_restore))
-                }
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth().focusGroup(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedTextField(
-                    value = saveName,
-                    onValueChange = { saveName = it },
-                    modifier = Modifier.weight(1f).widthIn(min = 180.dp),
-                    label = { Text(stringResource(R.string.gradient_name)) },
-                    singleLine = true,
-                )
-                Button(
-                    onClick = {
-                        actions.onSave(saveName)
-                        saveName = ""
-                    },
-                    enabled = saveName.isNotBlank(),
-                    modifier = Modifier.height(56.dp),
-                ) {
-                    Text(stringResource(R.string.gradient_save))
-                }
-            }
         }
     }
 }
@@ -329,9 +397,9 @@ private fun zoneLongLabel(zone: GradientEditorZone): String {
     val position = zone.position?.let { positionLabel(it) } ?: return stringResource(R.string.gradient_zone_number, zone.index + 1)
     val stick =
         when (zone.stick) {
-            GradientStick.LEFT -> stringResource(R.string.gradient_stick_left)
-            GradientStick.RIGHT -> stringResource(R.string.gradient_stick_right)
-            null -> return position
+            0 -> stringResource(R.string.gradient_stick_left)
+            1 -> stringResource(R.string.gradient_stick_right)
+            else -> return position
         }
     return "$stick · $position"
 }
@@ -343,4 +411,8 @@ private fun positionLabel(position: GradientZonePosition): String =
         GradientZonePosition.LEFT -> stringResource(R.string.gradient_position_left)
         GradientZonePosition.BOTTOM -> stringResource(R.string.gradient_position_bottom)
         GradientZonePosition.RIGHT -> stringResource(R.string.gradient_position_right)
+        GradientZonePosition.TOP_LEFT -> stringResource(R.string.gradient_position_top_left)
+        GradientZonePosition.TOP_RIGHT -> stringResource(R.string.gradient_position_top_right)
+        GradientZonePosition.BOTTOM_LEFT -> stringResource(R.string.gradient_position_bottom_left)
+        GradientZonePosition.BOTTOM_RIGHT -> stringResource(R.string.gradient_position_bottom_right)
     }

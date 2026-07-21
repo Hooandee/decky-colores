@@ -33,6 +33,7 @@ import com.hooandee.colores.sensor.SysfsThermalSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -125,6 +126,7 @@ class ColoresViewModel(
 
     private val controller: LightingController = (application as ColoresApplication).lightingController
     private var refreshJob: Job? = null
+    private var commitJob: Job? = null
     private val ledPreviewPreferences = LedPreviewPreferences(application)
     private val gradientPreferences = GradientPreferences(application)
     private val lightingPreferences = LightingPreferences(application)
@@ -353,9 +355,9 @@ class ColoresViewModel(
     fun setEditingColor(color: RgbColor) {
         val current = mutableState.value
         if (current.gradient.mode == LightingMode.GRADIENT) {
-            updateGradient(current.gradient.replaceSelectedStop(color), apply = true)
+            updateGradient(current.gradient.replaceSelectedStop(color), apply = true, debounce = true)
         } else {
-            updateLedState { state -> state.withTargetColor(current.editTarget, color) }
+            updateLedState(debounce = true) { state -> state.withTargetColor(current.editTarget, color) }
         }
     }
 
@@ -363,9 +365,9 @@ class ColoresViewModel(
         val current = mutableState.value
         if (current.gradient.mode == LightingMode.GRADIENT) {
             val changed = current.editingColor.toHsvColor().copy(saturation = saturation.coerceIn(0f, 1f)).toRgbColor()
-            updateGradient(current.gradient.replaceSelectedStop(changed), apply = true)
+            updateGradient(current.gradient.replaceSelectedStop(changed), apply = true, debounce = true)
         } else {
-            updateLedState { state -> state.withTargetSaturation(current.editTarget, saturation) }
+            updateLedState(debounce = true) { state -> state.withTargetSaturation(current.editTarget, saturation) }
         }
     }
 
@@ -395,12 +397,6 @@ class ColoresViewModel(
             ),
             apply = true,
         )
-    }
-
-    fun reverseGradient() {
-        val current = mutableState.value
-        if (!current.gradientAvailable) return
-        updateGradient(current.gradient.reversed(), apply = true)
     }
 
     fun restoreGradientPreset() {
@@ -435,24 +431,53 @@ class ColoresViewModel(
         ledPreviewPreferences.setEnabled(device.id, enabled)
     }
 
-    private fun updateLedState(transform: (LedState) -> LedState) {
+    private fun updateLedState(
+        debounce: Boolean = false,
+        transform: (LedState) -> LedState,
+    ) {
         val current = mutableState.value
         if (!current.canWrite || current.detected == null) return
         mutableState.update { it.copy(ledState = transform(it.ledState)) }
-        pushColorsToController()
+        scheduleCommit(debounce) { pushColorsToController() }
     }
 
     private fun updateGradient(
         gradient: GradientUiState,
         apply: Boolean,
+        debounce: Boolean = false,
     ) {
         val current = mutableState.value
         val zones = current.detected?.capabilities?.zones ?: return
         if (!current.canWrite || !current.gradientAvailable) return
         val colors = GradientInterpolator.interpolate(gradient.stops, zones)
         mutableState.update { it.copy(gradient = gradient, ledState = it.ledState.copy(zoneColors = colors)) }
-        persistGradient()
-        if (apply) pushColorsToController()
+        if (apply) {
+            scheduleCommit(debounce) {
+                persistGradient()
+                pushColorsToController()
+            }
+        } else {
+            persistGradient()
+        }
+    }
+
+    // Applies colour edits when the user pauses instead of on every drag frame: the UI
+    // state updates live (wheel, preview, gradient bar) but the hardware write and the
+    // preference write only fire after a short quiet window, avoiding transport
+    // saturation. Discrete actions (presets, reverse, restore) commit immediately.
+    private fun scheduleCommit(
+        debounce: Boolean,
+        action: () -> Unit,
+    ) {
+        commitJob?.cancel()
+        if (!debounce) {
+            action()
+            return
+        }
+        commitJob = viewModelScope.launch {
+            delay(COLOR_COMMIT_DEBOUNCE_MS)
+            action()
+        }
     }
 
     private fun pushColorsToController() {
@@ -495,6 +520,8 @@ class ColoresViewModel(
         )
     }
 }
+
+private const val COLOR_COMMIT_DEBOUNCE_MS = 120L
 
 private val SENSOR_MODES = setOf(AppMode.BATTERY, AppMode.TEMPERATURE, AppMode.PERFORMANCE)
 

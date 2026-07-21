@@ -6,6 +6,8 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,8 +71,9 @@ fun HsvColorWheel(
     Canvas(
         modifier =
             modifier
-                .sizeIn(maxWidth = 232.dp, maxHeight = 232.dp)
+                .sizeIn(maxWidth = 236.dp, maxHeight = 236.dp)
                 .aspectRatio(1f)
+                .shadow(elevation = 12.dp, shape = CircleShape, clip = false)
                 .onSizeChanged { wheelPixelSize = minOf(it.width, it.height) }
                 .semantics { this.contentDescription = contentDescription }
                 .onFocusChanged {
@@ -158,20 +161,27 @@ fun HsvColorWheel(
                 alpha = if (enabled) 1f else 0.4f,
             )
         }
+        // Subtle rim so the wheel reads as a raised disc rather than a flat fill.
+        drawCircle(Color.White.copy(alpha = 0.16f), radius - 1f, center, style = Stroke(width = 2f))
+        drawCircle(Color.Black.copy(alpha = 0.28f), radius, center, style = Stroke(width = 3f))
+
         val angle = hsv.hue * PI.toFloat() / 180f
         val thumb =
             Offset(
                 x = center.x + cos(angle) * radius * hsv.saturation,
                 y = center.y + sin(angle) * radius * hsv.saturation,
             )
-        drawCircle(Color.Black.copy(alpha = 0.65f), 12f, thumb)
-        drawCircle(Color.White, 9f, thumb, style = Stroke(width = 4f))
+        val thumbColor = projection.display(color).toComposeColor()
+        drawCircle(Color.Black.copy(alpha = 0.30f), 22f, thumb.copy(y = thumb.y + 3f))
+        drawCircle(thumbColor, 18f, thumb)
+        drawCircle(Color.White, 18f, thumb, style = Stroke(width = 6f))
+        drawCircle(Color.Black.copy(alpha = 0.22f), 21f, thumb, style = Stroke(width = 2f))
         if (focused) {
             drawCircle(
                 color = if (editing) Color(0xFF8D83FF) else Color.White.copy(alpha = 0.58f),
-                radius = radius + 7f,
+                radius = radius + 8f,
                 center = center,
-                style = Stroke(width = if (editing) 5f else 3f),
+                style = Stroke(width = if (editing) 6f else 3f),
             )
         }
     }

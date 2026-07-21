@@ -24,7 +24,6 @@ fun ColoresScreen(
                 onStopChange = viewModel::selectGradientStop,
                 onPresetChange = viewModel::selectGradientPreset,
                 onSavedChange = viewModel::selectSavedGradient,
-                onReverse = viewModel::reverseGradient,
                 onRestore = viewModel::restoreGradientPreset,
                 onSave = viewModel::saveGradient,
                 onDelete = viewModel::deleteGradient,

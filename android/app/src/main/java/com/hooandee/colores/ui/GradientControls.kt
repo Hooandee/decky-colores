@@ -49,7 +49,6 @@ data class GradientActions(
     val onStopChange: (Int) -> Unit,
     val onPresetChange: (GradientPreset) -> Unit,
     val onSavedChange: (String) -> Unit,
-    val onReverse: () -> Unit,
     val onRestore: () -> Unit,
     val onSave: (String) -> Unit,
     val onDelete: (String) -> Unit,
@@ -183,41 +182,6 @@ private fun SavedGradientTile(
             },
         ) {
             Text(stringResource(R.string.gradient_delete), style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-@Composable
-internal fun StopTile(
-    label: String,
-    color: RgbColor,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    var focused by remember { mutableStateOf(false) }
-    Surface(
-        onClick = onClick,
-        modifier =
-            Modifier
-                .height(52.dp)
-                .width(126.dp)
-                .onFocusChanged { focused = it.isFocused }
-                .semantics { this.selected = selected },
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color(0xFF181920),
-        shape = RoundedCornerShape(14.dp),
-        border =
-            BorderStroke(
-                if (selected || focused) 2.dp else 1.dp,
-                if (focused) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = if (selected) 0.5f else 0.1f),
-            ),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(modifier = Modifier.size(24.dp), color = color.toComposeColor(), shape = RoundedCornerShape(8.dp)) {}
-            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
         }
     }
 }
