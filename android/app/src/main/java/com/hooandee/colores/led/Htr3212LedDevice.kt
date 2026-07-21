@@ -112,7 +112,7 @@ internal class Htr3212LedDevice internal constructor(
         val seedVendorColor = synchronized(cacheLock) { !vendorSeeded }
         val vendorResult = writeVendorState(vendorState, cache.vendorState, seedVendorColor)
         if (!vendorResult.succeeded) return false
-        synchronized(cacheLock) { vendorSeeded = true }
+        synchronized(cacheLock) { if (cacheGeneration == cache.generation) vendorSeeded = true }
         publishVendorState(cache.generation, vendorState)
         if (!state.power) {
             publishDirectState(cache.generation, null, null)

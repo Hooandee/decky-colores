@@ -17,6 +17,7 @@ import com.hooandee.colores.sensor.BatterySource
 import com.hooandee.colores.sensor.PerformanceMetric
 import com.hooandee.colores.sensor.PerformanceSource
 import com.hooandee.colores.sensor.TemperatureSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -124,6 +125,8 @@ class LightingController(
     private var renderJob: Job? = null
     private var watchJob: Job? = null
     private var rendererSignature: Pair<AppMode, String>? = null
+
+    @Volatile
     private var generation = 0L
     private var temperatureCelsius: Double? = null
     private var lastFrame: List<RgbColor> = emptyList()
@@ -277,7 +280,7 @@ class LightingController(
         val binding = binding ?: return
         val colors = intent.staticColors.fit(binding.zones)
         val effective = effectivePower()
-        runCatching { binding.device.applyZones(colors, intent.brightness, effective) }
+        runCatching { binding.device.applyZones(colors, intent.brightness, effective) }.rethrowCancellation()
         lastFrame = if (effective) colors else List(binding.zones) { RgbColor(0, 0, 0) }
         publishSnapshot()
     }
@@ -293,7 +296,7 @@ class LightingController(
             if (myGeneration != generation) return
             if (!effectivePower()) {
                 if (!offApplied) {
-                    runCatching { binding.device.applyZones(binding.offFrame(), intent.brightness, false) }
+                    runCatching { binding.device.applyZones(binding.offFrame(), intent.brightness, false) }.rethrowCancellation()
                     lastFrame = binding.offFrame()
                     publishSnapshot()
                     offApplied = true
@@ -304,7 +307,7 @@ class LightingController(
             offApplied = false
             val nowSeconds = (clockMs() - startMs) / 1000.0
             val tick = renderer.render(nowSeconds)
-            runCatching { binding.device.applyZones(tick.colors, intent.brightness, true) }
+            runCatching { binding.device.applyZones(tick.colors, intent.brightness, true) }.rethrowCancellation()
             lastFrame = tick.colors
             publishSnapshot()
             delay(tick.nextDelayMs.coerceAtLeast(1L))
@@ -465,3 +468,5 @@ class LightingController(
         }
     }
 }
+
+private fun <T> Result<T>.rethrowCancellation(): Result<T> = onFailure { if (it is CancellationException) throw it }
