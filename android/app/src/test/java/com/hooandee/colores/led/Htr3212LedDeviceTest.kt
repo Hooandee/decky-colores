@@ -132,7 +132,7 @@ class Htr3212LedDeviceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `vendor fallback color repaint resends unchanged zones too`() =
+    fun `editing a vendor-source zone does not repaint the vendor color`() =
         runTest {
             val store = FakeHtrSettingsStore()
             val executor = FakePServerExecutor()
@@ -142,11 +142,15 @@ class Htr3212LedDeviceTest {
             device.applyZones(initial, brightness = 60, power = true)
             runCurrent()
             advanceTimeBy(80)
+            // zone 0 is the vendor's left fallback colour; editing it must NOT rewrite the
+            // vendor color key (which would make the vendor flatten both sticks), only the
+            // one changed zone over i2c.
             device.applyZones(initial.toMutableList().also { it[0] = RgbColor(90, 91, 92) }, brightness = 60, power = true)
             runCurrent()
 
-            assertEquals(4, executor.commands.size)
-            assertTrue(executor.commands.takeLast(2).all { command -> command.count { it == '&' } == 24 })
+            assertEquals(1, store.writes.count { it.first == "color" })
+            assertEquals(3, executor.commands.size)
+            assertEquals(6, executor.commands.last().count { it == '&' })
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -195,7 +199,7 @@ class Htr3212LedDeviceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `successive vendor updates collapse to one delayed hardware resend`() =
+    fun `the seed write schedules one delayed resend that editing does not multiply`() =
         runTest {
             val store = FakeHtrSettingsStore()
             val executor = FakePServerExecutor()
@@ -208,12 +212,12 @@ class Htr3212LedDeviceTest {
             advanceTimeBy(80)
             device.applyZones(updated, brightness = 60, power = true)
             runCurrent()
-            assertEquals(4, executor.commands.size)
+            assertEquals(3, executor.commands.size)
 
             advanceTimeBy(2_000)
             runCurrent()
 
-            assertEquals(6, executor.commands.size)
+            assertEquals(5, executor.commands.size)
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)

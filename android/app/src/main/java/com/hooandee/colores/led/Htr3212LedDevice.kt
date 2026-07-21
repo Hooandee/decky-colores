@@ -38,6 +38,7 @@ internal class Htr3212LedDevice internal constructor(
     private var cachedRight: List<RgbColor>? = null
     private var latestRequestedState: LedState? = null
     private var directReassertToken = 0L
+    private var vendorSeeded = false
 
     override val available: Boolean
         get() =
@@ -97,6 +98,7 @@ internal class Htr3212LedDevice internal constructor(
             cachedRight = null
             latestRequestedState = null
             directReassertToken += 1
+            vendorSeeded = false
         }
     }
 
@@ -107,8 +109,10 @@ internal class Htr3212LedDevice internal constructor(
             if (cacheGeneration == cache.generation) latestRequestedState = state
         }
         val vendorState = state.toVendorState()
-        val vendorResult = writeVendorState(vendorState, cache.vendorState)
+        val seedVendorColor = synchronized(cacheLock) { !vendorSeeded }
+        val vendorResult = writeVendorState(vendorState, cache.vendorState, seedVendorColor)
         if (!vendorResult.succeeded) return false
+        synchronized(cacheLock) { vendorSeeded = true }
         publishVendorState(cache.generation, vendorState)
         if (!state.power) {
             publishDirectState(cache.generation, null, null)
@@ -150,10 +154,15 @@ internal class Htr3212LedDevice internal constructor(
     private fun writeVendorState(
         state: LedState,
         previous: LedState?,
+        seedColor: Boolean,
     ): VendorWriteResult {
         var succeeded = true
         var changed = false
-        if (previous?.zoneColors != state.zoneColors) {
+        // Colours are driven per-zone over i2c. The vendor colour key is only seeded
+        // once after (re)claim to trigger the vendor's channel init; rewriting it on
+        // every edit makes the vendor service re-flatten both sticks to its two-colour
+        // fallback, fighting the per-zone writes.
+        if (seedColor && previous?.zoneColors != state.zoneColors) {
             changed = true
             if (!store.put(descriptor.colorKey, SettingsProviderCodec.encodeColors(state.zoneColors, STICKS))) {
                 succeeded = false
