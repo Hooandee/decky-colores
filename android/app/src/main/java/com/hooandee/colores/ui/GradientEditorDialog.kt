@@ -137,7 +137,7 @@ private fun GradientZonesPane(
     actions: GradientActions,
     modifier: Modifier,
 ) {
-    val zones = gradientEditorZones(state.detected?.id, state.gradient.stops.size)
+    val zones = gradientEditorZones(state.detected?.gridLayout, state.gradient.stops.size)
     val projection = state.ledColorProjection
     Surface(
         modifier = modifier,
@@ -275,7 +275,7 @@ private fun GradientColorPane(
 ) {
     var saveName by rememberSaveable { mutableStateOf("") }
     val selectedZone =
-        gradientEditorZones(state.detected?.id, state.gradient.stops.size)
+        gradientEditorZones(state.detected?.gridLayout, state.gradient.stops.size)
             .getOrNull(state.gradient.selectedStopIndex)
     val color = state.editingColor
     val saturation = color.toHsvColor().saturation

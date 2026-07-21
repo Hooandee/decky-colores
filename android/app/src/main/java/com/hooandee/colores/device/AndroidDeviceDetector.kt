@@ -2,6 +2,10 @@ package com.hooandee.colores.device
 
 import android.content.Context
 import android.os.Build
+import android.provider.Settings
+import com.hooandee.colores.led.AndroidPServerCommandExecutor
+import com.hooandee.colores.led.LedDescriptor
+import com.hooandee.colores.led.SysfsRgbDescriptor
 import java.util.concurrent.TimeUnit
 
 data class AndroidDeviceIdentity(
@@ -15,13 +19,17 @@ data class DetectedAndroidDevice(
     val id: String,
     val friendlyName: String,
     val capabilities: DeviceCapabilities,
-    val led: com.hooandee.colores.led.SettingsProviderDescriptor,
+    val led: LedDescriptor,
     val previewProfileId: String?,
     val previewCalibration: LedPreviewCalibration?,
+    val gridLayout: List<LedGridCell>? = null,
 )
 
 class AndroidDeviceDetector(
     private val context: Context,
+    private val pserverAvailable: () -> Boolean = { AndroidPServerCommandExecutor().available },
+    private val readSetting: (String) -> String? = { key -> Settings.System.getString(context.contentResolver, key) },
+    private val scanSysfs: () -> SysfsRgbDescriptor? = { SysfsRgbDiscovery.scan() },
 ) {
     fun readIdentity(): AndroidDeviceIdentity {
         val properties =
@@ -35,12 +43,26 @@ class AndroidDeviceDetector(
         )
     }
 
-    fun detect(): DetectedAndroidDevice? =
+    fun detect(): DetectedAndroidDevice? {
+        val identity =
+            runCatching { readIdentity() }.getOrElse {
+                AndroidDeviceIdentity(model = "", device = "", manufacturer = "", productProperties = emptyMap())
+            }
+        return modelMatch(identity)
+            ?: GenericLedResolver.vendor(
+                identity,
+                pserverAvailable = runCatching { pserverAvailable() }.getOrDefault(false),
+                colorKeyValue = runCatching { readSetting(GenericVendorLed.COLOR_KEY) }.getOrNull(),
+            )
+            ?: GenericLedResolver.sysfs(identity, runCatching { scanSysfs() }.getOrNull())
+    }
+
+    private fun modelMatch(identity: AndroidDeviceIdentity): DetectedAndroidDevice? =
         runCatching {
             DeviceRegistry.parse(
                 devicesJson = context.readAsset("devices.json"),
                 previewProfilesJson = context.readAsset("led-preview-profiles.json"),
-            ).match(readIdentity())
+            ).match(identity)
         }.getOrNull()
 
     private fun readProperty(name: String): String =

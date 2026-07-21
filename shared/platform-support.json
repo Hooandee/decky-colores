@@ -8,6 +8,11 @@
       "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
     },
     {
+      "id": "generic_led_discovery",
+      "contracts": ["devices.json"],
+      "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }
+    },
+    {
       "id": "solid_color",
       "contracts": ["devices.json"],
       "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }

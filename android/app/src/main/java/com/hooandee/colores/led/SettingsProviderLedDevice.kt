@@ -10,6 +10,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+sealed interface LedDescriptor
+
 data class SettingsProviderDescriptor(
     val driver: String,
     val transport: String = "direct",
@@ -22,7 +24,7 @@ data class SettingsProviderDescriptor(
     val requiresPermission: String?,
     val vendorService: String,
     val htr3212: Htr3212Descriptor? = null,
-)
+) : LedDescriptor
 
 data class Htr3212Descriptor(
     val leftBus: Int,
