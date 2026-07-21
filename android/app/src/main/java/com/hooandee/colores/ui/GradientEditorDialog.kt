@@ -1,6 +1,7 @@
 package com.hooandee.colores.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -37,7 +39,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -261,6 +265,7 @@ private fun zoneCellDescription(zone: GradientEditorZone): String {
     return if (stick != null) "$stick · $position" else position
 }
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 private fun GradientColorPane(
     state: ColoresUiState,
@@ -383,6 +388,20 @@ private fun GradientColorPane(
                 onValueChange = actions.onSaturationChange,
                 valueRange = 0f..1f,
                 enabled = state.canWrite,
+                track = {
+                    val hue = color.toHsvColor().hue
+                    val projection = state.ledColorProjection
+                    val start = projection.display(HsvColor(hue, 0f, 1f).toRgbColor()).toComposeColor()
+                    val end = projection.display(HsvColor(hue, 1f, 1f).toRgbColor()).toComposeColor()
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(10.dp)
+                                .clip(CircleShape)
+                                .background(Brush.horizontalGradient(listOf(start, end))),
+                    )
+                },
             )
         }
     }
