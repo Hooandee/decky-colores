@@ -557,7 +557,7 @@ private fun AppMode.coerceAvailable(gradientSupported: Boolean): AppMode =
     if (this == AppMode.GRADIENT && !gradientSupported) AppMode.COLOR else this
 
 private fun ColoresUiState.gradientStopCount(): Int =
-    if (effectNeedsGradient) 2 else (detected?.capabilities?.zones ?: 2)
+    if (effectNeedsGradient && !gradientAvailable) 2 else (detected?.capabilities?.zones ?: 2)
 
 private fun android.content.Context.readAsset(name: String): String =
     assets.open(name).bufferedReader().use { it.readText() }
