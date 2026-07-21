@@ -62,7 +62,7 @@ fun DeviceScene(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val compact = maxHeight < 320.dp
-            val ringSize = if (compact) (maxHeight * 0.34f).coerceIn(52.dp, 112.dp) else 112.dp
+            val ringSize = if (compact) (maxHeight - 150.dp).coerceIn(40.dp, 112.dp) else 112.dp
             val scenePadding = if (compact) 14.dp else 22.dp
             Column(
                 modifier = Modifier.fillMaxSize().padding(scenePadding),
@@ -145,7 +145,7 @@ fun DeviceScene(
                     Surface(
                     onClick = { onTargetChange(EditTarget.BOTH) },
                     enabled = enabled,
-                    modifier = Modifier.heightIn(min = 48.dp),
+                    modifier = Modifier.heightIn(min = if (compact) 36.dp else 48.dp),
                     color =
                         if (selectedTarget == EditTarget.BOTH) {
                             MaterialTheme.colorScheme.primaryContainer
@@ -172,8 +172,8 @@ fun DeviceScene(
                 ) {
                     Text(
                         text = stringResource(R.string.target_both),
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
-                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = if (compact) 6.dp else 10.dp),
+                        style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
