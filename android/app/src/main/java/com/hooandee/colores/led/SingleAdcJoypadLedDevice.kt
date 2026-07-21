@@ -3,6 +3,7 @@ package com.hooandee.colores.led
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlin.math.roundToInt
 
 data class SingleAdcJoypadDescriptor(
     val basePath: String = DEFAULT_BASE_PATH,
@@ -22,12 +23,15 @@ class SingleAdcJoypadLedDevice internal constructor(
         scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     ) : this(descriptor, FileSysfsAccess, scope)
 
-    private val writer = ConflatedLedWriter(scope, WRITE_INTERVAL_MS, write = ::writeState)
+    private val writer = ConflatedLedWriter(scope, WRITE_INTERVAL_MS, write = ::writeFrame)
 
     override val available: Boolean
         get() = access.canWrite(node("custum_rgb_r")) && access.canWrite(node("led_set"))
 
     override val supportsPerZone: Boolean = false
+
+    override val hardwareEffects: List<HardwareEffect> =
+        EFFECTS.map { HardwareEffect(it.id, it.needsColor, it.defaultSpeed, it.previewColors) }
 
     override suspend fun readState(): LedState {
         val color =
@@ -47,7 +51,17 @@ class SingleAdcJoypadLedDevice internal constructor(
         colors: List<RgbColor>,
         brightness: Int,
         power: Boolean,
-    ): Boolean = writer.submit(LedState(listOf(colors.firstOrNull() ?: RgbColor(255, 255, 255)), brightness.coerceIn(0, 100), power))
+    ): Boolean =
+        writer.submit(
+            Frame(
+                color = colors.firstOrNull() ?: RgbColor(255, 255, 255),
+                brightness = brightness.coerceIn(0, 100),
+                power = power,
+                ledMode = STATIC_MODE,
+                speed = 0,
+                colored = true,
+            ),
+        )
 
     override suspend fun applySolid(
         color: RgbColor,
@@ -55,10 +69,29 @@ class SingleAdcJoypadLedDevice internal constructor(
         power: Boolean,
     ): Boolean = applyZones(listOf(color), brightness, power)
 
+    override suspend fun applyHardwareEffect(
+        effectId: String,
+        color: RgbColor,
+        brightness: Int,
+        speed: Int,
+        power: Boolean,
+    ): Boolean {
+        val spec = EFFECTS.firstOrNull { it.id == effectId } ?: return false
+        return writer.submit(
+            Frame(
+                color = color,
+                brightness = brightness.coerceIn(0, 100),
+                power = power,
+                ledMode = spec.ledMode,
+                speed = mapSpeed(speed),
+                colored = spec.needsColor,
+            ),
+        )
+    }
+
     override fun invalidate() = Unit
 
-    private fun writeState(state: LedState): Boolean {
-        val color = state.zoneColors.first()
+    private fun writeFrame(frame: Frame): Boolean {
         var succeeded = true
         fun put(
             name: String,
@@ -66,19 +99,31 @@ class SingleAdcJoypadLedDevice internal constructor(
         ) {
             if (!access.write(node(name), "$value\n")) succeeded = false
         }
-        if (state.power) {
-            put("custum_rgb_r", color.red.coerceIn(0, 255))
-            put("custum_rgb_g", color.green.coerceIn(0, 255))
-            put("custum_rgb_b", color.blue.coerceIn(0, 255))
-            put("led_level", state.brightness)
-            put("led_mode", STATIC_MODE)
-            put("led_switch", 1)
-        } else {
+        if (!frame.power) {
             put("led_switch", 0)
+            put("led_set", 1)
+            return succeeded
         }
+        val c = frame.color
+        put("custum_rgb_r", c.red.coerceIn(0, 255))
+        put("custum_rgb_g", c.green.coerceIn(0, 255))
+        put("custum_rgb_b", c.blue.coerceIn(0, 255))
+        val zone = if (frame.colored) c else RgbColor(0, 0, 0)
+        put("Led_rgb_r1", zone.red.coerceIn(0, 255))
+        put("Led_rgb_g1", zone.green.coerceIn(0, 255))
+        put("Led_rgb_b1", zone.blue.coerceIn(0, 255))
+        put("Led_rgb_r2", zone.red.coerceIn(0, 255))
+        put("Led_rgb_g2", zone.green.coerceIn(0, 255))
+        put("Led_rgb_b2", zone.blue.coerceIn(0, 255))
+        put("led_level", frame.brightness)
+        put("led_speed", frame.speed)
+        put("led_mode", frame.ledMode)
+        put("led_switch", 1)
         put("led_set", 1)
         return succeeded
     }
+
+    private fun mapSpeed(percent: Int): Int = ((percent.coerceIn(0, 100) / 100.0) * MAX_SPEED).roundToInt().coerceIn(0, MAX_SPEED)
 
     private fun readInt(
         name: String,
@@ -87,8 +132,38 @@ class SingleAdcJoypadLedDevice internal constructor(
 
     private fun node(name: String): String = "${descriptor.basePath}/$name"
 
+    private data class Frame(
+        val color: RgbColor,
+        val brightness: Int,
+        val power: Boolean,
+        val ledMode: Int,
+        val speed: Int,
+        val colored: Boolean,
+    )
+
+    private data class EffectSpec(
+        val id: String,
+        val ledMode: Int,
+        val needsColor: Boolean,
+        val defaultSpeed: Int,
+        val previewColors: List<RgbColor>,
+    )
+
     private companion object {
         const val WRITE_INTERVAL_MS = 80L
         const val STATIC_MODE = 1
+        const val MAX_SPEED = 8
+
+        private val RAINBOW =
+            listOf(RgbColor(255, 0, 0), RgbColor(0, 255, 0), RgbColor(0, 0, 255))
+
+        val EFFECTS =
+            listOf(
+                EffectSpec("breathing", ledMode = 2, needsColor = true, defaultSpeed = 50, previewColors = listOf(RgbColor(93, 81, 255))),
+                EffectSpec("rainbow", ledMode = 3, needsColor = false, defaultSpeed = 50, previewColors = RAINBOW),
+                EffectSpec("marquee", ledMode = 4, needsColor = false, defaultSpeed = 50, previewColors = RAINBOW),
+                EffectSpec("chasing", ledMode = 5, needsColor = true, defaultSpeed = 50, previewColors = listOf(RgbColor(93, 81, 255))),
+                EffectSpec("gaming", ledMode = 6, needsColor = false, defaultSpeed = 50, previewColors = RAINBOW),
+            )
     }
 }

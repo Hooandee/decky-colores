@@ -91,6 +91,9 @@
     <string name="effect_sparkle">Sparkle</string>
     <string name="effect_ripple">Ripple</string>
     <string name="effect_aurora">Aurora</string>
+    <string name="effect_marquee">Marquee</string>
+    <string name="effect_chasing">Chasing</string>
+    <string name="effect_gaming">Gaming</string>
 
     <string name="sensor_battery">Battery</string>
     <string name="sensor_temperature">Temperature</string>

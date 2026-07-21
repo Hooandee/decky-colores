@@ -85,7 +85,7 @@
     {
       "id": "hardware_effects",
       "contracts": ["devices.json"],
-      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+      "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }
     }
   ]
 }

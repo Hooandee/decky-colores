@@ -14,6 +14,7 @@ import com.hooandee.colores.device.AndroidDeviceDetector
 import com.hooandee.colores.device.DetectedAndroidDevice
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.EffectCatalog
+import com.hooandee.colores.engine.EffectNeed
 import com.hooandee.colores.engine.EffectPreset
 import com.hooandee.colores.gradient.DeviceGradientPreferences
 import com.hooandee.colores.gradient.GradientInterpolator
@@ -192,6 +193,19 @@ class ColoresViewModel(
                 }
 
                 val catalog = withContext(Dispatchers.IO) { EffectCatalog.parse(context.readAsset("effects.json")) }
+                val effectPresets =
+                    if (device.hardwareEffects.isNotEmpty()) {
+                        device.hardwareEffects.map {
+                            EffectPreset(
+                                id = it.id,
+                                need = if (it.needsColor) EffectNeed.COLOR else EffectNeed.NONE,
+                                defaultSpeed = it.defaultSpeed,
+                                colors = it.colors,
+                            )
+                        }
+                    } else {
+                        catalog.presets
+                    }
                 val bands = withContext(Dispatchers.IO) { BandSet.parse(context.readAsset("bands.json")) }
                 val zones = detected.capabilities.zones
                 val gradientSupported = detected.capabilities.supportsGradient(device.supportsPerZone)
@@ -238,7 +252,10 @@ class ColoresViewModel(
                             staticColors = zoneColors,
                             solidColor = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255),
                             gradientStops = hydratedGradient.stops,
-                            effectId = catalog.byId(storedLighting.effectId)?.id ?: catalog.defaultEffectId,
+                            effectId =
+                                effectPresets.firstOrNull { it.id == storedLighting.effectId }?.id
+                                    ?: effectPresets.firstOrNull()?.id
+                                    ?: catalog.defaultEffectId,
                             speed = storedLighting.speed,
                             brightness = brightness,
                             power = power,
@@ -253,7 +270,7 @@ class ColoresViewModel(
                         loading = false,
                         detected = detected,
                         controlAccess = controlAccess,
-                        effects = catalog.presets,
+                        effects = effectPresets,
                         ledState = LedState(zoneColors, brightness, power),
                         gradientAvailable = gradientSupported,
                         gradient = hydratedGradient,
