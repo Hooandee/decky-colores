@@ -22,6 +22,11 @@ object GradientInterpolator {
         }
     }
 
+    fun sampleAt(
+        stops: List<RgbColor>,
+        position: Double,
+    ): RgbColor = if (stops.size == 1) stops.first() else sample(stops, position)
+
     private fun sample(
         stops: List<RgbColor>,
         position: Double,

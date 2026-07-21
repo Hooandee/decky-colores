@@ -249,21 +249,19 @@ private fun ZoneCell(
 }
 
 @Composable
-private fun stickLabel(stick: Int?): String =
+private fun stickName(stick: Int?): String? =
     when (stick) {
         0 -> stringResource(R.string.gradient_stick_left)
         1 -> stringResource(R.string.gradient_stick_right)
-        else -> stringResource(R.string.gradient_stops)
+        else -> null
     }
 
 @Composable
+private fun stickLabel(stick: Int?): String = stickName(stick) ?: stringResource(R.string.gradient_stops)
+
+@Composable
 private fun zoneCellDescription(zone: GradientEditorZone): String {
-    val stick =
-        when (zone.stick) {
-            0 -> stringResource(R.string.gradient_stick_left)
-            1 -> stringResource(R.string.gradient_stick_right)
-            else -> null
-        }
+    val stick = stickName(zone.stick)
     val position = zone.position?.let { positionLabel(it) } ?: stringResource(R.string.gradient_zone_number, zone.index + 1)
     return if (stick != null) "$stick · $position" else position
 }
@@ -405,12 +403,7 @@ private fun zoneShortLabel(zone: GradientEditorZone): String =
 @Composable
 private fun zoneLongLabel(zone: GradientEditorZone): String {
     val position = zone.position?.let { positionLabel(it) } ?: return stringResource(R.string.gradient_zone_number, zone.index + 1)
-    val stick =
-        when (zone.stick) {
-            0 -> stringResource(R.string.gradient_stick_left)
-            1 -> stringResource(R.string.gradient_stick_right)
-            else -> return position
-        }
+    val stick = stickName(zone.stick) ?: return position
     return "$stick · $position"
 }
 

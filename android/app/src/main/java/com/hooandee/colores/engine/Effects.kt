@@ -12,10 +12,8 @@ import com.hooandee.colores.gradient.GradientInterpolator
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.PI
 import kotlin.math.abs
-import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
 

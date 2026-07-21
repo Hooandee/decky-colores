@@ -215,7 +215,6 @@ private fun DashboardBody(
         )
         ChargerOnlyRow(
             chargerOnly = state.chargerOnly,
-            charging = state.charging,
             enabled = state.canWrite,
             onChange = modeActions.onChargerOnlyChange,
         )

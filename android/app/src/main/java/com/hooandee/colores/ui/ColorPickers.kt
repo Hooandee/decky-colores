@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -40,6 +41,10 @@ fun RingColorPicker(
 ) {
     val hsv = color.toHsvColor()
     val saturation by rememberUpdatedState(hsv.saturation)
+    val ringColors =
+        remember(projection) {
+            List(RING_SEGMENTS) { i -> projection.display(HsvColor(i * 360f / RING_SEGMENTS, 1f, 1f).toRgbColor()).toComposeColor() }
+        }
     val pulse by rememberInfiniteTransition(label = "ringPulse").animateFloat(
         initialValue = 0f,
         targetValue = 1f,
@@ -77,13 +82,11 @@ fun RingColorPicker(
         val band = radius * 0.185f
         val bandOuter = outlineRadius - radius * 0.05f - 3f
         val ringRadius = bandOuter - band / 2f
-        val segments = 120
-        for (i in 0 until segments) {
-            val angle = i * 360f / segments
+        for (i in 0 until RING_SEGMENTS) {
             drawArc(
-                color = projection.display(HsvColor(angle, 1f, 1f).toRgbColor()).toComposeColor().copy(alpha = alpha),
-                startAngle = angle,
-                sweepAngle = 360f / segments + 1.2f,
+                color = ringColors[i].copy(alpha = alpha),
+                startAngle = i * 360f / RING_SEGMENTS,
+                sweepAngle = 360f / RING_SEGMENTS + 1.2f,
                 useCenter = false,
                 topLeft = Offset(center.x - ringRadius, center.y - ringRadius),
                 size = Size(ringRadius * 2, ringRadius * 2),
@@ -109,3 +112,5 @@ fun RingColorPicker(
         drawCircle(Color.White, band * 0.38f, handle, style = Stroke(width = 5f))
     }
 }
+
+private const val RING_SEGMENTS = 120

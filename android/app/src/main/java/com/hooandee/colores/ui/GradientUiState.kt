@@ -42,12 +42,6 @@ data class GradientUiState(
             selectedPresetId = preset.id,
         )
 
-    fun reversed(): GradientUiState =
-        copy(
-            stops = stops.reversed(),
-            selectedStopIndex = (stops.lastIndex - selectedStopIndex).coerceAtLeast(0),
-        )
-
     fun restorePreset(zones: Int): GradientUiState {
         val preset = presets.firstOrNull { it.id == selectedPresetId } ?: return this
         return selectPreset(preset, zones)

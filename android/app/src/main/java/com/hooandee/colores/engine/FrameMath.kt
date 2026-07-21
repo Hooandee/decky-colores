@@ -1,5 +1,6 @@
 package com.hooandee.colores.engine
 
+import com.hooandee.colores.gradient.GradientInterpolator
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.abs
 import kotlin.math.floor
@@ -52,21 +53,7 @@ internal object FrameMath {
     fun sampleStops(
         stops: List<RgbColor>,
         position: Double,
-    ): RgbColor {
-        if (stops.size == 1) return stops.first()
-        val pos = position.coerceIn(0.0, 1.0)
-        val scaled = pos * (stops.size - 1)
-        val index = floor(scaled).toInt()
-        if (index >= stops.size - 1) return stops.last()
-        val f = scaled - index
-        val a = stops[index]
-        val b = stops[index + 1]
-        return RgbColor(
-            clamp8(lerp(a.red, b.red, f)),
-            clamp8(lerp(a.green, b.green, f)),
-            clamp8(lerp(a.blue, b.blue, f)),
-        )
-    }
+    ): RgbColor = GradientInterpolator.sampleAt(stops, position)
 
     fun hash01(
         a: Double,

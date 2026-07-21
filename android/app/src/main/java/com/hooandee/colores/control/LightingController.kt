@@ -39,6 +39,9 @@ enum class AppMode {
 
     val isDynamic: Boolean
         get() = this != COLOR && this != GRADIENT
+
+    val isSensor: Boolean
+        get() = this == BATTERY || this == TEMPERATURE || this == PERFORMANCE
 }
 
 data class LightingIntent(
@@ -352,7 +355,7 @@ class LightingController(
                     intervalMs = CLOCK_INTERVAL_MS,
                     hour = localHour,
                 )
-            AppMode.COLOR, AppMode.GRADIENT ->
+            else ->
                 EffectRenderer(intent.effectId, zones, interval, { intent.speed }, { resolvePalette(binding) })
         }
     }

@@ -38,21 +38,6 @@ class GradientUiStateTest {
     }
 
     @Test
-    fun `reverse preserves the selected physical color`() {
-        val state =
-            GradientUiState(
-                mode = LightingMode.GRADIENT,
-                stops = listOf(red, green, blue),
-                selectedStopIndex = 0,
-                selectedPresetId = "primary",
-            ).reversed()
-
-        assertEquals(listOf(blue, green, red), state.stops)
-        assertEquals(2, state.selectedStopIndex)
-        assertEquals("primary", state.selectedPresetId)
-    }
-
-    @Test
     fun `restore reuses the selected built-in preset`() {
         val restored =
             GradientUiState(

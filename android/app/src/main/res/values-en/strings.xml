@@ -33,7 +33,6 @@
     <string name="mode_gradient">Gradient</string>
     <string name="gradient_presets">Presets</string>
     <string name="gradient_stops">Zones</string>
-    <string name="gradient_reverse">Reverse</string>
     <string name="gradient_restore">Restore preset</string>
     <string name="gradient_name">Gradient name</string>
     <string name="gradient_save">Save</string>

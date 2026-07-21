@@ -60,11 +60,11 @@ fun ModeNav(
     onModeChange: (AppMode) -> Unit,
 ) {
     if (modes.size <= 1) return
-    val navSelected = if (selected in SENSOR_MODES) AppMode.BATTERY else selected
-    val entries = modes.filterNot { it in SENSOR_MODES && it != AppMode.BATTERY }
+    val navSelected = if (selected.isSensor) AppMode.BATTERY else selected
+    val entries = modes.filterNot { it.isSensor && it != AppMode.BATTERY }
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         entries.forEachIndexed { index, mode ->
-            val isSelected = mode == navSelected || (mode == AppMode.BATTERY && selected in SENSOR_MODES)
+            val isSelected = mode == navSelected
             SegmentedButton(
                 modifier = Modifier.height(46.dp),
                 selected = isSelected,
@@ -80,7 +80,6 @@ fun ModeNav(
 @Composable
 fun ChargerOnlyRow(
     chargerOnly: Boolean,
-    charging: Boolean,
     enabled: Boolean,
     onChange: (Boolean) -> Unit,
 ) {
@@ -503,8 +502,6 @@ private fun ValueSlider(
         Slider(value = value, onValueChange = onValueChange, valueRange = valueRange, enabled = enabled)
     }
 }
-
-private val SENSOR_MODES = setOf(AppMode.BATTERY, AppMode.TEMPERATURE, AppMode.PERFORMANCE)
 
 @Composable
 private fun navLabel(mode: AppMode): String =

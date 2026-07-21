@@ -51,15 +51,15 @@ internal fun gradientEditorZones(
     deviceId: String?,
     count: Int,
 ): List<GradientEditorZone> {
-    if (deviceId == "ayn-thor" && count == 8) {
-        return List(count) { index ->
-            val cell = if (index < 4) AYN_THOR_LEFT_CELLS[index % 4] else AYN_THOR_RIGHT_CELLS[index % 4]
-            GradientEditorZone(index = index, stick = index / 4, row = cell.row, col = cell.col, position = cell.position)
+    val cellFor: ((Int) -> Cell)? =
+        when {
+            deviceId == "ayn-thor" && count == 8 -> { index -> if (index < 4) AYN_THOR_LEFT_CELLS[index % 4] else AYN_THOR_RIGHT_CELLS[index % 4] }
+            deviceId == "retroid-pocket-5" && count == 8 -> { index -> RETROID_POCKET_5_CELLS[index % 4] }
+            else -> null
         }
-    }
-    if (deviceId == "retroid-pocket-5" && count == 8) {
+    if (cellFor != null) {
         return List(count) { index ->
-            val cell = RETROID_POCKET_5_CELLS[index % 4]
+            val cell = cellFor(index)
             GradientEditorZone(index = index, stick = index / 4, row = cell.row, col = cell.col, position = cell.position)
         }
     }

@@ -16,7 +16,7 @@ interface TemperatureSource {
 class SysfsThermalSource(
     private val readZones: () -> List<ThermalZoneRaw>,
 ) : TemperatureSource {
-    constructor() : this({ scanThermalZones() })
+    constructor() : this(androidThermalZoneReader())
 
     override val available: Boolean
         get() = readCelsius() != null
@@ -42,18 +42,21 @@ class SysfsThermalSource(
         const val PLAUSIBLE_MIN = -40.0
         const val PLAUSIBLE_MAX = 200.0
 
-        fun scanThermalZones(): List<ThermalZoneRaw> =
-            runCatching {
-                val root = File("/sys/class/thermal")
-                root.listFiles { file -> file.name.startsWith("thermal_zone") }
-                    ?.sortedBy { it.name }
-                    ?.map { zone ->
-                        ThermalZoneRaw(
-                            type = runCatching { File(zone, "type").readText().trim() }.getOrDefault(""),
-                            raw = runCatching { File(zone, "temp").readText().trim() }.getOrNull(),
-                        )
-                    }
-                    .orEmpty()
-            }.getOrDefault(emptyList())
+        fun androidThermalZoneReader(): () -> List<ThermalZoneRaw> {
+            var zones: List<Pair<String, File>>? = null
+            fun discover(): List<Pair<String, File>> =
+                runCatching {
+                    File("/sys/class/thermal").listFiles { file -> file.name.startsWith("thermal_zone") }
+                        ?.sortedBy { it.name }
+                        ?.map { zone ->
+                            runCatching { File(zone, "type").readText().trim() }.getOrDefault("") to File(zone, "temp")
+                        }
+                        .orEmpty()
+                }.getOrDefault(emptyList())
+            return {
+                (zones ?: discover().also { zones = it })
+                    .map { (type, tempFile) -> ThermalZoneRaw(type, runCatching { tempFile.readText().trim() }.getOrNull()) }
+            }
+        }
     }
 }

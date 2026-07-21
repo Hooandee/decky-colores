@@ -273,8 +273,8 @@ class ColoresViewModel(
         val current = mutableState.value
         if (!current.canWrite) return
         val target =
-            if (mode in SENSOR_MODES) {
-                if (current.mode in SENSOR_MODES) return
+            if (mode.isSensor) {
+                if (current.mode.isSensor) return
                 current.availableSensorModes().firstOrNull() ?: return
             } else {
                 mode
@@ -518,8 +518,6 @@ class ColoresViewModel(
 }
 
 private const val COLOR_COMMIT_DEBOUNCE_MS = 120L
-
-private val SENSOR_MODES = setOf(AppMode.BATTERY, AppMode.TEMPERATURE, AppMode.PERFORMANCE)
 
 private fun AppMode.coerceAvailable(gradientSupported: Boolean): AppMode =
     if (this == AppMode.GRADIENT && !gradientSupported) AppMode.COLOR else this
