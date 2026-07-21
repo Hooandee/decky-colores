@@ -82,7 +82,7 @@ class SysfsRgbDevice internal constructor(
         colors: List<RgbColor>,
         brightness: Int,
         power: Boolean,
-    ): Boolean = writer.submit(LedState(colors.fit(descriptor.zones), brightness.coerceIn(0, 100), power))
+    ): Boolean = writer.submit(LedState(colors.fitZones(descriptor.zones), brightness.coerceIn(0, 100), power))
 
     override suspend fun applySolid(
         color: RgbColor,
@@ -125,11 +125,6 @@ class SysfsRgbDevice internal constructor(
 
     private fun packed(color: RgbColor): Int =
         (color.red.coerceIn(0, 255) shl 16) or (color.green.coerceIn(0, 255) shl 8) or color.blue.coerceIn(0, 255)
-
-    private fun List<RgbColor>.fit(zones: Int): List<RgbColor> {
-        val fallback = firstOrNull() ?: RgbColor(255, 255, 255)
-        return List(zones.coerceAtLeast(1)) { getOrNull(it) ?: fallback }
-    }
 
     private companion object {
         const val WRITE_INTERVAL_MS = 80L

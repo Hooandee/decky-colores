@@ -111,12 +111,11 @@ class SingleAdcJoypadLedDevice internal constructor(
             return succeeded
         }
         val main = frame.color
-        val follow = if (frame.colored) frame.secondColor else main
         put("custum_rgb_r", main.red.coerceIn(0, 255))
         put("custum_rgb_g", main.green.coerceIn(0, 255))
         put("custum_rgb_b", main.blue.coerceIn(0, 255))
         val slotMain = if (frame.colored) main else RgbColor(0, 0, 0)
-        val slotFollow = if (frame.colored) follow else RgbColor(0, 0, 0)
+        val slotFollow = if (frame.colored) frame.secondColor else RgbColor(0, 0, 0)
         put("Led_rgb_r2", slotMain.red.coerceIn(0, 255))
         put("Led_rgb_g2", slotMain.green.coerceIn(0, 255))
         put("Led_rgb_b2", slotMain.blue.coerceIn(0, 255))

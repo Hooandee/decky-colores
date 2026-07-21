@@ -243,7 +243,3 @@ internal class ConflatedLedWriter<T>(
     fun submit(value: T): Boolean = channel.trySend(value).isSuccess
 }
 
-private fun List<RgbColor>.fitZones(zones: Int): List<RgbColor> {
-    val fallback = firstOrNull() ?: RgbColor(255, 255, 255)
-    return List(zones.coerceAtLeast(1)) { index -> getOrNull(index) ?: fallback }
-}

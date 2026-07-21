@@ -20,7 +20,7 @@ class SingleAdcJoypadLedDeviceTest {
     @Test
     fun `static color writes custum rgb, level, mode and latches led_set`() =
         runTest {
-            val access = FakeJoypadAccess(nodes)
+            val access = FakeSysfsAccess(nodes)
             val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
 
             device.applySolid(RgbColor(255, 128, 0), brightness = 80, power = true)
@@ -38,7 +38,7 @@ class SingleAdcJoypadLedDeviceTest {
     @Test
     fun `power off drops the switch and still latches`() =
         runTest {
-            val access = FakeJoypadAccess(nodes)
+            val access = FakeSysfsAccess(nodes)
             val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
 
             device.applySolid(RgbColor(255, 0, 0), brightness = 100, power = false)
@@ -55,7 +55,7 @@ class SingleAdcJoypadLedDeviceTest {
     @Test
     fun `two color hardware effect writes a distinct colour per zone slot`() =
         runTest {
-            val access = FakeJoypadAccess(allNodes)
+            val access = FakeSysfsAccess(allNodes)
             val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
 
             assertTrue(
@@ -82,7 +82,7 @@ class SingleAdcJoypadLedDeviceTest {
     @Test
     fun `single colour list mirrors the colour to both zone slots`() =
         runTest {
-            val access = FakeJoypadAccess(allNodes)
+            val access = FakeSysfsAccess(allNodes)
             val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
 
             device.applyHardwareEffect("chasing", listOf(RgbColor(9, 8, 7)), brightness = 100, speed = 0, power = true)
@@ -95,7 +95,7 @@ class SingleAdcJoypadLedDeviceTest {
     @Test
     fun `fixed hardware effect zeroes the zone colors`() =
         runTest {
-            val access = FakeJoypadAccess(allNodes)
+            val access = FakeSysfsAccess(allNodes)
             val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
 
             device.applyHardwareEffect("marquee", listOf(RgbColor(255, 0, 0)), brightness = 100, speed = 50, power = true)
@@ -108,7 +108,7 @@ class SingleAdcJoypadLedDeviceTest {
     @Test
     fun `unknown hardware effect is rejected`() =
         runTest {
-            val access = FakeJoypadAccess(nodes)
+            val access = FakeSysfsAccess(nodes)
             val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
             assertFalse(device.applyHardwareEffect("nope", listOf(RgbColor(1, 2, 3)), 100, 50, true))
         }
@@ -118,7 +118,7 @@ class SingleAdcJoypadLedDeviceTest {
         val device =
             SingleAdcJoypadLedDevice(
                 SingleAdcJoypadDescriptor(base),
-                FakeJoypadAccess(nodes),
+                FakeSysfsAccess(nodes),
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
             )
         assertEquals(listOf("breathing", "rainbow", "marquee", "chasing", "gaming"), device.hardwareEffects.map { it.id })
@@ -132,7 +132,7 @@ class SingleAdcJoypadLedDeviceTest {
         val device =
             SingleAdcJoypadLedDevice(
                 SingleAdcJoypadDescriptor(base),
-                FakeJoypadAccess(nodes),
+                FakeSysfsAccess(nodes),
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
             )
         assertFalse(device.supportsPerZone)
@@ -144,29 +144,9 @@ class SingleAdcJoypadLedDeviceTest {
         val device =
             SingleAdcJoypadLedDevice(
                 SingleAdcJoypadDescriptor(base),
-                FakeJoypadAccess(emptySet()),
+                FakeSysfsAccess(emptySet()),
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
             )
         assertFalse(device.available)
-    }
-}
-
-private class FakeJoypadAccess(
-    private val writable: Set<String>,
-    val values: MutableMap<String, String> = mutableMapOf(),
-) : SysfsAccess {
-    override fun read(path: String): String? = values[path]
-
-    override fun exists(path: String): Boolean = path in writable || path in values
-
-    override fun canWrite(path: String): Boolean = path in writable
-
-    override fun write(
-        path: String,
-        value: String,
-    ): Boolean {
-        if (path !in writable) return false
-        values[path] = value.trim()
-        return true
     }
 }

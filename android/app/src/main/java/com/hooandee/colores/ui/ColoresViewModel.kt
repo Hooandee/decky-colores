@@ -86,13 +86,14 @@ data class ColoresUiState(
     val currentEffect: EffectPreset?
         get() = effects.firstOrNull { it.id == effectId }
 
+    val effectNeedsGradient: Boolean
+        get() = mode == AppMode.EFFECT && currentEffect?.need == EffectNeed.GRADIENT
+
     val gradientEditable: Boolean
-        get() = gradientAvailable || (mode == AppMode.EFFECT && currentEffect?.need == EffectNeed.GRADIENT)
+        get() = gradientAvailable || effectNeedsGradient
 
     val editingGradientStops: Boolean
-        get() =
-            (gradient.mode == LightingMode.GRADIENT && gradientAvailable) ||
-                (mode == AppMode.EFFECT && currentEffect?.need == EffectNeed.GRADIENT)
+        get() = (gradient.mode == LightingMode.GRADIENT && gradientAvailable) || effectNeedsGradient
 
     val editingColor: RgbColor
         get() =
@@ -556,11 +557,7 @@ private fun AppMode.coerceAvailable(gradientSupported: Boolean): AppMode =
     if (this == AppMode.GRADIENT && !gradientSupported) AppMode.COLOR else this
 
 private fun ColoresUiState.gradientStopCount(): Int =
-    if (mode == AppMode.EFFECT && currentEffect?.need == EffectNeed.GRADIENT) {
-        2
-    } else {
-        detected?.capabilities?.zones ?: 2
-    }
+    if (effectNeedsGradient) 2 else (detected?.capabilities?.zones ?: 2)
 
 private fun android.content.Context.readAsset(name: String): String =
     assets.open(name).bufferedReader().use { it.readText() }

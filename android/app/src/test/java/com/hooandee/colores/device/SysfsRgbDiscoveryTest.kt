@@ -1,5 +1,6 @@
 package com.hooandee.colores.device
 
+import com.hooandee.colores.led.FakeSysfsAccess
 import com.hooandee.colores.led.SysfsAccess
 import com.hooandee.colores.led.SysfsColorKind
 import org.junit.Assert.assertEquals
@@ -100,17 +101,5 @@ class SysfsRgbDiscoveryTest {
     private fun fakeAccess(
         files: Map<String, String>,
         writable: Set<String>,
-    ): SysfsAccess =
-        object : SysfsAccess {
-            override fun read(path: String): String? = files[path]
-
-            override fun exists(path: String): Boolean = path in files || path in writable
-
-            override fun canWrite(path: String): Boolean = path in writable
-
-            override fun write(
-                path: String,
-                value: String,
-            ): Boolean = path in writable
-        }
+    ): SysfsAccess = FakeSysfsAccess(writable, files.toMutableMap())
 }

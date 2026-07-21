@@ -19,8 +19,7 @@ enum class ControlAccess {
         ): ControlAccess =
             when {
                 !deviceAvailable -> SERVICE_UNAVAILABLE
-                descriptor is SysfsRgbDescriptor -> ENABLED
-                descriptor is SingleAdcJoypadDescriptor -> ENABLED
+                descriptor is SysfsRgbDescriptor || descriptor is SingleAdcJoypadDescriptor -> ENABLED
                 descriptor is SettingsProviderDescriptor && descriptor.transport == "pserver" -> ENABLED
                 descriptor is SettingsProviderDescriptor &&
                     (descriptor.requiresPermission == null || userPermissionGranted) -> ENABLED

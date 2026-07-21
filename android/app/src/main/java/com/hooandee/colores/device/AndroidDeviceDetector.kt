@@ -50,11 +50,12 @@ class AndroidDeviceDetector(
             runCatching { readIdentity() }.getOrElse {
                 AndroidDeviceIdentity(model = "", device = "", manufacturer = "", productProperties = emptyMap())
             }
+        val pserver = runCatching { pserverAvailable() }.getOrDefault(false)
         return modelMatch(identity)
             ?: GenericLedResolver.vendor(
                 identity,
-                pserverAvailable = runCatching { pserverAvailable() }.getOrDefault(false),
-                colorKeyValue = runCatching { readSetting(GenericVendorLed.COLOR_KEY) }.getOrNull(),
+                pserverAvailable = pserver,
+                colorKeyValue = if (pserver) runCatching { readSetting(GenericVendorLed.COLOR_KEY) }.getOrNull() else null,
             )
             ?: GenericLedResolver.joypad(identity, runCatching { scanJoypad() }.getOrNull())
             ?: GenericLedResolver.sysfs(identity, runCatching { scanSysfs() }.getOrNull())

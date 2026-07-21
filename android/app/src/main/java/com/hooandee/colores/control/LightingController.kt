@@ -11,6 +11,7 @@ import com.hooandee.colores.engine.PerformanceRenderer
 import com.hooandee.colores.engine.Renderer
 import com.hooandee.colores.engine.StatusTargets
 import com.hooandee.colores.gradient.GradientInterpolator
+import com.hooandee.colores.led.HardwareEffect
 import com.hooandee.colores.led.LedDevice
 import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.sensor.BatterySource
@@ -220,11 +221,7 @@ class LightingController(
     private suspend fun onReassert() {
         val binding = binding ?: return
         runCatching { binding.device.invalidate() }
-        val hwEffect = hardwareEffect(binding)
-        when {
-            hwEffect != null -> applyHardwareEffect(binding, hwEffect)
-            !intent.mode.isDynamic -> applyStatic()
-        }
+        applyCurrent(binding, manageRenderJob = false)
     }
 
     private suspend fun onReading(command: Command.WatchReading) {
@@ -234,12 +231,7 @@ class LightingController(
         batteryPresent = command.present
         temperatureCelsius = command.temperatureCelsius
         if (effectivePower() != previousEffective) {
-            val binding = binding
-            val hwEffect = binding?.let { hardwareEffect(it) }
-            when {
-                hwEffect != null -> applyHardwareEffect(binding, hwEffect)
-                !intent.mode.isDynamic -> applyStatic()
-            }
+            binding?.let { applyCurrent(it, manageRenderJob = false) }
         }
         publishSnapshot()
     }
@@ -251,9 +243,9 @@ class LightingController(
 
     private fun effectivePower(): Boolean = intent.power && (!intent.chargerOnly || charging)
 
-    private fun hardwareEffect(binding: LightingBinding): String? =
+    private fun hardwareEffect(binding: LightingBinding): HardwareEffect? =
         if (intent.mode == AppMode.EFFECT) {
-            binding.device.hardwareEffects.firstOrNull { it.id == intent.effectId }?.id
+            binding.device.hardwareEffects.firstOrNull { it.id == intent.effectId }
         } else {
             null
         }
@@ -261,35 +253,38 @@ class LightingController(
     private suspend fun reconcile() {
         val binding = binding ?: run { publishSnapshot(); return }
         updateService()
+        applyCurrent(binding, manageRenderJob = true)
+        publishSnapshot()
+    }
+
+    private suspend fun applyCurrent(
+        binding: LightingBinding,
+        manageRenderJob: Boolean,
+    ) {
         val hwEffect = hardwareEffect(binding)
         when {
             hwEffect != null -> {
-                stopRenderJob()
+                if (manageRenderJob) stopRenderJob()
                 applyHardwareEffect(binding, hwEffect)
             }
-            intent.mode.isDynamic -> ensureRenderJob(binding)
+            intent.mode.isDynamic -> if (manageRenderJob) ensureRenderJob(binding)
             else -> {
-                stopRenderJob()
+                if (manageRenderJob) stopRenderJob()
                 applyStatic()
             }
         }
-        publishSnapshot()
     }
 
     private suspend fun applyHardwareEffect(
         binding: LightingBinding,
-        effectId: String,
+        effect: HardwareEffect,
     ) {
         val effective = effectivePower()
-        val stops = binding.device.hardwareEffects.firstOrNull { it.id == effectId }?.colorStops ?: 1
         val palette = intent.gradientStops.ifEmpty { listOf(intent.solidColor) }
         val colors =
-            when {
-                stops >= 2 -> listOf(palette.first(), palette.last())
-                else -> listOf(intent.solidColor)
-            }
+            if (effect.colorStops >= 2) listOf(palette.first(), palette.last()) else listOf(intent.solidColor)
         runCatching {
-            binding.device.applyHardwareEffect(effectId, colors, intent.brightness, intent.speed, effective)
+            binding.device.applyHardwareEffect(effect.id, colors, intent.brightness, intent.speed, effective)
         }.rethrowCancellation()
         lastFrame = if (effective) List(binding.zones) { colors.first() } else List(binding.zones) { RgbColor(0, 0, 0) }
         publishSnapshot()

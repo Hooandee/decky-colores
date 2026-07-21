@@ -56,3 +56,8 @@ interface LedDevice {
 
     fun invalidate()
 }
+
+internal fun List<RgbColor>.fitZones(zones: Int): List<RgbColor> {
+    val fallback = firstOrNull() ?: RgbColor(255, 255, 255)
+    return List(zones.coerceAtLeast(1)) { getOrNull(it) ?: fallback }
+}
