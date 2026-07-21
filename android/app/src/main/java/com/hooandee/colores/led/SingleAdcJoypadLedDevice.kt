@@ -110,18 +110,19 @@ class SingleAdcJoypadLedDevice internal constructor(
             put("led_set", 1)
             return succeeded
         }
-        val c = frame.color
-        put("custum_rgb_r", c.red.coerceIn(0, 255))
-        put("custum_rgb_g", c.green.coerceIn(0, 255))
-        put("custum_rgb_b", c.blue.coerceIn(0, 255))
-        val zone1 = if (frame.colored) c else RgbColor(0, 0, 0)
-        val zone2 = if (frame.colored) frame.secondColor else RgbColor(0, 0, 0)
-        put("Led_rgb_r1", zone1.red.coerceIn(0, 255))
-        put("Led_rgb_g1", zone1.green.coerceIn(0, 255))
-        put("Led_rgb_b1", zone1.blue.coerceIn(0, 255))
-        put("Led_rgb_r2", zone2.red.coerceIn(0, 255))
-        put("Led_rgb_g2", zone2.green.coerceIn(0, 255))
-        put("Led_rgb_b2", zone2.blue.coerceIn(0, 255))
+        val main = frame.color
+        val follow = if (frame.colored) frame.secondColor else main
+        put("custum_rgb_r", main.red.coerceIn(0, 255))
+        put("custum_rgb_g", main.green.coerceIn(0, 255))
+        put("custum_rgb_b", main.blue.coerceIn(0, 255))
+        val slotMain = if (frame.colored) main else RgbColor(0, 0, 0)
+        val slotFollow = if (frame.colored) follow else RgbColor(0, 0, 0)
+        put("Led_rgb_r2", slotMain.red.coerceIn(0, 255))
+        put("Led_rgb_g2", slotMain.green.coerceIn(0, 255))
+        put("Led_rgb_b2", slotMain.blue.coerceIn(0, 255))
+        put("Led_rgb_r1", slotFollow.red.coerceIn(0, 255))
+        put("Led_rgb_g1", slotFollow.green.coerceIn(0, 255))
+        put("Led_rgb_b1", slotFollow.blue.coerceIn(0, 255))
         put("led_level", frame.brightness)
         put("led_speed", frame.speed)
         put("led_mode", frame.ledMode)

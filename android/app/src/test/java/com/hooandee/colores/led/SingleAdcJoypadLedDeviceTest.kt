@@ -71,10 +71,11 @@ class SingleAdcJoypadLedDeviceTest {
 
             assertEquals("2", access.values["$base/led_mode"])
             assertEquals("8", access.values["$base/led_speed"])
-            assertEquals("10", access.values["$base/Led_rgb_r1"])
-            assertEquals("20", access.values["$base/Led_rgb_g1"])
-            assertEquals("40", access.values["$base/Led_rgb_r2"])
-            assertEquals("60", access.values["$base/Led_rgb_b2"])
+            assertEquals("10", access.values["$base/custum_rgb_r"])
+            assertEquals("10", access.values["$base/Led_rgb_r2"])
+            assertEquals("30", access.values["$base/Led_rgb_b2"])
+            assertEquals("40", access.values["$base/Led_rgb_r1"])
+            assertEquals("60", access.values["$base/Led_rgb_b1"])
             assertEquals("1", access.values["$base/led_set"])
         }
 
