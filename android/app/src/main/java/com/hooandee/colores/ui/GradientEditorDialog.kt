@@ -49,8 +49,11 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.hooandee.colores.R
@@ -277,7 +280,6 @@ private fun GradientColorPane(
         gradientEditorZones(state.detected?.id, state.gradient.stops.size)
             .getOrNull(state.gradient.selectedStopIndex)
     val color = state.editingColor
-    val shownColor = state.ledColorProjection.display(color)
     val saturation = color.toHsvColor().saturation
     Surface(
         modifier = modifier,
@@ -332,37 +334,17 @@ private fun GradientColorPane(
                     }
                 }
             }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.gradient_editor_selected_zone),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    Text(
-                        text = selectedZone?.let { zoneLongLabel(it) }.orEmpty(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = color.toHexString(),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Surface(
-                        modifier = Modifier.size(34.dp),
-                        color = shownColor.toComposeColor(),
-                        shape = RoundedCornerShape(10.dp),
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
-                    ) {}
-                }
+            Column {
+                Text(
+                    text = stringResource(R.string.gradient_editor_selected_zone),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelMedium,
+                )
+                Text(
+                    text = selectedZone?.let { zoneLongLabel(it) }.orEmpty(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
             Box(
                 modifier = Modifier.fillMaxWidth().height(236.dp),
@@ -376,6 +358,15 @@ private fun GradientColorPane(
                     onColorChange = actions.onColorChange,
                 )
             }
+            Text(
+                text = color.toHexString(),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 1.sp,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f),
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
