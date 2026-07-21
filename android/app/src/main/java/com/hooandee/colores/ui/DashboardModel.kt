@@ -14,11 +14,22 @@ enum class EditTarget {
 val LedState.hasMixedColors: Boolean
     get() = zoneColors.distinct().size > 1
 
+fun LedState.previewEndpointColors(gradientMode: Boolean): Pair<RgbColor, RgbColor> {
+    val first = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255)
+    val second =
+        if (gradientMode) {
+            zoneColors.lastOrNull() ?: first
+        } else {
+            zoneColors.getOrElse(zoneColors.stickSplitIndex()) { first }
+        }
+    return first to second
+}
+
 fun LedState.colorForEditing(target: EditTarget): RgbColor {
     val first = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255)
     return when (target) {
         EditTarget.BOTH, EditTarget.LEFT -> first
-        EditTarget.RIGHT -> zoneColors.getOrElse(1) { first }
+        EditTarget.RIGHT -> zoneColors.getOrElse(zoneColors.stickSplitIndex()) { first }
     }
 }
 
@@ -27,14 +38,21 @@ fun LedState.withTargetColor(
     color: RgbColor,
 ): LedState {
     val zones = zoneColors.ifEmpty { listOf(RgbColor(93, 81, 255), RgbColor(93, 81, 255)) }
+    val splitIndex = zones.stickSplitIndex()
     val changed =
         when (target) {
             EditTarget.BOTH -> List(zones.size) { color }
-            EditTarget.LEFT -> zones.mapIndexed { index, current -> if (index == 0) color else current }
-            EditTarget.RIGHT -> zones.mapIndexed { index, current -> if (index == 1) color else current }
+            EditTarget.LEFT -> zones.mapIndexed { index, current -> if (index < splitIndex) color else current }
+            EditTarget.RIGHT -> zones.mapIndexed { index, current -> if (index >= splitIndex) color else current }
         }
     return copy(zoneColors = changed)
 }
+
+private fun List<RgbColor>.stickSplitIndex(): Int =
+    when {
+        size <= 1 -> 1
+        else -> (size + 1) / 2
+    }
 
 fun LedState.withTargetSaturation(
     target: EditTarget,

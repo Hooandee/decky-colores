@@ -34,28 +34,38 @@
     },
     {
       "id": "gradient",
-      "contracts": ["golden/gradient.json"],
-      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+      "contracts": ["gradients.json", "golden/gradient.json"],
+      "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
     },
     {
       "id": "software_effects",
       "contracts": ["effects.json", "golden/effect-frame.json"],
-      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+      "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }
     },
     {
       "id": "battery_mode",
       "contracts": ["bands.json"],
-      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+      "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }
     },
     {
       "id": "temperature_mode",
       "contracts": ["bands.json"],
-      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+      "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }
+    },
+    {
+      "id": "performance_mode",
+      "contracts": ["golden/meter.json"],
+      "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }
+    },
+    {
+      "id": "clock_mode",
+      "contracts": ["golden/clock.json"],
+      "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }
     },
     {
       "id": "charger_only",
       "contracts": [],
-      "platforms": { "decky": "validated", "android": "planned", "windows": "deferred" }
+      "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }
     },
     {
       "id": "ambilight",

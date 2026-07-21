@@ -1,0 +1,72 @@
+[
+  {
+    "id": "night-midnight",
+    "operation": "clock_color",
+    "input": {
+      "hour": 0.0
+    },
+    "expected": {
+      "color": {
+        "r": 12,
+        "g": 22,
+        "b": 64
+      }
+    }
+  },
+  {
+    "id": "dawn-0600",
+    "operation": "clock_color",
+    "input": {
+      "hour": 6.0
+    },
+    "expected": {
+      "color": {
+        "r": 255,
+        "g": 120,
+        "b": 40
+      }
+    }
+  },
+  {
+    "id": "noon-1200",
+    "operation": "clock_color",
+    "input": {
+      "hour": 12.0
+    },
+    "expected": {
+      "color": {
+        "r": 221,
+        "g": 231,
+        "b": 240
+      }
+    }
+  },
+  {
+    "id": "noon-half-1230",
+    "operation": "clock_color",
+    "input": {
+      "hour": 12.5
+    },
+    "expected": {
+      "color": {
+        "r": 230,
+        "g": 235,
+        "b": 238
+      }
+    }
+  },
+  {
+    "id": "dusk-1800",
+    "operation": "clock_color",
+    "input": {
+      "hour": 18.0
+    },
+    "expected": {
+      "color": {
+        "r": 255,
+        "g": 105,
+        "b": 40
+      }
+    }
+  }
+]

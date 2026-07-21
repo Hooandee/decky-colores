@@ -44,6 +44,8 @@ fun DashboardScreen(
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
     onLedPreviewChange: (Boolean) -> Unit,
+    gradientActions: GradientActions,
+    modeActions: ModeActions,
 ) {
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -101,6 +103,8 @@ fun DashboardScreen(
                         onSaturationChange = onSaturationChange,
                         onBrightnessChange = onBrightnessChange,
                         onLedPreviewChange = onLedPreviewChange,
+                        gradientActions = gradientActions,
+                        modeActions = modeActions,
                         modifier = Modifier.weight(1f),
                     )
             }
@@ -195,68 +199,137 @@ private fun DashboardBody(
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
     onLedPreviewChange: (Boolean) -> Unit,
+    gradientActions: GradientActions,
+    modeActions: ModeActions,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        ModeNav(
+            modes = state.availableModes(),
+            selected = state.mode,
+            enabled = state.canWrite,
+            onModeChange = modeActions.onModeChange,
+        )
+        ChargerOnlyRow(
+            chargerOnly = state.chargerOnly,
+            enabled = state.canWrite,
+            onChange = modeActions.onChargerOnlyChange,
+        )
+        DashboardModeLayout(
+            state = state,
+            perZone = perZone,
+            colorEnabled = colorEnabled,
+            brightnessEnabled = brightnessEnabled,
+            onTargetChange = onTargetChange,
+            onColorChange = onColorChange,
+            onSaturationChange = onSaturationChange,
+            onBrightnessChange = onBrightnessChange,
+            onLedPreviewChange = onLedPreviewChange,
+            gradientActions = gradientActions,
+            modeActions = modeActions,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun DashboardModeLayout(
+    state: ColoresUiState,
+    perZone: Boolean,
+    colorEnabled: Boolean,
+    brightnessEnabled: Boolean,
+    onTargetChange: (EditTarget) -> Unit,
+    onColorChange: (RgbColor) -> Unit,
+    onSaturationChange: (Float) -> Unit,
+    onBrightnessChange: (Int) -> Unit,
+    onLedPreviewChange: (Boolean) -> Unit,
+    gradientActions: GradientActions,
+    modeActions: ModeActions,
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val left = state.ledState.zoneColors.firstOrNull() ?: state.editingColor
-        val right = state.ledState.zoneColors.getOrElse(1) { left }
+        val dynamic = state.mode.isDynamic
+        val gradientMode = state.mode == com.hooandee.colores.control.AppMode.GRADIENT
+        val (left, right) =
+            if (dynamic) {
+                val frame = state.currentFrame
+                val first = frame.firstOrNull() ?: RgbColor(30, 30, 36)
+                first to (frame.lastOrNull() ?: first)
+            } else {
+                state.ledState.previewEndpointColors(gradientMode)
+            }
+        val sceneTarget =
+            if (gradientMode) {
+                when (state.gradient.selectedStopIndex) {
+                    0 -> EditTarget.LEFT
+                    state.gradient.stops.lastIndex -> EditTarget.RIGHT
+                    else -> EditTarget.BOTH
+                }
+            } else {
+                state.editTarget
+            }
+        val sceneTargetChange: (EditTarget) -> Unit = { target ->
+            if (gradientMode) {
+                when (target) {
+                    EditTarget.LEFT -> gradientActions.onStopChange(0)
+                    EditTarget.RIGHT -> gradientActions.onStopChange(state.gradient.stops.lastIndex)
+                    EditTarget.BOTH -> Unit
+                }
+            } else {
+                onTargetChange(target)
+            }
+        }
+        val sceneEnabled = state.canWrite && colorEnabled && !dynamic
+
+        @Composable
+        fun Scene(sceneModifier: Modifier) {
+            DeviceScene(
+                leftColor = left,
+                rightColor = right,
+                selectedTarget = sceneTarget,
+                power = state.effectivePower,
+                enabled = sceneEnabled,
+                perZone = perZone && !dynamic,
+                projection = state.ledColorProjection,
+                onLedPreviewChange = onLedPreviewChange,
+                onTargetChange = sceneTargetChange,
+                showBoth = !gradientMode && !dynamic,
+                modifier = sceneModifier,
+            )
+        }
+
+        @Composable
+        fun Panel(panelModifier: Modifier) {
+            ModeControlPanel(
+                state = state,
+                perZone = perZone,
+                colorEnabled = colorEnabled,
+                brightnessEnabled = brightnessEnabled,
+                onTargetChange = onTargetChange,
+                onColorChange = onColorChange,
+                onSaturationChange = onSaturationChange,
+                onBrightnessChange = onBrightnessChange,
+                gradientActions = gradientActions,
+                modeActions = modeActions,
+                modifier = panelModifier,
+            )
+        }
+
         if (maxWidth >= 760.dp) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                DeviceScene(
-                    leftColor = left,
-                    rightColor = right,
-                    selectedTarget = state.editTarget,
-                    power = state.ledState.power,
-                    enabled = state.canWrite && colorEnabled,
-                    perZone = perZone,
-                    projection = state.ledColorProjection,
-                    onLedPreviewChange = onLedPreviewChange,
-                    onTargetChange = onTargetChange,
-                    modifier = Modifier.weight(0.88f).fillMaxHeight(),
-                )
-                ColorControlPanel(
-                    state = state,
-                    perZone = perZone,
-                    colorEnabled = colorEnabled,
-                    brightnessEnabled = brightnessEnabled,
-                    onTargetChange = onTargetChange,
-                    onColorChange = onColorChange,
-                    onSaturationChange = onSaturationChange,
-                    onBrightnessChange = onBrightnessChange,
-                    modifier = Modifier.weight(1.12f).fillMaxHeight(),
-                )
+            Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Scene(Modifier.weight(0.88f).fillMaxHeight())
+                Panel(Modifier.weight(1.12f).fillMaxHeight())
             }
         } else {
             Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                DeviceScene(
-                    leftColor = left,
-                    rightColor = right,
-                    selectedTarget = state.editTarget,
-                    power = state.ledState.power,
-                    enabled = state.canWrite && colorEnabled,
-                    perZone = perZone,
-                    projection = state.ledColorProjection,
-                    onLedPreviewChange = onLedPreviewChange,
-                    onTargetChange = onTargetChange,
-                    modifier = Modifier.fillMaxWidth().height(380.dp),
-                )
-                ColorControlPanel(
-                    state = state,
-                    perZone = perZone,
-                    colorEnabled = colorEnabled,
-                    brightnessEnabled = brightnessEnabled,
-                    onTargetChange = onTargetChange,
-                    onColorChange = onColorChange,
-                    onSaturationChange = onSaturationChange,
-                    onBrightnessChange = onBrightnessChange,
-                    modifier = Modifier.fillMaxWidth().height(430.dp),
-                )
+                Scene(Modifier.fillMaxWidth().height(360.dp))
+                Panel(Modifier.fillMaxWidth().height(440.dp))
             }
         }
     }

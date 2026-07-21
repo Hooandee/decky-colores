@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
+import com.hooandee.colores.gradient.LightingMode
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.roundToInt
 
@@ -61,6 +62,7 @@ fun ColorControlPanel(
     onColorChange: (RgbColor) -> Unit,
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
+    gradientActions: GradientActions,
     modifier: Modifier = Modifier,
 ) {
     val projection = state.ledColorProjection
@@ -82,53 +84,57 @@ fun ColorControlPanel(
                         .padding(horizontal = 18.dp, vertical = 14.dp),
             ) {
                 if (colorEnabled) {
-                    TargetSelector(
-                        target = state.editTarget,
-                        perZone = perZone,
-                        enabled = state.canWrite,
-                        onTargetChange = onTargetChange,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(colorAreaHeight),
-                        horizontalArrangement = Arrangement.spacedBy(20.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(
-                            modifier = Modifier.weight(0.9f).fillMaxHeight(),
-                            contentAlignment = Alignment.Center,
+                    if (state.gradient.mode == LightingMode.GRADIENT) {
+                        GradientControls(state = state, actions = gradientActions)
+                    } else {
+                        TargetSelector(
+                            target = state.editTarget,
+                            perZone = perZone,
+                            enabled = state.canWrite,
+                            onTargetChange = onTargetChange,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().height(colorAreaHeight),
+                            horizontalArrangement = Arrangement.spacedBy(20.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            HsvColorWheel(
-                                color = state.editingColor,
-                                enabled = state.canWrite,
-                                projection = projection,
-                                contentDescription = stringResource(R.string.color_wheel_description),
-                                onColorChange = onColorChange,
-                            )
+                            Box(
+                                modifier = Modifier.weight(0.9f).fillMaxHeight(),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                RingColorPicker(
+                                    color = state.editingColor,
+                                    enabled = state.canWrite,
+                                    projection = projection,
+                                    contentDescription = stringResource(R.string.color_wheel_description),
+                                    onColorChange = onColorChange,
+                                )
+                            }
+                            Column(
+                                modifier = Modifier.weight(1.1f),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                CurrentColor(state, projection)
+                                LabeledSlider(
+                                    label = stringResource(R.string.saturation_title),
+                                    valueLabel = "${(editingHsv.saturation * 100f).roundToInt()}%",
+                                    value = editingHsv.saturation,
+                                    onValueChange = onSaturationChange,
+                                    valueRange = 0f..1f,
+                                    enabled = state.canWrite,
+                                )
+                            }
                         }
-                        Column(
-                            modifier = Modifier.weight(1.1f),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            CurrentColor(state, projection)
-                            LabeledSlider(
-                                label = stringResource(R.string.saturation_title),
-                                valueLabel = "${(editingHsv.saturation * 100f).roundToInt()}%",
-                                value = editingHsv.saturation,
-                                onValueChange = onSaturationChange,
-                                valueRange = 0f..1f,
-                                enabled = state.canWrite,
-                            )
-                        }
+                        Spacer(Modifier.height(4.dp))
+                        QuickColors(
+                            current = state.editingColor,
+                            mixed = state.mixedTarget,
+                            enabled = state.canWrite,
+                            projection = projection,
+                            onColorChange = onColorChange,
+                        )
                     }
-                    Spacer(Modifier.height(4.dp))
-                    QuickColors(
-                        current = state.editingColor,
-                        mixed = state.mixedTarget,
-                        enabled = state.canWrite,
-                        projection = projection,
-                        onColorChange = onColorChange,
-                    )
                 }
                 if (brightnessEnabled) {
                     if (colorEnabled) Spacer(Modifier.height(4.dp))

@@ -21,6 +21,16 @@ data class SettingsProviderDescriptor(
     val zones: Int,
     val requiresPermission: String?,
     val vendorService: String,
+    val htr3212: Htr3212Descriptor? = null,
+)
+
+data class Htr3212Descriptor(
+    val leftBus: Int,
+    val rightBus: Int,
+    val address: Int,
+    val leftOrder: List<Int>,
+    val rightOrder: List<Int>,
+    val rgbStartRegister: Int = 0x01,
 )
 
 class SettingsProviderLedDevice internal constructor(

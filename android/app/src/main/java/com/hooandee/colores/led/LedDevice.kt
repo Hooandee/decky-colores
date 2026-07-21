@@ -16,6 +16,9 @@ interface LedDevice {
     val available: Boolean
     val supportsPerZone: Boolean
 
+    val recommendedFrameIntervalMs: Long
+        get() = 80L
+
     suspend fun readState(): LedState
 
     suspend fun applyZones(

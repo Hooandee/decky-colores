@@ -21,6 +21,8 @@ class PlatformSupportContractTest {
             "software_effects",
             "battery_mode",
             "temperature_mode",
+            "performance_mode",
+            "clock_mode",
             "charger_only",
             "ambilight",
             "audio_vu",
@@ -56,6 +58,20 @@ class PlatformSupportContractTest {
             }
         }
         assertEquals(requiredFeatures, ids)
+    }
+
+    @Test
+    fun `gradient declares presets and golden vector as shared contracts`() {
+        val features = JSONObject(shared.resolve("platform-support.json").readText()).getJSONArray("features")
+        val gradient =
+            (0 until features.length())
+                .map(features::getJSONObject)
+                .single { it.getString("id") == "gradient" }
+
+        assertEquals(
+            listOf("gradients.json", "golden/gradient.json"),
+            gradient.getJSONArray("contracts").strings(),
+        )
     }
 }
 

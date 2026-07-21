@@ -23,6 +23,8 @@ La raíz es una lista de dispositivos. Cada entrada requiere:
 
 El bloque `android` puede declarar listas `model`, `device` y un objeto `led`. Para `settings_provider`, `led` requiere `driver`, `transport`, `colorKey`, `colorFormat`, `brightnessKey`, `brightnessRange`, `enableKeys`, `zones`, `requiresPermission` y `vendorService`. `transport` admite `direct` y `pserver`; `requiresPermission` es `null` cuando el transporte no necesita una concesión del usuario. `colorFormat` admite actualmente `argb_hex_csv`. No se debe inferir sysfs cuando no aparezca en el descriptor.
 
+El driver `htr3212` conserva esos campos para el estado oficial de brillo, encendido y color de respaldo, y añade un bloque `htr3212` con `leftBus`, `rightBus`, `address`, `leftOrder` y `rightOrder`. Las listas de orden traducen cada zona lógica del joystick, en orden arriba/izquierda/abajo/derecha, al grupo físico `0..3` del controlador. Deben ser permutaciones completas y calibradas en el dispositivo real.
+
 Una entrada puede declarar `previewProfile` para aproximar en la interfaz la apariencia de sus LEDs físicos. Si la referencia falta o no se resuelve, la plataforma muestra el RGB exacto y no ofrece la vista calibrada.
 
 ## `led-preview-profiles.json`
@@ -38,6 +40,12 @@ Registra las funciones del producto, los contratos compartidos que consumen y su
 Los estados permitidos son `validated`, probado de extremo a extremo; `implemented`, terminado pero pendiente de validación final; `planned`, aprobado para una fase próxima; `deferred`, posible trabajo futuro sin compromiso actual; y `unsupported`, no disponible deliberadamente. El estado sigue condicionado por las capacidades y dispositivos validados de cada plataforma: `validated` no significa que todo el hardware soporte esa función.
 
 Una modificación de comportamiento común actualiza el contrato o golden vector y cada plataforma consumidora. Un cambio de transporte, permisos, ciclo de vida o UI se implementa únicamente en el runtime nativo afectado. Un fichero de `shared/` nunca sustituye esa implementación.
+
+## `gradients.json`
+
+La raíz requiere `schemaVersion` y una lista `presets`. Cada preset contiene un `id` estable en minúsculas y una lista no vacía `colors` de colores RGB. El contrato no contiene nombres visibles: cada plataforma localiza los identificadores en su propia interfaz.
+
+El orden de `colors` define las paradas del gradiente. Cada runtime interpola esas paradas al número real de zonas del dispositivo mediante `golden/gradient.json`.
 
 ## `bands.json`
 
@@ -56,10 +64,20 @@ La raíz es una lista de presets. Cada preset requiere:
 
 Las plataformas deben localizar las cadenas que muestran al usuario. Los valores de `id`, `needs`, `defaultSpeed` y `colors` forman parte del contrato compartido.
 
+Los ficheros de `golden/` son listas de vectores deterministas generados desde la implementación de referencia de Decky (`py_modules/effects.py`). Cada plataforma valida su motor contra los mismos vectores; así se bloquea la deriva entre Python y Kotlin. Ningún vector depende del reloj ni del hardware.
+
 ## `golden/gradient.json`
 
-Un vector de gradiente requiere `id`, `operation: "interpolate_gradient"`, `input.stops`, `input.zones` y `expected.colors`. La salida contiene exactamente un color por zona y usa redondeo al entero más cercano igual que el backend actual.
+Lista de vectores. Cada vector requiere `id`, `operation: "interpolate_gradient"`, `input.stops`, `input.zones` y `expected.colors`. La salida contiene exactamente un color por zona y usa redondeo al entero más cercano con desempate al par, igual que el backend.
 
 ## `golden/effect-frame.json`
 
-Un vector de frame requiere `id`, `operation: "effect_frame"`, `input.effectId`, `input.timeSeconds`, `input.speed`, `input.base` y `expected.colors`. `base` y `expected.colors` contienen un color por zona. El vector debe ser determinista y no depender del reloj ni de hardware.
+Lista de vectores. Cada vector requiere `id`, `operation: "effect_frame"`, `input.effectId`, `input.timeSeconds`, `input.speed`, `input.zones` y `expected.colors`. Según el efecto, el input añade `base` (paleta por zona para efectos que necesitan color) o `stops` (paradas del gradiente para `wave` y `spiral`). Los efectos que no necesitan color no llevan ninguno de los dos.
+
+## `golden/clock.json`
+
+Lista de vectores. Cada vector requiere `id`, `operation: "clock_color"`, `input.hour` (hora local en 0..24 con la fracción de minutos) y `expected.color`. Interpola linealmente los puntos horarios del reloj.
+
+## `golden/meter.json`
+
+Lista de vectores. Cada vector requiere `id`, `operation: "performance_meter"`, `input.value` (0..1), `input.zones` y `expected.colors`. Reproduce la barra de nivel verde a rojo del modo rendimiento.

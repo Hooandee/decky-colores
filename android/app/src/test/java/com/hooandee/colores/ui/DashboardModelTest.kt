@@ -90,4 +90,39 @@ class DashboardModelTest {
     fun `hex color is uppercase and channel padded`() {
         assertEquals("#01020F", RgbColor(1, 2, 15).toHexString())
     }
+
+    @Test
+    fun `gradient preview uses first and last colors on devices with many zones`() {
+        val colors = listOf(red, green, RgbColor(255, 255, 0), blue)
+
+        assertEquals(red to blue, LedState(colors, 100, true).previewEndpointColors(gradientMode = true))
+        assertEquals(red to RgbColor(255, 255, 0), LedState(colors, 100, true).previewEndpointColors(gradientMode = false))
+    }
+
+    @Test
+    fun `eight-zone solid preview uses the first zone of each stick`() {
+        val colors = List(4) { red } + List(4) { blue }
+
+        assertEquals(red to blue, LedState(colors, 100, true).previewEndpointColors(gradientMode = false))
+    }
+
+    @Test
+    fun `eight-zone solid targets read and update whole physical sticks`() {
+        val state = LedState(List(4) { red } + List(4) { blue }, brightness = 80, power = true)
+
+        assertEquals(red, state.colorForEditing(EditTarget.LEFT))
+        assertEquals(blue, state.colorForEditing(EditTarget.RIGHT))
+        assertEquals(List(4) { green } + List(4) { blue }, state.withTargetColor(EditTarget.LEFT, green).zoneColors)
+        assertEquals(List(4) { red } + List(4) { green }, state.withTargetColor(EditTarget.RIGHT, green).zoneColors)
+    }
+
+    @Test
+    fun `eight-zone right saturation preserves every left-stick zone`() {
+        val state = LedState(List(4) { red } + List(4) { blue }, brightness = 80, power = true)
+
+        val changed = state.withTargetSaturation(EditTarget.RIGHT, 0.4f)
+
+        assertEquals(List(4) { red }, changed.zoneColors.take(4))
+        assertTrue(changed.zoneColors.drop(4).all { kotlin.math.abs(it.toHsvColor().saturation - 0.4f) < 0.02f })
+    }
 }
