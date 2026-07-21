@@ -1,6 +1,7 @@
 package com.hooandee.colores.device
 
 import com.hooandee.colores.led.SettingsProviderDescriptor
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsColorKind
 import com.hooandee.colores.led.SysfsRgbDescriptor
 import org.junit.Assert.assertEquals
@@ -65,5 +66,21 @@ class GenericLedResolverTest {
     @Test
     fun `null sysfs descriptor yields no device`() {
         assertNull(GenericLedResolver.sysfs(identity, null))
+    }
+
+    @Test
+    fun `joypad route builds a single zone device`() {
+        val detected = requireNotNull(GenericLedResolver.joypad(identity, SingleAdcJoypadDescriptor("/n")))
+
+        assertEquals("generic-joypad", detected.id)
+        assertEquals(1, detected.capabilities.zones)
+        assertEquals(false, detected.capabilities.perZone)
+        assertTrue(detected.capabilities.color)
+        assertTrue(detected.led is SingleAdcJoypadDescriptor)
+    }
+
+    @Test
+    fun `null joypad descriptor yields no device`() {
+        assertNull(GenericLedResolver.joypad(identity, null))
     }
 }

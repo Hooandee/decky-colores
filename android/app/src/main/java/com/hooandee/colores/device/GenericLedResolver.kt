@@ -1,10 +1,27 @@
 package com.hooandee.colores.device
 
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsRgbDescriptor
 
 internal object GenericLedResolver {
     const val VENDOR_ID = "generic-vendor"
     const val SYSFS_ID = "generic-sysfs"
+    const val JOYPAD_ID = "generic-joypad"
+
+    fun joypad(
+        identity: AndroidDeviceIdentity,
+        descriptor: SingleAdcJoypadDescriptor?,
+    ): DetectedAndroidDevice? {
+        if (descriptor == null) return null
+        return DetectedAndroidDevice(
+            id = JOYPAD_ID,
+            friendlyName = identity.friendlyName(),
+            capabilities = DeviceCapabilities(color = true, brightness = true, perZone = false, zones = 1),
+            led = descriptor,
+            previewProfileId = null,
+            previewCalibration = null,
+        )
+    }
 
     fun vendor(
         identity: AndroidDeviceIdentity,

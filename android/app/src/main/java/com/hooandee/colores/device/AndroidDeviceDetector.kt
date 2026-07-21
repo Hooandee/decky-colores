@@ -5,6 +5,7 @@ import android.os.Build
 import android.provider.Settings
 import com.hooandee.colores.led.AndroidPServerCommandExecutor
 import com.hooandee.colores.led.LedDescriptor
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsRgbDescriptor
 import java.util.concurrent.TimeUnit
 
@@ -29,6 +30,7 @@ class AndroidDeviceDetector(
     private val context: Context,
     private val pserverAvailable: () -> Boolean = { AndroidPServerCommandExecutor().available },
     private val readSetting: (String) -> String? = { key -> Settings.System.getString(context.contentResolver, key) },
+    private val scanJoypad: () -> SingleAdcJoypadDescriptor? = { SingleAdcJoypadDiscovery.scan() },
     private val scanSysfs: () -> SysfsRgbDescriptor? = { SysfsRgbDiscovery.scan() },
 ) {
     fun readIdentity(): AndroidDeviceIdentity {
@@ -54,6 +56,7 @@ class AndroidDeviceDetector(
                 pserverAvailable = runCatching { pserverAvailable() }.getOrDefault(false),
                 colorKeyValue = runCatching { readSetting(GenericVendorLed.COLOR_KEY) }.getOrNull(),
             )
+            ?: GenericLedResolver.joypad(identity, runCatching { scanJoypad() }.getOrNull())
             ?: GenericLedResolver.sysfs(identity, runCatching { scanSysfs() }.getOrNull())
     }
 

@@ -2,6 +2,7 @@ package com.hooandee.colores.ui
 
 import com.hooandee.colores.led.LedDescriptor
 import com.hooandee.colores.led.SettingsProviderDescriptor
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsRgbDescriptor
 
 enum class ControlAccess {
@@ -19,6 +20,7 @@ enum class ControlAccess {
             when {
                 !deviceAvailable -> SERVICE_UNAVAILABLE
                 descriptor is SysfsRgbDescriptor -> ENABLED
+                descriptor is SingleAdcJoypadDescriptor -> ENABLED
                 descriptor is SettingsProviderDescriptor && descriptor.transport == "pserver" -> ENABLED
                 descriptor is SettingsProviderDescriptor &&
                     (descriptor.requiresPermission == null || userPermissionGranted) -> ENABLED

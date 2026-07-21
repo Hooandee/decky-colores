@@ -17,5 +17,6 @@ internal object LedDeviceFactory {
                     else -> null
                 }
             is SysfsRgbDescriptor -> SysfsRgbDevice(descriptor, scope)
+            is SingleAdcJoypadDescriptor -> SingleAdcJoypadLedDevice(descriptor, scope)
         }
 }

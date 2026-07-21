@@ -1,12 +1,21 @@
 package com.hooandee.colores.ui
 
 import com.hooandee.colores.led.SettingsProviderDescriptor
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsColorKind
 import com.hooandee.colores.led.SysfsRgbDescriptor
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class ControlAccessTest {
+    @Test
+    fun `writable joypad enables controls without a permission`() {
+        assertEquals(
+            ControlAccess.ENABLED,
+            ControlAccess.resolve(SingleAdcJoypadDescriptor("/n"), deviceAvailable = true, userPermissionGranted = false),
+        )
+    }
+
     @Test
     fun `writable sysfs node enables controls without a permission`() {
         assertEquals(
