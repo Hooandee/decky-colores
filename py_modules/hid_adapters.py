@@ -85,9 +85,11 @@ ASUS_ALLY_IDS = {
     "usage": [0x0080],
 }
 
+# Match by VID + usage; PID varies across the OneXPlayer family, so leave it open
+# (one HID fallback covers every OXP model that exposes the XFLY RGB interface).
 OXP_IDS = {
     "vid": [0x1A2C],
-    "pid": [0xB001],
+    "pid": [],
     "usage_page": [0xFF01],
     "usage": [0x0001],
 }

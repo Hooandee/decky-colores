@@ -3,21 +3,7 @@
 
 CMD_ID = 0x07
 
-LEVEL_LOW = 0x01
-LEVEL_MEDIUM = 0x03
 LEVEL_HIGH = 0x04
-
-_MODE_BY_NAME = {
-    "aurora": 0x01,
-    "flowing": 0x03,
-    "neon": 0x05,
-    "dreamy": 0x07,
-    "sun": 0x08,
-    "cyberpunk": 0x09,
-    "sunset": 0x0B,
-    "colorful": 0x0C,
-    "monster_woke": 0x0D,
-}
 
 
 def _clamp8(v):
@@ -29,15 +15,6 @@ def buf(payload):
     return data + bytes(64 - len(data))
 
 
-def level_code(pct):
-    step = round(max(0, min(100, int(pct))) / 20)
-    if step <= 1:
-        return LEVEL_LOW
-    if step <= 3:
-        return LEVEL_MEDIUM
-    return LEVEL_HIGH
-
-
 def brightness_cmd(enabled, code):
     return buf([0xFD, 1 if enabled else 0, 0x05, code])
 
@@ -45,14 +22,6 @@ def brightness_cmd(enabled, code):
 def solid_cmd(r, g, b):
     triple = [_clamp8(r), _clamp8(g), _clamp8(b)]
     return buf([0xFE] + triple * 20 + [0x00])
-
-
-def mode_value(name):
-    return _MODE_BY_NAME.get(name, 0x01)
-
-
-def mode_cmd(code):
-    return buf([code])
 
 
 class OxpHidTransport:

@@ -42,7 +42,7 @@ class LedDevice:
 
     def invalidate(self):
         # Drop any cached "already in this mode" state so the next apply re-sends the
-        # full init/commit sequence. No-op for devices that always write in full (sysfs).
+        # full init/commit sequence. No-op for a plain sysfs device with no latch.
         return None
 
     def apply_zones(self, zone_colors, brightness, power):

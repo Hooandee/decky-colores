@@ -3,9 +3,6 @@ from py_modules.oxp_hid import (
     buf,
     brightness_cmd,
     solid_cmd,
-    mode_cmd,
-    level_code,
-    mode_value,
 )
 
 
@@ -41,21 +38,3 @@ def test_solid_cmd_clamps_channels():
     assert tuple(packet[3:6]) == (255, 0, 128)
 
 
-def test_level_code_quantization():
-    assert level_code(0) == 0x01
-    assert level_code(20) == 0x01
-    assert level_code(50) == 0x03
-    assert level_code(100) == 0x04
-
-
-def test_mode_value_mapping_defaults_to_aurora():
-    assert mode_value("aurora") == 0x01
-    assert mode_value("flowing") == 0x03
-    assert mode_value("neon") == 0x05
-    assert mode_value("unknown-effect") == 0x01
-
-
-def test_mode_cmd_bytes():
-    packet = mode_cmd(0x03)
-    assert packet[:3] == bytes([CMD_ID, 0xFF, 0x03])
-    assert len(packet) == 64
