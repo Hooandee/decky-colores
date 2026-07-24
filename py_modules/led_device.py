@@ -116,6 +116,62 @@ class SysfsRgbDevice(LedDevice):
             return False
 
 
+class OxpLedsDevice(SysfsRgbDevice):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._enabled_path = os.path.join(self._led_path, "enabled") if self._led_path else None
+        self._effect_path = os.path.join(self._led_path, "effect") if self._led_path else None
+        self._latched = False
+        self._last_level = None
+
+    def invalidate(self):
+        self._latched = False
+        self._last_level = None
+
+    def reconnect(self):
+        self.invalidate()
+        return self.available
+
+    @staticmethod
+    def _write(path, value):
+        with open(path, "w") as handle:
+            handle.write(value)
+
+    def _ensure_direct(self):
+        if self._latched:
+            return
+        if self._enabled_path and os.path.exists(self._enabled_path):
+            try:
+                self._write(self._enabled_path, "true")
+            except OSError:
+                self._write(self._enabled_path, "1")
+        if self._effect_path and os.path.exists(self._effect_path):
+            self._write(self._effect_path, "monocolor")
+        self._latched = True
+
+    def apply_zones(self, zone_colors, brightness, power):
+        self.last_error = None
+        if not self._led_path:
+            self.last_error = "no led path"
+            return False
+        level = self._level(brightness, power)
+        try:
+            self._ensure_direct()
+            if self._has_intensity:
+                values = " ".join(self._format_zone(c) for c in self._fit(zone_colors))
+                with open(self._intensity_path, "w") as handle:
+                    handle.write(values)
+            if self._has_brightness and level != self._last_level:
+                with open(self._brightness_path, "w") as handle:
+                    handle.write(str(level))
+                self._last_level = level
+            return True
+        except OSError as error:
+            self.last_error = str(error)
+            self.invalidate()
+            return False
+
+
 _VALVE_NODE_RE = re.compile(r"^valve-leds\[(\d+)\]$")
 
 

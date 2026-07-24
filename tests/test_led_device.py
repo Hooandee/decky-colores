@@ -1,6 +1,6 @@
 import os
 
-from py_modules.led_device import SysfsRgbDevice, ValveLedsDevice, discover_valve_leds
+from py_modules.led_device import OxpLedsDevice, SysfsRgbDevice, ValveLedsDevice, discover_valve_leds
 
 
 def _make_led(tmp_path, multi_index="rgb rgb rgb rgb"):
@@ -252,3 +252,73 @@ def test_valve_read_and_restore_startup_round_trip(tmp_path):
     assert device.restore_startup(factory) is True
     assert _read(os.path.join(nodes[0], "multi_intensity_startup")) == "0 90 255"
     assert _read(os.path.join(nodes[0], "brightness_startup")) == "56"
+
+
+def _make_oxp_led(tmp_path, with_latch=True):
+    led = os.path.join(str(tmp_path), "oxp:rgb:joystick_rings")
+    os.makedirs(led)
+    open(os.path.join(led, "multi_index"), "w").write("red green blue")
+    open(os.path.join(led, "multi_intensity"), "w").write("0 0 0")
+    open(os.path.join(led, "brightness"), "w").write("0")
+    open(os.path.join(led, "max_brightness"), "w").write("100")
+    if with_latch:
+        open(os.path.join(led, "enabled"), "w").write("false")
+        open(os.path.join(led, "effect"), "w").write("rainbow")
+    return led
+
+
+def test_oxp_latches_enabled_and_monocolor_before_color(tmp_path):
+    led = _make_oxp_led(tmp_path)
+    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    assert device.apply_zones([(255, 0, 0)], 100, True) is True
+    assert _read(os.path.join(led, "enabled")) == "true"
+    assert _read(os.path.join(led, "effect")) == "monocolor"
+    assert _read(os.path.join(led, "multi_intensity")) == "255 0 0"
+    assert _read(os.path.join(led, "brightness")) == "100"
+
+
+def test_oxp_latch_writes_only_once(tmp_path):
+    led = _make_oxp_led(tmp_path)
+    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device.apply_zones([(255, 0, 0)], 100, True)
+    open(os.path.join(led, "effect"), "w").write("rainbow")
+    device.apply_zones([(0, 255, 0)], 100, True)
+    assert _read(os.path.join(led, "effect")) == "rainbow"
+
+
+def test_oxp_invalidate_relatches(tmp_path):
+    led = _make_oxp_led(tmp_path)
+    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device.apply_zones([(255, 0, 0)], 100, True)
+    open(os.path.join(led, "effect"), "w").write("rainbow")
+    device.invalidate()
+    device.apply_zones([(0, 0, 255)], 100, True)
+    assert _read(os.path.join(led, "effect")) == "monocolor"
+
+
+def test_oxp_reconnect_relatches(tmp_path):
+    led = _make_oxp_led(tmp_path)
+    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device.apply_zones([(255, 0, 0)], 100, True)
+    open(os.path.join(led, "effect"), "w").write("rainbow")
+    assert device.reconnect() is True
+    device.apply_zones([(0, 0, 255)], 100, True)
+    assert _read(os.path.join(led, "effect")) == "monocolor"
+
+
+def test_oxp_tolerates_missing_latch_attrs(tmp_path):
+    led = _make_oxp_led(tmp_path, with_latch=False)
+    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    assert device.apply_zones([(255, 0, 0)], 100, True) is True
+    assert _read(os.path.join(led, "multi_intensity")) == "255 0 0"
+
+
+def test_oxp_skips_redundant_brightness_writes(tmp_path):
+    led = _make_oxp_led(tmp_path)
+    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device.apply_zones([(255, 0, 0)], 80, True)
+    open(os.path.join(led, "brightness"), "w").write("99")
+    device.apply_zones([(0, 255, 0)], 80, True)
+    assert _read(os.path.join(led, "brightness")) == "99"
+    device.apply_zones([(0, 255, 0)], 50, True)
+    assert _read(os.path.join(led, "brightness")) == "50"
