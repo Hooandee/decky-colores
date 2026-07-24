@@ -1,6 +1,8 @@
 import os
 
-from py_modules.led_device import OxpLedsDevice, SysfsRgbDevice, ValveLedsDevice, discover_valve_leds
+from py_modules.led_device import SysfsRgbDevice, ValveLedsDevice, discover_valve_leds
+
+_OXP_LATCH = [["enabled", "true"], ["effect", "monocolor"]]
 
 
 def _make_led(tmp_path, multi_index="rgb rgb rgb rgb"):
@@ -267,9 +269,9 @@ def _make_oxp_led(tmp_path, with_latch=True):
     return led
 
 
-def test_oxp_latches_enabled_and_monocolor_before_color(tmp_path):
+def test_latch_writes_before_color(tmp_path):
     led = _make_oxp_led(tmp_path)
-    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal", latch=_OXP_LATCH)
     assert device.apply_zones([(255, 0, 0)], 100, True) is True
     assert _read(os.path.join(led, "enabled")) == "true"
     assert _read(os.path.join(led, "effect")) == "monocolor"
@@ -277,18 +279,18 @@ def test_oxp_latches_enabled_and_monocolor_before_color(tmp_path):
     assert _read(os.path.join(led, "brightness")) == "100"
 
 
-def test_oxp_latch_writes_only_once(tmp_path):
+def test_latch_writes_only_once(tmp_path):
     led = _make_oxp_led(tmp_path)
-    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal", latch=_OXP_LATCH)
     device.apply_zones([(255, 0, 0)], 100, True)
     open(os.path.join(led, "effect"), "w").write("rainbow")
     device.apply_zones([(0, 255, 0)], 100, True)
     assert _read(os.path.join(led, "effect")) == "rainbow"
 
 
-def test_oxp_invalidate_relatches(tmp_path):
+def test_latch_reapplied_after_invalidate(tmp_path):
     led = _make_oxp_led(tmp_path)
-    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal", latch=_OXP_LATCH)
     device.apply_zones([(255, 0, 0)], 100, True)
     open(os.path.join(led, "effect"), "w").write("rainbow")
     device.invalidate()
@@ -296,9 +298,9 @@ def test_oxp_invalidate_relatches(tmp_path):
     assert _read(os.path.join(led, "effect")) == "monocolor"
 
 
-def test_oxp_reconnect_relatches(tmp_path):
+def test_latch_reapplied_after_reconnect(tmp_path):
     led = _make_oxp_led(tmp_path)
-    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal", latch=_OXP_LATCH)
     device.apply_zones([(255, 0, 0)], 100, True)
     open(os.path.join(led, "effect"), "w").write("rainbow")
     assert device.reconnect() is True
@@ -306,19 +308,16 @@ def test_oxp_reconnect_relatches(tmp_path):
     assert _read(os.path.join(led, "effect")) == "monocolor"
 
 
-def test_oxp_tolerates_missing_latch_attrs(tmp_path):
+def test_latch_tolerates_missing_attrs(tmp_path):
     led = _make_oxp_led(tmp_path, with_latch=False)
-    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal", latch=_OXP_LATCH)
     assert device.apply_zones([(255, 0, 0)], 100, True) is True
     assert _read(os.path.join(led, "multi_intensity")) == "255 0 0"
 
 
-def test_oxp_skips_redundant_brightness_writes(tmp_path):
+def test_no_latch_leaves_attrs_untouched(tmp_path):
     led = _make_oxp_led(tmp_path)
-    device = OxpLedsDevice(led, zones=1, max_brightness=100, index_format="decimal")
-    device.apply_zones([(255, 0, 0)], 80, True)
-    open(os.path.join(led, "brightness"), "w").write("99")
-    device.apply_zones([(0, 255, 0)], 80, True)
-    assert _read(os.path.join(led, "brightness")) == "99"
-    device.apply_zones([(0, 255, 0)], 50, True)
-    assert _read(os.path.join(led, "brightness")) == "50"
+    device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    device.apply_zones([(255, 0, 0)], 100, True)
+    assert _read(os.path.join(led, "enabled")) == "false"
+    assert _read(os.path.join(led, "effect")) == "rainbow"

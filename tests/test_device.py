@@ -268,7 +268,7 @@ def test_build_device_oxp_uses_latch_device(tmp_path):
     _make_led(root, "oxp:rgb:joystick_rings", _OXP_LED_FILES)
     ctx = build_device(root)
     assert ctx["info"]["name"] == "OneXPlayer OneXFly Apex"
-    assert type(ctx["device"]).__name__ == "OxpLedsDevice"
+    assert type(ctx["device"]).__name__ == "SysfsRgbDevice"
     caps = ctx["capabilities"]
     assert caps["zones"] == 1
     assert caps["maxBrightness"] == 100

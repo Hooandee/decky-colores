@@ -79,8 +79,9 @@ OXP_HID = {
 }
 
 OXP_SYSFS = {
-    "driver": "oxp_sysfs",
+    "driver": "sysfs",
     "color_order": "rgb",
+    "latch": [["enabled", "true"], ["effect", "monocolor"]],
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
     "experimental": [],
 }

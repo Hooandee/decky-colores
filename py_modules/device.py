@@ -1,7 +1,7 @@
 import os
 
 from device_profiles import resolve_profile
-from led_device import SysfsRgbDevice, OxpLedsDevice, NullDevice, ValveLedsDevice, discover_valve_leds
+from led_device import SysfsRgbDevice, NullDevice, ValveLedsDevice, discover_valve_leds
 from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device
 from power_led import PowerLedController
 from power_supply import battery_present
@@ -197,7 +197,7 @@ def _find_rgb_led(leds_dir):
     return None
 
 
-_IMPLEMENTED_DRIVERS ={"sysfs", "oxp_sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally", "valve_leds"}
+_IMPLEMENTED_DRIVERS ={"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally", "valve_leds"}
 
 
 def _build_hid_context(profile, ambilight, power_led=None, battery=False, temperature=False):
@@ -273,10 +273,10 @@ def build_device(sysfs_root="/", ambilight=False):
         if profile.get("zones"):
             zones = profile["zones"]
         max_brightness = _max_brightness(_read(os.path.join(led_path, "max_brightness")))
-        cls = OxpLedsDevice if profile["driver"] == "oxp_sysfs" else SysfsRgbDevice
-        device = cls(
+        device = SysfsRgbDevice(
             led_path, zones, max_brightness, profile["color_order"], index_format,
             color_correction=profile.get("color_correction", [1.0, 1.0, 1.0]),
+            latch=profile.get("latch"),
         )
         has_led = True
     else:
