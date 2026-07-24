@@ -139,3 +139,11 @@ def test_onexplayer_family_fallback_profile():
     profile = resolve_profile("ONEXPLAYER X1 mini", "ONEXPLAYER X1 mini")
     assert profile["driver"] == "oxp_sysfs"
     assert profile["name"] == "ONEXPLAYER X1 mini"
+
+
+def test_onexplayer_profile_has_hid_fallback():
+    profile = resolve_profile("ONEXPLAYER APEX", "ONEXPLAYER APEX")
+    fallback = profile.get("fallback")
+    assert fallback is not None
+    assert fallback["driver"] == "hid_oxp_v2"
+    assert fallback["conflicts_with_system_rgb"] is True

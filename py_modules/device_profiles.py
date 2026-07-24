@@ -69,6 +69,15 @@ VALVE_LEDS = {
     "experimental": [],
 }
 
+OXP_HID = {
+    "driver": "hid_oxp_v2",
+    "color_order": "rgb",
+    "zones": 1,
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "conflicts_with_system_rgb": True,
+    "experimental": [],
+}
+
 OXP_SYSFS = {
     "driver": "oxp_sysfs",
     "color_order": "rgb",
@@ -87,6 +96,10 @@ GENERIC = {
 # The sysfs RGB node isn't guaranteed on every kernel/Bazzite build for the Ally line.
 # When it's missing, build_device drops to the Aura HID driver instead of "no LEDs".
 ASUS_SYSFS["fallback"] = ASUS_ALLY_HID
+
+# OneXPlayer kernels without the hid-oxp sysfs node (e.g. some Bazzite builds) fall
+# back to the same MCU over raw HID, the path HueSync uses.
+OXP_SYSFS["fallback"] = OXP_HID
 
 
 def _copy_bits(bits):

@@ -583,3 +583,82 @@ def test_ally_invalidate_forces_reinit(hid_env):
     assert len(writes) == 8
     assert writes[0][:15] == bytes([0x5D]) + b"ASUS Tech.Inc."
     assert writes[-1][:2] == bytes([0x5D, 0xB4])  # APPLY
+
+
+def _oxp_entry():
+    return {
+        "vendor_id": 0x1A2C,
+        "product_id": 0xB001,
+        "usage_page": 0xFF01,
+        "usage": 0x0001,
+        "interface_number": 0,
+        "path": b"oxp",
+    }
+
+
+def test_oxp_solid_enables_then_paints(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    dev = adapters.OxpHidDevice.create()
+    assert dev.available is True
+    assert dev.supports_per_zone() is False
+    assert dev.supports_hardware_effects() is False
+    writes.clear()
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    assert len(writes) == 2
+    assert writes[0][:6] == bytes([0x07, 0xFF, 0xFD, 0x01, 0x05, 0x04])
+    assert writes[1][:3] == bytes([0x07, 0xFF, 0xFE])
+    assert tuple(writes[1][3:6]) == (255, 0, 0)
+
+
+def test_oxp_steady_state_sends_only_color(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    dev = adapters.OxpHidDevice.create()
+    dev.apply_solid((255, 0, 0), 100, True)
+    writes.clear()
+    dev.apply_solid((0, 255, 0), 100, True)
+    assert len(writes) == 1
+    assert writes[0][:3] == bytes([0x07, 0xFF, 0xFE])
+    assert tuple(writes[0][3:6]) == (0, 255, 0)
+
+
+def test_oxp_brightness_scales_color_in_software(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    dev = adapters.OxpHidDevice.create()
+    writes.clear()
+    dev.apply_solid((255, 0, 0), 50, True)
+    assert tuple(writes[1][3:6]) == (int(255 * 0.5), 0, 0)
+
+
+def test_oxp_power_off_disables(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    dev = adapters.OxpHidDevice.create()
+    dev.apply_solid((255, 0, 0), 100, True)
+    writes.clear()
+    dev.apply_solid((255, 0, 0), 100, False)
+    assert len(writes) == 1
+    assert writes[0][:4] == bytes([0x07, 0xFF, 0xFD, 0x00])
+
+
+def test_oxp_zones_use_first_color(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    dev = adapters.OxpHidDevice.create()
+    writes.clear()
+    dev.apply_zones([(10, 20, 30), (200, 0, 0)], 100, True)
+    assert tuple(writes[-1][3:6]) == (10, 20, 30)
+
+
+def test_oxp_invalidate_re_enables(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    dev = adapters.OxpHidDevice.create()
+    dev.apply_solid((255, 0, 0), 100, True)
+    dev.invalidate()
+    writes.clear()
+    dev.apply_solid((255, 0, 0), 100, True)
+    assert len(writes) == 2
+    assert writes[0][:3] == bytes([0x07, 0xFF, 0xFD])
