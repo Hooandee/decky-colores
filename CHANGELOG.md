@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.20.0...decky-colores-v0.21.0) (2026-07-24)
+
+
+### Features / Novedades
+
+* OneXPlayer support: Colores can now control the joystick-ring RGB on the OneXFly Apex and F1 Pro. It automatically uses Valve's `hid-oxp` LED interface when available and falls back to direct HID control on kernels without it, with stable power, brightness, color and effect handling. ([#72](https://github.com/Hooandee/decky-colores/pull/72)) ([be64221](https://github.com/Hooandee/decky-colores/commit/be642215130499f643e8a1d5972f11a64535f15d))
+* **ES:** Compatibilidad con OneXPlayer: Colores ya puede controlar el RGB de los anillos de los joysticks en OneXFly Apex y F1 Pro. Usa automáticamente la interfaz LED `hid-oxp` de Valve cuando está disponible y recurre al control HID directo en kernels que no la ofrecen, con un manejo estable del encendido, el brillo, el color y los efectos. ([#72](https://github.com/Hooandee/decky-colores/pull/72)) ([be64221](https://github.com/Hooandee/decky-colores/commit/be642215130499f643e8a1d5972f11a64535f15d))
+
 ## [0.20.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.19.0...decky-colores-v0.20.0) (2026-07-19)
 
 
