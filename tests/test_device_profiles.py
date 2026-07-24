@@ -120,3 +120,22 @@ def test_steam_machine_preproduction_by_product():
     p = resolve_profile("", "F7F")
     assert p["name"] == "Steam Machine"
     assert p["driver"] == "valve_leds"
+
+
+def test_onexplayer_apex_profile():
+    profile = resolve_profile("ONEXPLAYER APEX", "ONEXPLAYER APEX")
+    assert profile["name"] == "OneXPlayer OneXFly Apex"
+    assert profile["driver"] == "oxp_sysfs"
+    assert profile["experimental"] == []
+
+
+def test_onexplayer_f1pro_profile():
+    profile = resolve_profile("ONEXPLAYER F1Pro", "ONEXPLAYER F1Pro")
+    assert profile["name"] == "OneXPlayer OneXFly F1 Pro"
+    assert profile["driver"] == "oxp_sysfs"
+
+
+def test_onexplayer_family_fallback_profile():
+    profile = resolve_profile("ONEXPLAYER X1 mini", "ONEXPLAYER X1 mini")
+    assert profile["driver"] == "oxp_sysfs"
+    assert profile["name"] == "ONEXPLAYER X1 mini"

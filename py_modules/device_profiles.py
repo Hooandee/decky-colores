@@ -69,6 +69,13 @@ VALVE_LEDS = {
     "experimental": [],
 }
 
+OXP_SYSFS = {
+    "driver": "oxp_sysfs",
+    "color_order": "rgb",
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "experimental": [],
+}
+
 GENERIC = {
     "driver": "sysfs",
     "color_order": "rgb",
@@ -120,6 +127,9 @@ PROFILES = [
     ("product_contains", "Claw A1M", _profile(MSI_HID, "MSI Claw")),
     ("board", "Fremont", _profile(VALVE_LEDS, "Steam Machine")),
     ("product", "F7F", _profile(VALVE_LEDS, "Steam Machine")),
+    ("product", "ONEXPLAYER APEX", _profile(OXP_SYSFS, "OneXPlayer OneXFly Apex")),
+    ("product", "ONEXPLAYER F1Pro", _profile(OXP_SYSFS, "OneXPlayer OneXFly F1 Pro")),
+    ("product_contains", "ONEXPLAYER", _profile(OXP_SYSFS, "")),
 ]
 
 
@@ -130,7 +140,10 @@ def resolve_profile(board, product):
         if field == "product" and value == product:
             return _copy_profile(profile)
         if field == "product_contains" and value in (product or ""):
-            return _copy_profile(profile)
+            resolved = _copy_profile(profile)
+            if not resolved.get("name"):
+                resolved["name"] = product or board or "Unknown device"
+            return resolved
     fallback = _copy_profile(GENERIC)
     fallback["name"] = product or board or "Unknown device"
     return fallback
