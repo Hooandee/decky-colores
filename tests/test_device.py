@@ -250,3 +250,40 @@ def test_capabilities_conflicts_defaults_false():
     profile = resolve_profile("RC72LA", "ROG Ally X")
     caps = build_capabilities(profile, True, 4, 255, False)
     assert caps["conflictsWithSystemRgb"] is False
+
+
+_OXP_LED_FILES = {
+    "multi_index": "red green blue",
+    "multi_intensity": "0 0 0",
+    "brightness": "0",
+    "max_brightness": "100",
+    "enabled": "false",
+    "effect": "rainbow",
+}
+
+
+def test_build_device_oxp_uses_latch_device(tmp_path):
+    root = str(tmp_path)
+    _make_dmi(root, "ONEXPLAYER APEX", "ONEXPLAYER APEX")
+    _make_led(root, "oxp:rgb:joystick_rings", _OXP_LED_FILES)
+    ctx = build_device(root)
+    assert ctx["info"]["name"] == "OneXPlayer OneXFly Apex"
+    assert type(ctx["device"]).__name__ == "SysfsRgbDevice"
+    caps = ctx["capabilities"]
+    assert caps["zones"] == 1
+    assert caps["maxBrightness"] == 100
+    assert caps["maxRenderFps"] == 10
+    assert caps["states"]["color"] == "supported"
+    assert ctx["device"].apply_zones([(255, 0, 0)], 100, True) is True
+    led = os.path.join(root, "sys/class/leds/oxp:rgb:joystick_rings")
+    assert open(os.path.join(led, "enabled")).read() == "true"
+    assert open(os.path.join(led, "effect")).read() == "monocolor"
+    assert open(os.path.join(led, "multi_intensity")).read() == "255 0 0"
+
+
+def test_build_device_oxp_without_node_degrades(tmp_path):
+    root = str(tmp_path)
+    _make_dmi(root, "ONEXPLAYER APEX", "ONEXPLAYER APEX")
+    ctx = build_device(root)
+    assert ctx["capabilities"]["color"] is False
+    assert type(ctx["device"]).__name__ == "NullDevice"

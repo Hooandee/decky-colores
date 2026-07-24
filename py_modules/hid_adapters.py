@@ -1,5 +1,6 @@
 import os
 import sys
+from time import monotonic, sleep
 
 from led_device import LedDevice, _clamp8, _clamp_pct, apply_gain
 
@@ -41,6 +42,12 @@ try:
         ZONE_CODES,
         MODE_SOLID,
     )
+    from oxp_hid import (
+        OxpHidTransport,
+        brightness_cmd as oxp_brightness_cmd,
+        solid_cmd as oxp_solid_cmd,
+        LEVEL_HIGH as OXP_LEVEL_HIGH,
+    )
 
     HID_AVAILABLE = True
 except Exception as error:  # pragma: no cover - exercised only without libhidapi
@@ -77,6 +84,15 @@ ASUS_ALLY_IDS = {
     "pid": [],
     "usage_page": [0xFF31],
     "usage": [0x0080],
+}
+
+# Match by VID + usage; PID varies across the OneXPlayer family, so leave it open
+# (one HID fallback covers every OXP model that exposes the XFLY RGB interface).
+OXP_IDS = {
+    "vid": [0x1A2C],
+    "pid": [],
+    "usage_page": [0xFF01],
+    "usage": [0x0001],
 }
 
 
@@ -128,8 +144,20 @@ class _BaseHidDevice(LedDevice):
             if not self._transport.is_ready():
                 return False
             device = self._transport.hid_device
+        delay = getattr(self._transport, "write_delay", 0)
         for rep in reps:
-            device.write(rep)
+            last_write = getattr(self._transport, "_last_write_at", None)
+            if delay and last_write is not None:
+                remaining = delay - (monotonic() - last_write)
+                if remaining > 0:
+                    sleep(remaining)
+            try:
+                written = device.write(rep)
+            finally:
+                if delay:
+                    self._transport._last_write_at = monotonic()
+            if written != len(rep):
+                return False
         return True
 
     @property
@@ -434,11 +462,57 @@ class AsusAllyHidDevice(_BaseHidDevice):
         return self._heal(_do)
 
 
+class OxpHidDevice(_BaseHidDevice):
+    @classmethod
+    def create(cls):
+        if not HID_AVAILABLE:
+            return None
+        return cls(
+            OxpHidTransport(
+                OXP_IDS["vid"],
+                OXP_IDS["pid"],
+                OXP_IDS["usage_page"],
+                OXP_IDS["usage"],
+            )
+        )
+
+    def apply_solid(self, color, brightness, power):
+        if not power:
+            def _off():
+                ok = self._write([oxp_brightness_cmd(False, OXP_LEVEL_HIGH)])
+                if ok:
+                    self._transport.prev_mode = None
+                return ok
+
+            return self._heal(_off)
+
+        r, g, b = self._correct(color)
+        scale = _clamp_pct(brightness) / 100.0
+        scaled = (_clamp8(r * scale), _clamp8(g * scale), _clamp8(b * scale))
+
+        def _do():
+            reps = []
+            if self._transport.prev_mode != "solid":
+                reps.append(oxp_brightness_cmd(True, OXP_LEVEL_HIGH))
+            reps.append(oxp_solid_cmd(*scaled))
+            ok = self._write(reps)
+            if ok:
+                self._transport.prev_mode = "solid"
+            return ok
+
+        return self._heal(_do)
+
+    def apply_zones(self, zone_colors, brightness, power):
+        colors = list(zone_colors) or [(0, 0, 0)]
+        return self.apply_solid(colors[0], brightness, power)
+
+
 HID_DRIVERS = {
     "hid_msi": MsiHidDevice,
     "hid_legion_tablet": LegionTabletHidDevice,
     "hid_legion_go_s": LegionGoSHidDevice,
     "hid_asus_ally": AsusAllyHidDevice,
+    "hid_oxp_v2": OxpHidDevice,
 }
 
 

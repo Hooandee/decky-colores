@@ -42,7 +42,7 @@ class LedDevice:
 
     def invalidate(self):
         # Drop any cached "already in this mode" state so the next apply re-sends the
-        # full init/commit sequence. No-op for devices that always write in full (sysfs).
+        # full init/commit sequence. No-op for a plain sysfs device with no latch.
         return None
 
     def apply_zones(self, zone_colors, brightness, power):
@@ -60,7 +60,7 @@ class NullDevice(LedDevice):
 
 
 class SysfsRgbDevice(LedDevice):
-    def __init__(self, led_path, zones=1, max_brightness=255, color_order="rgb", index_format="hex", color_correction=(1.0, 1.0, 1.0)):
+    def __init__(self, led_path, zones=1, max_brightness=255, color_order="rgb", index_format="hex", color_correction=(1.0, 1.0, 1.0), latch=None):
         self._led_path = led_path
         self._zones = max(1, zones)
         self._max_brightness = max_brightness or 255
@@ -72,6 +72,8 @@ class SysfsRgbDevice(LedDevice):
         self._brightness_path = os.path.join(led_path, "brightness") if led_path else None
         self._has_intensity = bool(self._intensity_path) and os.path.exists(self._intensity_path)
         self._has_brightness = bool(self._brightness_path) and os.path.exists(self._brightness_path)
+        self._latch = [(os.path.join(led_path, attr), value) for attr, value in (latch or [])] if led_path else []
+        self._latched = False
 
     @property
     def available(self):
@@ -83,6 +85,23 @@ class SysfsRgbDevice(LedDevice):
 
     def supports_per_zone(self):
         return True
+
+    def invalidate(self):
+        self._latched = False
+
+    def reconnect(self):
+        self._latched = False
+        return self.available
+
+    def _apply_latch(self):
+        if self._latched or not self._latch:
+            return
+        if not all(os.path.exists(path) for path, _ in self._latch):
+            return
+        for path, value in self._latch:
+            with open(path, "w") as handle:
+                handle.write(value)
+        self._latched = True
 
     def _order(self, color):
         r, g, b = apply_gain(color, self._color_correction)
@@ -102,6 +121,12 @@ class SysfsRgbDevice(LedDevice):
             self.last_error = "no led path"
             return False
         level = self._level(brightness, power)
+        try:
+            self._apply_latch()
+        except OSError as error:
+            self.last_error = str(error)
+            self._latched = False
+            return False
         try:
             if self._has_intensity:
                 values = " ".join(self._format_zone(c) for c in self._fit(zone_colors))

@@ -143,7 +143,7 @@ def kernel_logs(
 _SNAP_MAX_NODES = 64
 _SNAP_MAX_MODULES = 512
 _SNAP_CAP = 60_000
-_LED_VALUE_NODES = ("multi_index", "max_brightness", "brightness")
+_LED_VALUE_NODES = ("multi_index", "max_brightness", "brightness", "enabled", "effect", "effect_index", "speed")
 
 
 def _glob(root: str, pattern: str) -> list[str]:

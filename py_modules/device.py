@@ -22,6 +22,8 @@ DEVICE_REGISTRY = [
     ("product", "83N0", "Legion Go 2"),
     ("product", "83N1", "Legion Go 2"),
     ("board", "Fremont", "Steam Machine"),
+    ("product", "ONEXPLAYER APEX", "OneXPlayer OneXFly Apex"),
+    ("product", "ONEXPLAYER F1Pro", "OneXPlayer OneXFly F1 Pro"),
 ]
 
 
@@ -173,6 +175,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "audioMode": active["color"],
         "conflictsWithSystemRgb": bool(profile.get("conflicts_with_system_rgb", False)),
         "persistentStartup": bool(profile.get("persistent_startup", False)),
+        "maxRenderFps": int(profile.get("max_render_fps", 30)),
         "layoutKind": profile.get("layout_kind", "rings"),
         "layout": build_layout(zones, profile.get("swap_sticks", False), profile.get("layout_kind", "rings")),
     }
@@ -274,6 +277,7 @@ def build_device(sysfs_root="/", ambilight=False):
         device = SysfsRgbDevice(
             led_path, zones, max_brightness, profile["color_order"], index_format,
             color_correction=profile.get("color_correction", [1.0, 1.0, 1.0]),
+            latch=profile.get("latch"),
         )
         has_led = True
     else:

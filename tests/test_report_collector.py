@@ -174,3 +174,31 @@ def test_build_bundle_shape():
     assert len(b["text"]) == 4000
     assert b["kernel"] == {"dmesg": "x", "journal": None}
     assert b["sysfs"] == {"leds": []}
+
+
+def test_sysfs_snapshot_captures_led_latch_attrs(tmp_path):
+    led = tmp_path / "sys/class/leds/oxp:rgb:joystick_rings"
+    led.mkdir(parents=True)
+    (led / "multi_index").write_text("red green blue")
+    (led / "max_brightness").write_text("100")
+    (led / "brightness").write_text("80")
+    (led / "multi_intensity").write_text("0 0 0")
+    (led / "enabled").write_text("false")
+    (led / "effect").write_text("rainbow")
+    (led / "effect_index").write_text("monocolor rainbow breathe")
+    entry = sysfs_snapshot(root=str(tmp_path))["leds"][0]
+    assert entry["enabled"] == "false"
+    assert entry["effect"] == "rainbow"
+    assert entry["effect_index"] == "monocolor rainbow breathe"
+
+
+def test_sysfs_snapshot_latch_attrs_absent_when_missing(tmp_path):
+    led = tmp_path / "sys/class/leds/ally:rgb:joystick_rings"
+    led.mkdir(parents=True)
+    (led / "multi_index").write_text("red green blue")
+    (led / "max_brightness").write_text("255")
+    (led / "brightness").write_text("128")
+    (led / "multi_intensity").write_text("0 0 0")
+    entry = sysfs_snapshot(root=str(tmp_path))["leds"][0]
+    assert entry["enabled"] is None
+    assert entry["effect"] is None

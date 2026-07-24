@@ -120,3 +120,34 @@ def test_steam_machine_preproduction_by_product():
     p = resolve_profile("", "F7F")
     assert p["name"] == "Steam Machine"
     assert p["driver"] == "valve_leds"
+
+
+def test_onexplayer_apex_profile():
+    profile = resolve_profile("ONEXPLAYER APEX", "ONEXPLAYER APEX")
+    assert profile["name"] == "OneXPlayer OneXFly Apex"
+    assert profile["driver"] == "sysfs"
+    assert profile["latch"] == [["enabled", "true"], ["effect", "monocolor"]]
+    assert profile["max_render_fps"] == 10
+    assert profile["experimental"] == []
+
+
+def test_onexplayer_f1pro_profile():
+    profile = resolve_profile("ONEXPLAYER F1Pro", "ONEXPLAYER F1Pro")
+    assert profile["name"] == "OneXPlayer OneXFly F1 Pro"
+    assert profile["driver"] == "sysfs"
+    assert profile["latch"] == [["enabled", "true"], ["effect", "monocolor"]]
+
+
+def test_onexplayer_family_fallback_profile():
+    profile = resolve_profile("ONEXPLAYER X1 mini", "ONEXPLAYER X1 mini")
+    assert profile["driver"] == "sysfs"
+    assert profile["name"] == "ONEXPLAYER X1 mini"
+
+
+def test_onexplayer_profile_has_hid_fallback():
+    profile = resolve_profile("ONEXPLAYER APEX", "ONEXPLAYER APEX")
+    fallback = profile.get("fallback")
+    assert fallback is not None
+    assert fallback["driver"] == "hid_oxp_v2"
+    assert fallback["max_render_fps"] == 20
+    assert fallback["conflicts_with_system_rgb"] is True
