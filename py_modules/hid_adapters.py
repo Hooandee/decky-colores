@@ -85,8 +85,6 @@ ASUS_ALLY_IDS = {
     "usage": [0x0080],
 }
 
-# OneXPlayer XFLY RGB interface (OneXFly F1 series, Apex). Match VID + usage; the RGB
-# interface shares vid:pid 1A2C:B001 with a second HID interface, disambiguated by usage.
 OXP_IDS = {
     "vid": [0x1A2C],
     "pid": [0xB001],
@@ -450,11 +448,6 @@ class AsusAllyHidDevice(_BaseHidDevice):
 
 
 class OxpHidDevice(_BaseHidDevice):
-    # HID V2 (XFLY) is single-zone with 3 coarse hardware brightness levels, so we hold
-    # hardware brightness at high and scale color in software (like the Ally driver).
-    # Live color updates send only the solid command; the enable command is sent on
-    # transitions so the 30fps effect path is one 64-byte write per frame.
-
     @classmethod
     def create(cls):
         if not HID_AVAILABLE:

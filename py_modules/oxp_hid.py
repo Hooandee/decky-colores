@@ -1,8 +1,5 @@
-# OneXPlayer RGB protocol, HID V2 ("XFLY": OneXFly F1 series, Apex, A1X). The byte
-# layout is an interface fact of the device, documented by HHD (hhd/device/oxp/hid_v2.py,
-# GPL) and HueSync (BSD-3); this is an original implementation (no third-party code
-# copied). All output reports are 64 bytes: [0x07, 0xFF, *payload]. The RGB interface
-# is VID 0x1A2C, usage_page 0xFF01 / usage 0x0001.
+# OneXPlayer HID V2 ("XFLY") RGB protocol. Wire format documented by HHD and HueSync
+# (BSD-3); original implementation, no third-party code copied.
 
 CMD_ID = 0x07
 

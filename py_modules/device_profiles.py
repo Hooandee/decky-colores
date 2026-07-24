@@ -96,9 +96,6 @@ GENERIC = {
 # The sysfs RGB node isn't guaranteed on every kernel/Bazzite build for the Ally line.
 # When it's missing, build_device drops to the Aura HID driver instead of "no LEDs".
 ASUS_SYSFS["fallback"] = ASUS_ALLY_HID
-
-# OneXPlayer kernels without the hid-oxp sysfs node (e.g. some Bazzite builds) fall
-# back to the same MCU over raw HID, the path HueSync uses.
 OXP_SYSFS["fallback"] = OXP_HID
 
 
