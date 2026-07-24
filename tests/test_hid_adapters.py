@@ -662,3 +662,48 @@ def test_oxp_invalidate_re_enables(hid_env):
     dev.apply_solid((255, 0, 0), 100, True)
     assert len(writes) == 2
     assert writes[0][:3] == bytes([0x07, 0xFF, 0xFD])
+
+
+def test_oxp_spaces_consecutive_reports_by_protocol_delay(hid_env, monkeypatch):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    clock = {"now": 0.0}
+    sleeps = []
+
+    monkeypatch.setattr(adapters, "monotonic", lambda: clock["now"], raising=False)
+
+    def advance(delay):
+        sleeps.append(delay)
+        clock["now"] += delay
+
+    monkeypatch.setattr(adapters, "sleep", advance, raising=False)
+    dev = adapters.OxpHidDevice.create()
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    assert len(writes) == 2
+    assert sleeps == pytest.approx([0.05])
+
+
+def test_oxp_short_write_reconnects_and_retries_full_transition(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    results = iter([32, 64, 64])
+
+    class ShortWriteDevice:
+        def __init__(self, path=None):
+            self.path = path
+
+        def write(self, data):
+            writes.append(bytes(data))
+            return next(results)
+
+        def close(self):
+            pass
+
+    sys.modules["lib_hid"].Device = ShortWriteDevice
+    dev = adapters.OxpHidDevice.create()
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    assert [packet[:3] for packet in writes] == [
+        bytes([0x07, 0xFF, 0xFD]),
+        bytes([0x07, 0xFF, 0xFD]),
+        bytes([0x07, 0xFF, 0xFE]),
+    ]

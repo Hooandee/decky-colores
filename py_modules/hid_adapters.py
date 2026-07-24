@@ -1,5 +1,6 @@
 import os
 import sys
+from time import monotonic, sleep
 
 from led_device import LedDevice, _clamp8, _clamp_pct, apply_gain
 
@@ -143,8 +144,20 @@ class _BaseHidDevice(LedDevice):
             if not self._transport.is_ready():
                 return False
             device = self._transport.hid_device
+        delay = getattr(self._transport, "write_delay", 0)
         for rep in reps:
-            device.write(rep)
+            last_write = getattr(self._transport, "_last_write_at", None)
+            if delay and last_write is not None:
+                remaining = delay - (monotonic() - last_write)
+                if remaining > 0:
+                    sleep(remaining)
+            try:
+                written = device.write(rep)
+            finally:
+                if delay:
+                    self._transport._last_write_at = monotonic()
+            if written != len(rep):
+                return False
         return True
 
     @property

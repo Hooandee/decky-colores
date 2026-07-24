@@ -4,6 +4,7 @@
 CMD_ID = 0x07
 
 LEVEL_HIGH = 0x04
+WRITE_DELAY = 0.05
 
 
 def _clamp8(v):
@@ -32,6 +33,8 @@ class OxpHidTransport:
         self._usage = usage
         self.hid_device = None
         self.prev_mode = None
+        self.write_delay = WRITE_DELAY
+        self._last_write_at = None
 
     def is_ready(self):
         if self.hid_device:

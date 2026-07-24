@@ -291,9 +291,10 @@ def temperature_band_color(temp):
 
 
 class EffectEngine:
-    def __init__(self, apply_zones, zones):
+    def __init__(self, apply_zones, zones, max_fps=30):
         self._apply_zones = apply_zones
         self._zones = zones
+        self._frame_interval = 1.0 / max(1, int(max_fps))
         self._task = None
         self._sig = None
 
@@ -425,7 +426,7 @@ class EffectEngine:
                 factor = breathe_factor(loop.time() - start, INDICATOR_BREATHE_SPEED) if breathing else 1.0
                 frame = tuple(clamp8(c * factor) for c in displayed)
                 self._apply_zones([frame] * self._zones)
-                await asyncio.sleep(FRAME_INTERVAL)
+                await asyncio.sleep(self._frame_interval)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -453,7 +454,7 @@ class EffectEngine:
                 raise
             except Exception:
                 logger.exception("effect frame failed")
-            await asyncio.sleep(FRAME_INTERVAL)
+            await asyncio.sleep(self._frame_interval)
 
     async def _run_performance(self, state_fn):
         displayed = 0.0
@@ -467,4 +468,4 @@ class EffectEngine:
                 raise
             except Exception:
                 logger.exception("performance frame failed")
-            await asyncio.sleep(FRAME_INTERVAL)
+            await asyncio.sleep(self._frame_interval)

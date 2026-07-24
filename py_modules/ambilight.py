@@ -72,12 +72,13 @@ def _gst_command(node, width, height):
 
 
 class Ambilight:
-    def __init__(self, apply_zones, zones, runtime_dir, uid=None, gid=None, layout=None):
+    def __init__(self, apply_zones, zones, runtime_dir, uid=None, gid=None, layout=None, max_fps=None):
         self._apply = apply_zones
         self._zones = max(1, zones)
         self._runtime_dir = runtime_dir
         self._uid = uid
         self._gid = gid
+        self._max_fps = max_fps
         self._layout = layout or [{"name": "Lights", "region": _FULL_REGION, "zones": list(range(self._zones))}]
         self._task = None
         self._proc = None
@@ -102,6 +103,12 @@ class Ambilight:
 
     def _cred(self):
         return user_cred(self._uid, self._gid)
+
+    def _capture_interval(self):
+        fps = max(1, int(self._options.get("fps", 10)))
+        if self._max_fps is not None:
+            fps = min(fps, max(1, int(self._max_fps)))
+        return 1.0 / fps
 
     async def _find_node(self):
         # Async so the retry loop never blocks the event loop while waiting on pw-dump
@@ -169,7 +176,7 @@ class Ambilight:
                 await asyncio.sleep(RETRY_INTERVAL)
                 continue
 
-            interval = 1.0 / max(1, int(self._options.get("fps", 10)))
+            interval = self._capture_interval()
             command = _gst_command(node, CAP_W, CAP_H)
             proc = None
             logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / interval)

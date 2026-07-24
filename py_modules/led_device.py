@@ -96,10 +96,11 @@ class SysfsRgbDevice(LedDevice):
     def _apply_latch(self):
         if self._latched or not self._latch:
             return
+        if not all(os.path.exists(path) for path, _ in self._latch):
+            return
         for path, value in self._latch:
-            if os.path.exists(path):
-                with open(path, "w") as handle:
-                    handle.write(value)
+            with open(path, "w") as handle:
+                handle.write(value)
         self._latched = True
 
     def _order(self, color):
@@ -122,6 +123,11 @@ class SysfsRgbDevice(LedDevice):
         level = self._level(brightness, power)
         try:
             self._apply_latch()
+        except OSError as error:
+            self.last_error = str(error)
+            self._latched = False
+            return False
+        try:
             if self._has_intensity:
                 values = " ".join(self._format_zone(c) for c in self._fit(zone_colors))
                 with open(self._intensity_path, "w") as handle:
@@ -132,7 +138,6 @@ class SysfsRgbDevice(LedDevice):
             return True
         except OSError as error:
             self.last_error = str(error)
-            self._latched = False
             return False
 
 

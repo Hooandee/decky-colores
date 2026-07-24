@@ -73,6 +73,7 @@ OXP_HID = {
     "driver": "hid_oxp_v2",
     "color_order": "rgb",
     "zones": 1,
+    "max_render_fps": 20,
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
     "conflicts_with_system_rgb": True,
     "experimental": [],
@@ -82,6 +83,7 @@ OXP_SYSFS = {
     "driver": "sysfs",
     "color_order": "rgb",
     "latch": [["enabled", "true"], ["effect", "monocolor"]],
+    "max_render_fps": 10,
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
     "experimental": [],
 }

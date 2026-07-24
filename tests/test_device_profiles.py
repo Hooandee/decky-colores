@@ -127,6 +127,7 @@ def test_onexplayer_apex_profile():
     assert profile["name"] == "OneXPlayer OneXFly Apex"
     assert profile["driver"] == "sysfs"
     assert profile["latch"] == [["enabled", "true"], ["effect", "monocolor"]]
+    assert profile["max_render_fps"] == 10
     assert profile["experimental"] == []
 
 
@@ -148,4 +149,5 @@ def test_onexplayer_profile_has_hid_fallback():
     fallback = profile.get("fallback")
     assert fallback is not None
     assert fallback["driver"] == "hid_oxp_v2"
+    assert fallback["max_render_fps"] == 20
     assert fallback["conflicts_with_system_rgb"] is True

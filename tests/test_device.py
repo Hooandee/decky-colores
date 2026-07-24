@@ -272,6 +272,7 @@ def test_build_device_oxp_uses_latch_device(tmp_path):
     caps = ctx["capabilities"]
     assert caps["zones"] == 1
     assert caps["maxBrightness"] == 100
+    assert caps["maxRenderFps"] == 10
     assert caps["states"]["color"] == "supported"
     assert ctx["device"].apply_zones([(255, 0, 0)], 100, True) is True
     led = os.path.join(root, "sys/class/leds/oxp:rgb:joystick_rings")

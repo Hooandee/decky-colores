@@ -175,6 +175,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "audioMode": active["color"],
         "conflictsWithSystemRgb": bool(profile.get("conflicts_with_system_rgb", False)),
         "persistentStartup": bool(profile.get("persistent_startup", False)),
+        "maxRenderFps": int(profile.get("max_render_fps", 30)),
         "layoutKind": profile.get("layout_kind", "rings"),
         "layout": build_layout(zones, profile.get("swap_sticks", False), profile.get("layout_kind", "rings")),
     }

@@ -315,6 +315,28 @@ def test_latch_tolerates_missing_attrs(tmp_path):
     assert _read(os.path.join(led, "multi_intensity")) == "255 0 0"
 
 
+def test_latch_applies_when_attrs_appear_after_led_node(tmp_path):
+    led = _make_oxp_led(tmp_path, with_latch=False)
+    device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal", latch=_OXP_LATCH)
+    assert device.apply_zones([(255, 0, 0)], 100, True) is True
+    open(os.path.join(led, "enabled"), "w").write("false")
+    open(os.path.join(led, "effect"), "w").write("rainbow")
+    assert device.apply_zones([(0, 255, 0)], 100, True) is True
+    assert _read(os.path.join(led, "enabled")) == "true"
+    assert _read(os.path.join(led, "effect")) == "monocolor"
+
+
+def test_downstream_write_error_does_not_repeat_successful_latch(tmp_path):
+    led = _make_oxp_led(tmp_path)
+    os.unlink(os.path.join(led, "brightness"))
+    os.mkdir(os.path.join(led, "brightness"))
+    device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal", latch=_OXP_LATCH)
+    assert device.apply_zones([(255, 0, 0)], 100, True) is False
+    open(os.path.join(led, "effect"), "w").write("rainbow")
+    assert device.apply_zones([(0, 255, 0)], 100, True) is False
+    assert _read(os.path.join(led, "effect")) == "rainbow"
+
+
 def test_no_latch_leaves_attrs_untouched(tmp_path):
     led = _make_oxp_led(tmp_path)
     device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal")

@@ -1,6 +1,11 @@
+import asyncio
+
+import pytest
+
 from py_modules.effects import (
     BATTERY_BANDS,
     TEMPERATURE_BANDS,
+    EffectEngine,
     battery_band_color,
     temperature_band_color,
     frame_breathing,
@@ -155,6 +160,24 @@ def test_frame_breathing_preserves_per_zone_palette():
     frame = frame_breathing(base, 0.0, 50)
     assert frame[0][0] >= frame[0][1] and frame[0][0] >= frame[0][2]
     assert frame[1][1] >= frame[1][0] and frame[1][1] >= frame[1][2]
+
+
+def test_effect_engine_uses_device_render_limit(monkeypatch):
+    sleeps = []
+
+    async def stop_after_first(delay):
+        sleeps.append(delay)
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(asyncio, "sleep", stop_after_first)
+    engine = EffectEngine(lambda colors: None, zones=1, max_fps=10)
+
+    async def drive():
+        with pytest.raises(asyncio.CancelledError):
+            await engine._run("breathing", 50, {"color": (255, 0, 0)})
+
+    asyncio.run(drive())
+    assert sleeps == pytest.approx([0.1])
 
 
 def test_frame_rainbow_valid():

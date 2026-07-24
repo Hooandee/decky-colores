@@ -127,7 +127,8 @@ class Plugin:
         self._controller = ctx["device"]
         self._power_led = ctx.get("power_led")
         self._cpu_sampler = CpuSampler()
-        self._engine = EffectEngine(self._render, self._zones)
+        max_render_fps = self._capabilities.get("maxRenderFps", 30)
+        self._engine = EffectEngine(self._render, self._zones, max_fps=max_render_fps)
         runtime_dir, uid, gid = _user_creds()
         self._ambilight = Ambilight(
             self._render,
@@ -136,6 +137,7 @@ class Plugin:
             uid,
             gid,
             layout=self._capabilities.get("layout"),
+            max_fps=max_render_fps,
         )
         self._audio = AudioReactive(self._render, self._zones, runtime_dir, uid, gid)
 

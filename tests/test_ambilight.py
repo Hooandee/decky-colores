@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+
 import py_modules.ambilight as ambilight_mod
 from py_modules.ambilight import (
     Ambilight,
@@ -99,6 +101,12 @@ def test_gst_command_uses_leaky_queue_before_scaling():
     assert "leaky=downstream" in cmd
     assert cmd.index("queue") < cmd.index("videoscale")
     assert "path=68" in cmd
+
+
+def test_capture_interval_respects_device_render_limit():
+    amb = Ambilight(lambda colors: None, zones=1, runtime_dir=None, max_fps=10)
+    amb._options = {"fps": 30}
+    assert amb._capture_interval() == pytest.approx(0.1)
 
 
 def _solid_frame(width, height, color):
