@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.21.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.20.0...decky-colores-v0.21.0) (2026-07-24)
+
+
+### Features
+
+* OneXPlayer OneXFly Apex / F1 Pro joystick-ring LEDs ([be64221](https://github.com/Hooandee/decky-colores/commit/be642215130499f643e8a1d5972f11a64535f15d))
+* **oxp:** add OxpLedsDevice with enabled/monocolor latch ([fd6f39a](https://github.com/Hooandee/decky-colores/commit/fd6f39af84999c70a3ed4c1d5292dd20db884c9e))
+* **oxp:** OneXPlayer profile for OneXFly Apex and F1 Pro joystick rings ([755b41f](https://github.com/Hooandee/decky-colores/commit/755b41f5509edd2b7e3f9bbe75e79fb1a4dbbd7d))
+* **oxp:** raw-HID fallback for OneXFly/Apex without the hid-oxp node ([1742034](https://github.com/Hooandee/decky-colores/commit/1742034b289811a2a22f39222360dd199de31dec))
+* **report:** snapshot LED latch attrs (enabled/effect/speed) ([0a588a9](https://github.com/Hooandee/decky-colores/commit/0a588a9ad6b04a37cb10bdab7adf319a2693cabe))
+
+
+### Bug Fixes
+
+* harden OneXPlayer LED writes ([12762c8](https://github.com/Hooandee/decky-colores/commit/12762c8af5028767523275cda0b110b15731a403))
+* **oxp:** match HID by VID+usage and drop unused effect scaffolding per review ([e8a450f](https://github.com/Hooandee/decky-colores/commit/e8a450f361ffd60a32f7adcd4775e67f6c9e102d))
+
 ## [0.20.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.19.0...decky-colores-v0.20.0) (2026-07-19)
 
 
