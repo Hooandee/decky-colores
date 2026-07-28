@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { buildFocusCss, ensureFocusStyles, FOCUS_STYLE_ID, COLORES_ROOT } from "./focus";
+import {
+  buildFocusCss,
+  ensureFocusStyles,
+  FOCUS_STYLE_ID,
+  COLORES_ROOT,
+  COLORES_TABSTRIP,
+  focusAfterNavigation,
+} from "./focus";
 
 describe("buildFocusCss", () => {
   const css = buildFocusCss();
@@ -20,6 +27,11 @@ describe("buildFocusCss", () => {
 
   it("uses !important so it wins over the elements' inline box-shadow", () => {
     expect(css).toContain("!important");
+  });
+
+  it("hides the native scrollbar on the horizontal tab strip", () => {
+    expect(css).toContain(`.${COLORES_TABSTRIP} { scrollbar-width: none;`);
+    expect(css).toContain(`.${COLORES_TABSTRIP}::-webkit-scrollbar`);
   });
 });
 
@@ -65,5 +77,56 @@ describe("ensureFocusStyles", () => {
 
   it("never throws when the document surface is unusable", () => {
     expect(() => ensureFocusStyles({} as unknown as Document)).not.toThrow();
+  });
+});
+
+describe("focusAfterNavigation", () => {
+  it("reasserts the active focus after Steam restores the previous controller focus", () => {
+    let focused = "previous";
+    let scheduled: FrameRequestCallback | undefined;
+    const element = {
+      isConnected: true,
+      ownerDocument: { hasFocus: () => true },
+      focus: () => {
+        focused = "active";
+      },
+    } as unknown as HTMLElement;
+
+    focusAfterNavigation(
+      element,
+      (callback) => {
+        scheduled = callback;
+        return 1;
+      },
+      () => undefined,
+    );
+    focused = "previous";
+    scheduled?.(0);
+
+    expect(focused).toBe("active");
+  });
+
+  it("does not steal focus when the QAM document is inactive", () => {
+    let focusCalls = 0;
+    let scheduled: FrameRequestCallback | undefined;
+    const element = {
+      isConnected: true,
+      ownerDocument: { hasFocus: () => false },
+      focus: () => {
+        focusCalls += 1;
+      },
+    } as unknown as HTMLElement;
+
+    focusAfterNavigation(
+      element,
+      (callback) => {
+        scheduled = callback;
+        return 1;
+      },
+      () => undefined,
+    );
+    scheduled?.(0);
+
+    expect(focusCalls).toBe(0);
   });
 });

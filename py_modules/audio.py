@@ -13,6 +13,7 @@ _spawn = asyncio.create_subprocess_exec
 RATE = 16000
 CHUNK = 1024  # samples per frame (~64ms at 16kHz)
 FULL_SCALE = 8000.0  # RMS mapped to level 1.0
+DYNAMIC_RANGE_DB = 40.0
 RETRY_INTERVAL = 3.0
 
 
@@ -22,7 +23,10 @@ def _level_from_pcm(data):
     if not samples:
         return 0.0
     rms = math.sqrt(sum(s * s for s in samples) / len(samples))
-    return min(1.0, rms / FULL_SCALE)
+    if rms <= 0:
+        return 0.0
+    level = 1.0 + 20.0 * math.log10(rms / FULL_SCALE) / DYNAMIC_RANGE_DB
+    return max(0.0, min(1.0, level))
 
 
 class AudioReactive:

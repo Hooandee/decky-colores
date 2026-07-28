@@ -18,6 +18,7 @@ from py_modules.effects import (
     frame_ripple,
     frame_aurora,
     frame_meter,
+    frame_vu,
     clock_color,
     hsv_to_rgb,
     interpolate_gradient,
@@ -36,7 +37,6 @@ def test_clock_color_wraps_around_midnight():
 
 
 def test_vu_silence_is_dark_and_loud_fills_from_center():
-    from py_modules.effects import frame_vu
     assert all(c == (0, 0, 0) for c in frame_vu(0.0, 17))
     loud = frame_vu(1.0, 17)
     assert len(loud) == 17
@@ -44,6 +44,13 @@ def test_vu_silence_is_dark_and_loud_fills_from_center():
     quiet = frame_vu(0.25, 17)
     assert sum(quiet[8]) > 0 and quiet[0] == (0, 0, 0)  # center lit, edges dark
     assert frame_vu(0.5, 0) == []
+
+
+def test_vu_two_zone_device_reacts_below_half_scale():
+    quiet = frame_vu(0.1, 2)
+    assert quiet[0] == quiet[1]
+    assert sum(quiet[0]) > 0
+    assert quiet[0][1] > quiet[0][0]
 
 
 def test_meter_fills_proportionally():
