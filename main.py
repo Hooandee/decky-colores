@@ -57,9 +57,6 @@ CHARGER_POLL_INTERVAL = 3.0
 # so we debounce it — dragging the color wheel must not write flash on every frame.
 STARTUP_PERSIST_DELAY = 1.0
 
-# When "force control" is on, how often we re-assert our LED state to win it back
-# from another RGB tool (e.g. HHD) that keeps reapplying its own colors. A blind
-# re-write, not an ownership check. Only runs on devices that actually conflict.
 FORCE_CONTROL_INTERVAL = 2.0
 
 # Cold-boot LED acquisition: the Ally's RGB node hangs off a USB HID device that can
