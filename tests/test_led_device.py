@@ -260,6 +260,7 @@ def _make_oxp_led(tmp_path, with_latch=True):
     led = os.path.join(str(tmp_path), "oxp:rgb:joystick_rings")
     os.makedirs(led)
     open(os.path.join(led, "multi_index"), "w").write("red green blue")
+    open(os.path.join(led, "multi_max_intensity"), "w").write("100 100 100")
     open(os.path.join(led, "multi_intensity"), "w").write("0 0 0")
     open(os.path.join(led, "brightness"), "w").write("0")
     open(os.path.join(led, "max_brightness"), "w").write("100")
@@ -275,8 +276,16 @@ def test_latch_writes_before_color(tmp_path):
     assert device.apply_zones([(255, 0, 0)], 100, True) is True
     assert _read(os.path.join(led, "enabled")) == "true"
     assert _read(os.path.join(led, "effect")) == "monocolor"
-    assert _read(os.path.join(led, "multi_intensity")) == "255 0 0"
+    assert _read(os.path.join(led, "multi_intensity")) == "100 0 0"
     assert _read(os.path.join(led, "brightness")) == "100"
+
+
+def test_decimal_channels_scale_to_multi_max_intensity(tmp_path):
+    led = _make_oxp_led(tmp_path)
+    device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal")
+    assert device.apply_zones([(255, 122, 0)], 80, True) is True
+    assert _read(os.path.join(led, "multi_intensity")) == "100 48 0"
+    assert _read(os.path.join(led, "brightness")) == "80"
 
 
 def test_latch_writes_only_once(tmp_path):
@@ -312,7 +321,7 @@ def test_latch_tolerates_missing_attrs(tmp_path):
     led = _make_oxp_led(tmp_path, with_latch=False)
     device = SysfsRgbDevice(led, zones=1, max_brightness=100, index_format="decimal", latch=_OXP_LATCH)
     assert device.apply_zones([(255, 0, 0)], 100, True) is True
-    assert _read(os.path.join(led, "multi_intensity")) == "255 0 0"
+    assert _read(os.path.join(led, "multi_intensity")) == "100 0 0"
 
 
 def test_latch_applies_when_attrs_appear_after_led_node(tmp_path):

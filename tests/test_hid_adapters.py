@@ -664,7 +664,7 @@ def test_oxp_invalidate_re_enables(hid_env):
     assert writes[0][:3] == bytes([0x07, 0xFF, 0xFD])
 
 
-def test_oxp_spaces_consecutive_reports_by_protocol_delay(hid_env, monkeypatch):
+def test_oxp_waits_for_apex_mcu_after_enable(hid_env, monkeypatch):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
     clock = {"now": 0.0}
@@ -680,6 +680,28 @@ def test_oxp_spaces_consecutive_reports_by_protocol_delay(hid_env, monkeypatch):
     dev = adapters.OxpHidDevice.create()
     assert dev.apply_solid((255, 0, 0), 100, True) is True
     assert len(writes) == 2
+    assert sleeps == pytest.approx([0.3])
+
+
+def test_oxp_steady_state_keeps_protocol_delay(hid_env, monkeypatch):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    clock = {"now": 0.0}
+    sleeps = []
+
+    monkeypatch.setattr(adapters, "monotonic", lambda: clock["now"], raising=False)
+
+    def advance(delay):
+        sleeps.append(delay)
+        clock["now"] += delay
+
+    monkeypatch.setattr(adapters, "sleep", advance, raising=False)
+    dev = adapters.OxpHidDevice.create()
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    sleeps.clear()
+    writes.clear()
+    assert dev.apply_solid((0, 255, 0), 100, True) is True
+    assert len(writes) == 1
     assert sleeps == pytest.approx([0.05])
 
 
