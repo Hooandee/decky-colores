@@ -3,10 +3,10 @@
 ## [0.21.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.1...decky-colores-v0.21.2) (2026-07-29)
 
 
-### Bug Fixes
+### Bug Fixes / Correcciones
 
-* correct OneXPlayer Apex RGB output ([f2e32ce](https://github.com/Hooandee/decky-colores/commit/f2e32cec116860f939c1f66480e3561db07eed97))
-* correct OneXPlayer Apex RGB output ([84091d3](https://github.com/Hooandee/decky-colores/commit/84091d3c3292c2b07177346b53459758aee0efea))
+* More reliable RGB control on the OneXPlayer Apex: colors keep their intended hue, startup timing now matches the controller and Colores can reclaim control from other RGB services. Reports also capture the driver's real intensity values for easier diagnosis. ([#83](https://github.com/Hooandee/decky-colores/pull/83)) ([f2e32ce](https://github.com/Hooandee/decky-colores/commit/f2e32cec116860f939c1f66480e3561db07eed97))
+* **ES:** Control RGB más fiable en OneXPlayer Apex: los colores conservan el tono elegido, el encendido respeta los tiempos del controlador y Colores puede recuperar el control frente a otros servicios RGB. Los reportes también recogen los valores reales de intensidad del driver para facilitar el diagnóstico. ([#83](https://github.com/Hooandee/decky-colores/pull/83)) ([f2e32ce](https://github.com/Hooandee/decky-colores/commit/f2e32cec116860f939c1f66480e3561db07eed97))
 
 ## [0.21.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.0...decky-colores-v0.21.1) (2026-07-29)
 
