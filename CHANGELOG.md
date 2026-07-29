@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.1...decky-colores-v0.21.2) (2026-07-29)
+
+
+### Bug Fixes
+
+* correct OneXPlayer Apex RGB output ([f2e32ce](https://github.com/Hooandee/decky-colores/commit/f2e32cec116860f939c1f66480e3561db07eed97))
+* correct OneXPlayer Apex RGB output ([84091d3](https://github.com/Hooandee/decky-colores/commit/84091d3c3292c2b07177346b53459758aee0efea))
+
 ## [0.21.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.0...decky-colores-v0.21.1) (2026-07-29)
 
 
