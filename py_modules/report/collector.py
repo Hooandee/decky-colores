@@ -243,7 +243,7 @@ def sysfs_snapshot(
     return redact_obj(snap, home=home, hostname=hostname)
 
 
-def capabilities_from(state: dict, *, driver=None, led_path=None, last_error=None) -> dict:
+def capabilities_from(state: dict, *, driver=None, route=None, led_path=None, last_error=None) -> dict:
     state = state or {}
     caps = state.get("capabilities") or {}
     dev = state.get("device") or {}
@@ -253,6 +253,7 @@ def capabilities_from(state: dict, *, driver=None, led_path=None, last_error=Non
         "board": dev.get("board"),
         "product": dev.get("product"),
         "driver": caps.get("driver") or driver,
+        "route": caps.get("rgbRoute") or route,
         "led_path": caps.get("ledPath") or led_path,
         "last_error": last_error,
         "color": bool(caps.get("color")),

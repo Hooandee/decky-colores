@@ -1,8 +1,11 @@
+import logging
 import os
 import sys
 from time import monotonic, sleep
 
 from led_device import LedDevice, _clamp8, _clamp_pct, apply_gain
+
+logger = logging.getLogger(__name__)
 
 _HUESYNC_DIR = os.path.join(os.path.dirname(__file__), "huesync")
 if _HUESYNC_DIR not in sys.path:
@@ -94,6 +97,13 @@ OXP_IDS = {
     "usage": [0x0001],
 }
 
+OXP_APEX_IDS = {
+    "vid": [0x1A2C],
+    "pid": [0xB001],
+    "usage_page": [0xFF01],
+    "usage": [0x0001],
+}
+
 
 def _effect_mode(effect_id):
     if not HID_AVAILABLE:
@@ -126,6 +136,7 @@ class _BaseHidDevice(LedDevice):
 
     def __init__(self, transport):
         self._transport = transport
+        self.last_error = None
 
     def set_color_correction(self, gains):
         self._color_correction = tuple(gains)
@@ -141,6 +152,9 @@ class _BaseHidDevice(LedDevice):
         device = self._transport.hid_device
         if device is None:
             if not self._transport.is_ready():
+                self.last_error = getattr(
+                    self._transport, "last_error", "HID interface unavailable"
+                )
                 return False
             device = self._transport.hid_device
         delay = getattr(self._transport, "write_delay", 0)
@@ -152,12 +166,22 @@ class _BaseHidDevice(LedDevice):
                     sleep(remaining)
             try:
                 written = device.write(rep)
+            except Exception as exc:
+                self.last_error = f"write failed: {type(exc).__name__}"
+                self._after_write(rep, None)
+                raise
             finally:
                 if delay:
                     self._transport._last_write_at = monotonic()
+            self._after_write(rep, written)
             if written != len(rep):
+                self.last_error = f"short write: {written}/{len(rep)}"
                 return False
+            self.last_error = None
         return True
+
+    def _after_write(self, _report, _written):
+        return None
 
     @property
     def available(self):
@@ -462,6 +486,8 @@ class AsusAllyHidDevice(_BaseHidDevice):
 
 
 class OxpHidDevice(_BaseHidDevice):
+    route = "hid"
+
     @classmethod
     def create(cls):
         if not HID_AVAILABLE:
@@ -505,6 +531,45 @@ class OxpHidDevice(_BaseHidDevice):
         colors = list(zone_colors) or [(0, 0, 0)]
         return self.apply_solid(colors[0], brightness, power)
 
+    def reconnect(self):
+        ok = super().reconnect()
+        if ok:
+            logger.info("OneXPlayer HID reconnect succeeded")
+        else:
+            logger.warning("OneXPlayer HID reconnect failed: %s", self.last_error)
+        return ok
+
+    def _after_write(self, report, written):
+        command = report[2] if len(report) > 2 else None
+        if command == 0xFD:
+            kind = "enable" if len(report) > 3 and report[3] else "disable"
+        elif command == 0xFE:
+            kind = "color"
+        else:
+            kind = "unknown"
+        message = "OneXPlayer HID packet kind=%s length=%s result=%s"
+        if written != len(report):
+            logger.warning(message + " short write", kind, len(report), written)
+        elif kind != "color" or self._transport.prev_mode != "solid":
+            logger.info(message, kind, len(report), written)
+        else:
+            logger.debug(message, kind, len(report), written)
+
+
+class ApexOxpHidDevice(OxpHidDevice):
+    @classmethod
+    def create(cls):
+        if not HID_AVAILABLE:
+            return None
+        return cls(
+            OxpHidTransport(
+                OXP_APEX_IDS["vid"],
+                OXP_APEX_IDS["pid"],
+                OXP_APEX_IDS["usage_page"],
+                OXP_APEX_IDS["usage"],
+            )
+        )
+
 
 HID_DRIVERS = {
     "hid_msi": MsiHidDevice,
@@ -512,6 +577,7 @@ HID_DRIVERS = {
     "hid_legion_go_s": LegionGoSHidDevice,
     "hid_asus_ally": AsusAllyHidDevice,
     "hid_oxp_v2": OxpHidDevice,
+    "hid_oxp_apex_v2": ApexOxpHidDevice,
 }
 
 

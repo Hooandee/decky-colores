@@ -1,5 +1,9 @@
+import logging
 import os
 import re
+
+
+logger = logging.getLogger(__name__)
 
 
 def _clamp8(value):
@@ -57,6 +61,106 @@ class LedDevice:
 
 class NullDevice(LedDevice):
     pass
+
+
+class ApexRgbDevice(LedDevice):
+    def __init__(self, hid_device, sysfs_device):
+        self._devices = {"hid": hid_device, "sysfs": sysfs_device}
+        self.route = "hid" if self._is_available(hid_device) else "sysfs"
+        self._active = self._devices[self.route]
+        self.last_error = None
+        logger.info("Apex RGB route selected: %s", self.route)
+
+    @staticmethod
+    def _is_available(device):
+        try:
+            return bool(device and device.available)
+        except Exception:
+            return False
+
+    @property
+    def available(self):
+        return self._is_available(self._active)
+
+    @property
+    def led_path(self):
+        return getattr(self._active, "led_path", None)
+
+    def supports_per_zone(self):
+        return bool(self._active and self._active.supports_per_zone())
+
+    def supports_hardware_effects(self):
+        return False
+
+    def invalidate(self):
+        for device in self._devices.values():
+            if device:
+                device.invalidate()
+
+    def reconnect(self):
+        if self._activate("hid", reconnect=True):
+            self.last_error = None
+            logger.info("Apex RGB HID route recovered")
+            return True
+        if self._activate("sysfs", reconnect=True):
+            return True
+        return False
+
+    def apply_zones(self, zone_colors, brightness, power):
+        colors = list(zone_colors)
+        primary = self.route
+        if self._apply(self._active, colors, brightness, power):
+            self.last_error = None
+            return True
+
+        primary_error = self._route_error(primary, "write failed")
+        fallback = "sysfs" if primary == "hid" else "hid"
+        logger.warning(
+            "Apex RGB %s route failed (%s), switching to %s",
+            primary,
+            primary_error,
+            fallback,
+        )
+        if self._activate(fallback, reconnect=fallback == "hid"):
+            if self._apply(self._active, colors, brightness, power):
+                self.last_error = None
+                logger.info("Apex RGB route switched to %s", fallback)
+                return True
+
+        fallback_error = self._route_error(fallback, "unavailable")
+        self.last_error = f"{primary}: {primary_error}; {fallback}: {fallback_error}"
+        logger.error("Apex RGB routes failed: %s", self.last_error)
+        return False
+
+    def apply_solid(self, color, brightness, power):
+        return self.apply_zones([tuple(color)], brightness, power)
+
+    def _activate(self, route, reconnect=False):
+        device = self._devices.get(route)
+        if not device:
+            return False
+        try:
+            if reconnect and not device.reconnect():
+                return False
+            device.invalidate()
+        except Exception as exc:
+            device.last_error = f"{type(exc).__name__}"
+            return False
+        self.route = route
+        self._active = device
+        return True
+
+    def _route_error(self, route, fallback):
+        return getattr(self._devices.get(route), "last_error", None) or fallback
+
+    @staticmethod
+    def _apply(device, colors, brightness, power):
+        try:
+            return bool(device and device.apply_zones(colors, brightness, power))
+        except Exception as exc:
+            if device:
+                device.last_error = type(exc).__name__
+            return False
 
 
 class SysfsRgbDevice(LedDevice):
