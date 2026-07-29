@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import logging
 import urllib.error
@@ -41,9 +39,7 @@ class HhdRgbControl:
             {"hhd": {"settings": {"rgb": bool(enabled)}}},
         )
         echoed = self._rgb_from_state(state)
-        if echoed is None:
-            return None
-        return echoed is bool(enabled)
+        return None if echoed is None else echoed == bool(enabled)
 
     def _request(self, method: str, payload: dict | None = None) -> dict | None:
         try:

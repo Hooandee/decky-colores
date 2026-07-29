@@ -89,6 +89,8 @@ class Plugin:
         if getattr(self, "_ready", False):
             return
         self._stopping = False
+        self._hhd_rgb_lock = asyncio.Lock()
+        self._hhd_rgb_status = None
         self._setup_device(self._build_context())
         self._store = SettingsStore(
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
@@ -405,31 +407,29 @@ class Plugin:
 
     async def set_force_control(self, on: bool) -> None:
         self._init()
-        if getattr(self, "_stopping", False):
+        if self._stopping:
             decky.logger.warning("Colores: force-control change ignored during shutdown")
             return
         self._settings["force_control"] = on
         self._store.save(self._settings)
         if on:
             claim = await self._claim_hhd_rgb()
-            if claim == "stopping" or getattr(self, "_stopping", False):
+            if claim == "stopping" or self._stopping:
                 return
             self._controller.invalidate()
         else:
             await self._restore_hhd_rgb()
-            if getattr(self, "_stopping", False):
+            if self._stopping:
                 return
         self._apply()
 
     def _uses_hhd_rgb_takeover(self) -> bool:
         return bool(self._capabilities.get("hhdRgbTakeover"))
 
-    def _hhd_operation_lock(self):
-        lock = getattr(self, "_hhd_rgb_lock", None)
-        if lock is None:
-            lock = asyncio.Lock()
-            self._hhd_rgb_lock = lock
-        return lock
+    def _set_hhd_status(self, status, log, message):
+        if self._hhd_rgb_status != status:
+            log(message)
+        self._hhd_rgb_status = status
 
     async def _run_hhd_call(self, call):
         future = asyncio.get_running_loop().run_in_executor(None, call)
@@ -447,21 +447,15 @@ class Plugin:
     async def _claim_hhd_rgb(self) -> str:
         if not self._uses_hhd_rgb_takeover():
             return "not_applicable"
-        async with self._hhd_operation_lock():
-            if getattr(self, "_stopping", False):
+        async with self._hhd_rgb_lock:
+            if self._stopping:
                 return "stopping"
             current = await self._run_hhd_call(self._hhd_rgb.read_rgb)
             if current is None:
-                if getattr(self, "_hhd_rgb_status", None) != "unavailable":
-                    decky.logger.warning(
-                        "Colores: HHD RGB state unavailable; continuing Apex reclaim"
-                    )
-                self._hhd_rgb_status = "unavailable"
+                self._set_hhd_status("unavailable", decky.logger.warning, "Colores: HHD RGB state unavailable; continuing Apex reclaim")
                 return "failed"
             if current is False:
-                if getattr(self, "_hhd_rgb_status", None) != "disabled":
-                    decky.logger.info("Colores: HHD RGB already disabled")
-                self._hhd_rgb_status = "disabled"
+                self._set_hhd_status("disabled", decky.logger.info, "Colores: HHD RGB already disabled")
                 return "unchanged"
             if self._settings.get("hhd_rgb_restore") is not True:
                 self._settings["hhd_rgb_restore"] = True
@@ -471,17 +465,13 @@ class Plugin:
                 self._hhd_rgb_status = "disabled"
                 decky.logger.info("Colores: HHD RGB disabled and confirmed for Apex takeover")
                 return "changed"
-            if getattr(self, "_hhd_rgb_status", None) != "disable_failed":
-                decky.logger.warning(
-                    "Colores: HHD RGB disable was not confirmed; restore marker retained"
-                )
-            self._hhd_rgb_status = "disable_failed"
+            self._set_hhd_status("disable_failed", decky.logger.warning, "Colores: HHD RGB disable was not confirmed; restore marker retained")
             return "failed"
 
     async def _restore_hhd_rgb(self) -> bool:
         if not self._uses_hhd_rgb_takeover():
             return True
-        async with self._hhd_operation_lock():
+        async with self._hhd_rgb_lock:
             if self._settings.get("hhd_rgb_restore") is not True:
                 return True
             confirmed = await self._run_hhd_call(lambda: self._hhd_rgb.set_rgb(True))
@@ -578,11 +568,11 @@ class Plugin:
 
     async def reconnect(self) -> bool:
         self._init()
-        if getattr(self, "_stopping", False):
+        if self._stopping:
             return False
         if self._settings.get("force_control"):
             claim = await self._claim_hhd_rgb()
-            if claim == "stopping" or getattr(self, "_stopping", False):
+            if claim == "stopping" or self._stopping:
                 return False
         self._reprobe_device()
         ok = self._controller.reconnect()
@@ -896,7 +886,7 @@ class Plugin:
             decky.logger.warning("Colores: force-control watch failed: %s", error)
 
     async def _stop_background_tasks(self):
-        async with self._hhd_operation_lock():
+        async with self._hhd_rgb_lock:
             self._stopping = True
         tasks = []
         for attr in ("_reassert_task", "_charger_task", "_force_control_task", "_startup_task"):

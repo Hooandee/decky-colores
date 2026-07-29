@@ -67,7 +67,6 @@ class ApexRgbDevice(LedDevice):
     def __init__(self, hid_device, sysfs_device):
         self._devices = {"hid": hid_device, "sysfs": sysfs_device}
         self.route = "hid" if self._is_available(hid_device) else "sysfs"
-        self._active = self._devices[self.route]
         self.last_error = None
         logger.info("Apex RGB route selected: %s", self.route)
 
@@ -80,14 +79,15 @@ class ApexRgbDevice(LedDevice):
 
     @property
     def available(self):
-        return self._is_available(self._active)
+        return self._is_available(self._devices[self.route])
 
     @property
     def led_path(self):
-        return getattr(self._active, "led_path", None)
+        return getattr(self._devices[self.route], "led_path", None)
 
     def supports_per_zone(self):
-        return bool(self._active and self._active.supports_per_zone())
+        device = self._devices[self.route]
+        return bool(device and device.supports_per_zone())
 
     def supports_hardware_effects(self):
         return False
@@ -109,7 +109,7 @@ class ApexRgbDevice(LedDevice):
     def apply_zones(self, zone_colors, brightness, power):
         colors = list(zone_colors)
         primary = self.route
-        if self._apply(self._active, colors, brightness, power):
+        if self._apply(self._devices[primary], colors, brightness, power):
             self.last_error = None
             return True
 
@@ -122,7 +122,7 @@ class ApexRgbDevice(LedDevice):
             fallback,
         )
         if self._activate(fallback, reconnect=fallback == "hid"):
-            if self._apply(self._active, colors, brightness, power):
+            if self._apply(self._devices[fallback], colors, brightness, power):
                 self.last_error = None
                 logger.info("Apex RGB route switched to %s", fallback)
                 return True
@@ -147,7 +147,6 @@ class ApexRgbDevice(LedDevice):
             device.last_error = f"{type(exc).__name__}"
             return False
         self.route = route
-        self._active = device
         return True
 
     def _route_error(self, route, fallback):

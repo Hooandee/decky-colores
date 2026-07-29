@@ -819,9 +819,7 @@ def test_oxp_steady_state_keeps_protocol_delay(hid_env, monkeypatch):
     assert sleeps == pytest.approx([0.05])
 
 
-def test_oxp_short_write_reconnects_and_retries_full_transition(hid_env):
-    adapters, writes = hid_env
-    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+def _short_write_device(writes):
     results = iter([32, 64, 64])
 
     class ShortWriteDevice:
@@ -835,8 +833,19 @@ def test_oxp_short_write_reconnects_and_retries_full_transition(hid_env):
         def close(self):
             pass
 
-    sys.modules["lib_hid"].Device = ShortWriteDevice
-    dev = adapters.OxpHidDevice.create()
+    return ShortWriteDevice
+
+
+def _oxp_with_short_write(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    sys.modules["lib_hid"].Device = _short_write_device(writes)
+    return adapters.OxpHidDevice.create(), writes
+
+
+def test_oxp_short_write_reconnects_and_retries_full_transition(hid_env):
+    dev, writes = _oxp_with_short_write(hid_env)
+
     assert dev.apply_solid((255, 0, 0), 100, True) is True
     assert [packet[:3] for packet in writes] == [
         bytes([0x07, 0xFF, 0xFD]),
@@ -846,24 +855,8 @@ def test_oxp_short_write_reconnects_and_retries_full_transition(hid_env):
 
 
 def test_oxp_short_write_logs_failure_before_recovery(hid_env, caplog):
-    adapters, writes = hid_env
-    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
-    results = iter([32, 64, 64])
-
-    class ShortWriteDevice:
-        def __init__(self, path=None):
-            self.path = path
-
-        def write(self, data):
-            writes.append(bytes(data))
-            return next(results)
-
-        def close(self):
-            pass
-
-    sys.modules["lib_hid"].Device = ShortWriteDevice
     caplog.set_level(logging.INFO)
-    dev = adapters.OxpHidDevice.create()
+    dev, _ = _oxp_with_short_write(hid_env)
 
     assert dev.apply_solid((255, 0, 0), 100, True) is True
     assert "kind=enable length=64 result=32" in caplog.text

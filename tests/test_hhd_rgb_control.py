@@ -8,7 +8,7 @@ from hhd_rgb_control import HhdRgbControl, RejectRedirects
 
 class Response:
     def __init__(self, body):
-        self._body = json.dumps(body).encode()
+        self._body = body if isinstance(body, bytes) else json.dumps(body).encode()
 
     def __enter__(self):
         return self
@@ -20,18 +20,35 @@ class Response:
         return self._body
 
 
-def test_read_rgb_returns_current_boolean(tmp_path, monkeypatch):
+@pytest.fixture
+def control_factory(tmp_path):
     token = tmp_path / "hhd.token"
     token.write_text("secret\n")
-    seen = {}
 
-    def urlopen(request, timeout):
-        seen["request"] = request
-        seen["timeout"] = timeout
-        return Response({"hhd": {"settings": {"rgb": True}}})
+    def make(body, **options):
+        seen = {}
 
-    monkeypatch.setattr("urllib.request.urlopen", urlopen)
-    control = HhdRgbControl(token_path=str(token), timeout=1.5, open_request=urlopen)
+        def open_request(request, timeout):
+            seen.update(request=request, timeout=timeout)
+            if isinstance(body, BaseException):
+                raise body
+            return Response(body)
+
+        control = HhdRgbControl(
+            token_path=str(token),
+            open_request=open_request,
+            **options,
+        )
+        return control, seen
+
+    return make
+
+
+def test_read_rgb_returns_current_boolean(control_factory):
+    control, seen = control_factory(
+        {"hhd": {"settings": {"rgb": True}}},
+        timeout=1.5,
+    )
 
     assert control.read_rgb() is True
     assert seen["request"].full_url == "http://127.0.0.1:5335/api/v1/state"
@@ -40,54 +57,31 @@ def test_read_rgb_returns_current_boolean(tmp_path, monkeypatch):
     assert seen["timeout"] == 1.5
 
 
-def test_set_rgb_posts_partial_state_and_confirms_echo(tmp_path, monkeypatch):
-    token = tmp_path / "hhd.token"
-    token.write_text("secret")
-    seen = {}
-
-    def urlopen(request, timeout):
-        seen["body"] = json.loads(request.data)
-        seen["method"] = request.get_method()
-        return Response({"hhd": {"settings": {"rgb": False}}})
-
-    monkeypatch.setattr("urllib.request.urlopen", urlopen)
-    control = HhdRgbControl(token_path=str(token), open_request=urlopen)
+def test_set_rgb_posts_partial_state_and_confirms_echo(control_factory):
+    control, seen = control_factory({"hhd": {"settings": {"rgb": False}}})
 
     assert control.set_rgb(False) is True
-    assert seen == {
+    assert {
+        "body": json.loads(seen["request"].data),
+        "method": seen["request"].get_method(),
+    } == {
         "body": {"hhd": {"settings": {"rgb": False}}},
         "method": "POST",
     }
 
 
-def test_set_rgb_rejects_mismatched_echo(tmp_path, monkeypatch):
-    token = tmp_path / "hhd.token"
-    token.write_text("secret")
-    monkeypatch.setattr(
-        "urllib.request.urlopen",
-        lambda *_args, **_kwargs: Response({"hhd": {"settings": {"rgb": True}}}),
-    )
+def test_set_rgb_rejects_mismatched_echo(control_factory):
+    control, _ = control_factory({"hhd": {"settings": {"rgb": True}}})
 
-    assert HhdRgbControl(
-        token_path=str(token), open_request=urllib.request.urlopen
-    ).set_rgb(False) is False
+    assert control.set_rgb(False) is False
 
 
-def test_unavailable_api_returns_none_without_exposing_token(tmp_path, monkeypatch, caplog):
-    token = tmp_path / "hhd.token"
-    token.write_text("do-not-log-this")
+def test_unavailable_api_returns_none_without_exposing_token(control_factory, caplog):
+    control, _ = control_factory(urllib.error.URLError("connection refused"))
 
-    def unavailable(*_args, **_kwargs):
-        raise urllib.error.URLError("connection refused")
-
-    monkeypatch.setattr("urllib.request.urlopen", unavailable)
-
-    control = HhdRgbControl(
-        token_path=str(token), open_request=urllib.request.urlopen
-    )
     assert control.read_rgb() is None
     assert control.read_rgb() is None
-    assert "do-not-log-this" not in caplog.text
+    assert "secret" not in caplog.text
     assert caplog.text.count("HHD RGB control request failed") == 1
 
 
@@ -97,22 +91,10 @@ def test_missing_token_returns_none(monkeypatch):
     assert HhdRgbControl(token_path="/missing").read_rgb() is None
 
 
-def test_invalid_response_returns_none(tmp_path, monkeypatch):
-    token = tmp_path / "hhd.token"
-    token.write_text("secret")
+def test_invalid_response_returns_none(control_factory):
+    control, _ = control_factory(b"not-json")
 
-    class InvalidResponse(Response):
-        def read(self):
-            return b"not-json"
-
-    monkeypatch.setattr(
-        "urllib.request.urlopen",
-        lambda *_args, **_kwargs: InvalidResponse({}),
-    )
-
-    assert HhdRgbControl(
-        token_path=str(token), open_request=urllib.request.urlopen
-    ).read_rgb() is None
+    assert control.read_rgb() is None
 
 
 def test_redirects_are_rejected_before_authorization_can_leave_localhost():
