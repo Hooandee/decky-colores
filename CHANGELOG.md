@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.0...decky-colores-v0.21.1) (2026-07-29)
+
+
+### Bug Fixes / Correcciones
+
+* Tabs stay readable and easy to navigate: the tab bar now scrolls instead of squeezing labels, keeps controller focus aligned with L1/R1 navigation and centers the active tab. The audio VU also responds better to normal listening levels and renders its center correctly on devices with an even number of LED zones. ([#80](https://github.com/Hooandee/decky-colores/pull/80)) ([0458670](https://github.com/Hooandee/decky-colores/commit/0458670caa2635137eb1ce2e886aab2cbd9f1764))
+* **ES:** Pestañas más legibles y cómodas con el mando: la barra ahora se desplaza en lugar de comprimir los nombres, mantiene el foco sincronizado al navegar con L1/R1 y centra la pestaña activa. El VU de audio también reacciona mejor a niveles normales de escucha y representa correctamente el centro en dispositivos con un número par de zonas LED. ([#80](https://github.com/Hooandee/decky-colores/pull/80)) ([0458670](https://github.com/Hooandee/decky-colores/commit/0458670caa2635137eb1ce2e886aab2cbd9f1764))
+
 ## [0.21.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.20.0...decky-colores-v0.21.0) (2026-07-24)
 
 
