@@ -272,8 +272,14 @@ def frame_vu(level, zones):
     if zones <= 0:
         return []
     center = (zones - 1) / 2.0
+    center_fill = 0.5 if zones % 2 == 0 else 0.0
+    radius = center - center_fill
     reach = max(0.0, min(1.0, level)) * (zones / 2.0)
-    return _fill_bar(zones, lambda i: reach - abs(i - center), lambda i: abs(i - center) / center if center else 0.0)
+    return _fill_bar(
+        zones,
+        lambda i: reach + center_fill - abs(i - center),
+        lambda i: max(0.0, abs(i - center) - center_fill) / radius if radius else 0.0,
+    )
 
 
 def battery_band_color(level):

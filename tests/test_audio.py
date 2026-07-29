@@ -11,9 +11,9 @@ def test_level_zero_on_silence():
     assert _level_from_pcm(_pcm(0)) == 0.0
 
 
-def test_level_scales_with_amplitude():
-    # RMS of a constant signal is its amplitude; FULL_SCALE is 8000.
-    assert _level_from_pcm(_pcm(4000)) == 0.5
+def test_level_uses_decibel_range_for_quiet_audio():
+    assert _level_from_pcm(_pcm(80)) == 0.0
+    assert _level_from_pcm(_pcm(800)) == 0.5
     assert _level_from_pcm(_pcm(8000)) == 1.0
 
 

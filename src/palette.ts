@@ -288,10 +288,17 @@ export function performanceMeterColors(loadPct: number, zones: number): RGB[] {
 }
 
 export function audioVuColors(level: number, zones: number): RGB[] {
-  const n = Math.max(1, zones);
+  if (zones <= 0) return [];
+  const n = zones;
   const center = (n - 1) / 2;
+  const centerFill = n % 2 === 0 ? 0.5 : 0;
+  const radius = center - centerFill;
   const reach = Math.max(0, Math.min(1, level)) * (n / 2);
-  return fillBar(zones, (i) => reach - Math.abs(i - center), (i) => (center ? Math.abs(i - center) / center : 0));
+  return fillBar(
+    zones,
+    (i) => reach + centerFill - Math.abs(i - center),
+    (i) => (radius ? Math.max(0, Math.abs(i - center) - centerFill) / radius : 0),
+  );
 }
 
 export function temperatureBandColor(temp: number): RGB {

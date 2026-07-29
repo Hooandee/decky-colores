@@ -2,6 +2,20 @@ import { FALLBACK_ACCENT_RGB } from "./accent";
 
 export const COLORES_ROOT = "colores-root";
 export const FOCUS_STYLE_ID = "colores-focus-styles";
+export const COLORES_TABSTRIP = "colores-tabstrip";
+
+export function focusAfterNavigation(
+  element: HTMLElement,
+  scheduleFrame: (callback: FrameRequestCallback) => number = requestAnimationFrame,
+  cancelFrame: (handle: number) => void = cancelAnimationFrame,
+): () => void {
+  const canFocus = () => element.isConnected && element.ownerDocument.hasFocus();
+  if (canFocus()) element.focus();
+  const handle = scheduleFrame(() => {
+    if (canFocus()) element.focus();
+  });
+  return () => cancelFrame(handle);
+}
 
 export function buildFocusCss(): string {
   const ring = `rgb(var(--colores-accent-rgb, ${FALLBACK_ACCENT_RGB}))`;
@@ -16,7 +30,9 @@ export function buildFocusCss(): string {
   transition: box-shadow 120ms ease, filter 120ms ease;
   position: relative;
   z-index: 1;
-}`.trim();
+}
+.${COLORES_TABSTRIP} { scrollbar-width: none; -ms-overflow-style: none; }
+.${COLORES_TABSTRIP}::-webkit-scrollbar { display: none; width: 0; height: 0; }`.trim();
 }
 
 export function ensureFocusStyles(doc: Document = document): void {
