@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.0...decky-colores-v0.21.1) (2026-07-29)
+
+
+### Bug Fixes
+
+* improve tab navigation and audio VU ([0458670](https://github.com/Hooandee/decky-colores/commit/0458670caa2635137eb1ce2e886aab2cbd9f1764))
+* improve tab navigation and audio VU ([ab4ce87](https://github.com/Hooandee/decky-colores/commit/ab4ce87b8631a0c4b40680eca8585392549a990d))
+
 ## [0.21.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.20.0...decky-colores-v0.21.0) (2026-07-24)
 
 
