@@ -72,6 +72,7 @@ class SysfsRgbDevice(LedDevice):
         self._brightness_path = os.path.join(led_path, "brightness") if led_path else None
         self._has_intensity = bool(self._intensity_path) and os.path.exists(self._intensity_path)
         self._has_brightness = bool(self._brightness_path) and os.path.exists(self._brightness_path)
+        self._channel_maxima = self._read_channel_maxima()
         self._latch = [(os.path.join(led_path, attr), value) for attr, value in (latch or [])] if led_path else []
         self._latched = False
 
@@ -109,8 +110,25 @@ class SysfsRgbDevice(LedDevice):
             return b, g, r
         return r, g, b
 
-    def _format_zone(self, color):
-        r, g, b = self._order(color)
+    def _read_channel_maxima(self):
+        if not self._led_path or self._index_format != "decimal":
+            return None
+        try:
+            with open(os.path.join(self._led_path, "multi_max_intensity")) as handle:
+                values = tuple(int(value) for value in handle.read().split())
+        except (OSError, ValueError):
+            return None
+        if len(values) != self._zones * 3 or any(value <= 0 for value in values):
+            return None
+        return values
+
+    def _format_zone(self, color, zone):
+        channels = self._order(color)
+        if self._channel_maxima:
+            offset = zone * 3
+            maxima = self._channel_maxima[offset : offset + 3]
+            channels = tuple(round(channel * maximum / 255) for channel, maximum in zip(channels, maxima))
+        r, g, b = channels
         if self._index_format == "decimal":
             return f"{r} {g} {b}"
         return f"0x{r:02x}{g:02x}{b:02x}"
@@ -129,7 +147,7 @@ class SysfsRgbDevice(LedDevice):
             return False
         try:
             if self._has_intensity:
-                values = " ".join(self._format_zone(c) for c in self._fit(zone_colors))
+                values = " ".join(self._format_zone(color, zone) for zone, color in enumerate(self._fit(zone_colors)))
                 with open(self._intensity_path, "w") as handle:
                     handle.write(values)
             if self._has_brightness:

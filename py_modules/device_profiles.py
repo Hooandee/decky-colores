@@ -85,6 +85,7 @@ OXP_SYSFS = {
     "latch": [["enabled", "true"], ["effect", "monocolor"]],
     "max_render_fps": 10,
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "conflicts_with_system_rgb": True,
     "experimental": [],
 }
 
@@ -96,8 +97,6 @@ GENERIC = {
     "experimental": ["color", "brightness", "effects", "ambilight"],
 }
 
-# The sysfs RGB node isn't guaranteed on every kernel/Bazzite build for the Ally line.
-# When it's missing, build_device drops to the Aura HID driver instead of "no LEDs".
 ASUS_SYSFS["fallback"] = ASUS_ALLY_HID
 OXP_SYSFS["fallback"] = OXP_HID
 

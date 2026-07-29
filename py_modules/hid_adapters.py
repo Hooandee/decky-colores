@@ -44,6 +44,7 @@ try:
     )
     from oxp_hid import (
         OxpHidTransport,
+        STATE_CHANGE_DELAY as OXP_STATE_CHANGE_DELAY,
         brightness_cmd as oxp_brightness_cmd,
         solid_cmd as oxp_solid_cmd,
         LEVEL_HIGH as OXP_LEVEL_HIGH,
@@ -86,8 +87,6 @@ ASUS_ALLY_IDS = {
     "usage": [0x0080],
 }
 
-# Match by VID + usage; PID varies across the OneXPlayer family, so leave it open
-# (one HID fallback covers every OXP model that exposes the XFLY RGB interface).
 OXP_IDS = {
     "vid": [0x1A2C],
     "pid": [],
@@ -491,11 +490,11 @@ class OxpHidDevice(_BaseHidDevice):
         scaled = (_clamp8(r * scale), _clamp8(g * scale), _clamp8(b * scale))
 
         def _do():
-            reps = []
             if self._transport.prev_mode != "solid":
-                reps.append(oxp_brightness_cmd(True, OXP_LEVEL_HIGH))
-            reps.append(oxp_solid_cmd(*scaled))
-            ok = self._write(reps)
+                if not self._write([oxp_brightness_cmd(True, OXP_LEVEL_HIGH)]):
+                    return False
+                sleep(OXP_STATE_CHANGE_DELAY)
+            ok = self._write([oxp_solid_cmd(*scaled)])
             if ok:
                 self._transport.prev_mode = "solid"
             return ok

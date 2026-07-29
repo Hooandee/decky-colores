@@ -5,6 +5,7 @@ CMD_ID = 0x07
 
 LEVEL_HIGH = 0x04
 WRITE_DELAY = 0.05
+STATE_CHANGE_DELAY = 0.3
 
 
 def _clamp8(v):

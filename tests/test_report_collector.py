@@ -180,6 +180,7 @@ def test_sysfs_snapshot_captures_led_latch_attrs(tmp_path):
     led = tmp_path / "sys/class/leds/oxp:rgb:joystick_rings"
     led.mkdir(parents=True)
     (led / "multi_index").write_text("red green blue")
+    (led / "multi_max_intensity").write_text("100 100 100")
     (led / "max_brightness").write_text("100")
     (led / "brightness").write_text("80")
     (led / "multi_intensity").write_text("0 0 0")
@@ -190,6 +191,8 @@ def test_sysfs_snapshot_captures_led_latch_attrs(tmp_path):
     assert entry["enabled"] == "false"
     assert entry["effect"] == "rainbow"
     assert entry["effect_index"] == "monocolor rainbow breathe"
+    assert entry["multi_intensity"] == "0 0 0"
+    assert entry["multi_max_intensity"] == "100 100 100"
 
 
 def test_sysfs_snapshot_latch_attrs_absent_when_missing(tmp_path):
