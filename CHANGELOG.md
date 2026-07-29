@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.3](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.2...decky-colores-v0.21.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* harden OneXPlayer Apex RGB control ([55f2792](https://github.com/Hooandee/decky-colores/commit/55f279254ee2d85f5f297106b84714d4413e284d))
+* harden OneXPlayer Apex RGB control ([aeb842b](https://github.com/Hooandee/decky-colores/commit/aeb842bedeb8519553c80c8635be42954c4e5964))
+
 ## [0.21.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.1...decky-colores-v0.21.2) (2026-07-29)
 
 
