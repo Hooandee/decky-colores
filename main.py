@@ -17,6 +17,7 @@ from power_supply import charger_online, battery_level
 from thermal import apu_temperature
 from performance import gpu_busy_percent, CpuSampler
 from saved_gradients import upsert_gradient, remove_gradient
+from hhd_rgb_control import HhdRgbControl
 import self_updater
 from report import collector as report_collector
 from report import client as report_client
@@ -40,6 +41,7 @@ DEFAULTS = {
     "power_led_off": False,
     "charger_only": False,
     "force_control": False,
+    "hhd_rgb_restore": None,
     "battery_breathe": True,
     "temperature_breathe": True,
     "remember_startup": True,
@@ -55,9 +57,6 @@ CHARGER_POLL_INTERVAL = 3.0
 # so we debounce it — dragging the color wheel must not write flash on every frame.
 STARTUP_PERSIST_DELAY = 1.0
 
-# When "force control" is on, how often we re-assert our LED state to win it back
-# from another RGB tool (e.g. HHD) that keeps reapplying its own colors. A blind
-# re-write, not an ownership check. Only runs on devices that actually conflict.
 FORCE_CONTROL_INTERVAL = 2.0
 
 # Cold-boot LED acquisition: the Ally's RGB node hangs off a USB HID device that can
@@ -89,6 +88,9 @@ class Plugin:
     def _init(self) -> None:
         if getattr(self, "_ready", False):
             return
+        self._stopping = False
+        self._hhd_rgb_lock = asyncio.Lock()
+        self._hhd_rgb_status = None
         self._setup_device(self._build_context())
         self._store = SettingsStore(
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
@@ -96,6 +98,7 @@ class Plugin:
         self._settings = self._store.load(DEFAULTS)
         self._settings["ambilight"] = {**DEFAULTS["ambilight"], **self._settings["ambilight"]}
         self._settings["effect"] = {**DEFAULTS["effect"], **self._settings["effect"]}
+        self._hhd_rgb = HhdRgbControl()
         self._ac_online = charger_online()
         level = battery_level()
         self._battery_level = 100 if level is None else level
@@ -246,6 +249,7 @@ class Plugin:
         capabilities = report_collector.capabilities_from(
             state,
             driver=type(self._controller).__name__,
+            route=getattr(self._controller, "route", None),
             led_path=getattr(self._controller, "led_path", None),
             last_error=getattr(self._controller, "last_error", None),
         )
@@ -355,6 +359,9 @@ class Plugin:
             else:
                 caps[feature] = False
         caps["enabledExperiments"] = sorted(enabled)
+        route = getattr(self._controller, "route", None)
+        if route:
+            caps["rgbRoute"] = route
         return caps
 
     async def get_state(self) -> dict:
@@ -400,11 +407,82 @@ class Plugin:
 
     async def set_force_control(self, on: bool) -> None:
         self._init()
+        if self._stopping:
+            decky.logger.warning("Colores: force-control change ignored during shutdown")
+            return
         self._settings["force_control"] = on
         self._store.save(self._settings)
         if on:
-            self._controller.invalidate()  # force a full re-init so it reclaims at once
+            claim = await self._claim_hhd_rgb()
+            if claim == "stopping" or self._stopping:
+                return
+            self._controller.invalidate()
+        else:
+            await self._restore_hhd_rgb()
+            if self._stopping:
+                return
         self._apply()
+
+    def _uses_hhd_rgb_takeover(self) -> bool:
+        return bool(self._capabilities.get("hhdRgbTakeover"))
+
+    def _set_hhd_status(self, status, log, message):
+        if self._hhd_rgb_status != status:
+            log(message)
+        self._hhd_rgb_status = status
+
+    async def _run_hhd_call(self, call):
+        future = asyncio.get_running_loop().run_in_executor(None, call)
+        try:
+            return await asyncio.shield(future)
+        except asyncio.CancelledError:
+            await future
+            raise
+        except Exception as error:
+            decky.logger.warning(
+                "Colores: HHD RGB operation failed: %s", type(error).__name__
+            )
+            return None
+
+    async def _claim_hhd_rgb(self) -> str:
+        if not self._uses_hhd_rgb_takeover():
+            return "not_applicable"
+        async with self._hhd_rgb_lock:
+            if self._stopping:
+                return "stopping"
+            current = await self._run_hhd_call(self._hhd_rgb.read_rgb)
+            if current is None:
+                self._set_hhd_status("unavailable", decky.logger.warning, "Colores: HHD RGB state unavailable; continuing Apex reclaim")
+                return "failed"
+            if current is False:
+                self._set_hhd_status("disabled", decky.logger.info, "Colores: HHD RGB already disabled")
+                return "unchanged"
+            if self._settings.get("hhd_rgb_restore") is not True:
+                self._settings["hhd_rgb_restore"] = True
+                self._store.save(self._settings)
+            confirmed = await self._run_hhd_call(lambda: self._hhd_rgb.set_rgb(False))
+            if confirmed is True:
+                self._hhd_rgb_status = "disabled"
+                decky.logger.info("Colores: HHD RGB disabled and confirmed for Apex takeover")
+                return "changed"
+            self._set_hhd_status("disable_failed", decky.logger.warning, "Colores: HHD RGB disable was not confirmed; restore marker retained")
+            return "failed"
+
+    async def _restore_hhd_rgb(self) -> bool:
+        if not self._uses_hhd_rgb_takeover():
+            return True
+        async with self._hhd_rgb_lock:
+            if self._settings.get("hhd_rgb_restore") is not True:
+                return True
+            confirmed = await self._run_hhd_call(lambda: self._hhd_rgb.set_rgb(True))
+            if confirmed is True:
+                self._settings["hhd_rgb_restore"] = None
+                self._store.save(self._settings)
+                self._hhd_rgb_status = "restored"
+                decky.logger.info("Colores: HHD RGB ownership restored and confirmed")
+                return True
+            decky.logger.warning("Colores: HHD RGB restore not confirmed; retry marker retained")
+            return False
 
     async def set_battery_breathe(self, on: bool) -> None:
         self._init()
@@ -490,6 +568,12 @@ class Plugin:
 
     async def reconnect(self) -> bool:
         self._init()
+        if self._stopping:
+            return False
+        if self._settings.get("force_control"):
+            claim = await self._claim_hhd_rgb()
+            if claim == "stopping" or self._stopping:
+                return False
         self._reprobe_device()
         ok = self._controller.reconnect()
         self._apply()
@@ -731,11 +815,20 @@ class Plugin:
 
     async def _main(self):
         self._init()
+        if self._settings.get("force_control"):
+            await self._claim_hhd_rgb()
+            self._controller.invalidate()
+        else:
+            await self._restore_hhd_rgb()
         decky.logger.info(
-            "Colores v%s on %s (euid=%s color=%s zones=%s ambilight=%s available=%s ledPath=%s lastError=%s)",
+            "Colores v%s on %s (product=%s board=%s euid=%s driver=%s route=%s color=%s zones=%s ambilight=%s available=%s ledPath=%s lastError=%s)",
             read_version(),
             self._device["name"],
+            self._device.get("product"),
+            self._device.get("board"),
             os.geteuid(),
+            type(self._controller).__name__,
+            getattr(self._controller, "route", None),
             self._capabilities["color"],
             self._capabilities["zones"],
             self._capabilities["ambilight"],
@@ -776,32 +869,38 @@ class Plugin:
             decky.logger.warning("Colores: charger watch failed: %s", error)
 
     async def _force_control_watch(self) -> None:
-        # Another RGB tool (e.g. HHD) keeps reapplying its own colors on its events, so
-        # a one-shot reclaim doesn't hold. Re-assert our state on a coarse tick to win it
-        # back within a couple seconds, even with the menu closed. This is a blind
-        # re-write (no read-back, no ownership check). It is a GENTLE re-assert: it does
-        # NOT invalidate()/re-init, so apply_zones takes its fast path (per-zone color
-        # only, no Aura init handshake or APPLY latch) — re-writing the same color that
-        # way is visually seamless, where a full re-init every tick makes the LEDs blink.
-        # The strong, latched reclaim (invalidate) runs on real reclaim moments instead:
-        # toggling the switch on, panel-open (reconnect), and resume. Skipped while a
-        # render loop (effect/ambilight) is active: that already rewrites ~30fps, and
-        # re-applying would restart it at frame 0. Only created on conflicting devices.
         try:
             while True:
                 await asyncio.sleep(FORCE_CONTROL_INTERVAL)
-                if self._settings.get("force_control") and not self._wants_render_loop():
+                if not self._settings.get("force_control"):
+                    continue
+                if self._uses_hhd_rgb_takeover():
+                    claim = await self._claim_hhd_rgb()
+                    if claim == "changed":
+                        self._controller.invalidate()
+                if not self._wants_render_loop():
                     self._apply()
         except asyncio.CancelledError:
             raise
         except Exception as error:  # never let the background task break plugin load
             decky.logger.warning("Colores: force-control watch failed: %s", error)
 
-    async def _unload(self):
+    async def _stop_background_tasks(self):
+        async with self._hhd_rgb_lock:
+            self._stopping = True
+        tasks = []
         for attr in ("_reassert_task", "_charger_task", "_force_control_task", "_startup_task"):
             task = getattr(self, attr, None)
             if task:
                 task.cancel()
+                tasks.append(task)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _unload(self):
+        await self._stop_background_tasks()
+        if getattr(self, "_ready", False):
+            await self._restore_hhd_rgb()
         if getattr(self, "_ambilight", None):
             self._ambilight.stop()
         if getattr(self, "_engine", None):
@@ -809,4 +908,7 @@ class Plugin:
         decky.logger.info("Colores unloaded")
 
     async def _uninstall(self):
+        await self._stop_background_tasks()
+        if getattr(self, "_ready", False):
+            await self._restore_hhd_rgb()
         decky.logger.info("Colores uninstalled")

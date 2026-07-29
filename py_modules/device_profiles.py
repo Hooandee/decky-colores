@@ -79,6 +79,12 @@ OXP_HID = {
     "experimental": [],
 }
 
+OXP_APEX_HID = {
+    **OXP_HID,
+    "driver": "hid_oxp_apex_v2",
+    "hhd_rgb_takeover": True,
+}
+
 OXP_SYSFS = {
     "driver": "sysfs",
     "color_order": "rgb",
@@ -87,6 +93,12 @@ OXP_SYSFS = {
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
     "conflicts_with_system_rgb": True,
     "experimental": [],
+}
+
+OXP_APEX = {
+    **OXP_SYSFS,
+    "prefer_hid": True,
+    "hhd_rgb_takeover": True,
 }
 
 GENERIC = {
@@ -99,6 +111,7 @@ GENERIC = {
 
 ASUS_SYSFS["fallback"] = ASUS_ALLY_HID
 OXP_SYSFS["fallback"] = OXP_HID
+OXP_APEX["fallback"] = OXP_APEX_HID
 
 
 def _copy_bits(bits):
@@ -139,7 +152,7 @@ PROFILES = [
     ("product_contains", "Claw A1M", _profile(MSI_HID, "MSI Claw")),
     ("board", "Fremont", _profile(VALVE_LEDS, "Steam Machine")),
     ("product", "F7F", _profile(VALVE_LEDS, "Steam Machine")),
-    ("product", "ONEXPLAYER APEX", _profile(OXP_SYSFS, "OneXPlayer OneXFly Apex")),
+    ("product", "ONEXPLAYER APEX", _profile(OXP_APEX, "OneXPlayer OneXFly Apex")),
     ("product", "ONEXPLAYER F1Pro", _profile(OXP_SYSFS, "OneXPlayer OneXFly F1 Pro")),
     ("product_contains", "ONEXPLAYER", _profile(OXP_SYSFS, "")),
 ]
