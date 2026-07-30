@@ -869,7 +869,9 @@ function Content() {
             )}
             <PanelSectionRow>
               <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "4px 2px 12px", lineHeight: 1.45 }}>
-                {t("ambient.stickHint")}
+                {capabilities.perZone || capabilities.perControllerColor
+                  ? t("ambient.stickHint")
+                  : t("ambient.globalHint")}
               </div>
             </PanelSectionRow>
             {capabilities.layoutKind === "bar" && (
@@ -889,10 +891,10 @@ function Content() {
             <PanelSectionRow>
               <SliderField
                 label={t("ambient.vividness")}
-                value={ambilight.saturation}
-                min={100}
-                max={250}
-                step={5}
+                value={ambilight.vividness}
+                min={0}
+                max={100}
+                step={1}
                 valueSuffix="%"
                 showValue
                 disabled={!power}
@@ -909,7 +911,7 @@ function Content() {
                 valueSuffix="%"
                 showValue
                 disabled={!power}
-                onChange={(v) => setAmbilight(ambilight.saturation, v, ambilight.fps)}
+                onChange={(v) => setAmbilight(ambilight.vividness, v, ambilight.fps)}
               />
             </PanelSectionRow>
             <PanelSectionRow>
@@ -922,7 +924,7 @@ function Content() {
                 valueSuffix=" fps"
                 showValue
                 disabled={!power}
-                onChange={(v) => setAmbilight(ambilight.saturation, ambilight.smoothing, v)}
+                onChange={(v) => setAmbilight(ambilight.vividness, ambilight.smoothing, v)}
                 bottomSeparator="none"
               />
             </PanelSectionRow>

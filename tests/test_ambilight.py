@@ -40,6 +40,19 @@ def test_bottom_edge_sampling_favors_lower_band():
     assert bottom[2] > bottom[0]  # and blue-dominant
 
 
+def test_global_color_sampling_averages_full_frame_for_all_logical_zones():
+    layout = [
+        {"name": "Left stick", "region": [0.0, 0.0, 0.30, 0.35], "zones": [0]},
+        {"name": "Right stick", "region": [0.70, 0.33, 1.0, 0.67], "zones": [1]},
+    ]
+    amb = Ambilight(lambda c: None, zones=2, runtime_dir=None, layout=layout)
+    amb._options = {"saturation": 1.0, "global_color": True}
+
+    amb._update_targets(_split_frame())
+
+    assert amb._targets == [(127, 0, 127), (127, 0, 127)]
+
+
 def test_run_retries_when_source_missing(monkeypatch):
     # Cold boot: the gamescope node isn't there yet. The capture must keep retrying
     # (and stay alive) instead of giving up after one miss — otherwise ambient mode

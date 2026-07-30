@@ -35,7 +35,7 @@ DEFAULTS = {
     "gradient": [[0, 196, 255], [136, 86, 255]],
     "gradient_speed": 30,
     "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
-    "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10, "sampling": "columns"},
+    "ambilight": {"vividness": 27, "smoothing": 75, "fps": 10, "sampling": "columns"},
     "saved_gradients": [],
     "enabled_experiments": [],
     "power_led_off": False,
@@ -88,6 +88,19 @@ def _suspend_clock():
         return None
 
 
+def _normalize_ambilight_settings(settings: dict | None) -> dict:
+    stored = settings or {}
+    normalized = {**DEFAULTS["ambilight"], **stored}
+    if "vividness" in stored:
+        vividness = stored["vividness"]
+    else:
+        saturation = max(100, min(250, int(stored.get("saturation", 140))))
+        vividness = round((saturation - 100) / 1.5)
+    normalized["vividness"] = max(0, min(100, int(vividness)))
+    normalized.pop("saturation", None)
+    return normalized
+
+
 def _user_creds():
     try:
         entry = pwd.getpwnam(decky.DECKY_USER)
@@ -108,7 +121,9 @@ class Plugin:
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
         )
         self._settings = self._store.load(DEFAULTS)
-        self._settings["ambilight"] = {**DEFAULTS["ambilight"], **self._settings["ambilight"]}
+        self._settings["ambilight"] = _normalize_ambilight_settings(
+            self._settings.get("ambilight")
+        )
         self._settings["effect"] = {**DEFAULTS["effect"], **self._settings["effect"]}
         self._hhd_rgb = HhdRgbControl()
         self._ac_online = charger_online()
@@ -601,14 +616,15 @@ class Plugin:
         self._init()
         return self._audio.status
 
-    async def set_ambilight(self, saturation: int, smoothing: int, fps: int) -> None:
+    async def set_ambilight(self, vividness: int, smoothing: int, fps: int) -> None:
         self._init()
-        self._settings["ambilight"] = {
-            **self._settings.get("ambilight", {}),
-            "saturation": saturation,
-            "smoothing": smoothing,
-            "fps": fps,
-        }
+        ambilight = self._settings["ambilight"]
+        ambilight.update(
+            vividness=max(0, min(100, int(vividness))),
+            smoothing=smoothing,
+            fps=fps,
+        )
+        ambilight.pop("saturation", None)
         self._save_and_apply()
 
     async def set_ambilight_sampling(self, mode: str) -> None:
@@ -777,10 +793,14 @@ class Plugin:
             amb = s["ambilight"]
             self._ambilight.start(
                 {
-                    "saturation": amb["saturation"] / 100.0,
+                    "saturation": 1.0 + (amb["vividness"] / 100) * 1.5,
                     "smoothing": amb["smoothing"],
                     "fps": amb.get("fps", 10),
                     "sampling": amb.get("sampling", "columns"),
+                    "global_color": not (
+                        self._capabilities.get("perZone")
+                        or self._capabilities.get("perControllerColor")
+                    ),
                     "fallback": tuple(s["color"]),
                 }
             )

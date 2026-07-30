@@ -164,7 +164,7 @@ def _plugin(
         "gradient": [[0, 196, 255], [136, 86, 255]],
         "gradient_speed": 30,
         "effect": effect or {"id": "breathing", "speed": 50, "use_gradient": False},
-        "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
+        "ambilight": {"vividness": 27, "smoothing": 75, "fps": 10},
         "force_control": False,
         "hhd_rgb_restore": None,
     }
@@ -390,6 +390,63 @@ def test_ambient_runs_capture_on_hardware_device(main_module):
     p._apply()
     assert any(e[0] == "start" for e in p._ambilight.events)
     assert not any(c[0] == "solid" for c in p._controller.calls)
+
+
+@pytest.mark.parametrize(
+    ("per_zone", "per_controller", "global_color"),
+    [(False, False, True), (True, False, False), (False, True, False)],
+)
+def test_ambient_selects_sampling_for_device_capabilities(
+    main_module, per_zone, per_controller, global_color
+):
+    p = _plugin(
+        main_module,
+        "ambient",
+        per_zone=per_zone,
+        per_controller=per_controller,
+    )
+
+    p._apply()
+
+    start = next(event for event in p._ambilight.events if event[0] == "start")
+    assert start[1]["global_color"] is global_color
+
+
+def test_ambient_vividness_maps_to_saturation_factor(main_module):
+    p = _plugin(main_module, "ambient")
+    p._settings["ambilight"]["vividness"] = 100
+
+    p._apply()
+
+    start = next(event for event in p._ambilight.events if event[0] == "start")
+    assert start[1]["saturation"] == 2.5
+
+
+def test_set_ambilight_clamps_and_persists_vividness(main_module):
+    p = _plugin(main_module, "ambient")
+    saved = {}
+    p._store = types.SimpleNamespace(save=lambda state: saved.update({"value": dict(state)}))
+
+    asyncio.run(p.set_ambilight(150, 60, 20))
+
+    ambilight = saved["value"]["ambilight"]
+    assert ambilight["vividness"] == 100
+    assert "saturation" not in ambilight
+
+
+@pytest.mark.parametrize(
+    ("legacy_saturation", "expected_vividness"),
+    [(100, 0), (140, 27), (250, 100), (255, 100)],
+)
+def test_ambilight_settings_migrate_legacy_saturation_to_vividness(
+    main_module, legacy_saturation, expected_vividness
+):
+    settings = main_module._normalize_ambilight_settings(
+        {"saturation": legacy_saturation}
+    )
+
+    assert settings["vividness"] == expected_vividness
+    assert "saturation" not in settings
 
 
 def test_gradient_on_single_color_device_animates_crossfade(main_module):
