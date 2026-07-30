@@ -82,6 +82,15 @@ export function expandGradient(stops: RGB[], count: number): RGB[] {
   });
 }
 
+export function unifyColors(colors: RGB[]): RGB[] {
+  const samples = colors.length ? colors : [{ r: 0, g: 0, b: 0 }];
+  return [{
+    r: Math.round(samples.reduce((sum, color) => sum + color.r, 0) / samples.length),
+    g: Math.round(samples.reduce((sum, color) => sum + color.g, 0) / samples.length),
+    b: Math.round(samples.reduce((sum, color) => sum + color.b, 0) / samples.length),
+  }];
+}
+
 export function dim({ r, g, b }: RGB, percent: number): RGB {
   const factor = clamp(percent, 0, 100) / 100;
   return {

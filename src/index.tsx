@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
 import { getAmbilightStatus, getAudioStatus, getTemperature, getPerformance, reconnect as apiReconnect } from "./api";
-import { rgbToCss, gradientCss } from "./color";
+import { rgbToCss, gradientCss, unifyColors } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { ColorEditor } from "./components/ColorEditor";
@@ -767,7 +767,11 @@ function Content() {
         return [color];
     }
   };
-  const previewColors: RGB[] = previewColorsFor();
+  const sampledPreviewColors = previewColorsFor();
+  const previewColors: RGB[] =
+    mode === "ambient" && !capabilities.perZone && !capabilities.perControllerColor
+      ? unifyColors(sampledPreviewColors)
+      : sampledPreviewColors;
 
   const tabItems = visibleTabIds.map((id) => {
     const meta = tabMeta(id);
@@ -1087,23 +1091,6 @@ function Content() {
 }
 
 export default definePlugin(() => {
-  // SteamOS restores its own controller lighting on resume from suspend, wiping
-  // whatever the user set. Re-apply the saved settings shortly after waking so
-  // the user's choice survives a sleep/wake cycle. reconnect() reconnects the
-  // controller (which re-enumerates after resume) and re-applies the settings.
-  // The delay lets SteamOS finish writing its color first so we win the race.
-  // Registered at the plugin level so it runs even when the QAM panel is closed.
-  let resumeTimer: ReturnType<typeof setTimeout> | undefined;
-  const resumeReg = SteamClient?.System?.RegisterForOnResumeFromSuspend?.(() => {
-    clearTimeout(resumeTimer);
-    resumeTimer = setTimeout(() => {
-      apiReconnect().catch(() => {});
-    }, 2000);
-  });
-  if (!resumeReg) {
-    console.warn("[Colores] SteamClient unavailable at load; resume LED restore disabled");
-  }
-
   return {
     name: "Colores",
     titleView: <div className={staticClasses.Title}>Colores</div>,
@@ -1117,9 +1104,5 @@ export default definePlugin(() => {
       </ErrorBoundary>
     ),
     icon: <ColorWheelIcon />,
-    onDismount() {
-      clearTimeout(resumeTimer);
-      resumeReg?.unregister?.();
-    },
   };
 });

@@ -356,6 +356,21 @@ class LegionTabletHidDevice(_LegionHidDevice):
         )
 
 
+class LegionGoHidDevice(LegionTabletHidDevice):
+    def apply_solid(self, color, brightness, power):
+        if _clamp_pct(brightness) == 1:
+            brightness = 2
+        return super().apply_solid(color, brightness, power)
+
+    def apply_zones(self, zone_colors, brightness, power):
+        colors = list(zone_colors) or [(0, 0, 0)]
+        color = tuple(
+            round(sum(zone[channel] for zone in colors) / len(colors))
+            for channel in range(3)
+        )
+        return self.apply_solid(color, brightness, power)
+
+
 class LegionGoSHidDevice(_LegionHidDevice):
     @classmethod
     def create(cls):
@@ -573,7 +588,7 @@ class ApexOxpHidDevice(OxpHidDevice):
 
 HID_DRIVERS = {
     "hid_msi": MsiHidDevice,
-    "hid_legion_tablet": LegionTabletHidDevice,
+    "hid_legion_go": LegionGoHidDevice,
     "hid_legion_go_s": LegionGoSHidDevice,
     "hid_asus_ally": AsusAllyHidDevice,
     "hid_oxp_v2": OxpHidDevice,

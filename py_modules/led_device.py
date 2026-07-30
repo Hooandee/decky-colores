@@ -176,12 +176,13 @@ class SysfsRgbDevice(LedDevice):
         self._has_intensity = bool(self._intensity_path) and os.path.exists(self._intensity_path)
         self._has_brightness = bool(self._brightness_path) and os.path.exists(self._brightness_path)
         self._channel_maxima = self._read_channel_maxima()
+        self._packed_maxima_compatible = self._packed_maxima_are_compatible()
         self._latch = [(os.path.join(led_path, attr), value) for attr, value in (latch or [])] if led_path else []
         self._latched = False
 
     @property
     def available(self):
-        return bool(self._led_path)
+        return bool(self._led_path) and self._packed_maxima_compatible
 
     @property
     def led_path(self):
@@ -225,6 +226,19 @@ class SysfsRgbDevice(LedDevice):
             return None
         return values
 
+    def _packed_maxima_are_compatible(self):
+        if not self._led_path or self._index_format != "packed_decimal":
+            return True
+        path = os.path.join(self._led_path, "multi_max_intensity")
+        if not os.path.exists(path):
+            return True
+        try:
+            with open(path) as handle:
+                values = tuple(int(value, 0) for value in handle.read().split())
+        except (OSError, ValueError):
+            return False
+        return len(values) == self._zones and all(value >= 0xFFFFFF for value in values)
+
     def _format_zone(self, color, zone):
         channels = self._order(color)
         if self._channel_maxima:
@@ -234,6 +248,8 @@ class SysfsRgbDevice(LedDevice):
         r, g, b = channels
         if self._index_format == "decimal":
             return f"{r} {g} {b}"
+        if self._index_format == "packed_decimal":
+            return str((r << 16) | (g << 8) | b)
         return f"0x{r:02x}{g:02x}{b:02x}"
 
     def apply_zones(self, zone_colors, brightness, power):

@@ -135,6 +135,39 @@ def test_hex_rgb_packs_zones_and_brightness(tmp_path):
     assert _read(os.path.join(led, "brightness")) == "255"
 
 
+def test_packed_decimal_rgb_writes_kernel_compatible_values(tmp_path):
+    led = _make_led(tmp_path)
+    device = SysfsRgbDevice(
+        led,
+        zones=4,
+        max_brightness=255,
+        index_format="packed_decimal",
+        color_correction=(1.0, 0.85, 1.0),
+    )
+    assert device.apply_zones(
+        [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 255)],
+        100,
+        True,
+    ) is True
+    assert _read(os.path.join(led, "multi_intensity")) == "16711680 55552 255 16767487"
+
+
+def test_packed_decimal_rgb_is_unavailable_when_kernel_maxima_are_too_low(tmp_path):
+    led = _make_led(tmp_path)
+    open(os.path.join(led, "multi_max_intensity"), "w").write("255 255 255 255")
+    device = SysfsRgbDevice(led, zones=4, index_format="packed_decimal")
+    assert device.available is False
+
+
+def test_packed_decimal_rgb_accepts_hexadecimal_kernel_maxima(tmp_path):
+    led = _make_led(tmp_path)
+    open(os.path.join(led, "multi_max_intensity"), "w").write(
+        "0xffffff 0xffffff 0xffffff 0xffffff"
+    )
+    device = SysfsRgbDevice(led, zones=4, index_format="packed_decimal")
+    assert device.available is True
+
+
 def test_hex_bgr_swaps_red_and_blue(tmp_path):
     led = _make_led(tmp_path)
     device = SysfsRgbDevice(led, zones=4, max_brightness=255, color_order="bgr")
