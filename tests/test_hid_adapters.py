@@ -1,4 +1,5 @@
 import importlib
+import logging
 import sys
 import types
 
@@ -626,6 +627,102 @@ def _oxp_entry():
     }
 
 
+def test_oxp_rejects_foreign_pid_with_matching_usage(hid_env):
+    adapters, _ = hid_env
+    foreign = dict(_oxp_entry(), product_id=0xB002)
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [foreign]
+
+    assert adapters.ApexOxpHidDevice.create().available is False
+    assert adapters.OxpHidDevice.create().available is True
+
+
+def _make_oxp_root(tmp_path, product):
+    import os
+
+    root = _make_dmi_root(tmp_path, product)
+    led = os.path.join(root, "sys/class/leds", "oxp:rgb:joystick_rings")
+    os.makedirs(led)
+    for name, content in {
+        "multi_index": "red green blue",
+        "multi_max_intensity": "100 100 100",
+        "multi_intensity": "0 0 0",
+        "brightness": "0",
+        "max_brightness": "100",
+        "enabled": "false",
+        "effect": "rainbow",
+    }.items():
+        with open(os.path.join(led, name), "w") as handle:
+            handle.write(content)
+    return root
+
+
+def test_apex_prefers_direct_hid_and_keeps_sysfs_as_fallback(hid_env, tmp_path):
+    import os
+
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    device = _reload_device()
+    root = _make_oxp_root(tmp_path, "ONEXPLAYER APEX")
+
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+
+    assert type(ctx["device"]).__name__ == "ApexRgbDevice"
+    assert ctx["device"].route == "hid"
+    assert ctx["capabilities"]["reconnectable"] is True
+    writes.clear()
+    assert ctx["device"].apply_zones([(255, 0, 0)], 100, True) is True
+    assert [packet[:3] for packet in writes] == [
+        bytes([0x07, 0xFF, 0xFD]),
+        bytes([0x07, 0xFF, 0xFE]),
+    ]
+    led = os.path.join(root, "sys/class/leds/oxp:rgb:joystick_rings")
+    assert open(os.path.join(led, "multi_intensity")).read() == "0 0 0"
+    sys.modules.pop("device", None)
+
+
+def test_f1_pro_keeps_existing_sysfs_route(hid_env, tmp_path):
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    device = _reload_device()
+    root = _make_oxp_root(tmp_path, "ONEXPLAYER F1Pro")
+
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+
+    from led_device import SysfsRgbDevice
+
+    assert isinstance(ctx["device"], SysfsRgbDevice)
+    sys.modules.pop("device", None)
+
+
+def test_f1_pro_keeps_wildcard_hid_fallback_without_sysfs(hid_env, tmp_path):
+    adapters, _ = hid_env
+    foreign_pid = dict(_oxp_entry(), product_id=0xB002)
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [foreign_pid]
+    device = _reload_device()
+    root = _make_dmi_root(tmp_path, "ONEXPLAYER F1Pro")
+
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+
+    assert isinstance(ctx["device"], adapters.OxpHidDevice)
+    assert not isinstance(ctx["device"], adapters.ApexOxpHidDevice)
+    assert ctx["capabilities"]["color"] is True
+    sys.modules.pop("device", None)
+
+
+def test_apex_without_sysfs_keeps_exact_hid_takeover_capabilities(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    device = _reload_device()
+    root = _make_dmi_root(tmp_path, "ONEXPLAYER APEX")
+
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+
+    assert isinstance(ctx["device"], adapters.ApexOxpHidDevice)
+    assert ctx["device"].route == "hid"
+    assert ctx["capabilities"]["hhdRgbTakeover"] is True
+    assert ctx["capabilities"]["reconnectable"] is True
+    sys.modules.pop("device", None)
+
+
 def test_oxp_solid_enables_then_paints(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
@@ -639,6 +736,23 @@ def test_oxp_solid_enables_then_paints(hid_env):
     assert writes[0][:6] == bytes([0x07, 0xFF, 0xFD, 0x01, 0x05, 0x04])
     assert writes[1][:3] == bytes([0x07, 0xFF, 0xFE])
     assert tuple(writes[1][3:6]) == (255, 0, 0)
+
+
+def test_oxp_logs_sanitized_identity_and_claim_packets(hid_env, caplog):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    caplog.set_level(logging.INFO)
+    dev = adapters.OxpHidDevice.create()
+
+    assert dev.available is True
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    assert "vid=1a2c" in caplog.text
+    assert "pid=b001" in caplog.text
+    assert "usage_page=ff01" in caplog.text
+    assert "usage=0001" in caplog.text
+    assert "kind=enable length=64 result=64" in caplog.text
+    assert "kind=color length=64 result=64" in caplog.text
+    assert "b'oxp'" not in caplog.text
 
 
 def test_oxp_steady_state_sends_only_color(hid_env):
@@ -735,9 +849,7 @@ def test_oxp_steady_state_keeps_protocol_delay(hid_env, monkeypatch):
     assert sleeps == pytest.approx([0.05])
 
 
-def test_oxp_short_write_reconnects_and_retries_full_transition(hid_env):
-    adapters, writes = hid_env
-    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+def _short_write_device(writes):
     results = iter([32, 64, 64])
 
     class ShortWriteDevice:
@@ -751,11 +863,32 @@ def test_oxp_short_write_reconnects_and_retries_full_transition(hid_env):
         def close(self):
             pass
 
-    sys.modules["lib_hid"].Device = ShortWriteDevice
-    dev = adapters.OxpHidDevice.create()
+    return ShortWriteDevice
+
+
+def _oxp_with_short_write(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_entry()]
+    sys.modules["lib_hid"].Device = _short_write_device(writes)
+    return adapters.OxpHidDevice.create(), writes
+
+
+def test_oxp_short_write_reconnects_and_retries_full_transition(hid_env):
+    dev, writes = _oxp_with_short_write(hid_env)
+
     assert dev.apply_solid((255, 0, 0), 100, True) is True
     assert [packet[:3] for packet in writes] == [
         bytes([0x07, 0xFF, 0xFD]),
         bytes([0x07, 0xFF, 0xFD]),
         bytes([0x07, 0xFF, 0xFE]),
     ]
+
+
+def test_oxp_short_write_logs_failure_before_recovery(hid_env, caplog):
+    caplog.set_level(logging.INFO)
+    dev, _ = _oxp_with_short_write(hid_env)
+
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    assert "kind=enable length=64 result=32" in caplog.text
+    assert "short write" in caplog.text.lower()
+    assert "reconnect" in caplog.text.lower()

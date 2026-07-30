@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import threading
 import types
 
 import pytest
@@ -113,6 +114,21 @@ class FakeAudio:
         self.events.append(("start", options))
 
 
+class FakeHhdRgb:
+    def __init__(self, reads=None, writes=None):
+        self.reads = list(reads or [])
+        self.writes = list(writes or [])
+        self.calls = []
+
+    def read_rgb(self):
+        self.calls.append(("read",))
+        return self.reads.pop(0) if self.reads else False
+
+    def set_rgb(self, enabled):
+        self.calls.append(("set", enabled))
+        return self.writes.pop(0) if self.writes else True
+
+
 def _plugin(
     main_module,
     mode,
@@ -121,9 +137,13 @@ def _plugin(
     power=True,
     per_zone=False,
     per_controller=False,
+    hhd_takeover=False,
 ):
     p = main_module.Plugin()
     p._ready = True
+    p._stopping = False
+    p._hhd_rgb_lock = asyncio.Lock()
+    p._hhd_rgb_status = None
     p._controller = FakeController(hw, per_zone)
     p._engine = FakeEngine()
     p._ambilight = FakeAmbilight()
@@ -133,6 +153,8 @@ def _plugin(
         "zones": 2,
         "perControllerColor": per_controller,
         "perZone": per_zone,
+        "conflictsWithSystemRgb": hhd_takeover,
+        "hhdRgbTakeover": hhd_takeover,
     }
     p._settings = {
         "power": power,
@@ -143,8 +165,22 @@ def _plugin(
         "gradient_speed": 30,
         "effect": effect or {"id": "breathing", "speed": 50, "use_gradient": False},
         "ambilight": {"saturation": 140, "smoothing": 75, "fps": 10},
+        "force_control": False,
+        "hhd_rgb_restore": None,
     }
+    p._hhd_rgb = FakeHhdRgb()
     return p
+
+
+def _hhd_plugin(
+    main_module, *, reads=None, writes=None, restore=None, force=False, **plugin_options
+):
+    plugin = _plugin(main_module, "solid", hhd_takeover=True, **plugin_options)
+    plugin._settings.update(force_control=force, hhd_rgb_restore=restore)
+    plugin._hhd_rgb = FakeHhdRgb(reads, writes)
+    saved = []
+    plugin._store = types.SimpleNamespace(save=lambda state: saved.append(dict(state)))
+    return plugin, saved
 
 
 @pytest.mark.parametrize(
@@ -450,6 +486,38 @@ def test_resume_restore_stops_after_bounded_failures(main_module, monkeypatch):
     assert reconnects == 3
 
 
+def test_apex_reconnect_claims_hhd_before_controller_write(main_module):
+    events = []
+    p = _plugin(main_module, "solid", hhd_takeover=True)
+    p._settings["force_control"] = True
+    p._store = types.SimpleNamespace(save=lambda _s: None)
+
+    class OrderedHhd:
+        def read_rgb(self):
+            events.append("hhd-read")
+            return True
+
+        def set_rgb(self, enabled):
+            events.append(f"hhd-set-{enabled}")
+            return True
+
+    class OrderedController(FakeController):
+        def reconnect(self):
+            events.append("controller-reconnect")
+            return super().reconnect()
+
+        def apply_solid(self, color, brightness, power):
+            events.append("controller-write")
+            return super().apply_solid(color, brightness, power)
+
+    p._hhd_rgb = OrderedHhd()
+    p._controller = OrderedController()
+
+    assert asyncio.run(p.reconnect()) is True
+    assert events[:3] == ["hhd-read", "hhd-set-False", "controller-reconnect"]
+    assert events.index("hhd-set-False") < events.index("controller-write")
+
+
 def _late_ctx(device):
     return {
         "info": {"name": "ROG Xbox Ally X"},
@@ -602,6 +670,7 @@ def test_set_battery_breathe_persists(main_module):
 
 def test_force_control_default_is_false(main_module):
     assert main_module.DEFAULTS["force_control"] is False
+    assert main_module.DEFAULTS["hhd_rgb_restore"] is None
 
 
 def test_set_force_control_persists_and_applies(main_module):
@@ -612,6 +681,119 @@ def test_set_force_control_persists_and_applies(main_module):
     assert p._settings["force_control"] is True
     assert saved["v"]["force_control"] is True
     assert p._controller.calls, "set_force_control must re-apply"
+
+
+def test_apex_force_control_disables_hhd_rgb_and_saves_restore_state(main_module):
+    p, saved = _hhd_plugin(main_module, reads=[True], writes=[True])
+
+    asyncio.run(p.set_force_control(True))
+
+    assert p._hhd_rgb.calls == [("read",), ("set", False)]
+    assert p._settings["hhd_rgb_restore"] is True
+    assert saved[-1]["hhd_rgb_restore"] is True
+    assert p._controller.invalidated is True
+
+
+@pytest.mark.parametrize(
+    "confirmed,expected_marker",
+    [(True, None), (False, True)],
+    ids=["confirmed-clears-marker", "failed-keeps-marker"],
+)
+def test_apex_hhd_restore_marker(main_module, confirmed, expected_marker):
+    p, saved = _hhd_plugin(main_module, writes=[confirmed], restore=True, force=True)
+
+    asyncio.run(p.set_force_control(False))
+
+    assert p._hhd_rgb.calls == [("set", True)]
+    assert p._settings["hhd_rgb_restore"] is expected_marker
+    assert saved[-1]["hhd_rgb_restore"] is expected_marker
+
+
+def test_force_control_does_not_touch_hhd_on_other_devices(main_module):
+    p = _plugin(main_module, "solid", hhd_takeover=False)
+    p._hhd_rgb = FakeHhdRgb(reads=[True], writes=[True])
+    p._store = types.SimpleNamespace(save=lambda _s: None)
+
+    asyncio.run(p.set_force_control(True))
+
+    assert p._hhd_rgb.calls == []
+
+
+def test_unload_restores_hhd_rgb_ownership(main_module):
+    p, _ = _hhd_plugin(main_module, writes=[True], restore=True)
+
+    asyncio.run(p._unload())
+
+    assert p._hhd_rgb.calls == [("set", True)]
+    assert p._settings["hhd_rgb_restore"] is None
+
+
+def test_unload_waits_for_inflight_hhd_claim_before_restore(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "FORCE_CONTROL_INTERVAL", 0.001)
+    p = _plugin(main_module, "solid", hhd_takeover=True)
+    p._settings["force_control"] = True
+    p._store = types.SimpleNamespace(save=lambda _s: None)
+    claim_started = threading.Event()
+    release_claim = threading.Event()
+
+    class BlockingHhd:
+        def __init__(self):
+            self.calls = []
+
+        def read_rgb(self):
+            self.calls.append(("read",))
+            return True
+
+        def set_rgb(self, enabled):
+            self.calls.append(("set", enabled))
+            if not enabled:
+                claim_started.set()
+                release_claim.wait(1)
+            return True
+
+    p._hhd_rgb = BlockingHhd()
+
+    async def drive():
+        p._force_control_task = asyncio.create_task(p._force_control_watch())
+        while not claim_started.is_set():
+            await asyncio.sleep(0.001)
+        unload = asyncio.create_task(p._unload())
+        await asyncio.sleep(0.01)
+        assert ("set", True) not in p._hhd_rgb.calls
+        release_claim.set()
+        await unload
+
+    asyncio.run(drive())
+
+    assert p._hhd_rgb.calls[-2:] == [("set", False), ("set", True)]
+    assert p._settings["hhd_rgb_restore"] is None
+
+
+def test_uninstall_stops_watcher_before_restoring_hhd(main_module):
+    p, _ = _hhd_plugin(main_module, writes=[True], restore=True)
+
+    async def drive():
+        p._force_control_task = asyncio.create_task(asyncio.sleep(60))
+        p._resume_task = asyncio.create_task(asyncio.sleep(60))
+        await p._uninstall()
+        assert p._force_control_task.cancelled()
+        assert p._resume_task.cancelled()
+
+    asyncio.run(drive())
+    assert p._hhd_rgb.calls == [("set", True)]
+
+
+def test_force_control_cannot_reclaim_hhd_after_unload_begins(main_module):
+    p, _ = _hhd_plugin(main_module, reads=[True], writes=[True])
+
+    async def drive():
+        await p._unload()
+        await p.set_force_control(True)
+
+    asyncio.run(drive())
+
+    assert p._hhd_rgb.calls == []
+    assert p._controller.invalidated is False
 
 
 def test_hardware_gradient_uses_device_zone_count(main_module):
@@ -647,6 +829,32 @@ def test_force_control_watch_reasserts_static_mode(main_module, monkeypatch):
     _drive_watch(main_module, p)
     assert p._controller.invalidated is False, "maintenance re-assert must not re-init"
     assert p._controller.calls, "watch must re-apply in a static mode"
+
+
+@pytest.mark.parametrize(
+    "hhd_enabled,expected_invalidated",
+    [(True, True), (False, False)],
+    ids=["reclaim-relatches", "already-disabled"],
+)
+def test_apex_force_control_watch(
+    main_module, monkeypatch, hhd_enabled, expected_invalidated
+):
+    monkeypatch.setattr(main_module, "FORCE_CONTROL_INTERVAL", 0.001)
+    p, _ = _hhd_plugin(
+        main_module,
+        reads=[True] if hhd_enabled else [False] * 30,
+        writes=[True],
+        force=True,
+        hw=False,
+    )
+    p._controller.calls.clear()
+    p._engine.events.clear()
+
+    _drive_watch(main_module, p)
+
+    assert (("set", False) in p._hhd_rgb.calls) is hhd_enabled
+    assert p._controller.invalidated is expected_invalidated
+    assert p._engine.events
 
 
 def test_force_control_watch_skips_running_effect(main_module, monkeypatch):

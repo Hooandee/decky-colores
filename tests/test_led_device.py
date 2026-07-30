@@ -1,8 +1,110 @@
 import os
 
-from py_modules.led_device import SysfsRgbDevice, ValveLedsDevice, discover_valve_leds
+from py_modules.led_device import ApexRgbDevice, SysfsRgbDevice, ValveLedsDevice, discover_valve_leds
 
 _OXP_LATCH = [["enabled", "true"], ["effect", "monocolor"]]
+
+
+class FakeLedDevice:
+    def __init__(self, results, available=True, led_path=None, error="write failed"):
+        self.results = list(results)
+        self._available = available
+        self.led_path = led_path
+        self.last_error = error
+        self.calls = []
+        self.invalidations = 0
+        self.reconnects = 0
+
+    @property
+    def available(self):
+        return self._available
+
+    def apply_zones(self, colors, brightness, power):
+        self.calls.append((list(colors), brightness, power))
+        return self.results.pop(0)
+
+    def invalidate(self):
+        self.invalidations += 1
+
+    def reconnect(self):
+        self.reconnects += 1
+        return self._available
+
+    def supports_per_zone(self):
+        return False
+
+    def supports_hardware_effects(self):
+        return False
+
+
+def test_apex_rgb_uses_hid_primary_without_dual_write():
+    hid = FakeLedDevice([True])
+    sysfs = FakeLedDevice([True], led_path="/sys/oxp")
+    device = ApexRgbDevice(hid, sysfs)
+
+    assert device.route == "hid"
+    assert device.apply_zones([(10, 20, 30)], 70, True) is True
+    assert len(hid.calls) == 1
+    assert sysfs.calls == []
+
+
+def test_apex_rgb_falls_back_to_relatched_sysfs_after_hid_failure(caplog):
+    hid = FakeLedDevice([False], error="short HID write")
+    sysfs = FakeLedDevice([True], led_path="/sys/oxp")
+    device = ApexRgbDevice(hid, sysfs)
+
+    assert device.apply_zones([(10, 20, 30)], 70, True) is True
+    assert device.route == "sysfs"
+    assert sysfs.invalidations == 1
+    assert len(sysfs.calls) == 1
+    assert "hid" in caplog.text.lower()
+    assert "sysfs" in caplog.text.lower()
+
+
+def test_apex_rgb_starts_on_sysfs_when_hid_is_unavailable():
+    hid = FakeLedDevice([], available=False)
+    sysfs = FakeLedDevice([True], led_path="/sys/oxp")
+    device = ApexRgbDevice(hid, sysfs)
+
+    assert device.route == "sysfs"
+    assert device.apply_solid((1, 2, 3), 80, True) is True
+    assert sysfs.calls == [([(1, 2, 3)], 80, True)]
+
+
+def test_apex_rgb_reconnect_recovers_hid_primary():
+    hid = FakeLedDevice([False, True])
+    sysfs = FakeLedDevice([True], led_path="/sys/oxp")
+    device = ApexRgbDevice(hid, sysfs)
+    assert device.apply_zones([(1, 2, 3)], 100, True) is True
+    assert device.route == "sysfs"
+
+    assert device.reconnect() is True
+    assert device.route == "hid"
+    assert hid.reconnects == 1
+    assert hid.invalidations == 1
+    assert device.apply_zones([(4, 5, 6)], 100, True) is True
+
+
+def test_apex_rgb_recovers_hid_immediately_when_sysfs_write_fails():
+    hid = FakeLedDevice([True], available=False)
+    sysfs = FakeLedDevice([False], led_path="/sys/oxp", error="sysfs failed")
+    device = ApexRgbDevice(hid, sysfs)
+    hid._available = True
+
+    assert device.apply_zones([(4, 5, 6)], 100, True) is True
+    assert device.route == "hid"
+    assert hid.reconnects == 1
+    assert hid.invalidations == 1
+    assert len(hid.calls) == 1
+
+
+def test_apex_rgb_reports_both_route_failures():
+    hid = FakeLedDevice([False], error="hid failed")
+    sysfs = FakeLedDevice([False], led_path="/sys/oxp", error="sysfs failed")
+    device = ApexRgbDevice(hid, sysfs)
+
+    assert device.apply_zones([(1, 2, 3)], 100, True) is False
+    assert device.last_error == "hid: hid failed; sysfs: sysfs failed"
 
 
 def _make_led(tmp_path, multi_index="rgb rgb rgb rgb"):

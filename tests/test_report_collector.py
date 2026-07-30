@@ -113,10 +113,12 @@ def test_capabilities_from_uses_controller_fallback():
     caps = capabilities_from(
         {"capabilities": {"color": True}, "device": {"name": "ROG Ally"}},
         driver="AsusAllyHidDevice",
+        route="hid",
         led_path=None,
         last_error="probe with driver asus failed with error -12",
     )
     assert caps["driver"] == "AsusAllyHidDevice"
+    assert caps["route"] == "hid"
     assert caps["led_path"] is None
     assert caps["last_error"] == "probe with driver asus failed with error -12"
 

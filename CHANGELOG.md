@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.3](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.2...decky-colores-v0.21.3) (2026-07-29)
+
+
+### Bug Fixes / Correcciones
+
+* More resilient RGB control on the OneXPlayer Apex: Colores now prefers the dedicated HID route, turns the controller on before sending color, automatically falls back to the kernel LED interface and recovers between both routes when one fails. Force Control can temporarily take RGB ownership from HHD and restores its previous state when Colores stops, while expanded diagnostics report the active route and failures. Physical validation on an Apex is still pending. ([#88](https://github.com/Hooandee/decky-colores/pull/88)) ([55f2792](https://github.com/Hooandee/decky-colores/commit/55f279254ee2d85f5f297106b84714d4413e284d)) ([aeb842b](https://github.com/Hooandee/decky-colores/commit/aeb842bedeb8519553c80c8635be42954c4e5964))
+* **ES:** Control RGB más resistente en OneXPlayer Apex: Colores ahora prioriza la ruta HID dedicada, enciende el controlador antes de enviar el color, recurre automáticamente a la interfaz LED del kernel y se recupera entre ambas rutas si una falla. Forzar control puede tomar temporalmente el control RGB de HHD y restaura su estado anterior cuando Colores se detiene, mientras el diagnóstico ampliado informa de la ruta activa y de los fallos. La validación física en una Apex sigue pendiente. ([#88](https://github.com/Hooandee/decky-colores/pull/88)) ([55f2792](https://github.com/Hooandee/decky-colores/commit/55f279254ee2d85f5f297106b84714d4413e284d)) ([aeb842b](https://github.com/Hooandee/decky-colores/commit/aeb842bedeb8519553c80c8635be42954c4e5964))
+
 ## [0.21.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.1...decky-colores-v0.21.2) (2026-07-29)
 
 

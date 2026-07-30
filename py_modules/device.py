@@ -1,7 +1,7 @@
 import os
 
 from device_profiles import resolve_profile
-from led_device import SysfsRgbDevice, NullDevice, ValveLedsDevice, discover_valve_leds
+from led_device import ApexRgbDevice, SysfsRgbDevice, NullDevice, ValveLedsDevice, discover_valve_leds
 from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device
 from power_led import PowerLedController
 from power_supply import battery_present
@@ -180,6 +180,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "clockMode": active["color"],
         "audioMode": active["color"],
         "conflictsWithSystemRgb": bool(profile.get("conflicts_with_system_rgb", False)),
+        "hhdRgbTakeover": bool(profile.get("hhd_rgb_takeover", False)),
         "persistentStartup": bool(profile.get("persistent_startup", False)),
         "maxRenderFps": int(profile.get("max_render_fps", 30)),
         "layoutKind": profile.get("layout_kind", "rings"),
@@ -293,6 +294,14 @@ def build_device(sysfs_root="/", ambilight=False):
             latch=profile.get("latch"),
         )
         has_led = device.available
+        if has_led and profile.get("prefer_hid") and HID_AVAILABLE:
+            fallback = profile.get("fallback") or {}
+            hid_device = build_hid_device(fallback.get("driver"))
+            if hid_device is not None:
+                correction = fallback.get("color_correction")
+                if correction and hasattr(hid_device, "set_color_correction"):
+                    hid_device.set_color_correction(correction)
+                device = ApexRgbDevice(hid_device, device)
         if not has_led:
             led_path = None
 
@@ -315,6 +324,8 @@ def build_device(sysfs_root="/", ambilight=False):
         profile["experimental"] = _all_experimental(profile)
 
     capabilities = build_capabilities(profile, has_led, zones, max_brightness, ambilight, power_led, battery, temperature)
+    if isinstance(device, ApexRgbDevice):
+        capabilities["reconnectable"] = True
     return {
         "info": info,
         "capabilities": capabilities,
