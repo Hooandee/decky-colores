@@ -58,7 +58,7 @@ export type Mode =
   | "vu";
 
 export interface AmbilightState {
-  saturation: number;
+  vividness: number;
   smoothing: number;
   fps: number;
   sampling: string;

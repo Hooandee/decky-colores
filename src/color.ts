@@ -84,10 +84,14 @@ export function expandGradient(stops: RGB[], count: number): RGB[] {
 
 export function unifyColors(colors: RGB[]): RGB[] {
   const samples = colors.length ? colors : [{ r: 0, g: 0, b: 0 }];
+  const total = samples.reduce(
+    (sum, color) => ({ r: sum.r + color.r, g: sum.g + color.g, b: sum.b + color.b }),
+    { r: 0, g: 0, b: 0 },
+  );
   return [{
-    r: Math.round(samples.reduce((sum, color) => sum + color.r, 0) / samples.length),
-    g: Math.round(samples.reduce((sum, color) => sum + color.g, 0) / samples.length),
-    b: Math.round(samples.reduce((sum, color) => sum + color.b, 0) / samples.length),
+    r: Math.round(total.r / samples.length),
+    g: Math.round(total.g / samples.length),
+    b: Math.round(total.b / samples.length),
   }];
 }
 
