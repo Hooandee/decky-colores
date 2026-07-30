@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.5](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.4...decky-colores-v0.21.5) (2026-07-30)
+
+
+### Bug Fixes
+
+* improve global Ambilight controls ([fb78fe1](https://github.com/Hooandee/decky-colores/commit/fb78fe1edca6a7ee4f5deb610b976bc1ebac70ef))
+* improve global Ambilight sampling and vividness ([0421032](https://github.com/Hooandee/decky-colores/commit/042103240131daafede6e3c0bb6bfa09be3f6eea))
+
 ## [0.21.4](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.3...decky-colores-v0.21.4) (2026-07-30)
 
 
