@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.4](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.3...decky-colores-v0.21.4) (2026-07-30)
+
+
+### Bug Fixes
+
+* recover handheld lighting across suspend and drivers ([756d432](https://github.com/Hooandee/decky-colores/commit/756d432ca854b0939e2df5d64ca0fb913dcdd767))
+* recover handheld lighting across suspend and drivers ([5d3a2c0](https://github.com/Hooandee/decky-colores/commit/5d3a2c00c2ebb0a0d1eb5aada60c0c113fc0bca3))
+
 ## [0.21.3](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.2...decky-colores-v0.21.3) (2026-07-29)
 
 
