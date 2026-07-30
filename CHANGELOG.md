@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.4](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.3...decky-colores-v0.21.4) (2026-07-30)
+
+
+### Bug Fixes / Correcciones
+
+* More reliable lighting across suspend and device-specific drivers: ROG Ally X now writes the kernel's packed decimal RGB format while the original Ally stays on Aura HID. Legion Go and Go 2 expose honest global-color Ambilight previews, preserve a visible minimum brightness and restore lighting from the backend after waking. ([#90](https://github.com/Hooandee/decky-colores/pull/90)) ([756d432](https://github.com/Hooandee/decky-colores/commit/756d432ca854b0939e2df5d64ca0fb913dcdd767)) ([5d3a2c0](https://github.com/Hooandee/decky-colores/commit/5d3a2c00c2ebb0a0d1eb5aada60c0c113fc0bca3))
+* **ES:** Iluminación más fiable tras suspender y en los drivers específicos de cada máquina: ROG Ally X ahora escribe el formato RGB decimal empaquetado que espera el kernel, mientras la Ally original conserva Aura HID. Legion Go y Go 2 muestran una vista previa Ambilight honesta con color global, mantienen un brillo mínimo visible y restauran la iluminación desde el backend al despertar. ([#90](https://github.com/Hooandee/decky-colores/pull/90)) ([756d432](https://github.com/Hooandee/decky-colores/commit/756d432ca854b0939e2df5d64ca0fb913dcdd767)) ([5d3a2c0](https://github.com/Hooandee/decky-colores/commit/5d3a2c00c2ebb0a0d1eb5aada60c0c113fc0bca3))
+
 ## [0.21.3](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.2...decky-colores-v0.21.3) (2026-07-29)
 
 
