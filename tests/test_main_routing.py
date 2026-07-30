@@ -385,6 +385,71 @@ def test_reconnect_resets_controller_and_reapplies(main_module):
     assert any(c[0] == "solid" for c in p._controller.calls)
 
 
+def test_reconnect_restarts_ambient_capture(main_module):
+    p = _plugin(main_module, "ambient", hw=False, per_zone=True)
+    p._ambilight.events.clear()
+    ok = asyncio.run(p.reconnect())
+    assert ok is True
+    assert [event[0] for event in p._ambilight.events] == ["stop", "start"]
+
+
+def test_resume_watch_reconnects_after_suspend_clock_jump(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "RESUME_POLL_INTERVAL", 0)
+    monkeypatch.setattr(main_module, "RESUME_REAPPLY_DELAY", 0)
+    readings = iter([10.0, 10.1, 13.5])
+    monkeypatch.setattr(main_module, "_suspend_clock", lambda: next(readings))
+    p = _plugin(main_module, "solid")
+    reconnects = 0
+
+    async def reconnect():
+        nonlocal reconnects
+        reconnects += 1
+        raise asyncio.CancelledError
+
+    p.reconnect = reconnect
+
+    async def drive():
+        try:
+            await p._resume_watch()
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(drive())
+    assert reconnects == 1
+
+
+def test_resume_restore_retries_until_controller_is_ready(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "RESUME_RECONNECT_INTERVAL", 0)
+    p = _plugin(main_module, "solid")
+    results = iter([False, False, True])
+    reconnects = 0
+
+    async def reconnect():
+        nonlocal reconnects
+        reconnects += 1
+        return next(results)
+
+    p.reconnect = reconnect
+    assert asyncio.run(p._restore_after_resume()) is True
+    assert reconnects == 3
+
+
+def test_resume_restore_stops_after_bounded_failures(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "RESUME_RECONNECT_INTERVAL", 0)
+    monkeypatch.setattr(main_module, "RESUME_RECONNECT_ATTEMPTS", 3)
+    p = _plugin(main_module, "solid")
+    reconnects = 0
+
+    async def reconnect():
+        nonlocal reconnects
+        reconnects += 1
+        return False
+
+    p.reconnect = reconnect
+    assert asyncio.run(p._restore_after_resume()) is False
+    assert reconnects == 3
+
+
 def _late_ctx(device):
     return {
         "info": {"name": "ROG Xbox Ally X"},

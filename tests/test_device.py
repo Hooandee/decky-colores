@@ -111,8 +111,17 @@ def test_detect_capabilities_no_leds_dir(tmp_path):
     assert caps["zones"] == 0
 
 
-def test_read_zone_format_hex(tmp_path):
-    led = os.path.join(str(tmp_path), "led")
+def test_read_zone_format_packed_decimal(tmp_path):
+    led = os.path.join(str(tmp_path), "ally:rgb:joystick_rings")
+    os.makedirs(led)
+    open(os.path.join(led, "multi_index"), "w").write("rgb rgb rgb rgb")
+    zones, fmt = read_zone_format(led)
+    assert zones == 4
+    assert fmt == "packed_decimal"
+
+
+def test_read_zone_format_keeps_non_ally_rgb_as_hex(tmp_path):
+    led = os.path.join(str(tmp_path), "rgb:other")
     os.makedirs(led)
     open(os.path.join(led, "multi_index"), "w").write("rgb rgb rgb rgb")
     zones, fmt = read_zone_format(led)
@@ -178,6 +187,44 @@ def test_build_device_ally_returns_sysfs_writer(tmp_path):
     assert isinstance(ctx["device"], SysfsRgbDevice)
     assert ctx["capabilities"]["states"]["color"] == "supported"
     assert ctx["capabilities"]["zones"] == 4
+    assert ctx["device"].apply_zones([(255, 0, 0)], 100, True) is True
+    intensity = os.path.join(str(tmp_path), "sys/class/leds/ally:rgb:joystick_rings/multi_intensity")
+    assert open(intensity).read() == "16711680 16711680 16711680 16711680"
+
+
+def test_build_device_ally_uses_hid_fallback_for_incompatible_packed_maxima(tmp_path, monkeypatch):
+    import py_modules.device as device_module
+
+    fallback_device = object()
+    _make_dmi(str(tmp_path), "RC72LA", "ROG Ally X RC72LA")
+    _make_led(str(tmp_path), "ally:rgb:joystick_rings",
+              {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb",
+               "multi_max_intensity": "255 255 255 255",
+               "max_brightness": "255", "brightness": "0"})
+    monkeypatch.setattr(device_module, "HID_AVAILABLE", True)
+    monkeypatch.setattr(
+        device_module,
+        "_build_hid_context",
+        lambda *args: {"device": fallback_device, "capabilities": {"color": True}},
+    )
+
+    ctx = build_device(str(tmp_path))
+    assert ctx["device"] is fallback_device
+
+
+def test_build_device_original_ally_does_not_fall_back_to_sysfs(tmp_path, monkeypatch):
+    import py_modules.device as device_module
+
+    _make_dmi(str(tmp_path), "RC71L", "ROG Ally RC71L_RC71L")
+    _make_led(str(tmp_path), "ally:rgb:joystick_rings",
+              {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb",
+               "max_brightness": "255", "brightness": "128"})
+    monkeypatch.setattr(device_module, "HID_AVAILABLE", False)
+
+    ctx = build_device(str(tmp_path))
+    assert isinstance(ctx["device"], NullDevice)
+    intensity = os.path.join(str(tmp_path), "sys/class/leds/ally:rgb:joystick_rings/multi_intensity")
+    assert open(intensity).read() == "0 0 0 0"
 
 
 def test_build_device_legion_without_node_is_null_and_experimental(tmp_path):

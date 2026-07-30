@@ -178,6 +178,29 @@ def test_legion_tablet_per_controller_gradient(hid_env):
     assert right[6:9] == bytes([0, 0, 255])
 
 
+def test_legion_go_global_color_averages_ambilight_zones(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
+    dev = adapters.LegionGoHidDevice.create()
+    writes.clear()
+    assert dev.apply_zones([(255, 0, 0), (0, 0, 255)], 100, True) is True
+    set_profiles = [w for w in writes if len(w) >= 9 and w[2] == 0x72]
+    assert [packet[6:9] for packet in set_profiles] == [
+        bytes([128, 0, 128]),
+        bytes([128, 0, 128]),
+    ]
+
+
+def test_legion_go_one_percent_uses_minimum_visible_brightness(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
+    dev = adapters.LegionGoHidDevice.create()
+    writes.clear()
+    assert dev.apply_solid((255, 255, 255), 1, True) is True
+    set_profiles = [w for w in writes if len(w) >= 10 and w[2] == 0x72]
+    assert [packet[9] for packet in set_profiles] == [1, 1]
+
+
 def test_legion_tablet_reconnects_after_stale_handle(hid_env):
     adapters, writes = hid_env
     entry = _legion_tablet_entry()
@@ -338,13 +361,20 @@ def test_legion_ambilight_is_supported_when_capture_available(hid_env, tmp_path)
     sys.modules.pop("device", None)
 
 
-def test_per_controller_capability_tablet_vs_go_s(hid_env, tmp_path):
+def test_legion_tablets_do_not_declare_per_controller_color(hid_env, tmp_path):
     adapters, _ = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
     device = _reload_device()
-    tablet_root = _make_dmi_root(tmp_path / "tab", "83E1")
-    tablet = device.build_device(sysfs_root=tablet_root, ambilight=False)
-    assert tablet["capabilities"]["perControllerColor"] is True
+    original_root = _make_dmi_root(tmp_path / "original", "83E1")
+    original = device.build_device(sysfs_root=original_root, ambilight=False)
+    assert isinstance(original["device"], adapters.LegionGoHidDevice)
+    assert original["capabilities"]["perControllerColor"] is False
+
+    device = _reload_device()
+    go_2_root = _make_dmi_root(tmp_path / "go2", "83N0")
+    go_2 = device.build_device(sysfs_root=go_2_root, ambilight=False)
+    assert isinstance(go_2["device"], adapters.LegionGoHidDevice)
+    assert go_2["capabilities"]["perControllerColor"] is False
 
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_go_s_entry()]
     device = _reload_device()

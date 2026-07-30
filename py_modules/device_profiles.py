@@ -11,6 +11,7 @@ ASUS_ALLY_HID = {
     "driver": "hid_asus_ally",
     "color_order": "rgb",
     "zones": 4,
+    "allow_sysfs_fallback": False,
     # No "spiral": that renders as the Legion-only firmware effect ("Espiral GO").
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
     "color_correction": [1.0, 0.85, 1.0],
@@ -38,12 +39,11 @@ POWER_LED_LEDPM = [  # original Legion Go (LEDP awake + LEDM suspend)
     {"offset": 0x58, "mask": 0x01},
 ]
 
-LEGION_TABLET_HID = {
-    "driver": "hid_legion_tablet",
+LEGION_GO_HID = {
+    "driver": "hid_legion_go",
     "color_order": "rgb",
     "zones": 2,
     "supported_effects": ["breathing", "rainbow", "spiral"],
-    "per_controller": True,
     "gradient_crossfade": True,
     "experimental": [],
 }
@@ -128,9 +128,9 @@ PROFILES = [
     ("board", "RC72LA", _profile(ASUS_SYSFS, "ROG Ally X")),
     ("board", "RC73YA", _profile(ASUS_SYSFS, "ROG Xbox Ally")),
     ("board", "RC73XA", _profile(ASUS_SYSFS, "ROG Xbox Ally X")),
-    ("product", "83E1", _profile(LEGION_TABLET_HID, "Legion Go", POWER_LED_LEDPM)),
-    ("product", "83N0", _profile(LEGION_TABLET_HID, "Legion Go 2", POWER_LED_LPBL)),
-    ("product", "83N1", _profile(LEGION_TABLET_HID, "Legion Go 2", POWER_LED_LPBL)),
+    ("product", "83E1", _profile(LEGION_GO_HID, "Legion Go", POWER_LED_LEDPM)),
+    ("product", "83N0", _profile(LEGION_GO_HID, "Legion Go 2", POWER_LED_LPBL)),
+    ("product", "83N1", _profile(LEGION_GO_HID, "Legion Go 2", POWER_LED_LPBL)),
     ("product", "83L3", _profile(LEGION_GO_S_HID, "Legion Go S", POWER_LED_LPBL)),
     ("product", "83Q2", _profile(LEGION_GO_S_HID, "Legion Go S", POWER_LED_LPBL)),
     ("product", "83N6", _profile(LEGION_GO_S_HID, "Legion Go S", POWER_LED_LPBL)),

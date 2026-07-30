@@ -67,6 +67,11 @@ FORCE_CONTROL_INTERVAL = 2.0
 ACQUIRE_ATTEMPTS = 20
 ACQUIRE_INTERVAL = 1.0
 REASSERT_DELAY = 5.0
+RESUME_POLL_INTERVAL = 1.0
+RESUME_REAPPLY_DELAY = 2.0
+RESUME_SUSPEND_THRESHOLD = 1.0
+RESUME_RECONNECT_ATTEMPTS = 3
+RESUME_RECONNECT_INTERVAL = 1.0
 
 
 def _rgb(values):
@@ -75,6 +80,13 @@ def _rgb(values):
 
 def _saved(entry):
     return {"name": entry["name"], "stops": [_rgb(c) for c in entry["stops"]]}
+
+
+def _suspend_clock():
+    try:
+        return time.clock_gettime(time.CLOCK_BOOTTIME) - time.monotonic()
+    except (AttributeError, OSError):
+        return None
 
 
 def _user_creds():
@@ -492,6 +504,8 @@ class Plugin:
         self._init()
         self._reprobe_device()
         ok = self._controller.reconnect()
+        if self._settings["mode"] == "ambient":
+            self._ambilight.stop()
         self._apply()
         return bool(ok)
 
@@ -746,6 +760,7 @@ class Plugin:
         self._apply()
         self._reassert_task = asyncio.create_task(self._acquire_and_reassert())
         self._charger_task = asyncio.create_task(self._charger_watch())
+        self._resume_task = asyncio.create_task(self._resume_watch())
         if self._capabilities.get("conflictsWithSystemRgb"):
             self._force_control_task = asyncio.create_task(self._force_control_watch())
 
@@ -775,6 +790,48 @@ class Plugin:
         except Exception as error:  # a sysfs hiccup must never kill the plugin
             decky.logger.warning("Colores: charger watch failed: %s", error)
 
+    async def _resume_watch(self) -> None:
+        previous = _suspend_clock()
+        if previous is None:
+            return
+        try:
+            while True:
+                await asyncio.sleep(RESUME_POLL_INTERVAL)
+                current = _suspend_clock()
+                if current is None:
+                    return
+                suspended_for = current - previous
+                previous = current
+                if suspended_for < RESUME_SUSPEND_THRESHOLD:
+                    continue
+                await asyncio.sleep(RESUME_REAPPLY_DELAY)
+                if await self._restore_after_resume():
+                    decky.logger.info(
+                        "Colores: restored lighting after %.1fs suspend", suspended_for
+                    )
+                else:
+                    decky.logger.warning(
+                        "Colores: could not restore lighting after %.1fs suspend",
+                        suspended_for,
+                    )
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            decky.logger.warning("Colores: resume watch failed: %s", error)
+
+    async def _restore_after_resume(self) -> bool:
+        for attempt in range(RESUME_RECONNECT_ATTEMPTS):
+            try:
+                if await self.reconnect():
+                    return True
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:
+                decky.logger.warning("Colores: resume reconnect failed: %s", error)
+            if attempt + 1 < RESUME_RECONNECT_ATTEMPTS:
+                await asyncio.sleep(RESUME_RECONNECT_INTERVAL)
+        return False
+
     async def _force_control_watch(self) -> None:
         # Another RGB tool (e.g. HHD) keeps reapplying its own colors on its events, so
         # a one-shot reclaim doesn't hold. Re-assert our state on a coarse tick to win it
@@ -798,7 +855,13 @@ class Plugin:
             decky.logger.warning("Colores: force-control watch failed: %s", error)
 
     async def _unload(self):
-        for attr in ("_reassert_task", "_charger_task", "_force_control_task", "_startup_task"):
+        for attr in (
+            "_reassert_task",
+            "_charger_task",
+            "_resume_task",
+            "_force_control_task",
+            "_startup_task",
+        ):
             task = getattr(self, attr, None)
             if task:
                 task.cancel()

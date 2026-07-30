@@ -120,6 +120,8 @@ def build_layout(zones, swap_sticks=False, layout_kind="rings"):
 
 
 _CHANNEL_NAMES = {"red", "green", "blue"}
+_PACKED_COLOR_NAME = "rgb"
+_ALLY_RGB_NODE = "ally:rgb:joystick_rings"
 
 FEATURES = ("color", "brightness", "effects", "ambilight")
 
@@ -129,6 +131,10 @@ def read_zone_format(led_path):
     tokens = multi_index.split()
     if tokens and all(token.lower() in _CHANNEL_NAMES for token in tokens):
         return max(1, len(tokens) // 3), "decimal"
+    if os.path.basename(led_path) == _ALLY_RGB_NODE and tokens and all(
+        token.lower() == _PACKED_COLOR_NAME for token in tokens
+    ):
+        return len(tokens), "packed_decimal"
     return max(1, len(tokens)), "hex"
 
 
@@ -198,7 +204,14 @@ def _find_rgb_led(leds_dir):
     return None
 
 
-_IMPLEMENTED_DRIVERS ={"sysfs", "hid_msi", "hid_legion_tablet", "hid_legion_go_s", "hid_asus_ally", "valve_leds"}
+_IMPLEMENTED_DRIVERS = {
+    "sysfs",
+    "hid_msi",
+    "hid_legion_go",
+    "hid_legion_go_s",
+    "hid_asus_ally",
+    "valve_leds",
+}
 
 
 def _build_hid_context(profile, ambilight, power_led=None, battery=False, temperature=False):
@@ -267,7 +280,7 @@ def build_device(sysfs_root="/", ambilight=False):
         profile["experimental"] = _all_experimental(profile)
 
     leds_dir = os.path.join(sysfs_root, "sys/class/leds")
-    led_path = _find_rgb_led(leds_dir)
+    led_path = _find_rgb_led(leds_dir) if profile.get("allow_sysfs_fallback", True) else None
 
     if led_path:
         zones, index_format = read_zone_format(led_path)
@@ -279,8 +292,11 @@ def build_device(sysfs_root="/", ambilight=False):
             color_correction=profile.get("color_correction", [1.0, 1.0, 1.0]),
             latch=profile.get("latch"),
         )
-        has_led = True
-    else:
+        has_led = device.available
+        if not has_led:
+            led_path = None
+
+    if not led_path:
         fallback = profile.get("fallback")
         if fallback and HID_AVAILABLE and fallback.get("driver") in HID_DRIVERS:
             fb_profile = dict(fallback)

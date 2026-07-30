@@ -28,10 +28,18 @@ def test_ambilight_is_not_experimental_on_hid_profiles():
         assert "ambilight" not in p["experimental"]
 
 
-def test_legion_go_2_profile_is_hid_tablet():
+def test_legion_go_2_profile_uses_global_color_driver():
     p = resolve_profile("", "83N0")
     assert p["name"] == "Legion Go 2"
-    assert p["driver"] == "hid_legion_tablet"
+    assert p["driver"] == "hid_legion_go"
+    assert p.get("per_controller", False) is False
+
+
+def test_legion_go_profile_uses_global_color_driver():
+    p = resolve_profile("", "83E1")
+    assert p["name"] == "Legion Go"
+    assert p["driver"] == "hid_legion_go"
+    assert p.get("per_controller", False) is False
 
 
 def test_legion_go_s_profile_is_its_own_driver():
