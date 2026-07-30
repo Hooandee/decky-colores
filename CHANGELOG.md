@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.5](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.4...decky-colores-v0.21.5) (2026-07-30)
+
+
+### Bug Fixes / Correcciones
+
+* Ambilight now follows the full screen more naturally on devices with a single global LED color, while per-zone hardware keeps spatial sampling. The new 0–100 Vividness control replaces the confusing saturation range and migrates existing settings automatically. Physically validated on Legion Go S and Legion Go. ([#92](https://github.com/Hooandee/decky-colores/pull/92)) ([0421032](https://github.com/Hooandee/decky-colores/commit/042103240131daafede6e3c0bb6bfa09be3f6eea)) ([fb78fe1](https://github.com/Hooandee/decky-colores/commit/fb78fe1edca6a7ee4f5deb610b976bc1ebac70ef))
+* **ES:** Ambilight ahora sigue toda la pantalla de forma más natural en dispositivos con un único color LED global, mientras el hardware por zonas conserva el muestreo espacial. El nuevo control Vivacidad de 0 a 100 sustituye el confuso rango de saturación y migra automáticamente los ajustes existentes. Validado físicamente en Legion Go S y Legion Go. ([#92](https://github.com/Hooandee/decky-colores/pull/92)) ([0421032](https://github.com/Hooandee/decky-colores/commit/042103240131daafede6e3c0bb6bfa09be3f6eea)) ([fb78fe1](https://github.com/Hooandee/decky-colores/commit/fb78fe1edca6a7ee4f5deb610b976bc1ebac70ef))
+
 ## [0.21.4](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.3...decky-colores-v0.21.4) (2026-07-30)
 
 
