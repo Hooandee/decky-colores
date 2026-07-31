@@ -3,15 +3,16 @@
 ## [0.22.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.5...decky-colores-v0.22.0) (2026-07-31)
 
 
-### Features
+### Features / Novedades
 
-* customize sensor scales ([1d73b23](https://github.com/Hooandee/decky-colores/commit/1d73b2348646d0211a86f8fb7188a3b47aa89c8e))
-* customize sensor scales ([139e9b8](https://github.com/Hooandee/decky-colores/commit/139e9b8d0dccbb088c3f47c206a29f4427ec7d62))
+* Customize battery and temperature sensor scales with persistent thresholds and colors, a live gradient preview, and an option to restore the defaults. ([#94](https://github.com/Hooandee/decky-colores/pull/94), [1d73b23](https://github.com/Hooandee/decky-colores/commit/1d73b2348646d0211a86f8fb7188a3b47aa89c8e))
+  **ES:** Personaliza las escalas de batería y temperatura con umbrales y colores persistentes, una vista previa del degradado en tiempo real y una opción para restaurar los valores predeterminados.
 
 
-### Bug Fixes
+### Bug Fixes / Correcciones
 
-* format sensor readings ([0300ec9](https://github.com/Hooandee/decky-colores/commit/0300ec9c6ee74959d46dcef5b4aa7cf81a6e5763))
+* Format battery readings as whole percentages and temperature readings with one localized decimal. ([0300ec9](https://github.com/Hooandee/decky-colores/commit/0300ec9c6ee74959d46dcef5b4aa7cf81a6e5763))
+  **ES:** Muestra la batería como un porcentaje entero y la temperatura con una cifra decimal adaptada al idioma.
 
 ## [0.21.5](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.4...decky-colores-v0.21.5) (2026-07-30)
 
