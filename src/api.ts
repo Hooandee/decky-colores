@@ -1,5 +1,5 @@
 import { callable } from "@decky/api";
-import { ColoresState, GradientPreset } from "./types";
+import { ColoresState, GradientPreset, SensorBand, SensorKind } from "./types";
 
 export const getState = callable<[], ColoresState>("get_state");
 export const setPower = callable<[on: boolean], void>("set_power");
@@ -24,10 +24,12 @@ export const setForceControl = callable<[on: boolean], void>("set_force_control"
 export const setRememberStartup = callable<[on: boolean], void>("set_remember_startup");
 export const setBatteryBreathe = callable<[on: boolean], void>("set_battery_breathe");
 export const setTemperatureBreathe = callable<[on: boolean], void>("set_temperature_breathe");
+export const setSensorBands = callable<
+  [sensor: SensorKind, bands: SensorBand[]],
+  SensorBand[]
+>("set_sensor_bands");
 export const getTemperature = callable<[], number | null>("get_temperature");
 export const getPerformance = callable<[], number | null>("get_performance");
-
-// ── Self-updater ──
 
 export interface UpdateInfo {
   current: string;

@@ -6,8 +6,7 @@ from py_modules.effects import (
     BATTERY_BANDS,
     TEMPERATURE_BANDS,
     EffectEngine,
-    battery_band_color,
-    temperature_band_color,
+    sensor_band_color,
     frame_breathing,
     frame_cycle,
     frame_gradient_sweep,
@@ -239,16 +238,28 @@ def test_frame_spiral_rotates_and_stays_valid():
 
 
 def test_battery_band_color_thresholds():
-    assert battery_band_color(100) == (0, 120, 255)
-    assert battery_band_color(81) == (0, 120, 255)
-    assert battery_band_color(80) == (0, 200, 60)
-    assert battery_band_color(61) == (0, 200, 60)
-    assert battery_band_color(60) == (255, 200, 0)
-    assert battery_band_color(41) == (255, 200, 0)
-    assert battery_band_color(40) == (255, 110, 0)
-    assert battery_band_color(21) == (255, 110, 0)
-    assert battery_band_color(20) == (255, 30, 20)
-    assert battery_band_color(0) == (255, 30, 20)
+    assert sensor_band_color(100, BATTERY_BANDS) == (0, 120, 255)
+    assert sensor_band_color(81, BATTERY_BANDS) == (0, 120, 255)
+    assert sensor_band_color(80, BATTERY_BANDS) == (0, 200, 60)
+    assert sensor_band_color(61, BATTERY_BANDS) == (0, 200, 60)
+    assert sensor_band_color(60, BATTERY_BANDS) == (255, 200, 0)
+    assert sensor_band_color(41, BATTERY_BANDS) == (255, 200, 0)
+    assert sensor_band_color(40, BATTERY_BANDS) == (255, 110, 0)
+    assert sensor_band_color(21, BATTERY_BANDS) == (255, 110, 0)
+    assert sensor_band_color(20, BATTERY_BANDS) == (255, 30, 20)
+    assert sensor_band_color(0, BATTERY_BANDS) == (255, 30, 20)
+
+
+def test_battery_band_color_uses_custom_bands():
+    custom = (
+        (90, (1, 2, 3)),
+        (70, (4, 5, 6)),
+        (50, (7, 8, 9)),
+        (25, (10, 11, 12)),
+        (0, (13, 14, 15)),
+    )
+
+    assert sensor_band_color(75, custom) == (4, 5, 6)
 
 
 def test_battery_bands_cover_full_range_descending():
@@ -259,16 +270,28 @@ def test_battery_bands_cover_full_range_descending():
 
 
 def test_temperature_band_color_thresholds():
-    assert temperature_band_color(30) == (0, 120, 255)
-    assert temperature_band_color(54) == (0, 120, 255)
-    assert temperature_band_color(55) == (0, 200, 60)
-    assert temperature_band_color(67) == (0, 200, 60)
-    assert temperature_band_color(68) == (255, 200, 0)
-    assert temperature_band_color(79) == (255, 200, 0)
-    assert temperature_band_color(80) == (255, 110, 0)
-    assert temperature_band_color(89) == (255, 110, 0)
-    assert temperature_band_color(90) == (255, 30, 20)
-    assert temperature_band_color(105) == (255, 30, 20)
+    assert sensor_band_color(30, TEMPERATURE_BANDS) == (0, 120, 255)
+    assert sensor_band_color(54, TEMPERATURE_BANDS) == (0, 120, 255)
+    assert sensor_band_color(55, TEMPERATURE_BANDS) == (0, 200, 60)
+    assert sensor_band_color(67, TEMPERATURE_BANDS) == (0, 200, 60)
+    assert sensor_band_color(68, TEMPERATURE_BANDS) == (255, 200, 0)
+    assert sensor_band_color(79, TEMPERATURE_BANDS) == (255, 200, 0)
+    assert sensor_band_color(80, TEMPERATURE_BANDS) == (255, 110, 0)
+    assert sensor_band_color(89, TEMPERATURE_BANDS) == (255, 110, 0)
+    assert sensor_band_color(90, TEMPERATURE_BANDS) == (255, 30, 20)
+    assert sensor_band_color(105, TEMPERATURE_BANDS) == (255, 30, 20)
+
+
+def test_temperature_band_color_uses_custom_bands():
+    custom = (
+        (95, (1, 2, 3)),
+        (85, (4, 5, 6)),
+        (70, (7, 8, 9)),
+        (50, (10, 11, 12)),
+        (0, (13, 14, 15)),
+    )
+
+    assert sensor_band_color(72, custom) == (7, 8, 9)
 
 
 def test_temperature_bands_cover_full_range_descending():
@@ -276,3 +299,51 @@ def test_temperature_bands_cover_full_range_descending():
     assert thresholds == sorted(thresholds, reverse=True)
     assert thresholds[-1] == 0
     assert all(_valid(color) for _, color in TEMPERATURE_BANDS)
+
+
+def test_indicator_engine_reads_custom_bands_from_live_state():
+    engine = EffectEngine(lambda colors: None, zones=1)
+    captured = {}
+    engine._start_indicator = (
+        lambda key, state_fn, target_fn, breathe_fn, label: captured.update(
+            target=target_fn, breathe=breathe_fn
+        )
+    )
+    battery_bands = (
+        (90, (1, 2, 3)),
+        (70, (4, 5, 6)),
+        (50, (7, 8, 9)),
+        (25, (10, 11, 12)),
+        (0, (13, 14, 15)),
+    )
+
+    engine.start_battery(lambda: {})
+
+    assert captured["target"]({"level": 75, "bands": battery_bands}) == (4, 5, 6)
+
+
+def test_temperature_warning_uses_custom_hottest_threshold():
+    engine = EffectEngine(lambda colors: None, zones=1)
+    captured = {}
+    engine._start_indicator = (
+        lambda key, state_fn, target_fn, breathe_fn, label: captured.update(
+            target=target_fn, breathe=breathe_fn
+        )
+    )
+    temperature_bands = (
+        (95, (1, 2, 3)),
+        (85, (4, 5, 6)),
+        (70, (7, 8, 9)),
+        (50, (10, 11, 12)),
+        (0, (13, 14, 15)),
+    )
+
+    engine.start_temperature(lambda: {})
+
+    assert captured["target"]({"temp": 72, "bands": temperature_bands}) == (7, 8, 9)
+    assert captured["breathe"](
+        {"temp": 94, "breathe": True, "bands": temperature_bands}
+    ) is False
+    assert captured["breathe"](
+        {"temp": 95, "breathe": True, "bands": temperature_bands}
+    ) is True

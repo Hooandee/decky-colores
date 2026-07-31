@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useColores } from "./useColores";
 import { getAmbilightStatus, getAudioStatus, getTemperature, getPerformance, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss, unifyColors } from "./color";
-import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities } from "./types";
+import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities, SensorBand, SensorBands, SensorKind } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { ColorEditor } from "./components/ColorEditor";
 import { EffectsGallery } from "./components/EffectsGallery";
@@ -26,14 +26,16 @@ import { FocusRoot } from "./components/FocusRoot";
 import { SettingsSection } from "./components/SettingsSection";
 import { Divider } from "./components/Divider";
 import { ColorWheelIcon } from "./components/ColorWheelIcon";
+import { SensorScaleModal } from "./components/SensorScaleModal";
 import {
   GRADIENT_PRESETS,
   EFFECT_PRESETS,
-  BATTERY_BANDS,
-  batteryBandColor,
-  TEMPERATURE_BANDS,
   TEMPERATURE_RANGE,
-  temperatureBandColor,
+  formatTemperature,
+  sensorBandColor,
+  sensorScaleRange,
+  sensorScalePosition,
+  sensorThresholdPositions,
   PERFORMANCE_STOPS,
   performanceMeterColors,
   audioVuColors,
@@ -260,6 +262,8 @@ function SensorMeter({
   breathe,
   disabled,
   onBreathe,
+  onCustomize,
+  thresholdPositions,
 }: {
   hint: string;
   barStops: RGB[];
@@ -272,7 +276,10 @@ function SensorMeter({
   breathe?: boolean;
   disabled?: boolean;
   onBreathe?: (on: boolean) => void;
+  onCustomize?: () => void;
+  thresholdPositions?: number[];
 }) {
+  const { t } = useI18n();
   return (
     <>
       <PanelSectionRow>
@@ -298,6 +305,22 @@ function SensorMeter({
               boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
             }}
           >
+            {thresholdPositions?.map((position, index) => (
+              <div
+                key={index}
+                aria-hidden
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  bottom: 2,
+                  left: `calc(${position}% - 1px)`,
+                  width: 2,
+                  borderRadius: 2,
+                  background: "rgba(0,0,0,0.45)",
+                  boxShadow: "0 0 0 1px rgba(255,255,255,0.25)",
+                }}
+              />
+            ))}
             {markerPct !== null && (
               <div
                 style={{
@@ -328,6 +351,19 @@ function SensorMeter({
           </div>
         </div>
       </PanelSectionRow>
+      {onCustomize && (
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            description={t("sensorScale.customizeHint")}
+            disabled={disabled}
+            onClick={onCustomize}
+            bottomSeparator="none"
+          >
+            {t("sensorScale.customize")}
+          </ButtonItem>
+        </PanelSectionRow>
+      )}
       {onBreathe && (
         <PanelSectionRow>
           <ToggleField
@@ -349,18 +385,23 @@ function BatteryPanel({
   breathe,
   disabled,
   onBreathe,
+  bands,
+  onSaveBands,
 }: {
   level: number;
   breathe: boolean;
   disabled?: boolean;
   onBreathe: (on: boolean) => void;
+  bands: SensorBand[];
+  onSaveBands: (sensor: SensorKind, bands: SensorBand[]) => Promise<SensorBand[]>;
 }) {
   const { t } = useI18n();
-  const marker = Math.max(0, Math.min(100, level));
+  const marker = sensorScalePosition("battery", bands, level);
   return (
     <SensorMeter
       hint={t("battery.hint")}
-      barStops={[...BATTERY_BANDS].reverse().map((b) => b.color)}
+      barStops={[...bands].reverse().map((b) => b.color)}
+      thresholdPositions={sensorThresholdPositions("battery", bands)}
       markerPct={marker}
       leftLabel="0%"
       centerLabel={t("battery.level", { n: marker })}
@@ -370,6 +411,16 @@ function BatteryPanel({
       breathe={breathe}
       disabled={disabled}
       onBreathe={onBreathe}
+      onCustomize={() =>
+        showModal(
+          <SensorScaleModal
+            sensor="battery"
+            initial={bands}
+            reading={level}
+            onSave={onSaveBands}
+          />,
+        )
+      }
     />
   );
 }
@@ -379,24 +430,30 @@ function TemperaturePanel({
   breathe,
   disabled,
   onBreathe,
+  bands,
+  onSaveBands,
 }: {
   temp: number | null;
   breathe: boolean;
   disabled?: boolean;
   onBreathe: (on: boolean) => void;
+  bands: SensorBand[];
+  onSaveBands: (sensor: SensorKind, bands: SensorBand[]) => Promise<SensorBand[]>;
 }) {
-  const { t } = useI18n();
-  const { min, max } = TEMPERATURE_RANGE;
-  const markerPct =
-    temp === null ? null : Math.max(0, Math.min(100, ((temp - min) / (max - min)) * 100));
+  const { t, lang } = useI18n();
+  const { min, max } = sensorScaleRange("temperature", bands);
+  const markerPct = temp === null ? null : sensorScalePosition("temperature", bands, temp);
   return (
     <SensorMeter
       hint={t("temperature.hint")}
-      barStops={[...TEMPERATURE_BANDS].reverse().map((b) => b.color)}
+      barStops={[...bands].reverse().map((b) => b.color)}
+      thresholdPositions={sensorThresholdPositions("temperature", bands)}
       markerPct={markerPct}
       leftLabel={`${min}°`}
       centerLabel={
-        temp === null ? t("temperature.noReading") : t("temperature.reading", { n: Math.round(temp) })
+        temp === null
+          ? t("temperature.noReading")
+          : t("temperature.reading", { n: formatTemperature(temp, lang) })
       }
       rightLabel={`${max}°`}
       breatheLabel={t("temperature.breathe.label")}
@@ -404,6 +461,16 @@ function TemperaturePanel({
       breathe={breathe}
       disabled={disabled}
       onBreathe={onBreathe}
+      onCustomize={() =>
+        showModal(
+          <SensorScaleModal
+            sensor="temperature"
+            initial={bands}
+            reading={temp}
+            onSave={onSaveBands}
+          />,
+        )
+      }
     />
   );
 }
@@ -435,6 +502,8 @@ function SensorsPanel({
   onSelectMode,
   onBatteryBreathe,
   onTemperatureBreathe,
+  sensorBands,
+  onSaveBands,
 }: {
   mode: Mode;
   availableModes: Mode[];
@@ -447,6 +516,8 @@ function SensorsPanel({
   onSelectMode: (m: Mode) => void;
   onBatteryBreathe: (on: boolean) => void;
   onTemperatureBreathe: (on: boolean) => void;
+  sensorBands: SensorBands;
+  onSaveBands: (sensor: SensorKind, bands: SensorBand[]) => Promise<SensorBand[]>;
 }) {
   const { t } = useI18n();
   return (
@@ -471,6 +542,8 @@ function SensorsPanel({
           breathe={temperatureBreathe}
           disabled={disabled}
           onBreathe={onTemperatureBreathe}
+          bands={sensorBands.temperature}
+          onSaveBands={onSaveBands}
         />
       ) : (
         <BatteryPanel
@@ -478,6 +551,8 @@ function SensorsPanel({
           breathe={batteryBreathe}
           disabled={disabled}
           onBreathe={onBatteryBreathe}
+          bands={sensorBands.battery}
+          onSaveBands={onSaveBands}
         />
       )}
     </>
@@ -523,6 +598,7 @@ function Content() {
     setRememberStartup,
     setBatteryBreathe,
     setTemperatureBreathe,
+    setSensorBands,
     reconnect,
   } = useColores();
   const { t, lang } = useI18n();
@@ -714,6 +790,7 @@ function Content() {
     batteryBreathe,
     batteryLevel,
     temperatureBreathe,
+    sensorBands,
     rememberStartup,
   } = state;
   const currentTemp = tempReading ?? state.temperature;
@@ -752,9 +829,14 @@ function Content() {
       case "ambient":
         return AMBIENT_HINT;
       case "battery":
-        return [batteryBandColor(batteryLevel)];
+        return [sensorBandColor(batteryLevel, sensorBands.battery)];
       case "temperature":
-        return [temperatureBandColor(currentTemp ?? TEMPERATURE_RANGE.min)];
+        return [
+          sensorBandColor(
+            currentTemp ?? TEMPERATURE_RANGE.min,
+            sensorBands.temperature,
+          ),
+        ];
       case "performance":
         return performanceMeterColors(perfReading ?? 0, capabilities.zones);
       case "clock": {
@@ -946,6 +1028,8 @@ function Content() {
             onSelectMode={selectSensorMode}
             onBatteryBreathe={setBatteryBreathe}
             onTemperatureBreathe={setTemperatureBreathe}
+            sensorBands={sensorBands}
+            onSaveBands={setSensorBands}
           />
         );
       case "clock":

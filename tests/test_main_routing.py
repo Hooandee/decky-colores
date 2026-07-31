@@ -5,6 +5,21 @@ import types
 
 import pytest
 
+CUSTOM_SENSOR_BANDS = [
+    {"min": 90, "color": {"r": 1, "g": 2, "b": 3}},
+    {"min": 70, "color": {"r": 4, "g": 5, "b": 6}},
+    {"min": 50, "color": {"r": 7, "g": 8, "b": 9}},
+    {"min": 25, "color": {"r": 10, "g": 11, "b": 12}},
+    {"min": 0, "color": {"r": 13, "g": 14, "b": 15}},
+]
+PARSED_SENSOR_BANDS = (
+    (90, (1, 2, 3)),
+    (70, (4, 5, 6)),
+    (50, (7, 8, 9)),
+    (25, (10, 11, 12)),
+    (0, (13, 14, 15)),
+)
+
 
 @pytest.fixture
 def main_module():
@@ -658,7 +673,12 @@ def test_battery_mode_starts_battery_loop(main_module):
     p._ac_online = False
     p._apply()
     battery = next(e for e in p._engine.events if e[0] == "battery")
-    assert battery[1] == {"level": 45, "charging": False, "breathe": True}
+    assert battery[1] == {
+        "level": 45,
+        "charging": False,
+        "breathe": True,
+        "bands": main_module.BATTERY_BANDS,
+    }
     assert not any(c[0] == "hw_effect" for c in p._controller.calls)
 
 
@@ -688,8 +708,23 @@ def test_temperature_mode_starts_temperature_loop(main_module):
     p._apu_temp = 73.0
     p._apply()
     temp = next(e for e in p._engine.events if e[0] == "temperature")
-    assert temp[1] == {"temp": 73.0, "breathe": True}
+    assert temp[1] == {
+        "temp": 73.0,
+        "breathe": True,
+        "bands": main_module.TEMPERATURE_BANDS,
+    }
     assert not any(c[0] == "hw_effect" for c in p._controller.calls)
+
+
+def test_temperature_reading_is_canonical_at_fractional_thresholds(main_module):
+    assert main_module._temperature_reading(89.64) == 89.6
+    assert main_module._temperature_reading(89.96) == 90.0
+
+    p = _plugin(main_module, "temperature", hw=False, per_zone=True)
+    p._apu_temp = 89.64
+
+    assert p._temperature_state()["temp"] == 89.6
+    assert asyncio.run(p.get_temperature()) == 89.6
 
 
 def test_temperature_mode_wants_render_loop(main_module):
@@ -716,6 +751,78 @@ def test_battery_breathe_default_is_true(main_module):
     assert main_module.DEFAULTS["battery_breathe"] is True
 
 
+def test_parse_sensor_bands_accepts_five_strictly_descending_bands(main_module):
+    assert (
+        main_module._parse_sensor_bands("battery", CUSTOM_SENSOR_BANDS)
+        == PARSED_SENSOR_BANDS
+    )
+
+
+@pytest.mark.parametrize(
+    "sensor,bands",
+    [
+        (
+            "battery",
+            [
+                {"min": 80, "color": [1, 2, 3]},
+                {"min": 80, "color": [4, 5, 6]},
+                {"min": 50, "color": [7, 8, 9]},
+                {"min": 25, "color": [10, 11, 12]},
+                {"min": 0, "color": [13, 14, 15]},
+            ],
+        ),
+        (
+            "temperature",
+            [
+                {"min": 121, "color": [1, 2, 3]},
+                {"min": 85, "color": [4, 5, 6]},
+                {"min": 70, "color": [7, 8, 9]},
+                {"min": 50, "color": [10, 11, 12]},
+                {"min": 0, "color": [13, 14, 15]},
+            ],
+        ),
+        (
+            "battery",
+            [
+                {"min": 90, "color": [256, 2, 3]},
+                {"min": 70, "color": [4, 5, 6]},
+                {"min": 50, "color": [7, 8, 9]},
+                {"min": 25, "color": [10, 11, 12]},
+                {"min": 0, "color": [13, 14, 15]},
+            ],
+        ),
+        (
+            "battery",
+            [
+                {"min": 90, "color": [1, 2, 3]},
+                {"min": 70, "color": [4, 5, 6]},
+                {"min": 50, "color": [7, 8, 9]},
+                {"min": 25, "color": [10, 11, 12]},
+                {"min": 1, "color": [13, 14, 15]},
+            ],
+        ),
+    ],
+)
+def test_parse_sensor_bands_rejects_invalid_values(main_module, sensor, bands):
+    with pytest.raises(ValueError):
+        main_module._parse_sensor_bands(sensor, bands)
+
+
+def test_normalize_sensor_bands_falls_back_to_defaults(main_module):
+    assert main_module._normalize_sensor_bands("battery", []) == main_module.BATTERY_BANDS
+    assert (
+        main_module._normalize_sensor_bands("temperature", None)
+        == main_module.TEMPERATURE_BANDS
+    )
+
+
+def test_normalize_sensor_settings_handles_invalid_outer_shape(main_module):
+    assert main_module._normalize_sensor_settings([]) == {
+        "battery": main_module.BATTERY_BANDS,
+        "temperature": main_module.TEMPERATURE_BANDS,
+    }
+
+
 def test_set_battery_breathe_persists(main_module):
     p = _plugin(main_module, "battery", hw=False, per_zone=True)
     saved = {}
@@ -723,6 +830,52 @@ def test_set_battery_breathe_persists(main_module):
     asyncio.run(p.set_battery_breathe(False))
     assert p._settings["battery_breathe"] is False
     assert saved["v"]["battery_breathe"] is False
+
+
+def test_set_sensor_bands_persists_and_feeds_battery_loop(main_module):
+    p = _plugin(main_module, "battery", hw=False, per_zone=True)
+    p._settings["sensor_bands"] = {
+        "battery": main_module.BATTERY_BANDS,
+        "temperature": main_module.TEMPERATURE_BANDS,
+    }
+    saved = {}
+    p._store = types.SimpleNamespace(save=lambda s: saved.update({"v": dict(s)}))
+    result = asyncio.run(p.set_sensor_bands("battery", CUSTOM_SENSOR_BANDS))
+
+    assert result == CUSTOM_SENSOR_BANDS
+    assert p._battery_state()["bands"] == PARSED_SENSOR_BANDS
+    assert saved["v"]["sensor_bands"]["battery"] == p._battery_state()["bands"]
+
+
+def test_set_sensor_bands_keeps_live_state_when_save_fails(main_module):
+    p = _plugin(main_module, "battery", hw=False, per_zone=True)
+    p._settings["sensor_bands"] = {
+        "battery": main_module.BATTERY_BANDS,
+        "temperature": main_module.TEMPERATURE_BANDS,
+    }
+    p._store = types.SimpleNamespace(
+        save=lambda settings: (_ for _ in ()).throw(OSError("disk full"))
+    )
+    with pytest.raises(OSError, match="disk full"):
+        asyncio.run(p.set_sensor_bands("battery", CUSTOM_SENSOR_BANDS))
+
+    assert p._battery_state()["bands"] == main_module.BATTERY_BANDS
+
+
+def test_sensor_bands_survive_settings_store_roundtrip(main_module, tmp_path):
+    store = main_module.SettingsStore(str(tmp_path / "state.json"))
+    settings = dict(main_module.DEFAULTS)
+    settings["sensor_bands"] = {
+        "battery": PARSED_SENSOR_BANDS,
+        "temperature": main_module.TEMPERATURE_BANDS,
+    }
+
+    store.save(settings)
+    loaded = store.load(main_module.DEFAULTS)
+
+    assert main_module._normalize_sensor_bands(
+        "battery", loaded["sensor_bands"]["battery"]
+    ) == PARSED_SENSOR_BANDS
 
 
 def test_force_control_default_is_false(main_module):

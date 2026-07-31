@@ -7,9 +7,6 @@ logger = logging.getLogger("colores.effects")
 
 FRAME_INTERVAL = 1.0 / 30.0
 
-# Status-indicator color bands (battery %, APU temperature C). Each entry is
-# (min_value_inclusive, rgb), scanned high to low. Keep in sync with the frontend
-# copies in src/palette.ts (those drive the legend/preview; the LED render is here).
 BATTERY_BANDS = (
     (81, (0, 120, 255)),
     (61, (0, 200, 60)),
@@ -24,8 +21,6 @@ TEMPERATURE_BANDS = (
     (55, (0, 200, 60)),
     (0, (0, 120, 255)),
 )
-TEMPERATURE_CRITICAL = 90
-
 INDICATOR_EASE = 0.12
 INDICATOR_CONVERGE_EPS = 1.0
 INDICATOR_IDLE_INTERVAL = 0.5
@@ -282,18 +277,11 @@ def frame_vu(level, zones):
     )
 
 
-def battery_band_color(level):
-    for threshold, color in BATTERY_BANDS:
-        if level >= threshold:
+def sensor_band_color(value, bands):
+    for threshold, color in bands:
+        if value >= threshold:
             return color
-    return BATTERY_BANDS[-1][1]
-
-
-def temperature_band_color(temp):
-    for threshold, color in TEMPERATURE_BANDS:
-        if temp >= threshold:
-            return color
-    return TEMPERATURE_BANDS[-1][1]
+    return bands[-1][1]
 
 
 class EffectEngine:
@@ -326,7 +314,9 @@ class EffectEngine:
         self._start_indicator(
             "__battery__",
             state_fn,
-            lambda st: battery_band_color(st.get("level", 100)),
+            lambda st: sensor_band_color(
+                st.get("level", 100), st.get("bands", BATTERY_BANDS)
+            ),
             lambda st: bool(st.get("charging")) and bool(st.get("breathe")) and st.get("level", 100) < 100,
             "battery",
         )
@@ -335,8 +325,14 @@ class EffectEngine:
         self._start_indicator(
             "__temperature__",
             state_fn,
-            lambda st: None if st.get("temp") is None else temperature_band_color(st["temp"]),
-            lambda st: bool(st.get("breathe")) and st.get("temp") is not None and st["temp"] >= TEMPERATURE_CRITICAL,
+            lambda st: None
+            if st.get("temp") is None
+            else sensor_band_color(
+                st["temp"], st.get("bands", TEMPERATURE_BANDS)
+            ),
+            lambda st: bool(st.get("breathe"))
+            and st.get("temp") is not None
+            and st["temp"] >= st.get("bands", TEMPERATURE_BANDS)[0][0],
             "temperature",
         )
 
