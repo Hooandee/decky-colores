@@ -1,5 +1,5 @@
 import { hsvToRgb, rgbToHsv } from "./color";
-import { EffectMeta, GradientPreset, RGB } from "./types";
+import { EffectMeta, GradientPreset, RGB, SensorBand, SensorBands, SensorKind } from "./types";
 
 export const GRADIENT_PRESETS: GradientPreset[] = [
   {
@@ -196,11 +196,7 @@ export const EFFECT_PRESETS: EffectMeta[] = [
   },
 ];
 
-// Battery mode color bands (blue full -> red empty). Each entry is the inclusive
-// minimum level and its color. Must stay in sync with the backend BATTERY_BANDS
-// (py_modules/effects.py), which does the actual LED rendering; these drive the
-// legend and the on-screen preview only.
-export const BATTERY_BANDS: { min: number; color: RGB }[] = [
+export const BATTERY_BANDS: SensorBand[] = [
   { min: 81, color: { r: 0, g: 120, b: 255 } },
   { min: 61, color: { r: 0, g: 200, b: 60 } },
   { min: 41, color: { r: 255, g: 200, b: 0 } },
@@ -208,15 +204,7 @@ export const BATTERY_BANDS: { min: number; color: RGB }[] = [
   { min: 0, color: { r: 255, g: 30, b: 20 } },
 ];
 
-export function batteryBandColor(level: number): RGB {
-  for (const band of BATTERY_BANDS) {
-    if (level >= band.min) return band.color;
-  }
-  return BATTERY_BANDS[BATTERY_BANDS.length - 1].color;
-}
-
-// Keep in sync with the backend TEMPERATURE_BANDS (py_modules/effects.py).
-export const TEMPERATURE_BANDS: { min: number; color: RGB }[] = [
+export const TEMPERATURE_BANDS: SensorBand[] = [
   { min: 90, color: { r: 255, g: 30, b: 20 } },
   { min: 80, color: { r: 255, g: 110, b: 0 } },
   { min: 68, color: { r: 255, g: 200, b: 0 } },
@@ -225,6 +213,11 @@ export const TEMPERATURE_BANDS: { min: number; color: RGB }[] = [
 ];
 
 export const TEMPERATURE_RANGE = { min: 40, max: 95 };
+
+export const DEFAULT_SENSOR_BANDS: SensorBands = {
+  battery: BATTERY_BANDS,
+  temperature: TEMPERATURE_BANDS,
+};
 
 const CLOCK_KEYS: [number, RGB][] = [
   [0, { r: 12, g: 22, b: 64 }],
@@ -301,11 +294,55 @@ export function audioVuColors(level: number, zones: number): RGB[] {
   );
 }
 
-export function temperatureBandColor(temp: number): RGB {
-  for (const band of TEMPERATURE_BANDS) {
-    if (temp >= band.min) return band.color;
+export function sensorBandColor(value: number, bands: SensorBand[]): RGB {
+  for (const band of bands) {
+    if (value >= band.min) return band.color;
   }
-  return TEMPERATURE_BANDS[TEMPERATURE_BANDS.length - 1].color;
+  return bands[bands.length - 1].color;
+}
+
+export function sensorThresholdBounds(
+  sensor: SensorKind,
+  index: number,
+  bands: SensorBand[],
+): { min: number; max: number } | null {
+  if (index < 0 || index >= bands.length - 1) return null;
+  return {
+    min: bands[index + 1].min + 1,
+    max: index === 0 ? (sensor === "battery" ? 100 : 120) : bands[index - 1].min - 1,
+  };
+}
+
+export function sensorScaleRange(sensor: SensorKind, bands: SensorBand[]) {
+  if (sensor === "battery") return { min: 0, max: 100 };
+  return {
+    min: Math.min(TEMPERATURE_RANGE.min, bands[bands.length - 2]?.min ?? TEMPERATURE_RANGE.min),
+    max: Math.max(TEMPERATURE_RANGE.max, bands[0]?.min ?? TEMPERATURE_RANGE.max),
+  };
+}
+
+export function sensorScalePosition(
+  sensor: SensorKind,
+  bands: SensorBand[],
+  value: number,
+): number {
+  const range = sensorScaleRange(sensor, bands);
+  return Math.max(0, Math.min(100, ((value - range.min) / (range.max - range.min)) * 100));
+}
+
+export function formatSensorValue(
+  value: number,
+  lang: "es" | "en",
+  fractionDigits = 1,
+): string {
+  return value.toLocaleString(lang, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  });
+}
+
+export function sensorThresholdPositions(sensor: SensorKind, bands: SensorBand[]): number[] {
+  return bands.slice(0, -1).map((band) => sensorScalePosition(sensor, bands, band.min));
 }
 
 const NAME_PARTS: Record<"es" | "en", { adjectives: string[]; nouns: string[] }> = {

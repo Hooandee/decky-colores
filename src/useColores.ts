@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ColoresState, EffectId, EffectState, Mode, RGB } from "./types";
+import { ColoresState, EffectId, EffectState, Mode, RGB, SensorBand, SensorKind } from "./types";
 import * as api from "./api";
 
 function useThrottle<A extends unknown[]>(fn: (...args: A) => void, ms: number) {
@@ -199,6 +199,19 @@ export function useColores() {
     );
   };
 
+  const setSensorBands = (
+    sensor: SensorKind,
+    bands: SensorBand[],
+  ) =>
+    api.setSensorBands(sensor, bands).then((saved) => {
+      setState((state) =>
+        state
+          ? { ...state, sensorBands: { ...state.sensorBands, [sensor]: saved } }
+          : state,
+      );
+      return saved;
+    });
+
   const setExperiment = (feature: string, on: boolean) => {
     api
       .setExperiment(feature, on)
@@ -236,6 +249,7 @@ export function useColores() {
     setRememberStartup,
     setBatteryBreathe,
     setTemperatureBreathe,
+    setSensorBands,
     reconnect,
   };
 }

@@ -10,7 +10,12 @@ import decky
 from version import read_version
 from device import build_device
 from settings_store import SettingsStore
-from effects import EffectEngine, interpolate_gradient
+from effects import (
+    BATTERY_BANDS,
+    TEMPERATURE_BANDS,
+    EffectEngine,
+    interpolate_gradient,
+)
 from ambilight import Ambilight
 from audio import AudioReactive
 from power_supply import charger_online, battery_level
@@ -26,6 +31,12 @@ _REPORT_APP = "colores"
 _REPORT_SERVICE_URL = os.environ.get(
     "COLORES_REPORT_URL", "https://bug-collector-khaki.vercel.app/api/report"
 )
+
+SENSOR_BAND_DEFAULTS = {
+    "battery": BATTERY_BANDS,
+    "temperature": TEMPERATURE_BANDS,
+}
+SENSOR_BAND_LIMITS = {"battery": 100, "temperature": 120}
 
 DEFAULTS = {
     "power": True,
@@ -44,6 +55,7 @@ DEFAULTS = {
     "hhd_rgb_restore": None,
     "battery_breathe": True,
     "temperature_breathe": True,
+    "sensor_bands": dict(SENSOR_BAND_DEFAULTS),
     "remember_startup": True,
     "startup_factory": None,
 }
@@ -79,6 +91,72 @@ def _rgb(values):
 
 def _saved(entry):
     return {"name": entry["name"], "stops": [_rgb(c) for c in entry["stops"]]}
+
+
+def _parse_sensor_bands(sensor: str, bands) -> tuple:
+    if (
+        sensor not in SENSOR_BAND_LIMITS
+        or not isinstance(bands, (list, tuple))
+        or len(bands) != 5
+    ):
+        raise ValueError("invalid sensor bands")
+    parsed = []
+    for entry in bands:
+        if isinstance(entry, dict):
+            threshold = entry.get("min")
+            color = entry.get("color")
+        elif isinstance(entry, (list, tuple)) and len(entry) == 2:
+            threshold, color = entry
+        else:
+            raise ValueError("invalid sensor band")
+        if isinstance(color, dict):
+            color = [color.get(channel) for channel in ("r", "g", "b")]
+        if (
+            isinstance(threshold, bool)
+            or not isinstance(threshold, int)
+            or threshold < 0
+            or threshold > SENSOR_BAND_LIMITS[sensor]
+            or not isinstance(color, (list, tuple))
+            or len(color) != 3
+            or any(
+                isinstance(value, bool)
+                or not isinstance(value, int)
+                or value < 0
+                or value > 255
+                for value in color
+            )
+        ):
+            raise ValueError("invalid sensor band")
+        parsed.append((threshold, tuple(color)))
+    thresholds = [threshold for threshold, _ in parsed]
+    if thresholds[-1] != 0 or any(
+        high <= low for high, low in zip(thresholds, thresholds[1:])
+    ):
+        raise ValueError("invalid sensor thresholds")
+    return tuple(parsed)
+
+
+def _normalize_sensor_bands(sensor: str, bands) -> tuple:
+    try:
+        return _parse_sensor_bands(sensor, bands)
+    except (TypeError, ValueError):
+        return SENSOR_BAND_DEFAULTS[sensor]
+
+
+def _normalize_sensor_settings(stored) -> dict:
+    values = stored if isinstance(stored, dict) else {}
+    return {
+        sensor: _normalize_sensor_bands(sensor, values.get(sensor))
+        for sensor in SENSOR_BAND_DEFAULTS
+    }
+
+
+def _serialize_sensor_bands(bands) -> list:
+    return [{"min": threshold, "color": _rgb(color)} for threshold, color in bands]
+
+
+def _temperature_reading(value):
+    return None if value is None else round(float(value), 1)
 
 
 def _suspend_clock():
@@ -125,6 +203,9 @@ class Plugin:
             self._settings.get("ambilight")
         )
         self._settings["effect"] = {**DEFAULTS["effect"], **self._settings["effect"]}
+        self._settings["sensor_bands"] = _normalize_sensor_settings(
+            self._settings.get("sensor_bands")
+        )
         self._hhd_rgb = HhdRgbControl()
         self._ac_online = charger_online()
         level = battery_level()
@@ -416,7 +497,11 @@ class Plugin:
             "batteryBreathe": s.get("battery_breathe", True),
             "batteryLevel": getattr(self, "_battery_level", 100),
             "temperatureBreathe": s.get("temperature_breathe", True),
-            "temperature": getattr(self, "_apu_temp", None),
+            "temperature": _temperature_reading(getattr(self, "_apu_temp", None)),
+            "sensorBands": {
+                sensor: _serialize_sensor_bands(s["sensor_bands"][sensor])
+                for sensor in SENSOR_BAND_DEFAULTS
+            },
             "rememberStartup": s.get("remember_startup", True),
         }
 
@@ -523,9 +608,21 @@ class Plugin:
         self._settings["temperature_breathe"] = on
         self._save_and_apply()
 
+    async def set_sensor_bands(self, sensor: str, bands) -> list:
+        self._init()
+        parsed = _parse_sensor_bands(sensor, bands)
+        candidate = {
+            **self._settings,
+            "sensor_bands": {**self._settings["sensor_bands"], sensor: parsed},
+        }
+        self._store.save(candidate)
+        self._settings = candidate
+        self._apply()
+        return _serialize_sensor_bands(parsed)
+
     async def get_temperature(self):
         self._init()
-        return getattr(self, "_apu_temp", None)
+        return _temperature_reading(getattr(self, "_apu_temp", None))
 
     async def get_performance(self):
         self._init()
@@ -668,12 +765,18 @@ class Plugin:
             "level": getattr(self, "_battery_level", 100),
             "charging": bool(getattr(self, "_ac_online", True)),
             "breathe": self._settings.get("battery_breathe", True),
+            "bands": self._settings.get("sensor_bands", {}).get(
+                "battery", BATTERY_BANDS
+            ),
         }
 
     def _temperature_state(self) -> dict:
         return {
-            "temp": getattr(self, "_apu_temp", None),
+            "temp": _temperature_reading(getattr(self, "_apu_temp", None)),
             "breathe": self._settings.get("temperature_breathe", True),
+            "bands": self._settings.get("sensor_bands", {}).get(
+                "temperature", TEMPERATURE_BANDS
+            ),
         }
 
     def _performance_state(self) -> dict:

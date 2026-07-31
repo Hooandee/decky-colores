@@ -4,6 +4,18 @@ export interface RGB {
   b: number;
 }
 
+export interface SensorBand {
+  min: number;
+  color: RGB;
+}
+
+export type SensorKind = "battery" | "temperature";
+
+export interface SensorBands {
+  battery: SensorBand[];
+  temperature: SensorBand[];
+}
+
 export interface DeviceInfo {
   name: string;
   board: string;
@@ -100,6 +112,7 @@ export interface ColoresState {
   batteryLevel: number;
   temperatureBreathe: boolean;
   temperature: number | null;
+  sensorBands: SensorBands;
   rememberStartup: boolean;
 }
 
