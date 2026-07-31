@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.22.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.5...decky-colores-v0.22.0) (2026-07-31)
+
+
+### Features
+
+* customize sensor scales ([1d73b23](https://github.com/Hooandee/decky-colores/commit/1d73b2348646d0211a86f8fb7188a3b47aa89c8e))
+* customize sensor scales ([139e9b8](https://github.com/Hooandee/decky-colores/commit/139e9b8d0dccbb088c3f47c206a29f4427ec7d62))
+
+
+### Bug Fixes
+
+* format sensor readings ([0300ec9](https://github.com/Hooandee/decky-colores/commit/0300ec9c6ee74959d46dcef5b4aa7cf81a6e5763))
+
 ## [0.21.5](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.4...decky-colores-v0.21.5) (2026-07-30)
 
 

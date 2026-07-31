@@ -1,6 +1,6 @@
 {
   "name": "decky-colores",
-  "version": "0.21.5",
+  "version": "0.22.0",
   "description": "Beautiful RGB LED control for handheld gaming PCs.",
   "type": "module",
   "scripts": {
