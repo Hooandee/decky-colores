@@ -330,10 +330,14 @@ export function sensorScalePosition(
   return Math.max(0, Math.min(100, ((value - range.min) / (range.max - range.min)) * 100));
 }
 
-export function formatTemperature(value: number, lang: "es" | "en"): string {
+export function formatSensorValue(
+  value: number,
+  lang: "es" | "en",
+  fractionDigits = 1,
+): string {
   return value.toLocaleString(lang, {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
   });
 }
 

@@ -9,7 +9,7 @@ import {
 import { hsvToRgb, rgbToCss, rgbToHsv, gradientCss } from "../color";
 import {
   DEFAULT_SENSOR_BANDS,
-  formatTemperature,
+  formatSensorValue,
   sensorScaleRange,
   sensorScalePosition,
   sensorThresholdBounds,
@@ -66,7 +66,7 @@ export const SensorScaleModal: FC<Props> = ({
     reading === null
       ? t("temperature.noReading")
       : sensor === "temperature"
-        ? `${formatTemperature(reading, lang)}${unit}`
+        ? `${formatSensorValue(reading, lang)}${unit}`
         : `${Math.round(reading)}${unit}`;
   const names = Array.from({ length: 5 }, (_, index) =>
     t(`${sensor}.band.${index + 1}`),

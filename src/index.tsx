@@ -31,7 +31,7 @@ import {
   GRADIENT_PRESETS,
   EFFECT_PRESETS,
   TEMPERATURE_RANGE,
-  formatTemperature,
+  formatSensorValue,
   sensorBandColor,
   sensorScaleRange,
   sensorScalePosition,
@@ -395,7 +395,7 @@ function BatteryPanel({
   bands: SensorBand[];
   onSaveBands: (sensor: SensorKind, bands: SensorBand[]) => Promise<SensorBand[]>;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const marker = sensorScalePosition("battery", bands, level);
   return (
     <SensorMeter
@@ -404,7 +404,7 @@ function BatteryPanel({
       thresholdPositions={sensorThresholdPositions("battery", bands)}
       markerPct={marker}
       leftLabel="0%"
-      centerLabel={t("battery.level", { n: marker })}
+      centerLabel={t("battery.level", { n: formatSensorValue(level, lang, 0) })}
       rightLabel="100%"
       breatheLabel={t("battery.breathe.label")}
       breatheHint={t("battery.breathe.hint")}
@@ -453,7 +453,7 @@ function TemperaturePanel({
       centerLabel={
         temp === null
           ? t("temperature.noReading")
-          : t("temperature.reading", { n: formatTemperature(temp, lang) })
+          : t("temperature.reading", { n: formatSensorValue(temp, lang) })
       }
       rightLabel={`${max}°`}
       breatheLabel={t("temperature.breathe.label")}

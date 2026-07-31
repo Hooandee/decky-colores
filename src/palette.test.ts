@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   audioVuColors,
-  formatTemperature,
+  formatSensorValue,
   sensorBandColor,
   sensorScalePosition,
   sensorThresholdBounds,
@@ -56,7 +56,11 @@ describe("custom sensor bands", () => {
 
   it("keeps fractional temperature readings below their threshold", () => {
     expect(sensorBandColor(89.6, bands)).toEqual({ r: 4, g: 5, b: 6 });
-    expect(formatTemperature(89.6, "es")).toBe("89,6");
-    expect(formatTemperature(89.6, "en")).toBe("89.6");
+    expect(formatSensorValue(89.6, "es")).toBe("89,6");
+    expect(formatSensorValue(89.6, "en")).toBe("89.6");
+  });
+
+  it("formats battery percentages without floating point artifacts", () => {
+    expect(formatSensorValue(14.000000000000002, "es", 0)).toBe("14");
   });
 });
