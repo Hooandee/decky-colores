@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.22.0...decky-colores-v0.23.0) (2026-08-06)
+
+
+### Features
+
+* bring advanced lighting modes to Android ([230a8f9](https://github.com/Hooandee/decky-colores/commit/230a8f94f5abc531a3f760952d789681e13e58fb))
+* bring advanced lighting modes to Android ([83b5c06](https://github.com/Hooandee/decky-colores/commit/83b5c06c1be1a4465d0041fdf3f5f6e307debd65))
+
 ## [0.22.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.5...decky-colores-v0.22.0) (2026-07-31)
 
 
