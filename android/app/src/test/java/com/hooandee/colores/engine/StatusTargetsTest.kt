@@ -37,9 +37,17 @@ class StatusTargetsTest {
 
     @Test
     fun `temperature breathes only in the critical band`() {
-        assertTrue(StatusTargets.temperatureBreathing(breatheEnabled = true, celsius = 95.0))
-        assertFalse(StatusTargets.temperatureBreathing(breatheEnabled = true, celsius = 70.0))
-        assertFalse(StatusTargets.temperatureBreathing(breatheEnabled = false, celsius = 95.0))
-        assertFalse(StatusTargets.temperatureBreathing(breatheEnabled = true, celsius = null))
+        assertTrue(StatusTargets.temperatureBreathing(breatheEnabled = true, celsius = 95.0, bands = bands.temperature))
+        assertFalse(StatusTargets.temperatureBreathing(breatheEnabled = true, celsius = 70.0, bands = bands.temperature))
+        assertFalse(StatusTargets.temperatureBreathing(breatheEnabled = false, celsius = 95.0, bands = bands.temperature))
+        assertFalse(StatusTargets.temperatureBreathing(breatheEnabled = true, celsius = null, bands = bands.temperature))
+    }
+
+    @Test
+    fun `temperature breathing follows the customized hottest threshold`() {
+        val customized = bands.temperature.toMutableList().also { it[0] = it.first().copy(min = 105.0) }
+
+        assertFalse(StatusTargets.temperatureBreathing(breatheEnabled = true, celsius = 100.0, bands = customized))
+        assertTrue(StatusTargets.temperatureBreathing(breatheEnabled = true, celsius = 105.0, bands = customized))
     }
 }

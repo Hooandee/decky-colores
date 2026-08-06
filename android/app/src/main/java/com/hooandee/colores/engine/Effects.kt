@@ -12,6 +12,7 @@ import com.hooandee.colores.gradient.GradientInterpolator
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.pow
@@ -36,8 +37,23 @@ object Effects {
             "sparkle" -> sparkle(base, timeSeconds, speed)
             "ripple" -> ripple(base, timeSeconds, speed)
             "aurora" -> aurora(zones, timeSeconds, speed)
+            "gradient_sweep" -> gradientSweep(stops, zones, timeSeconds, speed)
             else -> List(zones.coerceAtLeast(0)) { RgbColor(0, 0, 0) }
         }
+
+    fun gradientSweep(
+        stops: List<RgbColor>,
+        zones: Int,
+        t: Double,
+        speed: Int,
+    ): List<RgbColor> {
+        if (zones <= 0) return emptyList()
+        val palette = stops.ifEmpty { listOf(RgbColor(255, 255, 255)) }
+        val phase = (freq(speed) * t) % 1.0
+        val position = (1.0 - cos(2.0 * PI * phase)) / 2.0
+        val color = sampleStops(palette, position)
+        return List(zones) { color }
+    }
 
     fun breathing(
         base: List<RgbColor>,
@@ -183,6 +199,24 @@ object Effects {
             val fill = (lit - i).coerceIn(0.0, 1.0)
             val pos = if (zones > 1) i.toDouble() / (zones - 1) else 0.0
             scale(sampleStops(METER_RAMP, pos), fill)
+        }
+    }
+
+    fun vu(
+        level: Double,
+        zones: Int,
+        scale: AudioScale = AudioScale.DEFAULT,
+    ): List<RgbColor> {
+        if (zones <= 0) return emptyList()
+        val center = (zones - 1) / 2.0
+        val centerFill = if (zones % 2 == 0) 0.5 else 0.0
+        val radius = center - centerFill
+        val reach = level.coerceIn(0.0, 1.0) * (zones / 2.0)
+        return List(zones) { index ->
+            val distance = abs(index - center)
+            val fill = (reach + centerFill - distance).coerceIn(0.0, 1.0)
+            val position = if (radius > 0.0) max(0.0, distance - centerFill) / radius else 0.0
+            scale(scale.colorAt(position), fill)
         }
     }
 

@@ -1,9 +1,12 @@
 package com.hooandee.colores.ui
 
 import android.app.Application
+import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hooandee.colores.ColoresApplication
+import com.hooandee.colores.audio.AudioCaptureStatus
+import com.hooandee.colores.audio.AudioLevelState
 import com.hooandee.colores.control.AppMode
 import com.hooandee.colores.control.LightingBinding
 import com.hooandee.colores.control.LightingController
@@ -13,15 +16,23 @@ import com.hooandee.colores.control.StoredLighting
 import com.hooandee.colores.device.AndroidDeviceDetector
 import com.hooandee.colores.device.DetectedAndroidDevice
 import com.hooandee.colores.engine.BandSet
+import com.hooandee.colores.engine.AudioScale
+import com.hooandee.colores.engine.AudioSensitivity
 import com.hooandee.colores.engine.EffectCatalog
 import com.hooandee.colores.engine.EffectNeed
 import com.hooandee.colores.engine.EffectPreset
+import com.hooandee.colores.engine.SensorBand
+import com.hooandee.colores.engine.SensorKind
+import com.hooandee.colores.effects.EffectsService
 import com.hooandee.colores.gradient.DeviceGradientPreferences
 import com.hooandee.colores.gradient.GradientInterpolator
 import com.hooandee.colores.gradient.GradientPreferences
+import com.hooandee.colores.gradient.GradientPresentation
 import com.hooandee.colores.gradient.GradientPreset
 import com.hooandee.colores.gradient.GradientPresetRepository
 import com.hooandee.colores.gradient.LightingMode
+import com.hooandee.colores.gradient.editorStopCount
+import com.hooandee.colores.gradient.gradientPresentation
 import com.hooandee.colores.led.LedDevice
 import com.hooandee.colores.led.LedDeviceFactory
 import com.hooandee.colores.led.LedState
@@ -50,6 +61,9 @@ data class ColoresUiState(
     val effects: List<EffectPreset> = emptyList(),
     val effectId: String = "breathing",
     val speed: Int = 50,
+    val gradientSpeed: Int = 30,
+    val effectUsesGradient: Boolean = false,
+    val softwareEffectIds: Set<String> = emptySet(),
     val ledState: LedState =
         LedState(
             zoneColors = listOf(RgbColor(93, 81, 255), RgbColor(93, 81, 255)),
@@ -60,16 +74,22 @@ data class ColoresUiState(
     val currentFrame: List<RgbColor> = emptyList(),
     val editTarget: EditTarget = EditTarget.BOTH,
     val ledPreviewEnabled: Boolean = false,
-    val gradientAvailable: Boolean = false,
+    val gradientPresentation: GradientPresentation? = null,
     val gradient: GradientUiState = GradientUiState(),
     val chargerOnly: Boolean = false,
     val batteryBreathe: Boolean = true,
+    val temperatureBreathe: Boolean = true,
+    val sensorBandDefaults: BandSet = BandSet.FALLBACK,
+    val sensorBands: BandSet = BandSet.FALLBACK,
     val charging: Boolean = true,
     val batteryPresent: Boolean = true,
     val batteryLevelPercent: Int? = null,
     val temperatureCelsius: Double? = null,
     val temperatureAvailable: Boolean = false,
     val performanceMetric: PerformanceMetric? = null,
+    val audio: AudioLevelState = AudioLevelState(),
+    val audioScale: AudioScale = AudioScale.DEFAULT,
+    val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
 ) {
     val canWrite: Boolean
         get() = controlAccess == ControlAccess.ENABLED
@@ -80,14 +100,34 @@ data class ColoresUiState(
     val brightnessEnabled: Boolean
         get() = detected?.capabilities?.brightness == true
 
+    val gradientAvailable: Boolean
+        get() = gradientPresentation != null
+
+    val gradientAnimated: Boolean
+        get() = gradientPresentation == GradientPresentation.ANIMATED
+
     val sensorsAvailable: Boolean
         get() = batteryPresent || temperatureAvailable || performanceMetric != null
+
+    val audioNeedsAuthorization: Boolean
+        get() =
+            audio.status == AudioCaptureStatus.AUTHORIZATION_REQUIRED ||
+                audio.status == AudioCaptureStatus.REVOKED ||
+                audio.status == AudioCaptureStatus.ERROR
 
     val currentEffect: EffectPreset?
         get() = effects.firstOrNull { it.id == effectId }
 
     val effectNeedsGradient: Boolean
-        get() = mode == AppMode.EFFECT && currentEffect?.need == EffectNeed.GRADIENT
+        get() =
+            mode == AppMode.EFFECT &&
+                (currentEffect?.need == EffectNeed.GRADIENT || (effectUsesGradient && canUseGradientForEffect))
+
+    val canUseGradientForEffect: Boolean
+        get() =
+            gradientAvailable &&
+                currentEffect?.need == EffectNeed.COLOR &&
+                currentEffect?.id in softwareEffectIds
 
     val gradientEditable: Boolean
         get() = gradientAvailable || effectNeedsGradient
@@ -118,6 +158,7 @@ data class ColoresUiState(
             }
             if (sensorsAvailable) add(AppMode.BATTERY)
             if (colorEnabled) add(AppMode.CLOCK)
+            if (colorEnabled) add(AppMode.AUDIO)
         }
 
     fun availableSensorModes(): List<AppMode> =
@@ -151,16 +192,22 @@ class ColoresViewModel(
                         mode = snap.mode,
                         effectId = snap.effectId,
                         speed = snap.speed,
+                        gradientSpeed = snap.gradientSpeed,
+                        effectUsesGradient = snap.effectUsesGradient,
                         effectivePower = snap.effectivePower,
                         currentFrame = snap.currentFrame,
                         chargerOnly = snap.chargerOnly,
                         batteryBreathe = snap.batteryBreathe,
+                        temperatureBreathe = snap.temperatureBreathe,
                         charging = snap.charging,
                         batteryPresent = snap.batteryPresent,
                         batteryLevelPercent = snap.batteryLevelPercent,
                         temperatureCelsius = snap.temperatureCelsius,
                         temperatureAvailable = snap.temperatureAvailable,
                         performanceMetric = snap.performanceMetric,
+                        audio = snap.audio,
+                        audioScale = snap.audioScale,
+                        audioSensitivityDb = snap.audioSensitivityDb,
                         ledState = current.ledState.copy(power = snap.powerRequested, brightness = snap.brightness),
                     )
                 }
@@ -176,13 +223,15 @@ class ColoresViewModel(
                 val context = getApplication<Application>()
                 val detected = withContext(Dispatchers.IO) { AndroidDeviceDetector(context).detect() }
                 val userPermissionGranted = WriteSettingsPermission.canWrite(context)
+                val applicationScope = getApplication<ColoresApplication>().applicationScope
                 val device =
                     detected?.let {
-                        LedDeviceFactory.create(
-                            context,
-                            it.led,
-                            scope = CoroutineScope(viewModelScope.coroutineContext + Dispatchers.IO),
-                        )
+                        controller.boundDevice(it.id)
+                            ?: LedDeviceFactory.create(
+                                context,
+                                it.led,
+                                scope = CoroutineScope(applicationScope.coroutineContext + Dispatchers.IO),
+                            )
                     }
                 val controlAccess =
                     detected?.let {
@@ -222,10 +271,12 @@ class ColoresViewModel(
                     }
                 val bands = withContext(Dispatchers.IO) { BandSet.parse(context.readAsset("bands.json")) }
                 val zones = detected.capabilities.zones
-                val gradientSupported = detected.capabilities.supportsGradient(device.supportsPerZone)
+                val gradientPresentation = detected.capabilities.gradientPresentation(device.supportsPerZone)
+                val gradientSupported = gradientPresentation != null
+                val gradientStopCount = gradientPresentation?.editorStopCount(zones) ?: zones
                 val storedGradient =
                     withContext(Dispatchers.IO) { gradientPreferences.load(detected.id) }
-                val storedLighting = withContext(Dispatchers.IO) { lightingPreferences.load(detected.id) }
+                val storedLighting = withContext(Dispatchers.IO) { lightingPreferences.load(detected.id, bands) }
                 val liveState = withContext(Dispatchers.IO) { runCatching { device.readState() }.getOrNull() }
 
                 val hydratedGradient =
@@ -233,7 +284,7 @@ class ColoresViewModel(
                         liveColors = storedGradient.currentStops,
                         preferences = storedGradient,
                         presets = gradientPresets,
-                        zones = zones,
+                        zones = gradientStopCount,
                         supported = gradientSupported,
                     ).let { gradient ->
                         val minStops = if (device.hardwareEffects.any { it.colorStops >= 2 }) 2 else 1
@@ -246,8 +297,8 @@ class ColoresViewModel(
                         }
                     }
                 val zoneColors = GradientInterpolator.interpolate(hydratedGradient.stops, zones)
-                val brightness = liveState?.brightness ?: 100
-                val power = liveState?.power ?: true
+                val brightness = storedLighting.brightness ?: liveState?.brightness ?: 100
+                val power = storedLighting.power ?: liveState?.power ?: true
 
                 val alreadyBound =
                     controller.snapshot.value.bound && controller.snapshot.value.deviceId == detected.id
@@ -259,10 +310,11 @@ class ColoresViewModel(
                             device = device,
                             zones = zones,
                             catalog = catalog,
-                            bands = bands,
+                            bands = storedLighting.sensorBands,
                             battery = AndroidBatterySource(context),
                             temperature = SysfsThermalSource().takeIf { it.available },
                             performance = PerformanceSources.detect(),
+                            audio = getApplication<ColoresApplication>().audioLevelSource,
                         ),
                         LightingIntent(
                             mode = storedLighting.mode.coerceAvailable(gradientSupported),
@@ -274,10 +326,16 @@ class ColoresViewModel(
                                     ?: effectPresets.firstOrNull()?.id
                                     ?: catalog.defaultEffectId,
                             speed = storedLighting.speed,
+                            gradientSpeed = storedLighting.gradientSpeed,
+                            gradientPresentation = gradientPresentation ?: GradientPresentation.SPATIAL,
+                            effectUsesGradient = storedLighting.effectUsesGradient,
                             brightness = brightness,
                             power = power,
                             chargerOnly = storedLighting.chargerOnly,
                             batteryBreathe = storedLighting.batteryBreathe,
+                            temperatureBreathe = storedLighting.temperatureBreathe,
+                            audioScale = storedLighting.audioScale,
+                            audioSensitivityDb = storedLighting.audioSensitivityDb,
                         ),
                     )
                 }
@@ -288,9 +346,16 @@ class ColoresViewModel(
                         detected = detected,
                         controlAccess = controlAccess,
                         effects = effectPresets,
+                        softwareEffectIds = catalog.presets.mapTo(mutableSetOf()) { it.id },
+                        gradientSpeed = storedLighting.gradientSpeed,
+                        effectUsesGradient = storedLighting.effectUsesGradient,
                         ledState = LedState(zoneColors, brightness, power),
-                        gradientAvailable = gradientSupported,
+                        gradientPresentation = gradientPresentation,
                         gradient = hydratedGradient,
+                        sensorBandDefaults = bands,
+                        sensorBands = storedLighting.sensorBands,
+                        audioScale = storedLighting.audioScale,
+                        audioSensitivityDb = storedLighting.audioSensitivityDb,
                         ledPreviewEnabled =
                             detected.takeIf { it.previewCalibration != null }
                                 ?.let { ledPreviewPreferences.isEnabled(it.id) } ?: false,
@@ -314,7 +379,11 @@ class ColoresViewModel(
                 mode
             }
         if (target == current.mode) return
+        if (target == AppMode.AUDIO) return
         if (target == AppMode.GRADIENT && !current.gradientAvailable) return
+        if (current.mode == AppMode.AUDIO) {
+            EffectsService.stopAudio(getApplication(), AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+        }
         when (target) {
             AppMode.GRADIENT -> updateGradient(current.gradient.copy(mode = LightingMode.GRADIENT), apply = false)
             AppMode.COLOR -> {
@@ -352,6 +421,22 @@ class ColoresViewModel(
         persistLighting()
     }
 
+    fun setGradientSpeed(speed: Int) {
+        val clamped = speed.coerceIn(0, 100)
+        controller.setGradientSpeed(clamped)
+        mutableState.update { it.copy(gradientSpeed = clamped) }
+        persistLighting()
+    }
+
+    fun setEffectUsesGradient(enabled: Boolean) {
+        val current = mutableState.value
+        if (enabled && !current.canUseGradientForEffect) return
+        controller.setEffectUsesGradient(enabled)
+        mutableState.update { it.copy(effectUsesGradient = enabled) }
+        pushColorsToController()
+        persistLighting()
+    }
+
     fun selectSensorMode(mode: AppMode) {
         if (mode !in mutableState.value.availableSensorModes()) return
         controller.setMode(mode)
@@ -360,14 +445,37 @@ class ColoresViewModel(
     }
 
     fun setPower(power: Boolean) {
+        if (!power && mutableState.value.mode == AppMode.AUDIO) {
+            EffectsService.stopAudio(getApplication(), AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+        }
         controller.setPower(power)
         mutableState.update { it.copy(ledState = it.ledState.copy(power = power)) }
+        persistLighting()
+    }
+
+    fun activateAudio(
+        resultCode: Int,
+        resultData: Intent,
+    ) {
+        val current = mutableState.value
+        if (!current.canWrite || !current.colorEnabled) return
+        EffectsService.startAudio(getApplication(), resultCode, resultData)
+        getApplication<ColoresApplication>().audioLevelSource.reset(AudioCaptureStatus.STARTING)
+        controller.setMode(AppMode.AUDIO)
+        mutableState.update { it.copy(mode = AppMode.AUDIO, audio = AudioLevelState(status = AudioCaptureStatus.STARTING)) }
+        persistLighting()
+    }
+
+    fun onAudioAuthorizationDenied() {
+        getApplication<ColoresApplication>().audioLevelSource.reset(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+        mutableState.update { it.copy(audio = AudioLevelState(status = AudioCaptureStatus.AUTHORIZATION_REQUIRED)) }
     }
 
     fun setBrightness(brightness: Int) {
         val clamped = brightness.coerceIn(0, 100)
         controller.setBrightness(clamped)
         mutableState.update { it.copy(ledState = it.ledState.copy(brightness = clamped)) }
+        persistLighting()
     }
 
     fun setChargerOnly(enabled: Boolean) {
@@ -379,6 +487,36 @@ class ColoresViewModel(
     fun setBatteryBreathe(enabled: Boolean) {
         controller.setBatteryBreathe(enabled)
         mutableState.update { it.copy(batteryBreathe = enabled) }
+        persistLighting()
+    }
+
+    fun setTemperatureBreathe(enabled: Boolean) {
+        controller.setTemperatureBreathe(enabled)
+        mutableState.update { it.copy(temperatureBreathe = enabled) }
+        persistLighting()
+    }
+
+    fun setSensorBands(
+        kind: SensorKind,
+        bands: List<SensorBand>,
+    ) {
+        val current = mutableState.value
+        val updated = current.sensorBands.replace(kind, bands) ?: return
+        controller.setSensorBands(updated)
+        mutableState.update { it.copy(sensorBands = updated) }
+        persistLighting()
+    }
+
+    fun setAudioScale(scale: AudioScale) {
+        controller.setAudioScale(scale)
+        mutableState.update { it.copy(audioScale = scale) }
+        persistLighting()
+    }
+
+    fun setAudioSensitivity(gainDb: Int) {
+        val clamped = gainDb.coerceIn(AudioSensitivity.MIN_DB, AudioSensitivity.MAX_DB)
+        controller.setAudioSensitivity(clamped)
+        mutableState.update { it.copy(audioSensitivityDb = clamped) }
         persistLighting()
     }
 
@@ -543,9 +681,17 @@ class ColoresViewModel(
                 mode = current.mode,
                 effectId = current.effectId,
                 speed = current.speed,
+                gradientSpeed = current.gradientSpeed,
+                effectUsesGradient = current.effectUsesGradient,
                 solidColor = current.ledState.zoneColors.firstOrNull() ?: RgbColor(93, 81, 255),
+                brightness = current.ledState.brightness,
+                power = current.ledState.power,
                 chargerOnly = current.chargerOnly,
                 batteryBreathe = current.batteryBreathe,
+                temperatureBreathe = current.temperatureBreathe,
+                audioScale = current.audioScale,
+                audioSensitivityDb = current.audioSensitivityDb,
+                sensorBands = current.sensorBands,
             ),
         )
     }
@@ -557,7 +703,7 @@ private fun AppMode.coerceAvailable(gradientSupported: Boolean): AppMode =
     if (this == AppMode.GRADIENT && !gradientSupported) AppMode.COLOR else this
 
 private fun ColoresUiState.gradientStopCount(): Int =
-    if (effectNeedsGradient && !gradientAvailable) 2 else (detected?.capabilities?.zones ?: 2)
+    gradientPresentation?.editorStopCount(detected?.capabilities?.zones ?: 2) ?: 2
 
 private fun android.content.Context.readAsset(name: String): String =
     assets.open(name).bufferedReader().use { it.readText() }

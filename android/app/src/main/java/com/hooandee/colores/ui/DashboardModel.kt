@@ -1,5 +1,6 @@
 package com.hooandee.colores.ui
 
+import com.hooandee.colores.control.AppMode
 import com.hooandee.colores.led.LedState
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.abs
@@ -23,6 +24,11 @@ fun LedState.previewEndpointColors(gradientMode: Boolean): Pair<RgbColor, RgbCol
             zoneColors.getOrElse(zoneColors.stickSplitIndex()) { first }
         }
     return first to second
+}
+
+fun ColoresUiState.devicePreviewFrame(): List<RgbColor> {
+    val dynamic = mode.isDynamic || (mode == AppMode.GRADIENT && gradientAnimated)
+    return if (dynamic) currentFrame.ifEmpty { ledState.zoneColors } else ledState.zoneColors
 }
 
 fun LedState.colorForEditing(target: EditTarget): RgbColor {

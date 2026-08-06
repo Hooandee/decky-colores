@@ -32,6 +32,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hooandee.colores.R
+import com.hooandee.colores.audio.AudioCaptureStatus
+import com.hooandee.colores.control.AppMode
+import com.hooandee.colores.engine.AudioSensitivity
 import com.hooandee.colores.led.RgbColor
 
 @Composable
@@ -211,7 +214,9 @@ private fun DashboardBody(
             modes = state.availableModes(),
             selected = state.mode,
             enabled = state.canWrite,
-            onModeChange = modeActions.onModeChange,
+            onModeChange = { mode ->
+                if (mode == AppMode.AUDIO) modeActions.onAudioCaptureRequest() else modeActions.onModeChange(mode)
+            },
         )
         ChargerOnlyRow(
             chargerOnly = state.chargerOnly,
@@ -251,16 +256,9 @@ private fun DashboardModeLayout(
     modifier: Modifier = Modifier,
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
-        val dynamic = state.mode.isDynamic
-        val gradientMode = state.mode == com.hooandee.colores.control.AppMode.GRADIENT
-        val (left, right) =
-            if (dynamic) {
-                val frame = state.currentFrame
-                val first = frame.firstOrNull() ?: RgbColor(30, 30, 36)
-                first to (frame.lastOrNull() ?: first)
-            } else {
-                state.ledState.previewEndpointColors(gradientMode)
-            }
+        val dynamic = state.mode.isDynamic || (state.mode == AppMode.GRADIENT && state.gradientAnimated)
+        val gradientMode = state.mode == AppMode.GRADIENT
+        val previewFrame = state.devicePreviewFrame()
         val sceneTarget =
             if (gradientMode) {
                 when (state.gradient.selectedStopIndex) {
@@ -286,19 +284,32 @@ private fun DashboardModeLayout(
 
         @Composable
         fun Scene(sceneModifier: Modifier) {
-            DeviceScene(
-                leftColor = left,
-                rightColor = right,
-                selectedTarget = sceneTarget,
-                power = state.effectivePower,
-                enabled = sceneEnabled,
-                perZone = perZone && !dynamic,
-                projection = state.ledColorProjection,
-                onLedPreviewChange = onLedPreviewChange,
-                onTargetChange = sceneTargetChange,
-                showBoth = !gradientMode && !dynamic,
-                modifier = sceneModifier,
-            )
+            if (state.mode == AppMode.AUDIO) {
+                AudioDeviceScene(
+                    frame = state.currentFrame,
+                    layout = state.detected?.gridLayout,
+                    level = AudioSensitivity.adjust(state.audio.level, state.audioSensitivityDb),
+                    capturing = state.audio.status == AudioCaptureStatus.CAPTURING,
+                    scale = state.audioScale,
+                    power = state.effectivePower,
+                    projection = state.ledColorProjection,
+                    modifier = sceneModifier,
+                )
+            } else {
+                DeviceScene(
+                    frame = previewFrame,
+                    layout = state.detected?.gridLayout,
+                    selectedTarget = sceneTarget,
+                    power = state.effectivePower,
+                    enabled = sceneEnabled,
+                    perZone = perZone && !dynamic,
+                    projection = state.ledColorProjection,
+                    onLedPreviewChange = onLedPreviewChange,
+                    onTargetChange = sceneTargetChange,
+                    showBoth = !gradientMode && !dynamic,
+                    modifier = sceneModifier,
+                )
+            }
         }
 
         @Composable

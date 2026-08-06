@@ -3,10 +3,34 @@ package com.hooandee.colores.engine
 import com.hooandee.colores.led.RgbColor
 import org.json.JSONObject
 
+enum class SensorKind(
+    val maximum: Int,
+) {
+    BATTERY(100),
+    TEMPERATURE(120),
+}
+
 data class BandSet(
     val battery: List<SensorBand>,
     val temperature: List<SensorBand>,
 ) {
+    fun bands(kind: SensorKind): List<SensorBand> =
+        when (kind) {
+            SensorKind.BATTERY -> battery
+            SensorKind.TEMPERATURE -> temperature
+        }
+
+    fun replace(
+        kind: SensorKind,
+        bands: List<SensorBand>,
+    ): BandSet? {
+        if (!bands.isValidFor(kind)) return null
+        return when (kind) {
+            SensorKind.BATTERY -> copy(battery = bands)
+            SensorKind.TEMPERATURE -> copy(temperature = bands)
+        }
+    }
+
     companion object {
         private val BATTERY_FALLBACK =
             listOf(
@@ -50,4 +74,16 @@ data class BandSet(
     }
 }
 
-const val TEMPERATURE_CRITICAL = 90.0
+private fun List<SensorBand>.isValidFor(kind: SensorKind): Boolean =
+    size == 5 &&
+        last().min == 0.0 &&
+        zipWithNext().all { (higher, lower) -> higher.min > lower.min } &&
+        all { band ->
+            band.min.isFinite() &&
+                band.min >= 0.0 &&
+                band.min <= kind.maximum &&
+                band.min % 1.0 == 0.0 &&
+                band.color.red in 0..255 &&
+                band.color.green in 0..255 &&
+                band.color.blue in 0..255
+        }

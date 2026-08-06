@@ -66,6 +66,24 @@ class EngineGoldenTest {
     }
 
     @Test
+    fun `matches every shared vu_frame golden vector`() {
+        val vectors = JSONArray(File("../../shared/golden/vu.json").readText())
+        assertTrue(vectors.length() > 0)
+        repeat(vectors.length()) { index ->
+            val vector = vectors.getJSONObject(index)
+            assertEquals("vu_frame", vector.getString("operation"))
+            val input = vector.getJSONObject("input")
+            val expected = vector.getJSONObject("expected").getJSONArray("colors").colors()
+
+            assertEquals(
+                "vector ${vector.getString("id")}",
+                expected,
+                Effects.vu(input.getDouble("level"), input.getInt("zones")),
+            )
+        }
+    }
+
+    @Test
     fun `every effect keeps channels within range across a time sweep`() {
         val base = List(8) { RgbColor(200, 100, 50) }
         val stops = listOf(RgbColor(255, 0, 0), RgbColor(0, 255, 0), RgbColor(0, 0, 255))
@@ -92,6 +110,15 @@ class EngineGoldenTest {
         val early = Effects.wave(stops, 4, 0.0, 0)
         val later = Effects.wave(stops, 4, 3.0, 0)
         assertTrue(early != later)
+    }
+
+    @Test
+    fun `gradient sweep eases from first stop to last and back`() {
+        val stops = listOf(RgbColor(255, 0, 0), RgbColor(0, 0, 255))
+
+        assertEquals(List(2) { RgbColor(255, 0, 0) }, Effects.frame("gradient_sweep", 0.0, 0, 2, emptyList(), stops))
+        assertEquals(List(2) { RgbColor(0, 0, 255) }, Effects.frame("gradient_sweep", 5.0, 0, 2, emptyList(), stops))
+        assertEquals(List(2) { RgbColor(255, 0, 0) }, Effects.frame("gradient_sweep", 10.0, 0, 2, emptyList(), stops))
     }
 
     @Test

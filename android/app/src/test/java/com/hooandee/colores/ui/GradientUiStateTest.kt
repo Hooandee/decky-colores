@@ -2,9 +2,12 @@ package com.hooandee.colores.ui
 
 import com.hooandee.colores.device.DeviceCapabilities
 import com.hooandee.colores.gradient.GradientPreset
+import com.hooandee.colores.gradient.GradientPresentation
 import com.hooandee.colores.gradient.DeviceGradientPreferences
 import com.hooandee.colores.gradient.LightingMode
 import com.hooandee.colores.gradient.SavedGradient
+import com.hooandee.colores.gradient.editorStopCount
+import com.hooandee.colores.gradient.gradientPresentation
 import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.led.LedState
 import org.junit.Assert.assertEquals
@@ -19,12 +22,29 @@ class GradientUiStateTest {
     private val preset = GradientPreset("primary", listOf(red, green, blue))
 
     @Test
-    fun `gradient requires color per-zone support and at least two zones`() {
-        assertTrue(DeviceCapabilities(true, true, true, 2).supportsGradient(deviceSupportsPerZone = true))
-        assertFalse(DeviceCapabilities(true, true, true, 1).supportsGradient(deviceSupportsPerZone = true))
-        assertFalse(DeviceCapabilities(true, true, false, 2).supportsGradient(deviceSupportsPerZone = true))
-        assertFalse(DeviceCapabilities(false, true, true, 2).supportsGradient(deviceSupportsPerZone = true))
-        assertFalse(DeviceCapabilities(true, true, true, 2).supportsGradient(deviceSupportsPerZone = false))
+    fun `gradient presentation follows effective transport capabilities`() {
+        assertEquals(
+            GradientPresentation.SPATIAL,
+            DeviceCapabilities(true, true, true, 2).gradientPresentation(deviceSupportsPerZone = true),
+        )
+        assertEquals(
+            GradientPresentation.ANIMATED,
+            DeviceCapabilities(true, true, true, 1).gradientPresentation(deviceSupportsPerZone = false),
+        )
+        assertEquals(
+            GradientPresentation.ANIMATED,
+            DeviceCapabilities(true, true, false, 2).gradientPresentation(deviceSupportsPerZone = false),
+        )
+        assertEquals(
+            null,
+            DeviceCapabilities(false, true, true, 2).gradientPresentation(deviceSupportsPerZone = true),
+        )
+    }
+
+    @Test
+    fun `animated gradient keeps two editable stops on a single-color device`() {
+        assertEquals(2, GradientPresentation.ANIMATED.editorStopCount(1))
+        assertEquals(8, GradientPresentation.SPATIAL.editorStopCount(8))
     }
 
     @Test

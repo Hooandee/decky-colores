@@ -79,8 +79,8 @@
     },
     {
       "id": "audio_vu",
-      "contracts": [],
-      "platforms": { "decky": "validated", "android": "deferred", "windows": "deferred" }
+      "contracts": ["golden/vu.json"],
+      "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }
     },
     {
       "id": "hardware_effects",

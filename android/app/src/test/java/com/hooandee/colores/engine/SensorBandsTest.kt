@@ -42,4 +42,32 @@ class SensorBandsTest {
         val bands = BandSet.parse("nonsense")
         assertEquals(BandSet.FALLBACK, bands)
     }
+
+    @Test
+    fun `replacing one scale accepts five descending bands ending at zero`() {
+        val custom =
+            listOf(
+                SensorBand(95.0, RgbColor(1, 2, 3)),
+                SensorBand(75.0, RgbColor(4, 5, 6)),
+                SensorBand(55.0, RgbColor(7, 8, 9)),
+                SensorBand(35.0, RgbColor(10, 11, 12)),
+                SensorBand(0.0, RgbColor(13, 14, 15)),
+            )
+
+        val replaced = BandSet.FALLBACK.replace(SensorKind.BATTERY, custom)
+
+        assertEquals(custom, replaced?.battery)
+        assertEquals(BandSet.FALLBACK.temperature, replaced?.temperature)
+    }
+
+    @Test
+    fun `invalid custom scales are rejected before they can reach the renderer`() {
+        val duplicateThreshold = BandSet.FALLBACK.battery.toMutableList().also { it[1] = it[0].copy() }
+        val nonZeroMinimum = BandSet.FALLBACK.temperature.toMutableList().also { it[it.lastIndex] = it.last().copy(min = 1.0) }
+        val aboveLimit = BandSet.FALLBACK.battery.toMutableList().also { it[0] = it.first().copy(min = 101.0) }
+
+        assertEquals(null, BandSet.FALLBACK.replace(SensorKind.BATTERY, duplicateThreshold))
+        assertEquals(null, BandSet.FALLBACK.replace(SensorKind.TEMPERATURE, nonZeroMinimum))
+        assertEquals(null, BandSet.FALLBACK.replace(SensorKind.BATTERY, aboveLimit))
+    }
 }

@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 internal class Htr3212LedDevice internal constructor(
     private val descriptor: SettingsProviderDescriptor,
@@ -120,8 +121,9 @@ internal class Htr3212LedDevice internal constructor(
         }
         if (vendorResult.changed) settleVendor()
 
-        val left = state.zoneColors.take(ZONES_PER_STICK)
-        val right = state.zoneColors.drop(ZONES_PER_STICK).take(ZONES_PER_STICK)
+        val directColors = state.zoneColors.map { it.scaleBrightness(state.brightness) }
+        val left = directColors.take(ZONES_PER_STICK)
+        val right = directColors.drop(ZONES_PER_STICK).take(ZONES_PER_STICK)
         val previousLeft = cache.left.takeUnless { vendorResult.changed }
         val previousRight = cache.right.takeUnless { vendorResult.changed }
         val leftSucceeded = writeStick(hardware.leftBus, hardware.address, left, hardware.leftOrder, previousLeft)
@@ -218,7 +220,15 @@ internal class Htr3212LedDevice internal constructor(
         logicalToDriverOrder: List<Int>,
         previous: List<RgbColor>?,
     ): Boolean =
-        Htr3212Command.build(bus, address, colors, logicalToDriverOrder, previous, hardware?.rgbStartRegister ?: 0x01)
+        Htr3212Command.build(
+            bus = bus,
+            address = address,
+            colors = colors,
+            logicalToDriverOrder = logicalToDriverOrder,
+            previous = previous,
+            rgbStartRegister = hardware?.rgbStartRegister ?: 0x01,
+            blockWrite = hardware?.blockWrite == true,
+        )
             ?.let(executor::execute)
             ?: true
 
@@ -250,4 +260,13 @@ internal class Htr3212LedDevice internal constructor(
 private fun List<RgbColor>.fitHtrZones(): List<RgbColor> {
     val fallback = firstOrNull() ?: RgbColor(255, 255, 255)
     return List(8) { index -> getOrNull(index) ?: fallback }
+}
+
+private fun RgbColor.scaleBrightness(brightness: Int): RgbColor {
+    val factor = brightness.coerceIn(0, 100) / 100f
+    return RgbColor(
+        (red.coerceIn(0, 255) * factor).roundToInt(),
+        (green.coerceIn(0, 255) * factor).roundToInt(),
+        (blue.coerceIn(0, 255) * factor).roundToInt(),
+    )
 }

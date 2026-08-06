@@ -2,6 +2,7 @@ package com.hooandee.colores.ui
 
 import com.hooandee.colores.led.LedState
 import com.hooandee.colores.led.RgbColor
+import com.hooandee.colores.control.AppMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -124,5 +125,31 @@ class DashboardModelTest {
 
         assertEquals(List(4) { red }, changed.zoneColors.take(4))
         assertTrue(changed.zoneColors.drop(4).all { kotlin.math.abs(it.toHsvColor().saturation - 0.4f) < 0.02f })
+    }
+
+    @Test
+    fun `static preview preserves every physical zone instead of reducing to endpoints`() {
+        val colors = (1..8).map { RgbColor(it * 20, it * 10, it) }
+        val state =
+            ColoresUiState(
+                mode = AppMode.GRADIENT,
+                ledState = LedState(colors, brightness = 80, power = true),
+            )
+
+        assertEquals(colors, state.devicePreviewFrame())
+    }
+
+    @Test
+    fun `dynamic preview uses the complete live frame`() {
+        val configured = List(8) { red }
+        val live = (1..8).map { RgbColor(0, it * 20, it * 10) }
+        val state =
+            ColoresUiState(
+                mode = AppMode.EFFECT,
+                ledState = LedState(configured, brightness = 80, power = true),
+                currentFrame = live,
+            )
+
+        assertEquals(live, state.devicePreviewFrame())
     }
 }

@@ -1,5 +1,11 @@
 package com.hooandee.colores.control
 
+import com.hooandee.colores.audio.AudioLevelSource
+import com.hooandee.colores.audio.AudioLevelState
+import com.hooandee.colores.audio.MutableAudioLevelSource
+import com.hooandee.colores.engine.AudioVuRenderer
+import com.hooandee.colores.engine.AudioScale
+import com.hooandee.colores.engine.AudioSensitivity
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.ClockRenderer
 import com.hooandee.colores.engine.EffectCatalog
@@ -11,6 +17,7 @@ import com.hooandee.colores.engine.PerformanceRenderer
 import com.hooandee.colores.engine.Renderer
 import com.hooandee.colores.engine.StatusTargets
 import com.hooandee.colores.gradient.GradientInterpolator
+import com.hooandee.colores.gradient.GradientPresentation
 import com.hooandee.colores.led.HardwareEffect
 import com.hooandee.colores.led.LedDevice
 import com.hooandee.colores.led.RgbColor
@@ -37,6 +44,7 @@ enum class AppMode {
     TEMPERATURE,
     PERFORMANCE,
     CLOCK,
+    AUDIO,
     ;
 
     val isDynamic: Boolean
@@ -53,10 +61,16 @@ data class LightingIntent(
     val gradientStops: List<RgbColor> = listOf(RgbColor(93, 81, 255), RgbColor(93, 81, 255)),
     val effectId: String = "breathing",
     val speed: Int = 50,
+    val gradientSpeed: Int = 30,
+    val gradientPresentation: GradientPresentation = GradientPresentation.SPATIAL,
+    val effectUsesGradient: Boolean = false,
     val brightness: Int = 100,
     val power: Boolean = true,
     val chargerOnly: Boolean = false,
     val batteryBreathe: Boolean = true,
+    val temperatureBreathe: Boolean = true,
+    val audioScale: AudioScale = AudioScale.DEFAULT,
+    val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
 )
 
 data class LightingBinding(
@@ -68,6 +82,7 @@ data class LightingBinding(
     val battery: BatterySource,
     val temperature: TemperatureSource?,
     val performance: PerformanceSource?,
+    val audio: AudioLevelSource = MutableAudioLevelSource(),
 )
 
 data class LightingSnapshot(
@@ -76,17 +91,23 @@ data class LightingSnapshot(
     val mode: AppMode = AppMode.COLOR,
     val effectId: String = "breathing",
     val speed: Int = 50,
+    val gradientSpeed: Int = 30,
+    val effectUsesGradient: Boolean = false,
     val brightness: Int = 100,
     val powerRequested: Boolean = true,
     val effectivePower: Boolean = true,
     val chargerOnly: Boolean = false,
     val batteryBreathe: Boolean = true,
+    val temperatureBreathe: Boolean = true,
     val charging: Boolean = true,
     val batteryPresent: Boolean = true,
     val batteryLevelPercent: Int? = null,
     val temperatureCelsius: Double? = null,
     val temperatureAvailable: Boolean = false,
     val performanceMetric: PerformanceMetric? = null,
+    val audio: AudioLevelState = AudioLevelState(),
+    val audioScale: AudioScale = AudioScale.DEFAULT,
+    val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
     val currentFrame: List<RgbColor> = emptyList(),
 )
 
@@ -122,7 +143,10 @@ class LightingController(
     @Volatile
     private var batteryPresent = true
 
+    @Volatile
     private var binding: LightingBinding? = null
+    @Volatile
+    private var sensorBands = BandSet.FALLBACK
     private var renderJob: Job? = null
     private var watchJob: Job? = null
     private var rendererSignature: Pair<AppMode, String>? = null
@@ -150,11 +174,17 @@ class LightingController(
 
     fun reassert() = send(Command.Reassert)
 
+    fun boundDevice(deviceId: String): LedDevice? = binding?.takeIf { it.deviceId == deviceId }?.device
+
     fun setMode(mode: AppMode) = send(Command.SetMode(mode))
 
     fun setEffect(effectId: String) = send(Command.SetEffect(effectId))
 
     fun setSpeed(speed: Int) = send(Command.SetSpeed(speed))
+
+    fun setGradientSpeed(speed: Int) = send(Command.SetGradientSpeed(speed))
+
+    fun setEffectUsesGradient(enabled: Boolean) = send(Command.SetEffectUsesGradient(enabled))
 
     fun setStaticFrame(colors: List<RgbColor>) = send(Command.SetStaticFrame(colors))
 
@@ -171,6 +201,16 @@ class LightingController(
 
     fun setBatteryBreathe(enabled: Boolean) = send(Command.SetBatteryBreathe(enabled))
 
+    fun setTemperatureBreathe(enabled: Boolean) = send(Command.SetTemperatureBreathe(enabled))
+
+    fun setSensorBands(bands: BandSet) = send(Command.SetSensorBands(bands))
+
+    fun setAudioScale(scale: AudioScale) = send(Command.SetAudioScale(scale))
+
+    fun setAudioSensitivity(gainDb: Int) = send(Command.SetAudioSensitivity(gainDb))
+
+    fun onAudioStateChanged() = send(Command.AudioStateChanged)
+
     private fun send(command: Command) {
         commands.trySend(command)
     }
@@ -183,12 +223,25 @@ class LightingController(
             is Command.SetMode -> mutateIntent { it.copy(mode = command.mode) }
             is Command.SetEffect -> mutateIntent { it.copy(effectId = command.effectId) }
             is Command.SetSpeed -> mutateIntent { it.copy(speed = command.speed.coerceIn(0, 100)) }
+            is Command.SetGradientSpeed -> mutateIntent { it.copy(gradientSpeed = command.speed.coerceIn(0, 100)) }
+            is Command.SetEffectUsesGradient -> mutateIntent { it.copy(effectUsesGradient = command.enabled) }
             is Command.SetStaticFrame -> mutateIntent { it.copy(staticColors = command.colors, solidColor = command.colors.firstOrNull() ?: it.solidColor) }
             is Command.SetPalette -> mutateIntent { it.copy(solidColor = command.solid, gradientStops = command.stops) }
             is Command.SetBrightness -> mutateIntent { it.copy(brightness = command.brightness.coerceIn(0, 100)) }
             is Command.SetPower -> mutateIntent { it.copy(power = command.power) }
             is Command.SetChargerOnly -> mutateIntent { it.copy(chargerOnly = command.chargerOnly) }
             is Command.SetBatteryBreathe -> mutateIntent { it.copy(batteryBreathe = command.enabled) }
+            is Command.SetTemperatureBreathe -> mutateIntent { it.copy(temperatureBreathe = command.enabled) }
+            is Command.SetAudioScale -> mutateIntent { it.copy(audioScale = command.scale) }
+            is Command.SetAudioSensitivity ->
+                mutateIntent {
+                    it.copy(audioSensitivityDb = command.gainDb.coerceIn(AudioSensitivity.MIN_DB, AudioSensitivity.MAX_DB))
+                }
+            Command.AudioStateChanged -> reconcile()
+            is Command.SetSensorBands -> {
+                sensorBands = command.bands
+                publishSnapshot()
+            }
             is Command.WatchReading -> onReading(command)
         }
     }
@@ -197,6 +250,7 @@ class LightingController(
         stopRenderJob()
         watchJob?.cancel()
         binding = command.binding
+        sensorBands = command.binding.bands
         intent = command.intent.copy(staticColors = command.intent.staticColors.fit(command.binding.zones))
         temperatureCelsius = command.binding.temperature?.readCelsius()
         rendererSignature = null
@@ -215,6 +269,7 @@ class LightingController(
         watchJob?.cancel()
         watchJob = null
         binding = null
+        serviceGate.stop()
         publishSnapshot()
     }
 
@@ -243,11 +298,20 @@ class LightingController(
 
     private fun effectivePower(): Boolean = intent.power && (!intent.chargerOnly || charging)
 
-    private fun hardwareEffect(binding: LightingBinding): HardwareEffect? =
-        if (intent.mode == AppMode.EFFECT) {
-            binding.device.hardwareEffects.firstOrNull { it.id == intent.effectId }
-        } else {
-            null
+    private fun hardwareEffect(binding: LightingBinding): HardwareEffect? {
+        if (intent.mode != AppMode.EFFECT || usesSoftwareGradientOverlay(binding)) return null
+        return binding.device.hardwareEffects.firstOrNull { it.id == intent.effectId }
+    }
+
+    private fun usesSoftwareGradientOverlay(binding: LightingBinding): Boolean =
+        intent.effectUsesGradient && binding.catalog.byId(intent.effectId)?.need == EffectNeed.COLOR
+
+    private fun needsRenderLoop(binding: LightingBinding): Boolean =
+        when (intent.mode) {
+            AppMode.GRADIENT -> intent.gradientPresentation == GradientPresentation.ANIMATED || !binding.device.supportsPerZone
+            AppMode.EFFECT -> hardwareEffect(binding) == null
+            AppMode.AUDIO -> binding.audio.state.value.status.keepsAudioCaptureActive
+            else -> intent.mode.isDynamic
         }
 
     private suspend fun reconcile() {
@@ -263,11 +327,19 @@ class LightingController(
     ) {
         val hwEffect = hardwareEffect(binding)
         when {
+            !intent.power -> {
+                if (manageRenderJob) stopRenderJob()
+                applyOff(binding)
+            }
+            intent.mode == AppMode.AUDIO && !binding.audio.state.value.status.keepsAudioCaptureActive -> {
+                if (manageRenderJob) stopRenderJob()
+                applyAudioUnavailable(binding)
+            }
             hwEffect != null -> {
                 if (manageRenderJob) stopRenderJob()
                 applyHardwareEffect(binding, hwEffect)
             }
-            intent.mode.isDynamic -> if (manageRenderJob) ensureRenderJob(binding)
+            needsRenderLoop(binding) -> if (manageRenderJob) ensureRenderJob(binding)
             else -> {
                 if (manageRenderJob) stopRenderJob()
                 applyStatic()
@@ -291,8 +363,26 @@ class LightingController(
     }
 
     private fun updateService() {
-        val needsService = binding != null && (intent.mode.isDynamic || (intent.chargerOnly && intent.power))
+        val activeBinding = binding
+        val needsService =
+            activeBinding != null &&
+                intent.power &&
+                (needsRenderLoop(activeBinding) || intent.chargerOnly)
         if (needsService) serviceGate.start() else serviceGate.stop()
+    }
+
+    private suspend fun applyOff(binding: LightingBinding) {
+        val colors = binding.offFrame()
+        runCatching { binding.device.applyZones(colors, intent.brightness, false) }.rethrowCancellation()
+        lastFrame = colors
+        publishSnapshot()
+    }
+
+    private suspend fun applyAudioUnavailable(binding: LightingBinding) {
+        val colors = binding.offFrame()
+        runCatching { binding.device.applyZones(colors, intent.brightness, effectivePower()) }.rethrowCancellation()
+        lastFrame = colors
+        publishSnapshot()
     }
 
     private fun ensureRenderJob(binding: LightingBinding) {
@@ -362,12 +452,20 @@ class LightingController(
                     speed = { intent.speed },
                     palette = { resolvePalette(binding) },
                 )
+            AppMode.GRADIENT ->
+                EffectRenderer(
+                    effectId = "gradient_sweep",
+                    zones = zones,
+                    frameIntervalMs = interval,
+                    speed = { intent.gradientSpeed },
+                    palette = { EffectPalette(List(zones) { intent.solidColor }, intent.gradientStops) },
+                )
             AppMode.BATTERY ->
                 IndicatorRenderer(
                     zones = zones,
                     frameIntervalMs = interval,
                     idleIntervalMs = INDICATOR_IDLE_MS,
-                    target = { StatusTargets.batteryTarget(batteryLevel, binding.bands.battery) },
+                    target = { StatusTargets.batteryTarget(batteryLevel, sensorBands.battery) },
                     breathing = { StatusTargets.batteryBreathing(charging, intent.batteryBreathe, batteryLevel) },
                 )
             AppMode.TEMPERATURE ->
@@ -377,9 +475,15 @@ class LightingController(
                     idleIntervalMs = INDICATOR_IDLE_MS,
                     target = {
                         val celsius = binding.temperature?.readCelsius().also { temperatureCelsius = it }
-                        StatusTargets.temperatureTarget(celsius, binding.bands.temperature)
+                        StatusTargets.temperatureTarget(celsius, sensorBands.temperature)
                     },
-                    breathing = { StatusTargets.temperatureBreathing(true, temperatureCelsius) },
+                    breathing = {
+                        StatusTargets.temperatureBreathing(
+                            intent.temperatureBreathe,
+                            temperatureCelsius,
+                            sensorBands.temperature,
+                        )
+                    },
                 )
             AppMode.PERFORMANCE ->
                 PerformanceRenderer(
@@ -394,6 +498,14 @@ class LightingController(
                     intervalMs = CLOCK_INTERVAL_MS,
                     hour = localHour,
                 )
+            AppMode.AUDIO ->
+                AudioVuRenderer(
+                    zones = zones,
+                    frameIntervalMs = interval,
+                    scale = { intent.audioScale },
+                    sensitivityDb = { intent.audioSensitivityDb },
+                    state = { binding.audio.state.value },
+                )
             else ->
                 EffectRenderer(intent.effectId, zones, interval, { intent.speed }, { resolvePalette(binding) })
         }
@@ -402,12 +514,14 @@ class LightingController(
     private fun resolvePalette(binding: LightingBinding): EffectPalette {
         val zones = binding.zones
         val need = binding.catalog.byId(intent.effectId)?.need ?: EffectNeed.COLOR
-        return when (need) {
-            EffectNeed.GRADIENT ->
-                EffectPalette(GradientInterpolator.interpolate(intent.gradientStops, zones), intent.gradientStops)
-            else ->
-                EffectPalette(List(zones) { intent.solidColor }, intent.gradientStops)
-        }
+        val usesGradient = need == EffectNeed.GRADIENT || (need == EffectNeed.COLOR && intent.effectUsesGradient)
+        val base =
+            if (usesGradient) {
+                GradientInterpolator.interpolate(intent.gradientStops, zones)
+            } else {
+                List(zones) { intent.solidColor }
+            }
+        return EffectPalette(base, intent.gradientStops)
     }
 
     private suspend fun watchLoop(binding: LightingBinding) {
@@ -435,17 +549,23 @@ class LightingController(
                 mode = intent.mode,
                 effectId = intent.effectId,
                 speed = intent.speed,
+                gradientSpeed = intent.gradientSpeed,
+                effectUsesGradient = intent.effectUsesGradient,
                 brightness = intent.brightness,
                 powerRequested = intent.power,
                 effectivePower = effectivePower(),
                 chargerOnly = intent.chargerOnly,
                 batteryBreathe = intent.batteryBreathe,
+                temperatureBreathe = intent.temperatureBreathe,
                 charging = charging,
                 batteryPresent = batteryPresent,
                 batteryLevelPercent = batteryLevel,
                 temperatureCelsius = temperatureCelsius,
                 temperatureAvailable = binding?.temperature?.available == true,
                 performanceMetric = binding?.performance?.metric,
+                audio = binding?.audio?.state?.value ?: AudioLevelState(),
+                audioScale = intent.audioScale,
+                audioSensitivityDb = intent.audioSensitivityDb,
                 currentFrame = lastFrame,
             )
     }
@@ -470,6 +590,10 @@ class LightingController(
 
         data class SetSpeed(val speed: Int) : Command
 
+        data class SetGradientSpeed(val speed: Int) : Command
+
+        data class SetEffectUsesGradient(val enabled: Boolean) : Command
+
         data class SetStaticFrame(val colors: List<RgbColor>) : Command
 
         data class SetPalette(val solid: RgbColor, val stops: List<RgbColor>) : Command
@@ -481,6 +605,16 @@ class LightingController(
         data class SetChargerOnly(val chargerOnly: Boolean) : Command
 
         data class SetBatteryBreathe(val enabled: Boolean) : Command
+
+        data class SetTemperatureBreathe(val enabled: Boolean) : Command
+
+        data class SetAudioScale(val scale: AudioScale) : Command
+
+        data class SetAudioSensitivity(val gainDb: Int) : Command
+
+        data object AudioStateChanged : Command
+
+        data class SetSensorBands(val bands: BandSet) : Command
 
         data class WatchReading(
             val charging: Boolean,
@@ -506,3 +640,9 @@ class LightingController(
 }
 
 private fun <T> Result<T>.rethrowCancellation(): Result<T> = onFailure { if (it is CancellationException) throw it }
+
+private val com.hooandee.colores.audio.AudioCaptureStatus.keepsAudioCaptureActive: Boolean
+    get() =
+        this == com.hooandee.colores.audio.AudioCaptureStatus.STARTING ||
+            this == com.hooandee.colores.audio.AudioCaptureStatus.CAPTURING ||
+            this == com.hooandee.colores.audio.AudioCaptureStatus.NO_AUDIO

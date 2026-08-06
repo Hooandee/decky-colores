@@ -249,7 +249,16 @@ export const PERFORMANCE_STOPS: RGB[] = [
 ];
 
 function lerpChannel(a: number, b: number, f: number): number {
-  return Math.round(a + (b - a) * f);
+  return roundHalfEven(a + (b - a) * f);
+}
+
+function roundHalfEven(value: number): number {
+  const lower = Math.floor(value);
+  const fraction = value - lower;
+  if (Math.abs(fraction - 0.5) < Number.EPSILON * Math.max(1, Math.abs(value))) {
+    return lower % 2 === 0 ? lower : lower + 1;
+  }
+  return Math.round(value);
 }
 
 function sampleRamp(stops: RGB[], pos: number): RGB {
@@ -271,7 +280,11 @@ function fillBar(
   return Array.from({ length: n }, (_, i) => {
     const fill = Math.max(0, Math.min(1, fillOf(i, n)));
     const ramp = sampleRamp(PERFORMANCE_STOPS, posOf(i, n));
-    return { r: Math.round(ramp.r * fill), g: Math.round(ramp.g * fill), b: Math.round(ramp.b * fill) };
+    return {
+      r: roundHalfEven(ramp.r * fill),
+      g: roundHalfEven(ramp.g * fill),
+      b: roundHalfEven(ramp.b * fill),
+    };
   });
 }
 

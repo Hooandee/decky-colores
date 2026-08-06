@@ -1,4 +1,6 @@
 import asyncio
+import json
+from pathlib import Path
 
 import pytest
 
@@ -50,6 +52,16 @@ def test_vu_two_zone_device_reacts_below_half_scale():
     assert quiet[0] == quiet[1]
     assert sum(quiet[0]) > 0
     assert quiet[0][1] > quiet[0][0]
+
+
+def test_vu_matches_shared_golden_vectors():
+    path = Path(__file__).parents[1] / "shared" / "golden" / "vu.json"
+    for vector in json.loads(path.read_text()):
+        assert vector["operation"] == "vu_frame"
+        input_value = vector["input"]
+        actual = frame_vu(input_value["level"], input_value["zones"])
+        expected = [tuple(color.values()) for color in vector["expected"]["colors"]]
+        assert actual == expected, vector["id"]
 
 
 def test_meter_fills_proportionally():

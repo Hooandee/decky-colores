@@ -22,7 +22,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -116,13 +115,14 @@ fun ColorControlPanel(
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 CurrentColor(state, projection)
-                                LabeledSlider(
+                                DeferredIntSlider(
                                     label = stringResource(R.string.saturation_title),
-                                    valueLabel = "${(editingHsv.saturation * 100f).roundToInt()}%",
-                                    value = editingHsv.saturation,
-                                    onValueChange = onSaturationChange,
-                                    valueRange = 0f..1f,
+                                    committedValue = (editingHsv.saturation * 100f).roundToInt(),
+                                    valueLabel = { "$it%" },
+                                    onValueCommit = { onSaturationChange(it / 100f) },
+                                    valueRange = 0..100,
                                     enabled = state.canWrite,
+                                    resetKey = state.editTarget,
                                 )
                             }
                         }
@@ -138,12 +138,12 @@ fun ColorControlPanel(
                 }
                 if (brightnessEnabled) {
                     if (colorEnabled) Spacer(Modifier.height(4.dp))
-                    LabeledSlider(
+                    DeferredIntSlider(
                         label = stringResource(R.string.brightness_title),
-                        valueLabel = stringResource(R.string.brightness_value, state.ledState.brightness),
-                        value = state.ledState.brightness.toFloat(),
-                        onValueChange = { onBrightnessChange(it.roundToInt()) },
-                        valueRange = 0f..100f,
+                        committedValue = state.ledState.brightness,
+                        valueLabel = { stringResource(R.string.brightness_value, it) },
+                        onValueCommit = onBrightnessChange,
+                        valueRange = 0..100,
                         enabled = state.canWrite,
                     )
                 }
@@ -291,41 +291,5 @@ private fun QuickColors(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun LabeledSlider(
-    label: String,
-    valueLabel: String,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    valueRange: ClosedFloatingPointRange<Float>,
-    enabled: Boolean,
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = label,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = valueLabel,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            enabled = enabled,
-        )
     }
 }

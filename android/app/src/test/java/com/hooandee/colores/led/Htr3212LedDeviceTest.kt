@@ -48,11 +48,9 @@ class Htr3212LedDeviceTest {
             assertEquals("1,1", store.values["enabled"])
             assertEquals(2, executor.commands.size)
             assertTrue(executor.commands[0].startsWith("i2cset -f -y 1 0x3c"))
-            assertTrue(executor.commands[0].contains("0x0a 0x03 i"))
-            assertTrue(executor.commands[0].contains("0x07 0x04 i"))
+            assertEquals(24, executor.commands[0].count { it == '&' })
             assertTrue(executor.commands[1].startsWith("i2cset -f -y 0 0x3c"))
-            assertTrue(executor.commands[1].contains("0x04 0x05 i"))
-            assertTrue(executor.commands[1].contains("0x01 0x08 i"))
+            assertEquals(24, executor.commands[1].count { it == '&' })
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -132,6 +130,41 @@ class Htr3212LedDeviceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `direct RGB bytes are scaled by the requested brightness`() =
+        runTest {
+            val store = FakeHtrSettingsStore()
+            val executor = FakePServerExecutor()
+            val device = device(store, executor)
+
+            device.applyZones(List(8) { RgbColor(200, 100, 50) }, brightness = 50, power = true)
+            runCurrent()
+
+            assertEquals("0.5", store.values["brightness"])
+            assertTrue(executor.commands[0].contains("0x01 0x64 i"))
+            assertTrue(executor.commands[0].contains("0x02 0x32 i"))
+            assertTrue(executor.commands[0].contains("0x03 0x19 i"))
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `zero brightness keeps power enabled but sends black direct zones`() =
+        runTest {
+            val store = FakeHtrSettingsStore()
+            val executor = FakePServerExecutor()
+            val device = device(store, executor)
+
+            device.applyZones(List(8) { RgbColor(200, 100, 50) }, brightness = 0, power = true)
+            runCurrent()
+
+            assertEquals("1,1", store.values["enabled"])
+            assertEquals("0.0", store.values["brightness"])
+            assertTrue(executor.commands[0].contains("0x01 0x00 i"))
+            assertTrue(executor.commands[0].contains("0x02 0x00 i"))
+            assertTrue(executor.commands[0].contains("0x03 0x00 i"))
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `editing a vendor-source zone does not repaint the vendor color`() =
         runTest {
             val store = FakeHtrSettingsStore()
@@ -191,7 +224,9 @@ class Htr3212LedDeviceTest {
             runCurrent()
 
             assertEquals(5, executor.commands.size)
-            assertTrue(executor.commands[3].contains("0x04 0x5a i"))
+            assertTrue(executor.commands[3].contains("0x04 0x36 i"))
+            assertTrue(executor.commands[3].contains("0x05 0x37 i"))
+            assertTrue(executor.commands[3].contains("0x06 0x37 i"))
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
