@@ -3,6 +3,7 @@ package com.hooandee.colores.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 
 private val ColoresDarkScheme =
@@ -24,8 +25,10 @@ private val ColoresDarkScheme =
 
 @Composable
 fun ColoresTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = ColoresDarkScheme,
-        content = content,
-    )
+    CompositionLocalProvider(LocalLedPreviewStyle provides SmokyGlassLedPreviewStyle) {
+        MaterialTheme(
+            colorScheme = ColoresDarkScheme,
+            content = content,
+        )
+    }
 }

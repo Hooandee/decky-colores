@@ -1,6 +1,5 @@
 package com.hooandee.colores.ui
 
-import com.hooandee.colores.device.DeviceCapabilities
 import com.hooandee.colores.gradient.GradientInterpolator
 import com.hooandee.colores.gradient.GradientPreset
 import com.hooandee.colores.gradient.DeviceGradientPreferences
@@ -47,9 +46,6 @@ data class GradientUiState(
         return selectPreset(preset, zones)
     }
 }
-
-fun DeviceCapabilities.supportsGradient(deviceSupportsPerZone: Boolean): Boolean =
-    color && perZone && zones >= 2 && deviceSupportsPerZone
 
 fun LedState.syncWithGradient(gradient: GradientUiState): LedState =
     if (gradient.mode == LightingMode.GRADIENT && gradient.stops.isNotEmpty()) {

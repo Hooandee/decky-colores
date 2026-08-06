@@ -62,7 +62,8 @@
           "address": 60,
           "leftOrder": [0, 1, 2, 3],
           "rightOrder": [0, 1, 2, 3],
-          "rgbStartRegister": 13
+          "rgbStartRegister": 13,
+          "blockWrite": true
         }
       },
       "gridLayout": [

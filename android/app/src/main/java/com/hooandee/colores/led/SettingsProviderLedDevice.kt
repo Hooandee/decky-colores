@@ -33,6 +33,7 @@ data class Htr3212Descriptor(
     val leftOrder: List<Int>,
     val rightOrder: List<Int>,
     val rgbStartRegister: Int = 0x01,
+    val blockWrite: Boolean = false,
 )
 
 class SettingsProviderLedDevice internal constructor(
@@ -242,4 +243,3 @@ internal class ConflatedLedWriter<T>(
 
     fun submit(value: T): Boolean = channel.trySend(value).isSuccess
 }
-

@@ -8,6 +8,7 @@ import androidx.compose.runtime.getValue
 fun ColoresScreen(
     viewModel: ColoresViewModel,
     onGrantPermission: () -> Unit,
+    onAudioCaptureRequest: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     DashboardScreen(
@@ -29,6 +30,7 @@ fun ColoresScreen(
                 onDelete = viewModel::deleteGradient,
                 onColorChange = viewModel::setEditingColor,
                 onSaturationChange = viewModel::setSaturation,
+                onSpeedChange = viewModel::setGradientSpeed,
             ),
         modeActions =
             ModeActions(
@@ -36,8 +38,14 @@ fun ColoresScreen(
                 onSensorModeChange = viewModel::selectSensorMode,
                 onEffectSelect = viewModel::selectEffect,
                 onSpeedChange = viewModel::setSpeed,
+                onEffectGradientChange = viewModel::setEffectUsesGradient,
                 onChargerOnlyChange = viewModel::setChargerOnly,
                 onBatteryBreatheChange = viewModel::setBatteryBreathe,
+                onTemperatureBreatheChange = viewModel::setTemperatureBreathe,
+                onSensorBandsChange = viewModel::setSensorBands,
+                onAudioScaleChange = viewModel::setAudioScale,
+                onAudioSensitivityChange = viewModel::setAudioSensitivity,
+                onAudioCaptureRequest = onAudioCaptureRequest,
             ),
     )
 }

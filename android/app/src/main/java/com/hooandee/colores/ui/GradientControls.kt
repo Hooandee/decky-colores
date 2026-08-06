@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
+import com.hooandee.colores.control.AppMode
 import com.hooandee.colores.gradient.GradientPreset
 import com.hooandee.colores.gradient.SavedGradient
 import com.hooandee.colores.led.RgbColor
@@ -54,6 +55,7 @@ data class GradientActions(
     val onDelete: (String) -> Unit,
     val onColorChange: (RgbColor) -> Unit,
     val onSaturationChange: (Float) -> Unit,
+    val onSpeedChange: (Int) -> Unit,
 )
 
 @Composable
@@ -68,6 +70,16 @@ fun GradientControls(
 
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         GradientPreviewBar(projectedStops)
+        if (state.mode == AppMode.GRADIENT && state.gradientAnimated) {
+            DeferredIntSlider(
+                label = stringResource(R.string.gradient_speed),
+                committedValue = state.gradientSpeed,
+                valueLabel = { "$it%" },
+                onValueCommit = actions.onSpeedChange,
+                valueRange = 0..100,
+                enabled = state.canWrite,
+            )
+        }
         SectionLabel(stringResource(R.string.gradient_presets))
         LazyRow(
             modifier = Modifier.fillMaxWidth().focusGroup(),

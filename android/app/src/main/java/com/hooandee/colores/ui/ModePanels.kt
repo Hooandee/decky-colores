@@ -1,6 +1,7 @@
 package com.hooandee.colores.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -27,9 +29,14 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -37,8 +44,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
+import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.control.AppMode
 import com.hooandee.colores.engine.EffectNeed
+import com.hooandee.colores.engine.AudioScale
+import com.hooandee.colores.engine.AudioSensitivity
+import com.hooandee.colores.engine.SensorBand
+import com.hooandee.colores.engine.SensorKind
 import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.sensor.PerformanceMetric
 import kotlin.math.roundToInt
@@ -48,8 +60,14 @@ data class ModeActions(
     val onSensorModeChange: (AppMode) -> Unit,
     val onEffectSelect: (String) -> Unit,
     val onSpeedChange: (Int) -> Unit,
+    val onEffectGradientChange: (Boolean) -> Unit,
     val onChargerOnlyChange: (Boolean) -> Unit,
     val onBatteryBreatheChange: (Boolean) -> Unit,
+    val onTemperatureBreatheChange: (Boolean) -> Unit,
+    val onSensorBandsChange: (SensorKind, List<SensorBand>) -> Unit,
+    val onAudioScaleChange: (AudioScale) -> Unit,
+    val onAudioSensitivityChange: (Int) -> Unit,
+    val onAudioCaptureRequest: () -> Unit,
 )
 
 @Composable
@@ -151,6 +169,16 @@ fun ModeControlPanel(
             PanelSurface(modifier) {
                 ClockPanel(state, onBrightnessChange)
             }
+        AppMode.AUDIO ->
+            PanelSurface(modifier) {
+                AudioPanel(
+                    state,
+                    onBrightnessChange,
+                    modeActions.onAudioCaptureRequest,
+                    modeActions.onAudioScaleChange,
+                    modeActions.onAudioSensitivityChange,
+                )
+            }
     }
 }
 
@@ -198,13 +226,14 @@ private fun EffectsPanel(
             )
         }
     }
-    ValueSlider(
+    DeferredIntSlider(
         label = stringResource(R.string.effect_speed),
-        valueLabel = "${state.speed}%",
-        value = state.speed.toFloat(),
-        onValueChange = { modeActions.onSpeedChange(it.roundToInt()) },
-        valueRange = 0f..100f,
+        committedValue = state.speed,
+        valueLabel = { "$it%" },
+        onValueCommit = modeActions.onSpeedChange,
+        valueRange = 0..100,
         enabled = state.canWrite,
+        resetKey = state.effectId,
     )
     when (state.currentEffect?.need ?: EffectNeed.COLOR) {
         EffectNeed.GRADIENT ->
@@ -218,7 +247,43 @@ private fun EffectsPanel(
             } else {
                 EffectColorEditor(state, onColorChange, onSaturationChange)
             }
-        EffectNeed.COLOR -> EffectColorEditor(state, onColorChange, onSaturationChange)
+        EffectNeed.COLOR -> {
+            if (state.canUseGradientForEffect) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.effect_use_gradient),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = stringResource(R.string.effect_use_gradient_description),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Switch(
+                        checked = state.effectUsesGradient,
+                        onCheckedChange = modeActions.onEffectGradientChange,
+                        enabled = state.canWrite,
+                    )
+                }
+            }
+            if (state.effectNeedsGradient) {
+                Text(
+                    text = stringResource(R.string.effect_uses_gradient),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                GradientControls(state = state, actions = gradientActions)
+            } else {
+                EffectColorEditor(state, onColorChange, onSaturationChange)
+            }
+        }
         EffectNeed.NONE ->
             Text(
                 text = stringResource(R.string.effect_uses_none),
@@ -257,13 +322,14 @@ private fun EffectColorEditor(
         }
         Column(modifier = Modifier.weight(1.1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             ColorSwatchRow(state)
-            ValueSlider(
+            DeferredIntSlider(
                 label = stringResource(R.string.saturation_title),
-                valueLabel = "${(hsv.saturation * 100f).roundToInt()}%",
-                value = hsv.saturation,
-                onValueChange = onSaturationChange,
-                valueRange = 0f..1f,
+                committedValue = (hsv.saturation * 100f).roundToInt(),
+                valueLabel = { "$it%" },
+                onValueCommit = { onSaturationChange(it / 100f) },
+                valueRange = 0..100,
                 enabled = state.canWrite,
+                resetKey = state.effectId,
             )
         }
     }
@@ -297,6 +363,7 @@ private fun SensorsPanel(
     modeActions: ModeActions,
 ) {
     val sensorModes = state.availableSensorModes()
+    var editingScale by remember { mutableStateOf<SensorKind?>(null) }
     if (sensorModes.size > 1) {
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             sensorModes.forEachIndexed { index, mode ->
@@ -312,18 +379,29 @@ private fun SensorsPanel(
         }
     }
     when (state.mode) {
-        AppMode.BATTERY -> BatteryContent(state, modeActions)
-        AppMode.TEMPERATURE -> TemperatureContent(state)
+        AppMode.BATTERY -> BatteryContent(state, modeActions, onCustomize = { editingScale = SensorKind.BATTERY })
+        AppMode.TEMPERATURE -> TemperatureContent(state, modeActions, onCustomize = { editingScale = SensorKind.TEMPERATURE })
         AppMode.PERFORMANCE -> PerformanceContent(state)
         else -> Unit
     }
     BrightnessRow(state, onBrightnessChange)
+    editingScale?.let { kind ->
+        SensorScaleDialog(
+            kind = kind,
+            initial = state.sensorBands.bands(kind),
+            defaults = state.sensorBandDefaults.bands(kind),
+            projection = state.ledColorProjection,
+            onSave = { modeActions.onSensorBandsChange(kind, it) },
+            onDismiss = { editingScale = null },
+        )
+    }
 }
 
 @Composable
 private fun BatteryContent(
     state: ColoresUiState,
     modeActions: ModeActions,
+    onCustomize: () -> Unit,
 ) {
     ReadoutCard(
         title = stringResource(R.string.battery_title),
@@ -347,10 +425,21 @@ private fun BatteryContent(
             enabled = state.canWrite,
         )
     }
+    OutlinedButton(
+        onClick = onCustomize,
+        enabled = state.canWrite,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(stringResource(R.string.sensor_scale_customize))
+    }
 }
 
 @Composable
-private fun TemperatureContent(state: ColoresUiState) {
+private fun TemperatureContent(
+    state: ColoresUiState,
+    modeActions: ModeActions,
+    onCustomize: () -> Unit,
+) {
     if (!state.temperatureAvailable) {
         ReadoutCard(
             title = stringResource(R.string.temperature_unavailable_title),
@@ -363,9 +452,32 @@ private fun TemperatureContent(state: ColoresUiState) {
     ReadoutCard(
         title = stringResource(R.string.temperature_title),
         description = stringResource(R.string.temperature_description),
-        value = state.temperatureCelsius?.let { stringResource(R.string.temperature_value, it.roundToInt().toString()) },
+        value = state.temperatureCelsius?.let { stringResource(R.string.temperature_value, it) },
         detail = null,
     )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.temperature_breathe),
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Switch(
+            checked = state.temperatureBreathe,
+            onCheckedChange = modeActions.onTemperatureBreatheChange,
+            enabled = state.canWrite,
+        )
+    }
+    OutlinedButton(
+        onClick = onCustomize,
+        enabled = state.canWrite,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(stringResource(R.string.sensor_scale_customize))
+    }
 }
 
 @Composable
@@ -407,6 +519,117 @@ private fun ClockPanel(
 }
 
 @Composable
+private fun AudioPanel(
+    state: ColoresUiState,
+    onBrightnessChange: (Int) -> Unit,
+    onCaptureRequest: () -> Unit,
+    onScaleChange: (AudioScale) -> Unit,
+    onSensitivityChange: (Int) -> Unit,
+) {
+    var editingScale by remember { mutableStateOf(false) }
+    val status =
+        when (state.audio.status) {
+            AudioCaptureStatus.AUTHORIZATION_REQUIRED -> stringResource(R.string.audio_status_authorization_required)
+            AudioCaptureStatus.STARTING -> stringResource(R.string.audio_status_starting)
+            AudioCaptureStatus.CAPTURING -> stringResource(R.string.audio_status_capturing)
+            AudioCaptureStatus.NO_AUDIO -> stringResource(R.string.audio_status_no_audio)
+            AudioCaptureStatus.REVOKED -> stringResource(R.string.audio_status_revoked)
+            AudioCaptureStatus.ERROR -> stringResource(R.string.audio_status_error)
+        }
+    ReadoutCard(
+        title = stringResource(R.string.audio_title),
+        description = stringResource(R.string.audio_description),
+        value = null,
+        detail = status,
+    )
+    OutlinedButton(
+        onClick = { editingScale = true },
+        enabled = state.canWrite,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.audio_scale_title), fontWeight = FontWeight.SemiBold)
+                Text(
+                    stringResource(R.string.audio_scale_customize),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Column(modifier = Modifier.width(112.dp)) {
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .background(state.audioScale.previewBrush(), RoundedCornerShape(999.dp)),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = stringResource(R.string.audio_scale_low),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    Text(
+                        text = stringResource(R.string.audio_scale_peak),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+        }
+    }
+    DeferredIntSlider(
+        label = stringResource(R.string.audio_sensitivity_title),
+        committedValue = state.audioSensitivityDb,
+        valueLabel = { audioSensitivityLabel(it) },
+        onValueCommit = onSensitivityChange,
+        valueRange = AudioSensitivity.MIN_DB..AudioSensitivity.MAX_DB,
+        steps = AudioSensitivity.MAX_DB - AudioSensitivity.MIN_DB - 1,
+        enabled = state.canWrite,
+    )
+    Text(
+        text = stringResource(R.string.audio_privacy),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    if (state.audioNeedsAuthorization) {
+        OutlinedButton(
+            onClick = onCaptureRequest,
+            enabled = state.canWrite && state.ledState.power,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.audio_activate))
+        }
+    }
+    BrightnessRow(state, onBrightnessChange)
+    if (editingScale) {
+        AudioScaleDialog(
+            initial = state.audioScale,
+            level = AudioSensitivity.adjust(state.audio.level, state.audioSensitivityDb),
+            active = state.audio.status == AudioCaptureStatus.CAPTURING,
+            projection = state.ledColorProjection,
+            onSave = onScaleChange,
+            onDismiss = { editingScale = false },
+        )
+    }
+}
+
+private fun AudioScale.previewBrush(): Brush =
+    Brush.horizontalGradient(
+        0f to lowColor.toComposeColor(),
+        mediumAt / 100f to mediumColor.toComposeColor(),
+        peakAt / 100f to peakColor.toComposeColor(),
+    )
+
+@Composable
 private fun ReadoutCard(
     title: String,
     description: String,
@@ -444,12 +667,12 @@ private fun BrightnessRow(
     onBrightnessChange: (Int) -> Unit,
 ) {
     if (!state.brightnessEnabled) return
-    ValueSlider(
+    DeferredIntSlider(
         label = stringResource(R.string.brightness_title),
-        valueLabel = stringResource(R.string.brightness_value, state.ledState.brightness),
-        value = state.ledState.brightness.toFloat(),
-        onValueChange = { onBrightnessChange(it.roundToInt()) },
-        valueRange = 0f..100f,
+        committedValue = state.ledState.brightness,
+        valueLabel = { stringResource(R.string.brightness_value, it) },
+        onValueCommit = onBrightnessChange,
+        valueRange = 0..100,
         enabled = state.canWrite,
     )
 }
@@ -481,12 +704,14 @@ private fun EffectChip(
 }
 
 @Composable
-private fun ValueSlider(
+internal fun ValueSlider(
     label: String,
     valueLabel: String,
     value: Float,
     onValueChange: (Float) -> Unit,
+    onValueChangeFinished: (() -> Unit)? = null,
     valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int = 0,
     enabled: Boolean,
 ) {
     Column {
@@ -499,9 +724,24 @@ private fun ValueSlider(
             Spacer(Modifier.width(12.dp))
             Text(valueLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
-        Slider(value = value, onValueChange = onValueChange, valueRange = valueRange, enabled = enabled)
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            onValueChangeFinished = onValueChangeFinished,
+            valueRange = valueRange,
+            steps = steps,
+            enabled = enabled,
+        )
     }
 }
+
+@Composable
+private fun audioSensitivityLabel(gainDb: Int): String =
+    when {
+        gainDb < AudioSensitivity.NORMAL_DB -> stringResource(R.string.audio_sensitivity_soft, gainDb)
+        gainDb > AudioSensitivity.NORMAL_DB -> stringResource(R.string.audio_sensitivity_intense, gainDb)
+        else -> stringResource(R.string.audio_sensitivity_normal)
+    }
 
 @Composable
 private fun navLabel(mode: AppMode): String =
@@ -511,6 +751,7 @@ private fun navLabel(mode: AppMode): String =
         AppMode.EFFECT -> stringResource(R.string.nav_effects)
         AppMode.BATTERY, AppMode.TEMPERATURE, AppMode.PERFORMANCE -> stringResource(R.string.nav_sensors)
         AppMode.CLOCK -> stringResource(R.string.nav_clock)
+        AppMode.AUDIO -> stringResource(R.string.nav_audio)
     }
 
 @Composable

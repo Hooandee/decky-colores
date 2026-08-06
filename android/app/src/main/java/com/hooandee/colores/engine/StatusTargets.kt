@@ -22,5 +22,6 @@ object StatusTargets {
     fun temperatureBreathing(
         breatheEnabled: Boolean,
         celsius: Double?,
-    ): Boolean = breatheEnabled && celsius != null && celsius >= TEMPERATURE_CRITICAL
+        bands: List<SensorBand>,
+    ): Boolean = breatheEnabled && celsius != null && bands.firstOrNull()?.let { celsius >= it.min } == true
 }

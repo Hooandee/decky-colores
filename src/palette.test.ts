@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   audioVuColors,
   formatSensorValue,
@@ -7,6 +8,17 @@ import {
   sensorThresholdBounds,
   sensorThresholdPositions,
 } from "./palette";
+
+type VuVector = {
+  id: string;
+  operation: string;
+  input: { level: number; zones: number };
+  expected: { colors: Array<{ r: number; g: number; b: number }> };
+};
+
+const vectors = JSON.parse(
+  readFileSync(new URL("../shared/golden/vu.json", import.meta.url), "utf8"),
+) as VuVector[];
 
 describe("audioVuColors", () => {
   it("renders a two-zone center pair as visible green", () => {
@@ -19,6 +31,13 @@ describe("audioVuColors", () => {
 
   it("returns no colors when the device has no zones", () => {
     expect(audioVuColors(0.6, 0)).toEqual([]);
+  });
+
+  it("matches every shared VU golden vector", () => {
+    for (const vector of vectors) {
+      expect(vector.operation).toBe("vu_frame");
+      expect(audioVuColors(vector.input.level, vector.input.zones), vector.id).toEqual(vector.expected.colors);
+    }
   });
 });
 

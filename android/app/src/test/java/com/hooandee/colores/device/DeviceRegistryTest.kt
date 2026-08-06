@@ -269,6 +269,7 @@ class DeviceRegistryTest {
         assertEquals(6, led.htr3212.rightBus)
         assertEquals(60, led.htr3212.address)
         assertEquals(0x0d, led.htr3212.rgbStartRegister)
+        assertTrue(led.htr3212.blockWrite)
     }
 
     @Test
@@ -281,6 +282,7 @@ class DeviceRegistryTest {
             )
         val match = registry.match(rp5Identity())
         assertEquals(0x01, (match?.led as? SettingsProviderDescriptor)?.htr3212?.rgbStartRegister)
+        assertFalse((match?.led as? SettingsProviderDescriptor)?.htr3212?.blockWrite == true)
     }
 
     @Test

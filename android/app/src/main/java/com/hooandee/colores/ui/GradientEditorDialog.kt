@@ -137,8 +137,9 @@ private fun GradientZonesPane(
     actions: GradientActions,
     modifier: Modifier,
 ) {
-    val zones = gradientEditorZones(state.detected?.gridLayout, state.gradient.stops.size)
+    val zones = state.editorZones()
     val projection = state.ledColorProjection
+    val animated = state.gradientAnimated
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface,
@@ -151,20 +152,20 @@ private fun GradientZonesPane(
         ) {
             GradientPreviewBar(state.gradient.stops.map(projection::display))
             Text(
-                text = stringResource(R.string.gradient_editor_choose_zone),
+                text = stringResource(if (animated) R.string.gradient_editor_choose_color else R.string.gradient_editor_choose_zone),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 style = MaterialTheme.typography.bodySmall,
             )
-            if (zones.any { it.stick != null }) {
+            if (!animated && zones.any { it.stick != null }) {
                 zones.groupBy { it.stick }.toSortedMap(compareBy { it ?: -1 }).forEach { (stick, stickZones) ->
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         SectionLabel(stickLabel(stick))
-                        ZoneGrid(stickZones, state, actions)
+                        ZoneGrid(stickZones, state, actions, colorStops = false)
                     }
                 }
             } else {
-                SectionLabel(stringResource(R.string.gradient_stops))
-                ZoneGrid(zones, state, actions)
+                SectionLabel(stringResource(if (animated) R.string.gradient_colors else R.string.gradient_stops))
+                ZoneGrid(zones, state, actions, colorStops = animated)
             }
         }
     }
@@ -175,6 +176,7 @@ private fun ZoneGrid(
     zones: List<GradientEditorZone>,
     state: ColoresUiState,
     actions: GradientActions,
+    colorStops: Boolean,
 ) {
     val rows = (zones.maxOfOrNull { it.row } ?: 0) + 1
     val cols = (zones.maxOfOrNull { it.col } ?: 0) + 1
@@ -187,7 +189,7 @@ private fun ZoneGrid(
                 repeat(cols) { col ->
                     val zone = zones.firstOrNull { it.row == row && it.col == col }
                     if (zone != null) {
-                        ZoneCell(zone, state, actions, Modifier.weight(1f))
+                        ZoneCell(zone, state, actions, colorStops, Modifier.weight(1f))
                     } else {
                         Spacer(Modifier.weight(1f))
                     }
@@ -202,11 +204,12 @@ private fun ZoneCell(
     zone: GradientEditorZone,
     state: ColoresUiState,
     actions: GradientActions,
+    colorStop: Boolean,
     modifier: Modifier,
 ) {
     val selected = state.gradient.selectedStopIndex == zone.index
     val color = state.ledColorProjection.display(state.gradient.stops[zone.index])
-    val description = zoneCellDescription(zone)
+    val description = if (colorStop) stringResource(R.string.gradient_color_number, zone.index + 1) else zoneCellDescription(zone)
     var focused by remember { mutableStateOf(false) }
     Surface(
         onClick = { actions.onStopChange(zone.index) },
@@ -240,7 +243,7 @@ private fun ZoneCell(
                 border = BorderStroke(2.dp, Color.White.copy(alpha = 0.5f)),
             ) {}
             Text(
-                text = zoneShortLabel(zone),
+                text = if (colorStop) stringResource(R.string.gradient_color_number, zone.index + 1) else zoneShortLabel(zone),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -274,11 +277,12 @@ private fun GradientColorPane(
     modifier: Modifier,
 ) {
     var saveName by rememberSaveable { mutableStateOf("") }
-    val selectedZone =
-        gradientEditorZones(state.detected?.gridLayout, state.gradient.stops.size)
-            .getOrNull(state.gradient.selectedStopIndex)
+    val selectedZone = state.editorZones().getOrNull(state.gradient.selectedStopIndex)
     val color = state.editingColor
     val saturation = color.toHsvColor().saturation
+    var saturationSlider by remember(state.gradient.selectedStopIndex, saturation) {
+        mutableStateOf(DeferredIntSliderState((saturation * 100f).roundToInt()))
+    }
     Surface(
         modifier = modifier,
         color = MaterialTheme.colorScheme.surface,
@@ -334,12 +338,21 @@ private fun GradientColorPane(
             }
             Column {
                 Text(
-                    text = stringResource(R.string.gradient_editor_selected_zone),
+                    text = stringResource(
+                        if (state.gradientAnimated) R.string.gradient_editor_selected_color else R.string.gradient_editor_selected_zone,
+                    ),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.labelMedium,
                 )
                 Text(
-                    text = selectedZone?.let { zoneLongLabel(it) }.orEmpty(),
+                    text =
+                        selectedZone?.let {
+                            if (state.gradientAnimated) {
+                                stringResource(R.string.gradient_color_number, it.index + 1)
+                            } else {
+                                zoneLongLabel(it)
+                            }
+                        }.orEmpty(),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -370,11 +383,22 @@ private fun GradientColorPane(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(stringResource(R.string.saturation_title), style = MaterialTheme.typography.labelMedium)
-                Text("${(saturation * 100f).roundToInt()}%", fontWeight = FontWeight.SemiBold)
+                Text("${saturationSlider.stagedValue}%", fontWeight = FontWeight.SemiBold)
             }
             Slider(
-                value = saturation,
-                onValueChange = actions.onSaturationChange,
+                value = saturationSlider.stagedValue / 100f,
+                onValueChange = {
+                    saturationSlider =
+                        reduceDeferredIntSlider(
+                            saturationSlider,
+                            DeferredIntSliderEvent.Drag((it * 100f).roundToInt()),
+                        ).state
+                },
+                onValueChangeFinished = {
+                    val update = reduceDeferredIntSlider(saturationSlider, DeferredIntSliderEvent.Finish)
+                    saturationSlider = update.state
+                    update.commitValue?.let { actions.onSaturationChange(it / 100f) }
+                },
                 valueRange = 0f..1f,
                 enabled = state.canWrite,
                 track = {
@@ -406,6 +430,12 @@ private fun zoneLongLabel(zone: GradientEditorZone): String {
     val stick = stickName(zone.stick) ?: return position
     return "$stick · $position"
 }
+
+private fun ColoresUiState.editorZones(): List<GradientEditorZone> =
+    gradientEditorZones(
+        layout = if (gradientAnimated) null else detected?.gridLayout,
+        count = gradient.stops.size,
+    )
 
 @Composable
 private fun positionLabel(position: GradientZonePosition): String =
