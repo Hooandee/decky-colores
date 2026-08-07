@@ -1,6 +1,7 @@
 package com.hooandee.colores.led
 
 import android.content.Context
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,7 +20,11 @@ internal class Htr3212LedDevice internal constructor(
         context: Context,
         descriptor: SettingsProviderDescriptor,
         scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
-        executor: PServerCommandExecutor = AndroidPServerCommandExecutor(),
+        executor: PServerCommandExecutor =
+            VerifiedPServerCommandExecutor(
+                AndroidPServerCommandExecutor(),
+                File(context.cacheDir, "pserver_led_status"),
+            ),
     ) : this(
         descriptor = descriptor,
         store = PServerSystemSettingsStore(context, executor),
@@ -126,8 +131,13 @@ internal class Htr3212LedDevice internal constructor(
         val right = directColors.drop(ZONES_PER_STICK).take(ZONES_PER_STICK)
         val previousLeft = cache.left.takeUnless { vendorResult.changed }
         val previousRight = cache.right.takeUnless { vendorResult.changed }
-        val leftSucceeded = writeStick(hardware.leftBus, hardware.address, left, hardware.leftOrder, previousLeft)
-        val rightSucceeded = writeStick(hardware.rightBus, hardware.address, right, hardware.rightOrder, previousRight)
+        val (leftSucceeded, rightSucceeded) =
+            if (hardware.pairedWrite) {
+                writeStickPair(hardware, left, right, previousLeft, previousRight)
+            } else {
+                writeStick(hardware.leftBus, hardware.address, left, hardware.leftOrder, previousLeft) to
+                    writeStick(hardware.rightBus, hardware.address, right, hardware.rightOrder, previousRight)
+            }
         publishDirectState(
             generation = cache.generation,
             left = left.takeIf { leftSucceeded },
@@ -219,7 +229,43 @@ internal class Htr3212LedDevice internal constructor(
         colors: List<RgbColor>,
         logicalToDriverOrder: List<Int>,
         previous: List<RgbColor>?,
-    ): Boolean =
+    ): Boolean = buildStickCommand(bus, address, colors, logicalToDriverOrder, previous)?.let(executor::execute) ?: true
+
+    private fun writeStickPair(
+        hardware: Htr3212Descriptor,
+        left: List<RgbColor>,
+        right: List<RgbColor>,
+        previousLeft: List<RgbColor>?,
+        previousRight: List<RgbColor>?,
+    ): Pair<Boolean, Boolean> {
+        val leftCommand = buildStickCommand(hardware.leftBus, hardware.address, left, hardware.leftOrder, previousLeft)
+        val rightCommand = buildStickCommand(hardware.rightBus, hardware.address, right, hardware.rightOrder, previousRight)
+        val combined = pairCommand(leftCommand, rightCommand) ?: return true to true
+        val succeeded = executor.execute(combined)
+        return (leftCommand == null || succeeded) to (rightCommand == null || succeeded)
+    }
+
+    private fun pairCommand(
+        left: String?,
+        right: String?,
+    ): String? =
+        when {
+            left == null -> right
+            right == null -> left
+            else ->
+                "$left; colores_left_status=\$?; " +
+                    "$right; colores_right_status=\$?; " +
+                    "if [ \"\$colores_left_status\" -eq 0 ] && [ \"\$colores_right_status\" -eq 0 ]; then true; " +
+                    "else log -t ColoresI2C \"left=\$colores_left_status right=\$colores_right_status\"; false; fi"
+        }
+
+    private fun buildStickCommand(
+        bus: Int,
+        address: Int,
+        colors: List<RgbColor>,
+        logicalToDriverOrder: List<Int>,
+        previous: List<RgbColor>?,
+    ): String? =
         Htr3212Command.build(
             bus = bus,
             address = address,
@@ -229,8 +275,6 @@ internal class Htr3212LedDevice internal constructor(
             rgbStartRegister = hardware?.rgbStartRegister ?: 0x01,
             blockWrite = hardware?.blockWrite == true,
         )
-            ?.let(executor::execute)
-            ?: true
 
     private fun LedState.toVendorState(): LedState =
         copy(zoneColors = listOf(zoneColors.first(), zoneColors[ZONES_PER_STICK]))

@@ -16,6 +16,7 @@ from effects import (
     EffectEngine,
     interpolate_gradient,
 )
+from lighting_profiles import LightingProfileStore
 from ambilight import Ambilight
 from audio import AudioReactive
 from power_supply import charger_online, battery_level
@@ -60,21 +61,26 @@ DEFAULTS = {
     "startup_factory": None,
 }
 
-# How often the background watcher samples the AC adapter to react to plug/unplug
-# while the menu is closed. A couple of sysfs reads every few seconds is negligible.
+PROFILE_KEYS = (
+    "brightness",
+    "mode",
+    "color",
+    "gradient",
+    "gradient_speed",
+    "effect",
+    "ambilight",
+    "battery_breathe",
+    "temperature_breathe",
+)
+PROFILE_DEFAULTS = {key: DEFAULTS[key] for key in PROFILE_KEYS}
+GLOBAL_KEYS = tuple(key for key in DEFAULTS if key not in PROFILE_KEYS)
+
 CHARGER_POLL_INTERVAL = 3.0
 
-# Seconds of quiet before committing a startup color to EC flash. The live color
-# applies immediately (volatile register); only this persisted copy touches flash,
-# so we debounce it — dragging the color wheel must not write flash on every frame.
 STARTUP_PERSIST_DELAY = 1.0
 
 FORCE_CONTROL_INTERVAL = 2.0
 
-# Cold-boot LED acquisition: the Ally's RGB node hangs off a USB HID device that can
-# enumerate late, so /sys/class/leds/...:rgb may not exist yet when the plugin loads.
-# Poll for it for a bounded window, then re-assert once more to beat any default the
-# firmware/another plugin writes shortly after load. Module-level so tests can shrink them.
 ACQUIRE_ATTEMPTS = 20
 ACQUIRE_INTERVAL = 1.0
 REASSERT_DELAY = 5.0
@@ -198,14 +204,22 @@ class Plugin:
         self._store = SettingsStore(
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "state.json")
         )
-        self._settings = self._store.load(DEFAULTS)
-        self._settings["ambilight"] = _normalize_ambilight_settings(
-            self._settings.get("ambilight")
+        legacy = self._store.load(DEFAULTS)
+        legacy["ambilight"] = _normalize_ambilight_settings(
+            legacy.get("ambilight")
         )
-        self._settings["effect"] = {**DEFAULTS["effect"], **self._settings["effect"]}
-        self._settings["sensor_bands"] = _normalize_sensor_settings(
-            self._settings.get("sensor_bands")
+        legacy["effect"] = {**DEFAULTS["effect"], **legacy["effect"]}
+        legacy["sensor_bands"] = _normalize_sensor_settings(
+            legacy.get("sensor_bands")
         )
+        self._base_settings = dict(legacy)
+        self._profiles = LightingProfileStore(
+            os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "profiles.json"),
+            PROFILE_DEFAULTS,
+            {key: legacy[key] for key in PROFILE_KEYS},
+        )
+        self._current_app_key = None
+        self._sync_effective_profile()
         self._hhd_rgb = HhdRgbControl()
         self._ac_online = charger_online()
         level = battery_level()
@@ -216,8 +230,6 @@ class Plugin:
         self._ready = True
 
     def _capture_startup_factory(self) -> None:
-        # Snapshot the untouched boot color ONCE, before we ever persist a custom one,
-        # so turning "remember at startup" off can hand the bar back to SteamOS.
         if self._settings.get("startup_factory") is not None:
             return
         controller = self._controller
@@ -225,7 +237,7 @@ class Plugin:
             factory = controller.read_startup()
             if factory:
                 self._settings["startup_factory"] = factory
-                self._store.save(self._settings)
+                self._persist_settings()
 
     def _build_context(self) -> dict:
         ambilight_available = shutil.which("gst-launch-1.0") is not None
@@ -253,9 +265,6 @@ class Plugin:
         self._audio = AudioReactive(self._render, self._zones, runtime_dir, uid, gid)
 
     def _reprobe_device(self) -> bool:
-        # Recover a controller that wasn't present at load (late USB HID enumeration on
-        # cold boot). No-op once we already have a working LED — this guard is what keeps
-        # a healthy machine completely untouched (never rebuilds the engine mid-effect).
         if self._controller.available:
             return True
         ctx = self._build_context()
@@ -268,29 +277,20 @@ class Plugin:
 
     async def _acquire_and_reassert(self) -> None:
         try:
-            # H1: wait for the LED node to appear, applying as soon as it does.
             for _ in range(ACQUIRE_ATTEMPTS):
                 if self._controller.available:
                     break
                 await asyncio.sleep(ACQUIRE_INTERVAL)
                 if self._reprobe_device():
                     self._apply()
-            # H2: a static write can be overwritten by a late firmware/other-plugin default.
-            # Re-assert once. Skip it when a render loop is active (effect/ambilight): that
-            # loop already rewrites ~30fps and wins on its own, so reapplying would only
-            # restart the effect at frame 0 — needless disruption of something that works.
             await asyncio.sleep(REASSERT_DELAY)
             self._reprobe_device()
             if not self._wants_render_loop():
                 self._apply()
-        except Exception as error:  # never let the background task break plugin load
+        except Exception as error:
             decky.logger.warning("Colores: acquire/reassert failed: %s", error)
 
     def _apply_power_led(self) -> None:
-        # Reassert ONLY the "off" state on load. When the feature is off we leave the
-        # EC untouched and never load ec_sys, so a Legion that never enables the toggle
-        # is never tainted (matches PowerLedController's lazy-load contract). Turning
-        # the LED back on is handled by the explicit set_power_led path.
         if not (self._power_led and self._capabilities.get("powerLed")):
             return
         if self._settings.get("power_led_off", False) and not self._power_led.set(True):
@@ -308,7 +308,6 @@ class Plugin:
         return self_updater.install()
 
     async def restart_loader(self) -> None:
-        # Fire-and-forget: restarts Decky to load the just-installed files.
         self_updater.restart_loader()
 
     async def submit_report(self, categories=None, text: str = "") -> dict:
@@ -450,7 +449,15 @@ class Plugin:
                 settings = json.load(f)
         except Exception:  # noqa: BLE001
             settings = getattr(self, "_settings", {})
-        return {"settings": settings}
+        stores = {"settings": settings}
+        profiles = getattr(self, "_profiles", None)
+        if profiles is not None:
+            stores["profiles"] = {
+                "profiles_configured": profiles.configured_count(),
+                "watcher_state": "game" if self._current_app_key else "global",
+                "fallback_reason": None,
+            }
+        return stores
 
     def _serialized_saved(self) -> list:
         return [_saved(g) for g in self._settings["saved_gradients"]]
@@ -458,7 +465,8 @@ class Plugin:
     def _merged_capabilities(self) -> dict:
         caps = dict(self._capabilities)
         states = dict(caps.get("states", {}))
-        enabled = set(self._settings.get("enabled_experiments", []))
+        settings = getattr(self, "_settings", getattr(self, "_base_settings", {}))
+        enabled = set(settings.get("enabled_experiments", []))
         for feature, state in states.items():
             if state == "experimental":
                 caps[feature] = feature in enabled
@@ -471,6 +479,145 @@ class Plugin:
         if route:
             caps["rgbRoute"] = route
         return caps
+
+    def _mode_is_supported(self, mode: str) -> bool:
+        requirements = {
+            "gradient": "color",
+            "effect": "effects",
+            "ambient": "ambilight",
+            "vu": "audioMode",
+            "battery": "batteryMode",
+            "temperature": "temperatureMode",
+            "performance": "performanceMode",
+            "clock": "clockMode",
+        }
+        if mode == "solid":
+            return True
+        capability = requirements.get(mode)
+        return capability is not None and bool(
+            self._merged_capabilities().get(capability, False)
+        )
+
+    def _sync_effective_profile(self) -> None:
+        profile = self._profiles.effective(self._current_app_key)
+        effective = dict(self._base_settings)
+        effective.update(profile)
+        effective["ambilight"] = _normalize_ambilight_settings(
+            effective.get("ambilight")
+        )
+        effective["effect"] = {
+            **DEFAULTS["effect"],
+            **effective.get("effect", {}),
+        }
+        if not self._mode_is_supported(effective["mode"]):
+            effective["mode"] = "solid"
+        self._settings = effective
+
+    def _persist_settings(self) -> None:
+        if not hasattr(self, "_profiles"):
+            self._store.save(self._settings)
+            return
+        for key in GLOBAL_KEYS:
+            if key in self._settings:
+                self._base_settings[key] = self._settings[key]
+        stored = dict(self._base_settings)
+        stored.update(self._profiles.editable("global", None))
+        self._store.save(stored)
+
+    def _edited_scope_is_effective(self, scope: str, app_key) -> bool:
+        if scope == "global":
+            return self._current_app_key is None or self._profiles.is_following_global(
+                self._current_app_key
+            )
+        return (
+            self._current_app_key is not None
+            and str(app_key) == self._current_app_key
+            and not self._profiles.is_following_global(self._current_app_key)
+        )
+
+    def _serialized_profile(self, profile: dict) -> dict:
+        return {
+            "brightness": profile["brightness"],
+            "mode": profile["mode"],
+            "color": _rgb(profile["color"]),
+            "gradient": [_rgb(color) for color in profile["gradient"]],
+            "gradientSpeed": profile["gradient_speed"],
+            "effect": {
+                "id": profile["effect"]["id"],
+                "speed": profile["effect"]["speed"],
+                "useGradient": profile["effect"].get("use_gradient", False),
+            },
+            "ambilight": profile["ambilight"],
+            "batteryBreathe": profile.get("battery_breathe", True),
+            "temperatureBreathe": profile.get("temperature_breathe", True),
+        }
+
+    def _profile_state(self, scope: str, app_key, profile=None) -> dict:
+        key = None if app_key is None else str(app_key)
+        state = self._profiles.scope_state(key)
+        selected = profile or self._profiles.editable(scope, key)
+        return {
+            "scope": scope,
+            "appKey": key,
+            "profile": self._serialized_profile(selected),
+            "hasGameProfile": state["has_game_profile"],
+            "followsGlobal": state["follows_global"],
+            "activeProfile": "default",
+        }
+
+    async def get_profile_state(self, scope: str, app_key=None) -> dict:
+        self._init()
+        return self._profile_state(scope, app_key)
+
+    async def patch_profile(self, scope: str, app_key, changes: dict) -> dict:
+        self._init()
+        if not hasattr(self, "_profiles"):
+            for key, value in changes.items():
+                if key in ("effect", "ambilight") and isinstance(value, dict):
+                    self._settings[key] = {**self._settings.get(key, {}), **value}
+                elif key in PROFILE_KEYS:
+                    self._settings[key] = value
+            self._save_and_apply()
+            return {}
+        updated = self._profiles.patch(scope, app_key, changes)
+        if self._edited_scope_is_effective(scope, app_key):
+            self._sync_effective_profile()
+            self._apply()
+        self._persist_settings()
+        if scope == "global" and self._current_app_key is None:
+            self._maybe_persist_startup()
+        return self._profile_state(scope, app_key, updated)
+
+    async def set_profile_follow_global(self, app_key, follow: bool) -> dict:
+        self._init()
+        key = str(app_key)
+        self._profiles.set_follow_global(key, follow)
+        if self._current_app_key == key:
+            self._sync_effective_profile()
+            self._apply()
+        return self._profile_state("game", key)
+
+    async def forget_profile(self, app_key) -> dict:
+        self._init()
+        key = str(app_key)
+        self._profiles.forget(key)
+        if self._current_app_key == key:
+            self._sync_effective_profile()
+            self._apply()
+        return self._profile_state("game", key)
+
+    async def set_current_app(self, app_key=None) -> dict:
+        self._init()
+        key = None if app_key is None or not str(app_key).strip() else str(app_key)
+        if key == self._current_app_key:
+            return self._profile_state("game" if key else "global", key)
+        self._current_app_key = key
+        self._ambilight.stop()
+        self._audio.stop()
+        self._engine.stop()
+        self._sync_effective_profile()
+        self._apply()
+        return self._profile_state("game" if key else "global", key)
 
     async def get_state(self) -> dict:
         self._init()
@@ -503,6 +650,10 @@ class Plugin:
                 for sensor in SENSOR_BAND_DEFAULTS
             },
             "rememberStartup": s.get("remember_startup", True),
+            "profileContext": self._profile_state(
+                "game" if self._current_app_key else "global",
+                self._current_app_key,
+            ),
         }
 
     async def set_power(self, on: bool) -> None:
@@ -523,7 +674,7 @@ class Plugin:
             decky.logger.warning("Colores: force-control change ignored during shutdown")
             return
         self._settings["force_control"] = on
-        self._store.save(self._settings)
+        self._persist_settings()
         if on:
             claim = await self._claim_hhd_rgb()
             if claim == "stopping" or self._stopping:
@@ -571,7 +722,7 @@ class Plugin:
                 return "unchanged"
             if self._settings.get("hhd_rgb_restore") is not True:
                 self._settings["hhd_rgb_restore"] = True
-                self._store.save(self._settings)
+                self._persist_settings()
             confirmed = await self._run_hhd_call(lambda: self._hhd_rgb.set_rgb(False))
             if confirmed is True:
                 self._hhd_rgb_status = "disabled"
@@ -589,7 +740,7 @@ class Plugin:
             confirmed = await self._run_hhd_call(lambda: self._hhd_rgb.set_rgb(True))
             if confirmed is True:
                 self._settings["hhd_rgb_restore"] = None
-                self._store.save(self._settings)
+                self._persist_settings()
                 self._hhd_rgb_status = "restored"
                 decky.logger.info("Colores: HHD RGB ownership restored and confirmed")
                 return True
@@ -597,16 +748,10 @@ class Plugin:
             return False
 
     async def set_battery_breathe(self, on: bool) -> None:
-        self._init()
-        self._settings["battery_breathe"] = on
-        # The battery loop reads this live via _battery_state, so persisting is
-        # enough; no restart needed. Re-apply is a cheap no-op unless idle.
-        self._save_and_apply()
+        await self.patch_profile("global", None, {"battery_breathe": on})
 
     async def set_temperature_breathe(self, on: bool) -> None:
-        self._init()
-        self._settings["temperature_breathe"] = on
-        self._save_and_apply()
+        await self.patch_profile("global", None, {"temperature_breathe": on})
 
     async def set_sensor_bands(self, sensor: str, bands) -> list:
         self._init()
@@ -639,47 +784,38 @@ class Plugin:
             self._maybe_persist_startup()
         elif hasattr(controller, "restore_startup"):
             controller.restore_startup(self._settings.get("startup_factory"))
-        self._store.save(self._settings)
+        self._persist_settings()
 
     async def set_brightness(self, value: int) -> None:
-        self._init()
-        self._settings["brightness"] = value
-        self._save_and_apply()
+        await self.patch_profile("global", None, {"brightness": value})
 
     async def set_mode(self, mode: str) -> None:
-        self._init()
-        self._settings["mode"] = mode
-        self._save_and_apply()
-        self._maybe_persist_startup()
+        await self.patch_profile("global", None, {"mode": mode})
 
     async def set_solid(self, r: int, g: int, b: int) -> None:
-        self._init()
-        self._settings["color"] = [r, g, b]
-        self._save_and_apply()
-        self._maybe_persist_startup()
+        await self.patch_profile("global", None, {"color": [r, g, b]})
 
     async def set_gradient(self, stops: list) -> None:
-        self._init()
-        self._settings["gradient"] = [list(stop) for stop in stops]
-        self._save_and_apply()
-        self._maybe_persist_startup()
+        await self.patch_profile(
+            "global", None, {"gradient": [list(stop) for stop in stops]}
+        )
 
     async def set_gradient_speed(self, speed: int) -> None:
-        self._init()
-        self._settings["gradient_speed"] = speed
-        self._save_and_apply()
+        await self.patch_profile("global", None, {"gradient_speed": speed})
 
     async def set_effect(self, effect_id: str, speed: int, use_gradient: bool) -> None:
-        self._init()
-        self._settings["effect"] = {"id": effect_id, "speed": speed, "use_gradient": use_gradient}
-        self._save_and_apply()
+        await self.patch_profile(
+            "global",
+            None,
+            {"effect": {"id": effect_id, "speed": speed, "use_gradient": use_gradient}},
+        )
 
     async def save_gradient(self, name: str, stops: list) -> list:
         self._init()
         self._settings["saved_gradients"] = upsert_gradient(
             self._settings["saved_gradients"], name, stops
         )
-        self._store.save(self._settings)
+        self._persist_settings()
         return self._serialized_saved()
 
     async def delete_gradient(self, name: str) -> list:
@@ -687,7 +823,7 @@ class Plugin:
         self._settings["saved_gradients"] = remove_gradient(
             self._settings["saved_gradients"], name
         )
-        self._store.save(self._settings)
+        self._persist_settings()
         return self._serialized_saved()
 
     async def reconnect(self) -> bool:
@@ -700,6 +836,8 @@ class Plugin:
                 return False
         self._reprobe_device()
         ok = self._controller.reconnect()
+        if hasattr(self, "_profiles"):
+            self._sync_effective_profile()
         if self._settings["mode"] == "ambient":
             self._ambilight.stop()
         self._apply()
@@ -715,24 +853,27 @@ class Plugin:
 
     async def set_ambilight(self, vividness: int, smoothing: int, fps: int) -> None:
         self._init()
-        ambilight = self._settings["ambilight"]
+        source = (
+            self._profiles.editable("global", None)["ambilight"]
+            if hasattr(self, "_profiles")
+            else self._settings["ambilight"]
+        )
+        ambilight = dict(source)
         ambilight.update(
             vividness=max(0, min(100, int(vividness))),
             smoothing=smoothing,
             fps=fps,
         )
         ambilight.pop("saturation", None)
-        self._save_and_apply()
+        await self.patch_profile("global", None, {"ambilight": ambilight})
 
     async def set_ambilight_sampling(self, mode: str) -> None:
-        self._init()
-        self._settings["ambilight"] = {**self._settings.get("ambilight", {}), "sampling": mode}
-        self._save_and_apply()
+        await self.patch_profile("global", None, {"ambilight": {"sampling": mode}})
 
     async def set_power_led(self, off: bool) -> None:
         self._init()
         self._settings["power_led_off"] = off
-        self._store.save(self._settings)
+        self._persist_settings()
         if self._power_led and self._capabilities.get("powerLed"):
             if not self._power_led.set(off):
                 decky.logger.warning("Colores: power LED write failed (off=%s)", off)
@@ -745,12 +886,9 @@ class Plugin:
         else:
             enabled.discard(feature)
         self._settings["enabled_experiments"] = sorted(enabled)
-        self._store.save(self._settings)
+        self._persist_settings()
 
     def _effective_power(self) -> bool:
-        # The manual power switch is the master. "Charger only" is a modifier on top:
-        # when on and running on battery, the LEDs are gated off WITHOUT touching the
-        # user's mode/effect/color — flipping back on at the wall restores it exactly.
         if not self._settings["power"]:
             return False
         if self._settings.get("charger_only", False):
@@ -758,9 +896,6 @@ class Plugin:
         return True
 
     def _battery_state(self) -> dict:
-        # Live state for the battery render loop. "charging" uses the cached adapter
-        # state (plugged) as the proxy; the loop only breathes when plugged AND below
-        # 100%. Level is refreshed on the coarse charger poll — battery moves slowly.
         return {
             "level": getattr(self, "_battery_level", 100),
             "charging": bool(getattr(self, "_ac_online", True)),
@@ -792,10 +927,13 @@ class Plugin:
         return {"hour": lt.tm_hour + lt.tm_min / 60.0}
 
     def _maybe_persist_startup(self) -> None:
-        # Persist ONLY on static-color modes, and DEBOUNCED: dragging the color wheel
-        # fires set_solid every ~60ms, but the flash write waits for the interaction to
-        # settle (STARTUP_PERSIST_DELAY), so one drag commits to flash once, not ~15x/s.
         if not self._settings.get("remember_startup"):
+            return
+        if (
+            hasattr(self, "_profiles")
+            and self._current_app_key is not None
+            and not self._profiles.is_following_global(self._current_app_key)
+        ):
             return
         if self._settings.get("mode") not in ("solid", "gradient"):
             return
@@ -821,19 +959,10 @@ class Plugin:
         )
 
     def _save_and_apply(self) -> None:
-        self._store.save(self._settings)
+        self._persist_settings()
         self._apply()
 
     def _wants_render_loop(self) -> bool:
-        # Modes driven by our per-frame render loop (software effect engine or
-        # ambilight capture) instead of firmware. Ambient capture always runs in
-        # software. Gradient mode runs in software on devices that cannot render a
-        # spatial gradient (single-color zones, e.g. Legion rings) — there we
-        # animate an elegant crossfade through the palette instead.
-        # For effects: the custom-gradient overlay must be painted per-frame, and
-        # so must wave on devices that can show more than one color at once
-        # (per-zone or per-controller). Single-color devices render wave with
-        # their native hardware effect instead of collapsing it to a flat color.
         s = self._settings
         if s["mode"] in ("ambient", "battery", "temperature", "performance", "clock", "vu"):
             return True
@@ -844,8 +973,6 @@ class Plugin:
             if effect.get("use_gradient", False):
                 return True
             if effect["id"] == "spiral":
-                # Legion Go renders spiral with its own firmware effect; only
-                # software-painting devices (e.g. the Ally) run the per-frame loop.
                 return not self._controller.supports_hardware_effects()
             if effect["id"] == "wave":
                 return self._controller.supports_per_zone() or bool(
@@ -942,8 +1069,6 @@ class Plugin:
             if self._controller.supports_per_zone():
                 self._engine.set_static(interpolate_gradient(stops, self._zones))
             else:
-                # single-color zones can't show a spatial gradient: animate an
-                # elegant crossfade through the whole palette instead
                 self._engine.start_effect(
                     "gradient_sweep", s["gradient_speed"], {"stops": stops}
                 )
@@ -981,15 +1106,9 @@ class Plugin:
             self._force_control_task = asyncio.create_task(self._force_control_watch())
 
     async def _charger_watch(self) -> None:
-        # React to plug/unplug live, even with the menu closed. Reapply ONLY on the
-        # edge (state actually changed), never every tick — so a running effect is
-        # not restarted at frame 0. The "charger only" gate is read inside
-        # _effective_power, so this stays a cheap no-op when the feature is off.
         try:
             while True:
                 await asyncio.sleep(CHARGER_POLL_INTERVAL)
-                # Refresh the cached battery level; the battery render loop reads it
-                # live, so no reapply is needed for it to ease to a new band.
                 level = battery_level()
                 if level is not None:
                     self._battery_level = level
@@ -1003,7 +1122,7 @@ class Plugin:
                         self._apply()
         except asyncio.CancelledError:
             raise
-        except Exception as error:  # a sysfs hiccup must never kill the plugin
+        except Exception as error:
             decky.logger.warning("Colores: charger watch failed: %s", error)
 
     async def _resume_watch(self) -> None:
@@ -1062,7 +1181,7 @@ class Plugin:
                     self._apply()
         except asyncio.CancelledError:
             raise
-        except Exception as error:  # never let the background task break plugin load
+        except Exception as error:
             decky.logger.warning("Colores: force-control watch failed: %s", error)
 
     async def _stop_background_tasks(self):

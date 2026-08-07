@@ -54,6 +54,9 @@ class MainActivity : ComponentActivity() {
                     viewModel = viewModel,
                     onGrantPermission = { startActivity(WriteSettingsPermission.createGrantIntent(this)) },
                     onAudioCaptureRequest = ::requestAudioCapture,
+                    onGrantUsage = {
+                        startActivity((application as ColoresApplication).usageAccess.settingsIntent())
+                    },
                 )
             }
         }
@@ -67,6 +70,11 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         unregisterReceiver(screenOnReceiver)
         super.onDestroy()
+    }
+
+    override fun onStop() {
+        viewModel.onAppBackground()
+        super.onStop()
     }
 
     @Suppress("DEPRECATION")

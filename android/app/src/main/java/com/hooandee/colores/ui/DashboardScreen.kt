@@ -47,6 +47,7 @@ fun DashboardScreen(
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
     onLedPreviewChange: (Boolean) -> Unit,
+    onOpenProfiles: () -> Unit,
     gradientActions: GradientActions,
     modeActions: ModeActions,
 ) {
@@ -72,6 +73,7 @@ fun DashboardScreen(
             DashboardHeader(
                 state = state,
                 onPowerChange = onPowerChange,
+                onOpenProfiles = onOpenProfiles,
             )
             Spacer(Modifier.height(14.dp))
             val detected = state.detected
@@ -119,6 +121,7 @@ fun DashboardScreen(
 private fun DashboardHeader(
     state: ColoresUiState,
     onPowerChange: (Boolean) -> Unit,
+    onOpenProfiles: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -143,6 +146,9 @@ private fun DashboardHeader(
                     fontWeight = FontWeight.SemiBold,
                 )
                 if (state.canWrite) ConnectedPill()
+                if (state.detected != null) {
+                    ProfileSelectorPill(state = state, onOpen = onOpenProfiles)
+                }
             }
         }
         if (state.detected != null) {

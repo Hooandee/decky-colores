@@ -22,39 +22,53 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+data class RestoredLightingBinding(
+    val deviceId: String,
+    val zones: Int,
+    val gradientSupported: Boolean,
+)
+
+internal fun attachProfileRuntime(
+    restored: RestoredLightingBinding?,
+    attach: (RestoredLightingBinding) -> Unit,
+): Boolean {
+    restored ?: return false
+    attach(restored)
+    return true
+}
+
 class LightingRuntime(
     private val context: Context,
     private val scope: CoroutineScope,
     private val controller: LightingController,
     private val audio: MutableAudioLevelSource,
 ) {
-    suspend fun restoreSaved(): Boolean =
+    suspend fun restoreSaved(): RestoredLightingBinding? =
         withContext(Dispatchers.IO) {
             val preferences = LightingPreferences(context)
-            val activeDeviceId = preferences.activeDeviceId() ?: return@withContext false
-            val detected = AndroidDeviceDetector(context).detect() ?: return@withContext false
-            if (detected.id != activeDeviceId) return@withContext false
+            val activeDeviceId = preferences.activeDeviceId() ?: return@withContext null
+            val detected = AndroidDeviceDetector(context).detect() ?: return@withContext null
+            if (detected.id != activeDeviceId) return@withContext null
 
             val device =
                 LedDeviceFactory.create(
                     context,
                     detected.led,
                     scope = CoroutineScope(scope.coroutineContext + Dispatchers.IO),
-                ) ?: return@withContext false
+                ) ?: return@withContext null
             val access =
                 ControlAccess.resolve(
                     descriptor = detected.led,
                     deviceAvailable = device.available,
                     userPermissionGranted = WriteSettingsPermission.canWrite(context),
                 )
-            if (access != ControlAccess.ENABLED) return@withContext false
+            if (access != ControlAccess.ENABLED) return@withContext null
 
             val catalog = EffectCatalog.parse(context.readAsset("effects.json"))
             val bands = BandSet.parse(context.readAsset("bands.json"))
             val stored = preferences.load(detected.id, bands)
-            val presentation =
-                detected.capabilities.gradientPresentation(device.supportsPerZone)
-                    ?: GradientPresentation.SPATIAL
+            val supportedPresentation = detected.capabilities.gradientPresentation(device.supportsPerZone)
+            val presentation = supportedPresentation ?: GradientPresentation.SPATIAL
             val zones = detected.capabilities.zones.coerceAtLeast(1)
             val storedStops = GradientPreferences(context).load(detected.id).currentStops
             val sourceStops = storedStops.ifEmpty { listOf(stored.solidColor, stored.solidColor) }
@@ -69,7 +83,7 @@ class LightingRuntime(
                     catalog.presets.mapTo(mutableSetOf()) { it.id }
                 }
             val mode =
-                if (stored.mode == AppMode.GRADIENT && detected.capabilities.gradientPresentation(device.supportsPerZone) == null) {
+                if (stored.mode == AppMode.GRADIENT && supportedPresentation == null) {
                     AppMode.COLOR
                 } else {
                     stored.mode
@@ -107,7 +121,11 @@ class LightingRuntime(
                     audioSensitivityDb = stored.audioSensitivityDb,
                 ),
             )
-            true
+            RestoredLightingBinding(
+                deviceId = detected.id,
+                zones = zones,
+                gradientSupported = supportedPresentation != null,
+            )
         }
 }
 

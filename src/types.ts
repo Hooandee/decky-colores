@@ -93,6 +93,29 @@ export interface EffectState {
   useGradient: boolean;
 }
 
+export type ProfileScope = "global" | "game";
+
+export interface LightingProfileState {
+  brightness: number;
+  mode: Mode;
+  color: RGB;
+  gradient: RGB[];
+  gradientSpeed: number;
+  effect: EffectState;
+  ambilight: AmbilightState;
+  batteryBreathe: boolean;
+  temperatureBreathe: boolean;
+}
+
+export interface ProfileState {
+  scope: ProfileScope;
+  appKey: string | null;
+  profile: LightingProfileState;
+  hasGameProfile: boolean;
+  followsGlobal: boolean;
+  activeProfile: "default";
+}
+
 export interface ColoresState {
   device: DeviceInfo;
   capabilities: Capabilities;
@@ -114,6 +137,7 @@ export interface ColoresState {
   temperature: number | null;
   sensorBands: SensorBands;
   rememberStartup: boolean;
+  profileContext: ProfileState;
 }
 
 export interface GradientPreset {

@@ -49,7 +49,7 @@ class EffectsService : Service() {
             EffectsServiceCommand.RESTORE -> {
                 startForegroundCompat(mediaProjection = false)
                 application.applicationScope.launch {
-                    if (!application.lightingRuntime.restoreSaved()) stopSelf(startId)
+                    if (!application.restoreRuntime()) stopSelf(startId)
                 }
             }
             EffectsServiceCommand.KEEP_ALIVE -> startForegroundCompat(mediaProjection = audioForegroundActive)

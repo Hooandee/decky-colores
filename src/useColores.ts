@@ -1,6 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ColoresState, EffectId, EffectState, Mode, RGB, SensorBand, SensorKind } from "./types";
+import {
+  ColoresState,
+  EffectId,
+  EffectState,
+  Mode,
+  ProfileScope,
+  ProfileState,
+  RGB,
+  SensorBand,
+  SensorKind,
+} from "./types";
 import * as api from "./api";
+import { useRunningApp } from "./apps/useRunningApp";
+import { nextProfileScope } from "./profiles/scope";
+
+function withProfile(state: ColoresState, profileState: ProfileState): ColoresState {
+  return {
+    ...state,
+    ...profileState.profile,
+    profileContext: profileState,
+  };
+}
 
 function useThrottle<A extends unknown[]>(fn: (...args: A) => void, ms: number) {
   const fnRef = useRef(fn);
@@ -33,11 +53,27 @@ function useThrottle<A extends unknown[]>(fn: (...args: A) => void, ms: number) 
 export function useColores() {
   const [state, setState] = useState<ColoresState | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [profileScope, setProfileScope] = useState<ProfileScope>("global");
+  const runningApp = useRunningApp();
+  const initializedScope = useRef(false);
+  const profileTarget = useRef<{ scope: ProfileScope; appKey: string | null }>({
+    scope: "global",
+    appKey: null,
+  });
 
   const refreshState = useCallback(() => {
     api.getState()
       .then((s) => {
         setState(s);
+        if (!initializedScope.current) {
+          const scope = s.profileContext.scope;
+          setProfileScope(scope);
+          profileTarget.current = {
+            scope,
+            appKey: scope === "game" ? s.profileContext.appKey : null,
+          };
+          initializedScope.current = true;
+        }
         setLoadError(false);
       })
       .catch((e) => {
@@ -50,12 +86,49 @@ export function useColores() {
     refreshState();
   }, [refreshState]);
 
-  // The RGB node hangs off a USB HID device that can enumerate late on cold boot,
-  // so the first getState may report no LEDs. The backend keeps probing for ~25s
-  // (ACQUIRE_ATTEMPTS) and rebuilds its capabilities once the node appears, but it
-  // never pushes; without this the QAM stays on "no LEDs" until reopened. While the
-  // loaded state shows no LEDs, re-fetch every 2s within a bounded window so the UI
-  // self-heals. A machine that detects LEDs immediately schedules zero timers.
+  const loadProfile = useCallback((scope: ProfileScope, appKey: string | null) => {
+    profileTarget.current = { scope, appKey };
+    setProfileScope(scope);
+    return api
+      .getProfileState(scope, appKey)
+      .then((profileState) => setState((current) => (current ? withProfile(current, profileState) : current)))
+      .catch((error) => console.error("Colores: getProfileState failed", error));
+  }, []);
+
+  useEffect(() => {
+    if (!initializedScope.current) return;
+    const next = nextProfileScope(profileScope, runningApp);
+    if (next !== profileScope) {
+      void loadProfile("global", null);
+      return;
+    }
+    if (
+      profileScope === "game" &&
+      runningApp &&
+      profileTarget.current.appKey !== runningApp.key
+    ) {
+      void loadProfile("game", runningApp.key);
+    }
+  }, [loadProfile, profileScope, runningApp]);
+
+  const selectScope = (scope: ProfileScope) => {
+    const appKey = scope === "game" ? runningApp?.key ?? null : null;
+    if (scope === "game" && appKey === null) return;
+    void loadProfile(scope, appKey);
+  };
+
+  const pushProfile = useCallback((changes: Record<string, unknown>) => {
+    const target = profileTarget.current;
+    return api
+      .patchProfile(target.scope, target.appKey, changes)
+      .then((profileState) =>
+        setState((current) =>
+          current ? { ...current, profileContext: profileState } : current,
+        ),
+      )
+      .catch((error) => console.error("Colores: patchProfile failed", error));
+  }, []);
+
   const noLeds = !!state && !state.capabilities.color && !state.capabilities.brightness;
   const acquireDeadline = useRef<number | null>(null);
   useEffect(() => {
@@ -69,21 +142,21 @@ export function useColores() {
     return () => clearTimeout(timer);
   }, [noLeds, state, refreshState]);
 
-  // Mirror the live effect so successive setters in the same tick chain off the
-  // latest value instead of a stale render-time snapshot.
   const effectRef = useRef<EffectState | null>(null);
   useEffect(() => {
     if (state) effectRef.current = state.effect;
   }, [state]);
 
-  const pushSolid = useThrottle((c: RGB) => api.setSolid(c.r, c.g, c.b), 60);
-  const pushBrightness = useThrottle((v: number) => api.setBrightness(v), 60);
+  const pushSolid = useThrottle((c: RGB) => pushProfile({ color: [c.r, c.g, c.b] }), 60);
+  const pushBrightness = useThrottle((v: number) => pushProfile({ brightness: v }), 60);
   const pushEffect = useThrottle(
-    (id: EffectId, speed: number, useGradient: boolean) => api.setEffect(id, speed, useGradient),
+    (id: EffectId, speed: number, useGradient: boolean) =>
+      pushProfile({ effect: { id, speed, use_gradient: useGradient } }),
     60,
   );
   const pushAmbilight = useThrottle(
-    (vividness: number, sm: number, fps: number) => api.setAmbilight(vividness, sm, fps),
+    (vividness: number, sm: number, fps: number) =>
+      pushProfile({ ambilight: { vividness, smoothing: sm, fps } }),
     80,
   );
 
@@ -106,7 +179,7 @@ export function useColores() {
 
   const setMode = (mode: Mode) => {
     setState((s) => (s ? { ...s, mode } : s));
-    api.setMode(mode);
+    void pushProfile({ mode });
   };
 
   const setColor = (color: RGB) => {
@@ -116,10 +189,10 @@ export function useColores() {
 
   const setGradient = (gradient: RGB[]) => {
     setState((s) => (s ? { ...s, gradient } : s));
-    api.setGradient(gradient.map((c) => [c.r, c.g, c.b]));
+    void pushProfile({ gradient: gradient.map((c) => [c.r, c.g, c.b]) });
   };
 
-  const pushGradientSpeed = useThrottle((v: number) => api.setGradientSpeed(v), 60);
+  const pushGradientSpeed = useThrottle((v: number) => pushProfile({ gradient_speed: v }), 60);
   const setGradientSpeed = (gradientSpeed: number) => {
     setState((s) => (s ? { ...s, gradientSpeed } : s));
     pushGradientSpeed(gradientSpeed);
@@ -144,9 +217,7 @@ export function useColores() {
 
   const setAmbilightSampling = (sampling: string) => {
     setState((s) => (s ? { ...s, ambilight: { ...s.ambilight, sampling } } : s));
-    api.setAmbilightSampling(sampling).catch((e) =>
-      console.error("Colores: setAmbilightSampling failed", e),
-    );
+    void pushProfile({ ambilight: { sampling } });
   };
 
   const saveGradient = (name: string, stops: RGB[]) => {
@@ -187,16 +258,28 @@ export function useColores() {
 
   const setBatteryBreathe = (batteryBreathe: boolean) => {
     setState((s) => (s ? { ...s, batteryBreathe } : s));
-    api.setBatteryBreathe(batteryBreathe).catch((e) =>
-      console.error("Colores: setBatteryBreathe failed", e),
-    );
+    void pushProfile({ battery_breathe: batteryBreathe });
   };
 
   const setTemperatureBreathe = (temperatureBreathe: boolean) => {
     setState((s) => (s ? { ...s, temperatureBreathe } : s));
-    api.setTemperatureBreathe(temperatureBreathe).catch((e) =>
-      console.error("Colores: setTemperatureBreathe failed", e),
-    );
+    void pushProfile({ temperature_breathe: temperatureBreathe });
+  };
+
+  const setFollowGlobal = (follow: boolean) => {
+    if (!runningApp) return;
+    api
+      .setProfileFollowGlobal(runningApp.key, follow)
+      .then(() => loadProfile("game", runningApp.key))
+      .catch((error) => console.error("Colores: setProfileFollowGlobal failed", error));
+  };
+
+  const forgetGameProfile = () => {
+    if (!runningApp) return;
+    api
+      .forgetProfile(runningApp.key)
+      .then(() => loadProfile("game", runningApp.key))
+      .catch((error) => console.error("Colores: forgetProfile failed", error));
   };
 
   const setSensorBands = (
@@ -229,6 +312,11 @@ export function useColores() {
     state,
     loadError,
     retry: refreshState,
+    runningApp,
+    profileScope,
+    selectScope,
+    setFollowGlobal,
+    forgetGameProfile,
     setBrightness,
     setPower,
     setChargerOnly,
