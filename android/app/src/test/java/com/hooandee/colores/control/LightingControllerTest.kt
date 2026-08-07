@@ -577,7 +577,8 @@ class LightingControllerTest {
     fun `unbinding stops all writes`() =
         runTest {
             val device = FakeDevice()
-            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            val gate = RecordingGate()
+            val controller = LightingController(backgroundScope, gate, clockMs = { testScheduler.currentTime })
             controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT, effectId = "rainbow"))
             advanceTimeBy(300)
             runCurrent()
@@ -589,5 +590,6 @@ class LightingControllerTest {
             runCurrent()
             assertEquals(settled, device.writes.size)
             assertFalse(controller.snapshot.value.bound)
+            assertFalse(gate.running)
         }
 }

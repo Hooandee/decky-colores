@@ -9,6 +9,15 @@ const es: Record<string, string> = {
   "load.error": "No se pudo cargar el estado del plugin. Vuelve a intentarlo en un momento.",
   "load.retry": "Reintentar",
 
+  "profiles.global": "Global",
+  "profiles.game": "Juego: {name}",
+  "profiles.followingGlobal": "Sigue el perfil global",
+  "profiles.usingOwn": "Usa su propio perfil",
+  "profiles.useOwn": "Usar perfil propio",
+  "profiles.followGlobal": "Seguir global",
+  "profiles.forget": "Olvidar",
+  "profiles.inactiveHint": "Se aplicará cuando abras este juego.",
+
   "device.noLeds": "No se detectaron LEDs controlables en este dispositivo.",
   "device.preview.rings": "Anillos del joystick",
   "device.preview.bar": "Barra de luz",
@@ -229,6 +238,15 @@ const es: Record<string, string> = {
 const en: Record<string, string> = {
   "load.error": "Couldn't load the plugin state. Please try again in a moment.",
   "load.retry": "Retry",
+
+  "profiles.global": "Global",
+  "profiles.game": "Game: {name}",
+  "profiles.followingGlobal": "Following the global profile",
+  "profiles.usingOwn": "Using its own profile",
+  "profiles.useOwn": "Use own profile",
+  "profiles.followGlobal": "Follow global",
+  "profiles.forget": "Forget",
+  "profiles.inactiveHint": "It will apply when you open this game.",
 
   "device.noLeds": "No controllable LEDs detected on this device.",
   "device.preview.rings": "Joystick rings",

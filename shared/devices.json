@@ -63,7 +63,8 @@
           "leftOrder": [0, 1, 2, 3],
           "rightOrder": [0, 1, 2, 3],
           "rgbStartRegister": 13,
-          "blockWrite": true
+          "blockWrite": true,
+          "pairedWrite": true
         }
       },
       "gridLayout": [

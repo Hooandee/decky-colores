@@ -9,6 +9,7 @@ fun ColoresScreen(
     viewModel: ColoresViewModel,
     onGrantPermission: () -> Unit,
     onAudioCaptureRequest: () -> Unit,
+    onGrantUsage: () -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
     DashboardScreen(
@@ -20,6 +21,7 @@ fun ColoresScreen(
         onSaturationChange = viewModel::setSaturation,
         onBrightnessChange = viewModel::setBrightness,
         onLedPreviewChange = viewModel::setLedPreviewEnabled,
+        onOpenProfiles = viewModel::openProfilePicker,
         gradientActions =
             GradientActions(
                 onStopChange = viewModel::selectGradientStop,
@@ -48,4 +50,16 @@ fun ColoresScreen(
                 onAudioCaptureRequest = onAudioCaptureRequest,
             ),
     )
+    if (state.profilePickerOpen) {
+        AppProfilesDialog(
+            state = state,
+            onDismiss = viewModel::closeProfilePicker,
+            onGlobal = viewModel::selectGlobalProfile,
+            onApp = viewModel::selectAppProfile,
+            onAutomation = viewModel::setProfileAutomation,
+            onGrantUsage = onGrantUsage,
+            onFollowGlobal = viewModel::setSelectedAppFollowGlobal,
+            onForget = viewModel::forgetSelectedAppProfile,
+        )
+    }
 }

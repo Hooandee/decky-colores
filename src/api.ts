@@ -1,5 +1,5 @@
 import { callable } from "@decky/api";
-import { ColoresState, GradientPreset, SensorBand, SensorKind } from "./types";
+import { ColoresState, GradientPreset, ProfileState, SensorBand, SensorKind } from "./types";
 
 export const getState = callable<[], ColoresState>("get_state");
 export const setPower = callable<[on: boolean], void>("set_power");
@@ -30,6 +30,11 @@ export const setSensorBands = callable<
 >("set_sensor_bands");
 export const getTemperature = callable<[], number | null>("get_temperature");
 export const getPerformance = callable<[], number | null>("get_performance");
+export const setCurrentApp = callable<[appKey: string | null], ProfileState>("set_current_app");
+export const getProfileState = callable<[scope: "global" | "game", appKey: string | null], ProfileState>("get_profile_state");
+export const patchProfile = callable<[scope: "global" | "game", appKey: string | null, changes: Record<string, unknown>], ProfileState>("patch_profile");
+export const setProfileFollowGlobal = callable<[appKey: string, follow: boolean], ProfileState>("set_profile_follow_global");
+export const forgetProfile = callable<[appKey: string], ProfileState>("forget_profile");
 
 export interface UpdateInfo {
   current: string;

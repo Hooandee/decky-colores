@@ -11,6 +11,23 @@
     <string name="control_service_description">The manufacturer control service is not available on this device.</string>
     <string name="status_connected">Connected</string>
     <string name="power_title">Power</string>
+    <string name="app_profiles_title">App profiles</string>
+    <string name="profile_editing">Editing: %1$s</string>
+    <string name="profile_editing_context">PROFILE YOU ARE EDITING</string>
+    <string name="profile_global">Global</string>
+    <string name="profile_global_description">Used when an app does not have its own profile.</string>
+    <string name="profile_using_global">Uses global settings</string>
+    <string name="profile_own_active">Own profile</string>
+    <string name="profile_auto_title">Apply automatically</string>
+    <string name="profile_auto_disabled">Disabled</string>
+    <string name="profile_auto_permission_required">Usage access required</string>
+    <string name="profile_auto_active">Active in the background</string>
+    <string name="profile_usage_permission">Grant usage access</string>
+    <string name="profile_use_own">Use own profile</string>
+    <string name="profile_follow_global">Follow global</string>
+    <string name="profile_forget">Forget</string>
+    <string name="profile_search">Search apps</string>
+    <string name="profile_done">Done</string>
     <string name="color_title">Color</string>
     <string name="rgb_sent_value">RGB output · %1$s</string>
     <string name="preview_title">Your sticks</string>
@@ -190,5 +207,5 @@
     <string name="service_channel_name">Lighting</string>
     <string name="service_channel_description">Keeps effects and automatic modes running.</string>
     <string name="service_notification_title">Colores active</string>
-    <string name="service_notification_text">Keeping your lighting running.</string>
+    <string name="service_notification_text">Keeping effects and automatic profiles running.</string>
 </resources>

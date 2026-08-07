@@ -11,6 +11,23 @@
     <string name="control_service_description">El servicio de control del fabricante no está disponible en este dispositivo.</string>
     <string name="status_connected">Conectado</string>
     <string name="power_title">Encendido</string>
+    <string name="app_profiles_title">Perfiles de aplicaciones</string>
+    <string name="profile_editing">Editando: %1$s</string>
+    <string name="profile_editing_context">PERFIL QUE ESTÁS EDITANDO</string>
+    <string name="profile_global">Global</string>
+    <string name="profile_global_description">Se usa cuando una app no tiene perfil propio.</string>
+    <string name="profile_using_global">Usa la configuración global</string>
+    <string name="profile_own_active">Perfil propio</string>
+    <string name="profile_auto_title">Aplicar automáticamente</string>
+    <string name="profile_auto_disabled">Desactivado</string>
+    <string name="profile_auto_permission_required">Falta acceso de uso</string>
+    <string name="profile_auto_active">Activo en segundo plano</string>
+    <string name="profile_usage_permission">Conceder acceso de uso</string>
+    <string name="profile_use_own">Usar perfil propio</string>
+    <string name="profile_follow_global">Seguir global</string>
+    <string name="profile_forget">Olvidar</string>
+    <string name="profile_search">Buscar aplicaciones</string>
+    <string name="profile_done">Listo</string>
     <string name="color_title">Color</string>
     <string name="rgb_sent_value">RGB enviado · %1$s</string>
     <string name="preview_title">Tus sticks</string>
@@ -190,5 +207,5 @@
     <string name="service_channel_name">Iluminación</string>
     <string name="service_channel_description">Mantiene activos los efectos y modos automáticos.</string>
     <string name="service_notification_title">Colores activo</string>
-    <string name="service_notification_text">Manteniendo la iluminación en marcha.</string>
+    <string name="service_notification_text">Manteniendo efectos y perfiles automáticos en marcha.</string>
 </resources>

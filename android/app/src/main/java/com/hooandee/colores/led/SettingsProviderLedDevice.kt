@@ -34,6 +34,7 @@ data class Htr3212Descriptor(
     val rightOrder: List<Int>,
     val rgbStartRegister: Int = 0x01,
     val blockWrite: Boolean = false,
+    val pairedWrite: Boolean = false,
 )
 
 class SettingsProviderLedDevice internal constructor(

@@ -111,10 +111,22 @@ data class LightingSnapshot(
     val currentFrame: List<RgbColor> = emptyList(),
 )
 
+enum class ServiceOwner {
+    EFFECTS,
+    APP_PROFILES,
+}
+
 interface ServiceGate {
     fun start()
 
     fun stop()
+
+    fun setRequired(
+        owner: ServiceOwner,
+        required: Boolean,
+    ) {
+        if (required) start() else stop()
+    }
 }
 
 object NoopServiceGate : ServiceGate {
@@ -266,6 +278,7 @@ class LightingController(
 
     private fun onUnbind() {
         stopRenderJob()
+        serviceGate.setRequired(ServiceOwner.EFFECTS, false)
         watchJob?.cancel()
         watchJob = null
         binding = null
@@ -368,7 +381,7 @@ class LightingController(
             activeBinding != null &&
                 intent.power &&
                 (needsRenderLoop(activeBinding) || intent.chargerOnly)
-        if (needsService) serviceGate.start() else serviceGate.stop()
+        serviceGate.setRequired(ServiceOwner.EFFECTS, needsService)
     }
 
     private suspend fun applyOff(binding: LightingBinding) {

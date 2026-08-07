@@ -50,6 +50,8 @@ import { visibleIds } from "./nav/layout";
 import { PINNED_TAB, tabMeta, TAB_META, SENSOR_TAB, SENSOR_MODES, tabForMode } from "./nav/manifest";
 import { useShoulderNav } from "./nav/useShoulderNav";
 import { readActiveTab, writeActiveTab, readSensorMode, writeSensorMode } from "./nav/activeTab";
+import { startGameWatcher } from "./apps/gameWatcher";
+import { ProfileScopeSelector } from "./components/ProfileScopeSelector";
 
 function DeviceHeader({ name, color }: { name: string; color: RGB }) {
   const css = rgbToCss(color);
@@ -578,6 +580,11 @@ function Content() {
     state,
     loadError,
     retry,
+    runningApp,
+    profileScope,
+    selectScope,
+    setFollowGlobal,
+    forgetGameProfile,
     setBrightness,
     setPower,
     setChargerOnly,
@@ -1078,6 +1085,16 @@ function Content() {
         <DeviceHeader name={device.name} color={previewColors[0] ?? color} />
       </PanelSectionRow>
       <PanelSectionRow>
+        <ProfileScopeSelector
+          scope={profileScope}
+          runningApp={runningApp}
+          context={state.profileContext}
+          onSelect={selectScope}
+          onFollowGlobal={setFollowGlobal}
+          onForget={forgetGameProfile}
+        />
+      </PanelSectionRow>
+      <PanelSectionRow>
         <TabBar tabs={tabItems} activeId={highlight} onSelect={select} />
       </PanelSectionRow>
 
@@ -1177,6 +1194,7 @@ function Content() {
 }
 
 export default definePlugin(() => {
+  const stopGameWatcher = startGameWatcher();
   return {
     name: "Colores",
     titleView: <div className={staticClasses.Title}>Colores</div>,
@@ -1190,5 +1208,8 @@ export default definePlugin(() => {
       </ErrorBoundary>
     ),
     icon: <ColorWheelIcon />,
+    onDismount() {
+      stopGameWatcher();
+    },
   };
 });

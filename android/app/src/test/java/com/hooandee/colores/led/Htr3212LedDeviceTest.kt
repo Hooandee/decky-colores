@@ -55,6 +55,22 @@ class Htr3212LedDeviceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `Thor submits both sticks in one privileged transaction`() =
+        runTest {
+            val store = FakeHtrSettingsStore()
+            val executor = FakePServerExecutor()
+            val device = device(store, executor, pairedWrite = true)
+
+            assertTrue(device.applyZones(List(8) { RgbColor(20, 30, 40) }, brightness = 70, power = true))
+            runCurrent()
+
+            assertEquals(1, executor.commands.size)
+            assertTrue(executor.commands.single().contains("i2cset -f -y 1 0x3c"))
+            assertTrue(executor.commands.single().contains("i2cset -f -y 0 0x3c"))
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `power off uses vendor gate and does not relight direct zones`() =
         runTest {
             val store = FakeHtrSettingsStore()
@@ -304,9 +320,14 @@ class Htr3212LedDeviceTest {
     private fun TestScope.device(
         store: SystemSettingsStore,
         executor: PServerCommandExecutor,
+        blockWrite: Boolean = false,
+        pairedWrite: Boolean = false,
     ) =
         Htr3212LedDevice(
-            descriptor = descriptor,
+            descriptor =
+                descriptor.copy(
+                    htr3212 = descriptor.htr3212?.copy(blockWrite = blockWrite, pairedWrite = pairedWrite),
+                ),
             store = store,
             executor = executor,
             scope = backgroundScope,
