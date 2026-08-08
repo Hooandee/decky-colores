@@ -8,6 +8,7 @@ import {
   type UpdateInfo,
 } from "../api";
 import type { Lang } from "../i18n";
+import { getUpdaterStrings } from "./strings";
 
 // Session-scoped guards: the check runs once per Steam session (the backend also caches),
 // and the "update available" toast fires at most once per session. Module-level so they
@@ -27,16 +28,6 @@ export interface UseUpdate {
   restart: () => void;
 }
 
-const UPDATE_AVAILABLE_TITLES: Record<Lang, string> = {
-  es: "Actualización disponible",
-  en: "Update available",
-  it: "Aggiornamento disponibile",
-};
-
-export function updateAvailableTitle(lang: Lang): string {
-  return UPDATE_AVAILABLE_TITLES[lang] ?? UPDATE_AVAILABLE_TITLES.en;
-}
-
 export function useUpdate(lang: Lang): UseUpdate {
   const [info, setInfo] = useState<UpdateInfo | null>(sessionInfo);
   const [status, setStatus] = useState<UpdateStatus>("idle");
@@ -52,7 +43,7 @@ export function useUpdate(lang: Lang): UseUpdate {
         if (res.has_update && !sessionToasted) {
           sessionToasted = true;
           toaster.toast({
-            title: updateAvailableTitle(lang),
+            title: getUpdaterStrings(lang).availableTitle,
             body: `v${res.latest}`,
           });
         }
