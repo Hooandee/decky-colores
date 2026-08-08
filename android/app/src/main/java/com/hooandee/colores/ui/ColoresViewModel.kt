@@ -2,6 +2,7 @@ package com.hooandee.colores.ui
 
 import android.app.Application
 import android.content.Intent
+import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hooandee.colores.ColoresApplication
@@ -40,6 +41,7 @@ import com.hooandee.colores.led.LedDeviceFactory
 import com.hooandee.colores.led.LedState
 import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.permission.WriteSettingsPermission
+import com.hooandee.colores.profiles.ConfiguredProfile
 import com.hooandee.colores.profiles.LightingProfile
 import com.hooandee.colores.profiles.LightingProfileCoordinator
 import com.hooandee.colores.profiles.LightingProfileStore
@@ -47,6 +49,10 @@ import com.hooandee.colores.profiles.ProfileAutomationStatus
 import com.hooandee.colores.profiles.ProfilePatch
 import com.hooandee.colores.profiles.ProfileScope
 import com.hooandee.colores.profiles.ProfileScopeState
+import com.hooandee.colores.report.AndroidReportSnapshot
+import com.hooandee.colores.report.ReportSender
+import com.hooandee.colores.report.ReportSubmissionState
+import com.hooandee.colores.report.buildReportBundle
 import com.hooandee.colores.sensor.AndroidBatterySource
 import com.hooandee.colores.sensor.PerformanceMetric
 import com.hooandee.colores.sensor.PerformanceSources
@@ -102,10 +108,12 @@ data class ColoresUiState(
     val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
     val profileScope: ProfileScope = ProfileScope.Global,
     val profileApps: List<LaunchableApp> = emptyList(),
+    val configuredProfiles: List<ConfiguredProfile> = emptyList(),
     val profilePickerOpen: Boolean = false,
     val profileScopeState: ProfileScopeState = ProfileScopeState(false, true),
     val automationEnabled: Boolean = false,
     val automationStatus: ProfileAutomationStatus = ProfileAutomationStatus.DISABLED,
+    val reportSubmission: ReportSubmissionState = ReportSubmissionState(),
 ) {
     val canWrite: Boolean
         get() = controlAccess == ControlAccess.ENABLED
@@ -195,6 +203,7 @@ class ColoresViewModel(
     private val controller: LightingController = coloresApplication.lightingController
     private val profileStore: LightingProfileStore = coloresApplication.profileStore
     private val profileCoordinator: LightingProfileCoordinator = coloresApplication.profileCoordinator
+    private val reportSender = ReportSender(application)
     private val appCatalog = LaunchableAppCatalog(application)
     private var refreshJob: Job? = null
     private var commitJob: Job? = null
@@ -406,6 +415,7 @@ class ColoresViewModel(
                 profileCoordinator.refreshAccess()
                 profileCoordinator.beginPreview(selectedScope)
                 val configured = profileStore.configuredPackages(detected.id)
+                val configuredProfiles = profileStore.configuredProfiles(detected.id)
                 val apps = withContext(Dispatchers.IO) { appCatalog.load(configured) }
                 val scopeState =
                     when (selectedScope) {
@@ -436,6 +446,7 @@ class ColoresViewModel(
                         audioScale = storedLighting.audioScale,
                         audioSensitivityDb = storedLighting.audioSensitivityDb,
                         profileApps = apps,
+                        configuredProfiles = configuredProfiles,
                         profileScopeState = scopeState,
                         ledPreviewEnabled =
                             detected.takeIf { it.previewCalibration != null }
@@ -473,12 +484,61 @@ class ColoresViewModel(
         profileCoordinator.refreshAccess()
     }
 
+    fun submitReport(
+        categories: List<String>,
+        text: String,
+    ) {
+        if (text.isBlank() || mutableState.value.reportSubmission.sending) return
+        val current = mutableState.value
+        val detected = current.detected
+        val descriptor = detected?.led
+        val application = getApplication<Application>()
+        val version =
+            runCatching {
+                application.packageManager
+                    .getPackageInfo(application.packageName, 0)
+                    .versionName
+            }.getOrNull().orEmpty()
+        val snapshot =
+            AndroidReportSnapshot(
+                appVersion = version,
+                manufacturer = Build.MANUFACTURER.orEmpty(),
+                model = Build.MODEL.orEmpty(),
+                androidRelease = Build.VERSION.RELEASE.orEmpty(),
+                sdk = Build.VERSION.SDK_INT,
+                deviceId = detected?.id,
+                deviceName = detected?.friendlyName,
+                driver = descriptor?.diagnosticDriver(),
+                transport = descriptor?.diagnosticRoute(),
+                color = detected?.capabilities?.color == true,
+                brightness = detected?.capabilities?.brightness == true,
+                perZone = detected?.capabilities?.perZone == true,
+                zones = detected?.capabilities?.zones ?: 0,
+                controlStatus = current.controlAccess.name.lowercase(),
+                mode = current.mode.name,
+                brightnessValue = current.ledState.brightness,
+                power = current.ledState.power,
+                configuredProfiles = current.configuredProfiles.size,
+                automationStatus = current.automationStatus.name.lowercase(),
+            )
+        mutableState.update { it.copy(reportSubmission = ReportSubmissionState(sending = true)) }
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { reportSender.submit(buildReportBundle(snapshot, categories, text)) }
+            mutableState.update { it.copy(reportSubmission = ReportSubmissionState(result = result)) }
+        }
+    }
+
+    fun resetReport() {
+        mutableState.update { it.copy(reportSubmission = ReportSubmissionState()) }
+    }
+
     fun setSelectedAppFollowGlobal(follow: Boolean) {
         val current = mutableState.value
         val scope = current.profileScope as? ProfileScope.App ?: return
         val scopeState = profileCoordinator.setFollowGlobal(scope.packageName, follow) ?: return
         val profile = profileCoordinator.selectedProfile(scope) ?: return
         applyProfileToState(scope, profile, scopeState)
+        refreshConfiguredProfiles()
     }
 
     fun forgetSelectedAppProfile() {
@@ -486,6 +546,7 @@ class ColoresViewModel(
         profileCoordinator.forget(scope.packageName)
         val profile = profileCoordinator.selectedProfile(scope) ?: return
         applyProfileToState(scope, profile, ProfileScopeState(false, true))
+        refreshConfiguredProfiles()
     }
 
     private fun selectProfileScope(scope: ProfileScope) {
@@ -878,7 +939,13 @@ class ColoresViewModel(
         if (current.profileScope == ProfileScope.Global) persistGlobalModifiers()
         if (current.profileScope is ProfileScope.App) {
             mutableState.update { it.copy(profileScopeState = ProfileScopeState(true, false)) }
+            refreshConfiguredProfiles()
         }
+    }
+
+    private fun refreshConfiguredProfiles() {
+        val deviceId = mutableState.value.detected?.id ?: return
+        mutableState.update { it.copy(configuredProfiles = profileStore.configuredProfiles(deviceId)) }
     }
 
     private fun persistGlobalModifiers() {

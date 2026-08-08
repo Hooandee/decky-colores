@@ -12,11 +12,14 @@ import com.hooandee.colores.control.attachProfileRuntime
 import com.hooandee.colores.effects.ContextServiceGate
 import com.hooandee.colores.profiles.LightingProfileCoordinator
 import com.hooandee.colores.profiles.LightingProfileStore
+import com.hooandee.colores.settings.AppPreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 
 class ColoresApplication : Application() {
+    val appPreferences: AppPreferences by lazy { AppPreferences(this) }
+
     val applicationScope: CoroutineScope by lazy { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
 
     val audioLevelSource by lazy { MutableAudioLevelSource() }

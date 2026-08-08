@@ -11,16 +11,20 @@ import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
+import androidx.core.os.LocaleListCompat
 import com.hooandee.colores.permission.WriteSettingsPermission
 import com.hooandee.colores.ui.ColoresScreen
 import com.hooandee.colores.ui.ColoresTheme
 import com.hooandee.colores.ui.ColoresViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val viewModel by viewModels<ColoresViewModel>()
     private val projectionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -49,13 +53,21 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         registerScreenOnReceiver()
         setContent {
-            ColoresTheme {
+            val appearance by (application as ColoresApplication).appPreferences.appearance.collectAsState()
+            ColoresTheme(appearance) {
                 ColoresScreen(
                     viewModel = viewModel,
                     onGrantPermission = { startActivity(WriteSettingsPermission.createGrantIntent(this)) },
                     onAudioCaptureRequest = ::requestAudioCapture,
                     onGrantUsage = {
                         startActivity((application as ColoresApplication).usageAccess.settingsIntent())
+                    },
+                    appearance = appearance,
+                    onThemeModeChange = (application as ColoresApplication).appPreferences::setThemeMode,
+                    onAccentChange = (application as ColoresApplication).appPreferences::setAccent,
+                    currentLanguageTag = AppCompatDelegate.getApplicationLocales()[0]?.toLanguageTag(),
+                    onLanguageChange = { language ->
+                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language.languageTag))
                     },
                 )
             }

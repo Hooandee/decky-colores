@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,12 +44,10 @@ fun DeviceScene(
     enabled: Boolean,
     perZone: Boolean,
     projection: LedColorProjection,
-    onLedPreviewChange: (Boolean) -> Unit,
     onTargetChange: (EditTarget) -> Unit,
     showBoth: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val ledPreviewLabel = stringResource(R.string.led_preview_toggle)
     val previewStyle = LocalLedPreviewStyle.current
     val preview = devicePreviewGroups(frame, layout)
     Surface(
@@ -86,23 +83,6 @@ fun DeviceScene(
                                 text = stringResource(R.string.preview_hint),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                    if (projection.available) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Text(
-                                text = ledPreviewLabel,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                style = MaterialTheme.typography.labelMedium,
-                            )
-                            Switch(
-                                checked = projection.active,
-                                onCheckedChange = onLedPreviewChange,
-                                modifier = Modifier.semantics { contentDescription = ledPreviewLabel },
                             )
                         }
                     }
