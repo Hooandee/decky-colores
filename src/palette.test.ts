@@ -96,4 +96,13 @@ describe("Italian gradient names", () => {
 
     expect(suggestGradientName("it")).toBe("Tramonto elettrico");
   });
+
+  it("never emits em dashes from Italian name parts", () => {
+    const random = vi.spyOn(Math, "random");
+
+    for (let index = 0; index < 10; index += 1) {
+      random.mockReturnValue((index + 0.5) / 10);
+      expect(suggestGradientName("it"), `name parts at index ${index}`).not.toContain("—");
+    }
+  });
 });

@@ -22,7 +22,7 @@ export const it: Record<string, string> = {
   "chargerOnly.hint": "Le luci si accendono solo quando l'alimentatore è collegato.",
   "startup.remember": "Ricorda all'avvio",
   "startup.remember.hint":
-    "Quando imposti un colore, Colores lo salva e lo usa all'avvio. Disattiva questa opzione per restituire la barra a SteamOS al riavvio.",
+    "Quando imposti un colore, Colores lo salva e lo usa all'avvio. Disattivalo per restituire a SteamOS il controllo della barra al riavvio.",
   "forceControl.label": "Dai priorità a Colores",
   "forceControl.hint": "Colores riprende il controllo delle luci ogni volta che lo apri.",
   "forceControl.notice":
@@ -50,7 +50,7 @@ export const it: Record<string, string> = {
   "nav.settings": "Impostazioni",
   "settings.language": "Lingua",
   "customize.title": "Personalizzazione",
-  "customize.accent": "Colore di accento",
+  "customize.accent": "Colore principale",
   "accent.blue": "Blu",
   "accent.teal": "Verde acqua",
   "accent.green": "Verde",
@@ -105,7 +105,7 @@ export const it: Record<string, string> = {
 
   "saved.sectionTitle": "Le mie sfumature",
   "saved.delete": "Elimina",
-  "saved.namePlaceholder": "Dagli un nome",
+  "saved.namePlaceholder": "Assegna un nome",
   "saved.suggest": "Un altro nome",
   "saved.confirm": "Salva",
 
@@ -129,7 +129,7 @@ export const it: Record<string, string> = {
   "effect.spiral.firmwareNote": "Effetto rotante integrato nel firmware di Legion Go.",
 
   "ambient.gameModeBanner":
-    "Non c'è ancora uno schermo da leggere. Ambilight funziona in GameMode con un gioco aperto, non in modalità Desktop né in Big Picture.",
+    "Non c’è ancora una schermata da acquisire. Ambilight funziona in GameMode quando è aperto un gioco, non in modalità Desktop né in Big Picture.",
   "ambient.stickHint":
     "Le luci seguono le zone dello schermo vicine a ciascuno stick: a sinistra campionano l'area in alto a sinistra, a destra l'area centrale destra.",
   "ambient.globalHint": "Le luci seguono il colore medio dell'intero schermo.",

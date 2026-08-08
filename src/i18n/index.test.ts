@@ -63,6 +63,26 @@ describe("Italian catalog", () => {
     expect(italian["performance.hint"]).toContain("GPU");
   });
 
+  it("hands startup control back to SteamOS in natural Italian", () => {
+    expect(italianCatalog()["startup.remember.hint"]).toBe(
+      "Quando imposti un colore, Colores lo salva e lo usa all'avvio. Disattivalo per restituire a SteamOS il controllo della barra al riavvio.",
+    );
+  });
+
+  it("calls the accent the primary color", () => {
+    expect(italianCatalog()["customize.accent"]).toBe("Colore principale");
+  });
+
+  it("uses a natural prompt for naming a gradient", () => {
+    expect(italianCatalog()["saved.namePlaceholder"]).toBe("Assegna un nome");
+  });
+
+  it("describes Ambilight capture in natural Italian", () => {
+    expect(italianCatalog()["ambient.gameModeBanner"]).toBe(
+      "Non c’è ancora una schermata da acquisire. Ambilight funziona in GameMode quando è aperto un gioco, non in modalità Desktop né in Big Picture.",
+    );
+  });
+
   it("looks up Italian strings and interpolates their parameters", () => {
     expect(i18n.translate("it", "profiles.game", { name: "Hades" })).toBe(
       "Gioco: Hades",

@@ -45,4 +45,14 @@ describe("Italian updater copy", () => {
   it("localizes the update-available toast", () => {
     expect(updateAvailableTitle("it")).toBe("Aggiornamento disponibile");
   });
+
+  it("does not use em dashes on any Italian updater surface", () => {
+    const values = [
+      ...Object.values(getUpdatePanelStrings("it")),
+      ...Object.values(getUpdateModalStrings("it")),
+      updateAvailableTitle("it"),
+    ];
+
+    expect(values.some((value) => value.includes("—"))).toBe(false);
+  });
 });
