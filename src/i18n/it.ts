@@ -22,7 +22,7 @@ export const it: Record<string, string> = {
   "chargerOnly.hint": "Le luci si accendono solo quando l'alimentatore è collegato.",
   "startup.remember": "Ricorda all'avvio",
   "startup.remember.hint":
-    "Quando imposti un colore, Colores lo salva e lo usa all'avvio. Disattivalo per restituire a SteamOS il controllo della barra al riavvio.",
+    "Quando imposti un colore, Colores lo salva e lo usa all'avvio. Disattiva questa opzione per restituire a SteamOS il controllo della barra al riavvio.",
   "forceControl.label": "Dai priorità a Colores",
   "forceControl.hint": "Colores riprende il controllo delle luci ogni volta che lo apri.",
   "forceControl.notice":

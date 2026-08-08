@@ -65,7 +65,7 @@ describe("Italian catalog", () => {
 
   it("hands startup control back to SteamOS in natural Italian", () => {
     expect(italianCatalog()["startup.remember.hint"]).toBe(
-      "Quando imposti un colore, Colores lo salva e lo usa all'avvio. Disattivalo per restituire a SteamOS il controllo della barra al riavvio.",
+      "Quando imposti un colore, Colores lo salva e lo usa all'avvio. Disattiva questa opzione per restituire a SteamOS il controllo della barra al riavvio.",
     );
   });
 
