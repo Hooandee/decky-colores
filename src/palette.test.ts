@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import {
   audioVuColors,
@@ -7,6 +7,7 @@ import {
   sensorScalePosition,
   sensorThresholdBounds,
   sensorThresholdPositions,
+  suggestGradientName,
 } from "./palette";
 
 type VuVector = {
@@ -77,9 +78,22 @@ describe("custom sensor bands", () => {
     expect(sensorBandColor(89.6, bands)).toEqual({ r: 4, g: 5, b: 6 });
     expect(formatSensorValue(89.6, "es")).toBe("89,6");
     expect(formatSensorValue(89.6, "en")).toBe("89.6");
+    expect(formatSensorValue(89.6, "it")).toBe("89,6");
   });
 
   it("formats battery percentages without floating point artifacts", () => {
     expect(formatSensorValue(14.000000000000002, "es", 0)).toBe("14");
+  });
+});
+
+describe("Italian gradient names", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("combines an Italian noun and adjective in natural order", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    expect(suggestGradientName("it")).toBe("Tramonto elettrico");
   });
 });

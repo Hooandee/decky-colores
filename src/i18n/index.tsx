@@ -1,7 +1,8 @@
 import { FC, ReactNode, createContext, useCallback, useContext, useMemo, useState } from "react";
 import { Focusable } from "@decky/ui";
+import { it } from "./it";
 
-export type Lang = "es" | "en";
+export type Lang = "es" | "en" | "it";
 
 const STORAGE_KEY = "colores-lang";
 
@@ -190,6 +191,7 @@ const es: Record<string, string> = {
 
   "lang.spanish": "Español",
   "lang.english": "Inglés",
+  "lang.italian": "Italiano",
 
   "experimental.title": "Funciones experimentales",
   "experimental.description": "Estas funciones no han sido verificadas en este dispositivo. Puedes probarlas, pero puede que no funcionen bien. Estoy trabajando para darle soporte.",
@@ -420,6 +422,7 @@ const en: Record<string, string> = {
 
   "lang.spanish": "Spanish",
   "lang.english": "English",
+  "lang.italian": "Italian",
 
   "experimental.title": "Experimental features",
   "experimental.description": "These features have not been verified on this device. You can try them, but they may not work correctly. I'm working on support.",
@@ -465,7 +468,7 @@ const en: Record<string, string> = {
   "report.retry": "Retry",
 };
 
-const DICTS: Record<Lang, Record<string, string>> = { es, en };
+export const DICTS: Record<Lang, Record<string, string>> = { es, en, it };
 
 type Params = Record<string, string | number>;
 
@@ -475,7 +478,7 @@ interface I18nValue {
   t: (key: string, params?: Params) => string;
 }
 
-function translate(lang: Lang, key: string, params?: Params): string {
+export function translate(lang: Lang, key: string, params?: Params): string {
   const raw = DICTS[lang][key] ?? key;
   if (!params) return raw;
   return raw.replace(/\{(\w+)\}/g, (match, token) =>
@@ -491,10 +494,10 @@ const FALLBACK_I18N: I18nValue = {
 
 const I18nContext = createContext<I18nValue | null>(null);
 
-function readInitialLang(): Lang {
+export function readInitialLang(): Lang {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "es" || stored === "en") return stored;
+    if (stored === "es" || stored === "en" || stored === "it") return stored;
   } catch {
     void 0;
   }
@@ -546,6 +549,14 @@ const FlagEN: FC = () => (
   </svg>
 );
 
+const FlagIT: FC = () => (
+  <svg width={20} height={14} viewBox="0 0 3 2" xmlns="http://www.w3.org/2000/svg">
+    <rect width={1} height={2} fill="#009246" />
+    <rect x={1} width={1} height={2} fill="#fff" />
+    <rect x={2} width={1} height={2} fill="#ce2b37" />
+  </svg>
+);
+
 export const LangToggle: FC = () => {
   const { lang, setLang, t } = useI18n();
 
@@ -579,6 +590,14 @@ export const LangToggle: FC = () => {
         style={buttonStyle(lang === "en")}
       >
         <FlagEN />
+      </Focusable>
+      <Focusable
+        onActivate={() => setLang("it")}
+        onClick={() => setLang("it")}
+        aria-label={t("lang.italian")}
+        style={buttonStyle(lang === "it")}
+      >
+        <FlagIT />
       </Focusable>
     </Focusable>
   );

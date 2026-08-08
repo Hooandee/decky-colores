@@ -3,8 +3,9 @@ import { type ReactNode, useState } from "react";
 import type { InstallResult } from "../api";
 import { useUpdate } from "./useUpdate";
 import { FocusRoot } from "../components/FocusRoot";
+import type { Lang } from "../i18n";
 
-const STRINGS = {
+const UPDATE_MODAL_STRINGS = {
   es: {
     title: "Novedades",
     noNotes: "Sin notas para esta versión.",
@@ -25,7 +26,21 @@ const STRINGS = {
     restart: "Restart Decky",
     failed: "Install failed. Please try again.",
   },
+  it: {
+    title: "Novità",
+    noNotes: "Nessuna nota per questa versione.",
+    install: "Installa l'aggiornamento",
+    installing: "Installazione in corso…",
+    installed: "Aggiornamento installato.",
+    restartNote: "Riavvia Decky per applicare l'aggiornamento.",
+    restart: "Riavvia Decky",
+    failed: "Installazione non riuscita. Riprova.",
+  },
 } as const;
+
+export function getUpdateModalStrings(lang: Lang) {
+  return UPDATE_MODAL_STRINGS[lang] ?? UPDATE_MODAL_STRINGS.en;
+}
 
 const MONO = "ui-monospace, SFMono-Regular, Menlo, monospace";
 
@@ -101,12 +116,12 @@ export function UpdateModal({
   notes,
   closeModal,
 }: {
-  lang: "es" | "en";
+  lang: Lang;
   latest: string;
   notes: string;
   closeModal?: () => void;
 }) {
-  const t = STRINGS[lang];
+  const t = getUpdateModalStrings(lang);
   const { install, restart, status } = useUpdate(lang);
   const [result, setResult] = useState<InstallResult | null>(null);
   const installing = status === "installing";
