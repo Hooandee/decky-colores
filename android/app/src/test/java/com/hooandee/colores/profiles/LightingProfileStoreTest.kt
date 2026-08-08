@@ -101,4 +101,17 @@ class LightingProfileStoreTest {
 
         assertTrue(store.isAutomationEnabled())
     }
+
+    @Test
+    fun `configured profiles only returns apps with their own active values`() {
+        val store = profileStore()
+        store.patch("thor", ProfileScope.App("org.own"), ProfilePatch(brightness = 42, mode = AppMode.EFFECT))
+        store.patch("thor", ProfileScope.App("org.follow"), ProfilePatch(brightness = 18))
+        store.setFollowGlobal("thor", "org.follow", true)
+
+        assertEquals(
+            listOf(ConfiguredProfile("org.own", store.effective("thor", "org.own"))),
+            store.configuredProfiles("thor"),
+        )
+    }
 }

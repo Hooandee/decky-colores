@@ -61,7 +61,6 @@ data class ModeActions(
     val onEffectSelect: (String) -> Unit,
     val onSpeedChange: (Int) -> Unit,
     val onEffectGradientChange: (Boolean) -> Unit,
-    val onChargerOnlyChange: (Boolean) -> Unit,
     val onBatteryBreatheChange: (Boolean) -> Unit,
     val onTemperatureBreatheChange: (Boolean) -> Unit,
     val onSensorBandsChange: (SensorKind, List<SensorBand>) -> Unit,
@@ -95,39 +94,6 @@ fun ModeNav(
     }
 }
 
-@Composable
-fun ChargerOnlyRow(
-    chargerOnly: Boolean,
-    enabled: Boolean,
-    onChange: (Boolean) -> Unit,
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.charger_only_title),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = stringResource(R.string.charger_only_description),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Switch(checked = chargerOnly, onCheckedChange = onChange, enabled = enabled)
-        }
-    }
-}
 
 @Composable
 fun ModeControlPanel(

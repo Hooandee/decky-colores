@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Colores" parent="android:style/Theme.Material.NoActionBar">
+    <style name="Theme.Colores" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowBackground">#090A0F</item>
         <item name="android:statusBarColor">#090A0F</item>
         <item name="android:navigationBarColor">#090A0F</item>

@@ -17,12 +17,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,7 +41,6 @@ import androidx.compose.ui.window.Dialog
 import com.hooandee.colores.R
 import com.hooandee.colores.apps.LaunchableApp
 import com.hooandee.colores.apps.filterApps
-import com.hooandee.colores.profiles.ProfileAutomationStatus
 import com.hooandee.colores.profiles.ProfileScope
 
 @Composable
@@ -87,8 +84,6 @@ fun AppProfilesDialog(
     onDismiss: () -> Unit,
     onGlobal: () -> Unit,
     onApp: (String) -> Unit,
-    onAutomation: (Boolean) -> Unit,
-    onGrantUsage: () -> Unit,
     onFollowGlobal: (Boolean) -> Unit,
     onForget: () -> Unit,
 ) {
@@ -120,28 +115,6 @@ fun AppProfilesDialog(
                                 else -> stringResource(R.string.profile_own_active)
                             },
                     )
-                }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(stringResource(R.string.profile_auto_title), fontWeight = FontWeight.SemiBold)
-                            Text(
-                                automationLabel(state.automationStatus),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Switch(checked = state.automationEnabled, onCheckedChange = onAutomation)
-                    }
-                }
-                if (state.automationStatus == ProfileAutomationStatus.PERMISSION_REQUIRED) {
-                    item {
-                        Button(onClick = onGrantUsage) { Text(stringResource(R.string.profile_usage_permission)) }
-                    }
                 }
                 selectedApp?.let {
                     item {
@@ -308,11 +281,3 @@ private fun ColoresUiState.selectedProfileApp(): LaunchableApp? {
     val packageName = (profileScope as? ProfileScope.App)?.packageName ?: return null
     return profileApps.firstOrNull { it.packageName == packageName }
 }
-
-@Composable
-private fun automationLabel(status: ProfileAutomationStatus): String =
-    when (status) {
-        ProfileAutomationStatus.DISABLED -> stringResource(R.string.profile_auto_disabled)
-        ProfileAutomationStatus.PERMISSION_REQUIRED -> stringResource(R.string.profile_auto_permission_required)
-        ProfileAutomationStatus.ACTIVE -> stringResource(R.string.profile_auto_active)
-    }

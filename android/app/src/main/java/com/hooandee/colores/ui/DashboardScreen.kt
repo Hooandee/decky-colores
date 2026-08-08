@@ -28,6 +28,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -46,8 +48,8 @@ fun DashboardScreen(
     onColorChange: (RgbColor) -> Unit,
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
-    onLedPreviewChange: (Boolean) -> Unit,
     onOpenProfiles: () -> Unit,
+    onOpenSettings: () -> Unit,
     gradientActions: GradientActions,
     modeActions: ModeActions,
 ) {
@@ -74,6 +76,7 @@ fun DashboardScreen(
                 state = state,
                 onPowerChange = onPowerChange,
                 onOpenProfiles = onOpenProfiles,
+                onOpenSettings = onOpenSettings,
             )
             Spacer(Modifier.height(14.dp))
             val detected = state.detected
@@ -107,7 +110,6 @@ fun DashboardScreen(
                         onColorChange = onColorChange,
                         onSaturationChange = onSaturationChange,
                         onBrightnessChange = onBrightnessChange,
-                        onLedPreviewChange = onLedPreviewChange,
                         gradientActions = gradientActions,
                         modeActions = modeActions,
                         modifier = Modifier.weight(1f),
@@ -122,7 +124,9 @@ private fun DashboardHeader(
     state: ColoresUiState,
     onPowerChange: (Boolean) -> Unit,
     onOpenProfiles: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
+    val settingsLabel = stringResource(R.string.settings_open)
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(20.dp),
@@ -168,6 +172,17 @@ private fun DashboardHeader(
                 )
             }
         }
+        Surface(
+            onClick = onOpenSettings,
+            modifier = Modifier.size(42.dp).semantics { contentDescription = settingsLabel },
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.primary,
+        ) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("⚙", style = MaterialTheme.typography.titleMedium)
+            }
+        }
     }
 }
 
@@ -207,7 +222,6 @@ private fun DashboardBody(
     onColorChange: (RgbColor) -> Unit,
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
-    onLedPreviewChange: (Boolean) -> Unit,
     gradientActions: GradientActions,
     modeActions: ModeActions,
     modifier: Modifier = Modifier,
@@ -224,11 +238,6 @@ private fun DashboardBody(
                 if (mode == AppMode.AUDIO) modeActions.onAudioCaptureRequest() else modeActions.onModeChange(mode)
             },
         )
-        ChargerOnlyRow(
-            chargerOnly = state.chargerOnly,
-            enabled = state.canWrite,
-            onChange = modeActions.onChargerOnlyChange,
-        )
         DashboardModeLayout(
             state = state,
             perZone = perZone,
@@ -238,7 +247,6 @@ private fun DashboardBody(
             onColorChange = onColorChange,
             onSaturationChange = onSaturationChange,
             onBrightnessChange = onBrightnessChange,
-            onLedPreviewChange = onLedPreviewChange,
             gradientActions = gradientActions,
             modeActions = modeActions,
             modifier = Modifier.weight(1f),
@@ -256,7 +264,6 @@ private fun DashboardModeLayout(
     onColorChange: (RgbColor) -> Unit,
     onSaturationChange: (Float) -> Unit,
     onBrightnessChange: (Int) -> Unit,
-    onLedPreviewChange: (Boolean) -> Unit,
     gradientActions: GradientActions,
     modeActions: ModeActions,
     modifier: Modifier = Modifier,
@@ -310,7 +317,6 @@ private fun DashboardModeLayout(
                     enabled = sceneEnabled,
                     perZone = perZone && !dynamic,
                     projection = state.ledColorProjection,
-                    onLedPreviewChange = onLedPreviewChange,
                     onTargetChange = sceneTargetChange,
                     showBoth = !gradientMode && !dynamic,
                     modifier = sceneModifier,

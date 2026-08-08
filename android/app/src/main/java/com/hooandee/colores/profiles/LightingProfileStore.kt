@@ -49,6 +49,11 @@ data class ProfileScopeState(
     val activeProfile: String = "default",
 )
 
+data class ConfiguredProfile(
+    val packageName: String,
+    val profile: LightingProfile,
+)
+
 private data class AppProfileEntry(
     val profile: LightingProfile,
     val followsGlobal: Boolean,
@@ -135,6 +140,11 @@ class LightingProfileStore(
     }
 
     fun configuredPackages(deviceId: String): Set<String> = load(deviceId).apps.keys
+
+    fun configuredProfiles(deviceId: String): List<ConfiguredProfile> =
+        load(deviceId).apps.toSortedMap().mapNotNull { (packageName, entry) ->
+            if (entry.followsGlobal) null else ConfiguredProfile(packageName, entry.profile)
+        }
 
     fun scopeState(
         deviceId: String,
