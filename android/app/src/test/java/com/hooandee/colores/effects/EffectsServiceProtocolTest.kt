@@ -23,6 +23,9 @@ class EffectsServiceProtocolTest {
     fun `explicit service actions keep their command`() {
         assertEquals(EffectsServiceCommand.START_AUDIO, resolveEffectsServiceCommand(true, ACTION_START_AUDIO))
         assertEquals(EffectsServiceCommand.STOP_AUDIO, resolveEffectsServiceCommand(true, ACTION_STOP_AUDIO))
+        assertEquals(EffectsServiceCommand.START_AMBIENT, resolveEffectsServiceCommand(true, ACTION_START_AMBIENT))
+        assertEquals(EffectsServiceCommand.STOP_AMBIENT, resolveEffectsServiceCommand(true, ACTION_STOP_AMBIENT))
+        assertEquals(EffectsServiceCommand.UPDATE_AMBIENT, resolveEffectsServiceCommand(true, ACTION_UPDATE_AMBIENT))
         assertEquals(EffectsServiceCommand.RESTORE, resolveEffectsServiceCommand(true, ACTION_RESTORE))
     }
 
@@ -39,5 +42,15 @@ class EffectsServiceProtocolTest {
         assertTrue(shouldReconcileAudioController(requested = true, mode = AppMode.AUDIO))
         assertFalse(shouldReconcileAudioController(requested = true, mode = AppMode.COLOR))
         assertFalse(shouldReconcileAudioController(requested = false, mode = AppMode.AUDIO))
+    }
+
+    @Test
+    fun `ambient stop uses a regular start and reconciles only ambient mode`() {
+        val policy = effectsServiceCommandPolicy(EffectsServiceCommand.STOP_AMBIENT)
+
+        assertEquals(EffectsServiceStartMode.REGULAR, policy.startMode)
+        assertTrue(policy.reconcileController)
+        assertTrue(shouldReconcileAmbientController(requested = true, mode = AppMode.AMBIENT))
+        assertFalse(shouldReconcileAmbientController(requested = true, mode = AppMode.COLOR))
     }
 }

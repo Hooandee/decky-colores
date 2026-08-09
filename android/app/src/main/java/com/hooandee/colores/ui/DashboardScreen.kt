@@ -235,7 +235,11 @@ private fun DashboardBody(
             selected = state.mode,
             enabled = state.canWrite,
             onModeChange = { mode ->
-                if (mode == AppMode.AUDIO) modeActions.onAudioCaptureRequest() else modeActions.onModeChange(mode)
+                when (mode) {
+                    AppMode.AUDIO -> modeActions.onAudioCaptureRequest()
+                    AppMode.AMBIENT -> modeActions.onAmbientCaptureRequest()
+                    else -> modeActions.onModeChange(mode)
+                }
             },
         )
         DashboardModeLayout(

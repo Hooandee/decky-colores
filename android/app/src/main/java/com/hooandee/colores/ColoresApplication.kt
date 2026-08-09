@@ -1,6 +1,8 @@
 package com.hooandee.colores
 
 import android.app.Application
+import com.hooandee.colores.ambient.AmbientCaptureSession
+import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.audio.AudioCaptureSession
 import com.hooandee.colores.audio.MutableAudioLevelSource
 import com.hooandee.colores.apps.ForegroundAppObserver
@@ -26,6 +28,10 @@ class ColoresApplication : Application() {
 
     val audioCaptureSession by lazy { AudioCaptureSession(applicationScope, audioLevelSource) }
 
+    val ambientFrameSource by lazy { MutableAmbientFrameSource() }
+
+    val ambientCaptureSession by lazy { AmbientCaptureSession(this, ambientFrameSource) }
+
     val effectsServiceGate by lazy { ContextServiceGate(this) }
 
     val profileStore: LightingProfileStore by lazy { LightingProfileStore(this) }
@@ -40,7 +46,7 @@ class ColoresApplication : Application() {
     }
 
     val lightingRuntime: LightingRuntime by lazy {
-        LightingRuntime(this, applicationScope, lightingController, audioLevelSource)
+        LightingRuntime(this, applicationScope, lightingController, audioLevelSource, ambientFrameSource)
     }
 
     val profileCoordinator: LightingProfileCoordinator by lazy {

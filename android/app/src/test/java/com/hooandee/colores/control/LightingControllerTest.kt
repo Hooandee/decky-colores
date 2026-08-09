@@ -1,5 +1,8 @@
 package com.hooandee.colores.control
 
+import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.AmbientFrameSource
+import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.audio.AudioLevelSource
 import com.hooandee.colores.audio.MutableAudioLevelSource
@@ -132,7 +135,31 @@ class LightingControllerTest {
         performance: PerformanceSource? = null,
         zones: Int = 2,
         audio: AudioLevelSource = MutableAudioLevelSource(),
-    ) = LightingBinding("dev", device, zones, catalog, bands, battery, temperature, performance, audio)
+        ambient: AmbientFrameSource = MutableAmbientFrameSource(),
+    ) = LightingBinding("dev", device, zones, catalog, bands, battery, temperature, performance, audio, ambient)
+
+    @Test
+    fun `ambient capture and led writes run at independent cadences`() =
+        runTest {
+            val device = FakeDevice(recommendedFrameIntervalMs = 80)
+            val gate = RecordingGate()
+            val ambient = MutableAmbientFrameSource().apply {
+                update(List(8) { RgbColor(it * 20, 10, 5) }, AmbientCaptureStatus.CAPTURING, 1L)
+            }
+            val controller = LightingController(backgroundScope, gate, clockMs = { testScheduler.currentTime })
+            controller.bind(
+                binding(device, zones = 8, ambient = ambient),
+                LightingIntent(mode = AppMode.AMBIENT, ambientSmoothing = 0, ambientVividness = 0),
+            )
+
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            assertTrue(gate.running)
+            assertTrue(device.writes.size in 10..14)
+            assertEquals(ambient.state.value.colors, device.writes.last().colors)
+            assertEquals(AmbientCaptureStatus.CAPTURING, controller.snapshot.value.ambient.status)
+        }
 
     @Test
     fun `audio mode waits black without authorization and stops when leaving the mode`() =

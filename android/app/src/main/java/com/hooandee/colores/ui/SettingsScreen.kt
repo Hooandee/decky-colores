@@ -280,6 +280,7 @@ private fun profileModeLabel(mode: AppMode): String =
         AppMode.PERFORMANCE -> stringResource(R.string.sensor_performance)
         AppMode.CLOCK -> stringResource(R.string.nav_clock)
         AppMode.AUDIO -> stringResource(R.string.nav_audio)
+        AppMode.AMBIENT -> stringResource(R.string.nav_ambient)
     }
 
 @Composable

@@ -26,18 +26,28 @@ import com.hooandee.colores.ui.ColoresViewModel
 
 class MainActivity : AppCompatActivity() {
     private val viewModel by viewModels<ColoresViewModel>()
+    private var projectionRequest = ProjectionRequest.NONE
     private val projectionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val data = result.data
             if (result.resultCode == Activity.RESULT_OK && data != null) {
-                viewModel.activateAudio(result.resultCode, data)
+                when (projectionRequest) {
+                    ProjectionRequest.AUDIO -> viewModel.activateAudio(result.resultCode, data)
+                    ProjectionRequest.AMBIENT -> viewModel.activateAmbient(result.resultCode, data)
+                    ProjectionRequest.NONE -> Unit
+                }
             } else {
-                viewModel.onAudioAuthorizationDenied()
+                when (projectionRequest) {
+                    ProjectionRequest.AUDIO -> viewModel.onAudioAuthorizationDenied()
+                    ProjectionRequest.AMBIENT -> viewModel.onAmbientAuthorizationDenied()
+                    ProjectionRequest.NONE -> Unit
+                }
             }
+            projectionRequest = ProjectionRequest.NONE
         }
     private val audioPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) launchProjectionConsent() else viewModel.onAudioAuthorizationDenied()
+            if (granted) launchProjectionConsent(ProjectionRequest.AUDIO) else viewModel.onAudioAuthorizationDenied()
         }
     private val screenOnReceiver =
         object : BroadcastReceiver() {
@@ -59,6 +69,7 @@ class MainActivity : AppCompatActivity() {
                     viewModel = viewModel,
                     onGrantPermission = { startActivity(WriteSettingsPermission.createGrantIntent(this)) },
                     onAudioCaptureRequest = ::requestAudioCapture,
+                    onAmbientCaptureRequest = { launchProjectionConsent(ProjectionRequest.AMBIENT) },
                     onGrantUsage = {
                         startActivity((application as ColoresApplication).usageAccess.settingsIntent())
                     },
@@ -101,14 +112,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestAudioCapture() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-            launchProjectionConsent()
+            launchProjectionConsent(ProjectionRequest.AUDIO)
         } else {
             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 
-    private fun launchProjectionConsent() {
+    private fun launchProjectionConsent(request: ProjectionRequest) {
+        projectionRequest = request
         val manager = getSystemService(MediaProjectionManager::class.java)
         projectionLauncher.launch(manager.createScreenCaptureIntent())
+    }
+
+    private enum class ProjectionRequest {
+        NONE,
+        AUDIO,
+        AMBIENT,
     }
 }

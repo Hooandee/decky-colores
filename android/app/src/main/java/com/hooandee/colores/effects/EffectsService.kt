@@ -19,14 +19,38 @@ import android.util.Log
 import com.hooandee.colores.ColoresApplication
 import com.hooandee.colores.MainActivity
 import com.hooandee.colores.R
+import com.hooandee.colores.ambient.AmbientCaptureConfig
+import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.AmbientSamplingMode
 import com.hooandee.colores.audio.AndroidPlaybackCapture
 import com.hooandee.colores.audio.AudioCaptureStatus
+import com.hooandee.colores.device.LedGridCell
+import com.hooandee.colores.control.AppMode
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class EffectsService : Service() {
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var projection: MediaProjection? = null
     private var projectionCallback: MediaProjection.Callback? = null
-    private var audioForegroundActive = false
+    private var projectionOwner: ProjectionOwner? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        serviceScope.launch {
+            application.lightingController.snapshot.collect { snapshot ->
+                when {
+                    projectionOwner == ProjectionOwner.AUDIO && snapshot.mode != AppMode.AUDIO ->
+                        stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED, reconcile = false)
+                    projectionOwner == ProjectionOwner.AMBIENT && snapshot.mode != AppMode.AMBIENT ->
+                        stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED, reconcile = false)
+                }
+            }
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -46,19 +70,27 @@ class EffectsService : Service() {
                 startForegroundCompat(mediaProjection = false)
                 stopAudioCapture(intent.audioStopStatus(), reconcile = policy.reconcileController)
             }
+            EffectsServiceCommand.START_AMBIENT -> startAmbientCapture(requireNotNull(intent))
+            EffectsServiceCommand.STOP_AMBIENT -> {
+                requireNotNull(intent)
+                startForegroundCompat(mediaProjection = false)
+                stopAmbientCapture(intent.ambientStopStatus(), reconcile = policy.reconcileController)
+            }
+            EffectsServiceCommand.UPDATE_AMBIENT -> intent?.ambientConfig()?.let(application.ambientCaptureSession::updateConfig)
             EffectsServiceCommand.RESTORE -> {
                 startForegroundCompat(mediaProjection = false)
                 application.applicationScope.launch {
                     if (!application.restoreRuntime()) stopSelf(startId)
                 }
             }
-            EffectsServiceCommand.KEEP_ALIVE -> startForegroundCompat(mediaProjection = audioForegroundActive)
+            EffectsServiceCommand.KEEP_ALIVE -> startForegroundCompat(mediaProjection = projectionOwner != null)
         }
         return START_STICKY
     }
 
     override fun onTimeout(startId: Int) {
         stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+        stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
         stopSelf()
     }
 
@@ -69,6 +101,12 @@ class EffectsService : Service() {
                 ?: AudioCaptureStatus.AUTHORIZATION_REQUIRED
         Log.i(TAG, "destroy status=$terminalStatus")
         stopAudioCapture(terminalStatus, reconcile = false)
+        val ambientStatus = application.ambientFrameSource.state.value.status
+        val ambientTerminal =
+            ambientStatus.takeIf { it == AmbientCaptureStatus.ERROR || it == AmbientCaptureStatus.REVOKED }
+                ?: AmbientCaptureStatus.AUTHORIZATION_REQUIRED
+        stopAmbientCapture(ambientTerminal, reconcile = false)
+        serviceScope.cancel()
         application.effectsServiceGate.onServiceStopped()
         super.onDestroy()
     }
@@ -86,8 +124,8 @@ class EffectsService : Service() {
     }
 
     private fun startAudioCapture(intent: Intent) {
+        stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
         stopAudioCapture(AudioCaptureStatus.STARTING)
-        audioForegroundActive = true
         startForegroundCompat(mediaProjection = true)
         val resultData = intent.projectionData()
         if (resultData == null || intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) != Activity.RESULT_OK) {
@@ -100,11 +138,14 @@ class EffectsService : Service() {
             val callback =
                 object : MediaProjection.Callback() {
                     override fun onStop() {
-                        stopAudioCapture(AudioCaptureStatus.REVOKED, stopProjection = false)
-                        stopSelf()
+                        if (projection === active && projectionOwner == ProjectionOwner.AUDIO) {
+                            stopAudioCapture(AudioCaptureStatus.REVOKED, stopProjection = false)
+                            stopSelf()
+                        }
                     }
                 }
             active.registerCallback(callback, Handler(Looper.getMainLooper()))
+            projectionOwner = ProjectionOwner.AUDIO
             projection = active
             projectionCallback = callback
             application.audioCaptureSession.start(AndroidPlaybackCapture(this, active)) { error ->
@@ -126,16 +167,77 @@ class EffectsService : Service() {
         reconcile: Boolean = true,
     ) {
         Log.i(TAG, "stop audio status=$status projection=${projection != null}")
-        audioForegroundActive = false
         application.audioCaptureSession.stop(status)
-        val active = projection
-        val callback = projectionCallback
-        projection = null
-        projectionCallback = null
-        if (active != null && callback != null) runCatching { active.unregisterCallback(callback) }
-        if (stopProjection) runCatching { active?.stop() }
+        if (projectionOwner == ProjectionOwner.AUDIO) {
+            val active = projection
+            val callback = projectionCallback
+            projection = null
+            projectionCallback = null
+            projectionOwner = null
+            if (active != null && callback != null) runCatching { active.unregisterCallback(callback) }
+            if (stopProjection) runCatching { active?.stop() }
+        }
         if (shouldReconcileAudioController(reconcile, application.lightingController.snapshot.value.mode)) {
             application.lightingController.onAudioStateChanged()
+        }
+    }
+
+    private fun startAmbientCapture(intent: Intent) {
+        stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+        stopAmbientCapture(AmbientCaptureStatus.STARTING)
+        startForegroundCompat(mediaProjection = true)
+        val resultData = intent.projectionData()
+        val config = intent.ambientConfig()
+        if (resultData == null || config == null || intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) != Activity.RESULT_OK) {
+            stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
+            return
+        }
+        runCatching {
+            val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            val active = manager.getMediaProjection(Activity.RESULT_OK, resultData) ?: error("MediaProjection unavailable")
+            val callback =
+                object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        if (projection === active && projectionOwner == ProjectionOwner.AMBIENT) {
+                            stopAmbientCapture(AmbientCaptureStatus.REVOKED, stopProjection = false)
+                            stopSelf()
+                        }
+                    }
+                }
+            active.registerCallback(callback, Handler(Looper.getMainLooper()))
+            projectionOwner = ProjectionOwner.AMBIENT
+            projection = active
+            projectionCallback = callback
+            application.ambientCaptureSession.start(active, config) { error ->
+                Log.e(TAG, "ambient capture failed", error)
+                stopAmbientCapture(AmbientCaptureStatus.ERROR)
+                stopSelf()
+            }
+            Log.i(TAG, "ambient capture started fps=${config.captureFps} mode=${config.samplingMode}")
+        }.onFailure {
+            Log.e(TAG, "ambient capture setup failed", it)
+            stopAmbientCapture(AmbientCaptureStatus.ERROR)
+            stopSelf()
+        }
+    }
+
+    private fun stopAmbientCapture(
+        status: AmbientCaptureStatus,
+        stopProjection: Boolean = true,
+        reconcile: Boolean = true,
+    ) {
+        application.ambientCaptureSession.stop(status)
+        if (projectionOwner == ProjectionOwner.AMBIENT) {
+            val active = projection
+            val callback = projectionCallback
+            projection = null
+            projectionCallback = null
+            projectionOwner = null
+            if (active != null && callback != null) runCatching { active.unregisterCallback(callback) }
+            if (stopProjection) runCatching { active?.stop() }
+        }
+        if (shouldReconcileAmbientController(reconcile, application.lightingController.snapshot.value.mode)) {
+            application.lightingController.onAmbientStateChanged()
         }
     }
 
@@ -178,6 +280,13 @@ class EffectsService : Service() {
         private const val EXTRA_RESULT_CODE = "result_code"
         private const val EXTRA_PROJECTION_DATA = "projection_data"
         private const val EXTRA_STOP_STATUS = "stop_status"
+        private const val EXTRA_CAPTURE_FPS = "capture_fps"
+        private const val EXTRA_SAMPLING_MODE = "sampling_mode"
+        private const val EXTRA_ZONES = "zones"
+        private const val EXTRA_PER_ZONE = "per_zone"
+        private const val EXTRA_GRID_STICKS = "grid_sticks"
+        private const val EXTRA_GRID_ROWS = "grid_rows"
+        private const val EXTRA_GRID_COLUMNS = "grid_columns"
         private const val CHANNEL_ID = "colores_effects"
         private const val NOTIFICATION_ID = 1001
         private const val TAG = "ColoresEffects"
@@ -208,6 +317,39 @@ class EffectsService : Service() {
             )
         }
 
+        fun startAmbient(
+            context: Context,
+            resultCode: Int,
+            resultData: Intent,
+            config: AmbientCaptureConfig,
+        ) {
+            startService(
+                context,
+                ambientIntent(context, ACTION_START_AMBIENT, config)
+                    .putExtra(EXTRA_RESULT_CODE, resultCode)
+                    .putExtra(EXTRA_PROJECTION_DATA, resultData),
+            )
+        }
+
+        fun updateAmbient(
+            context: Context,
+            config: AmbientCaptureConfig,
+        ) {
+            startService(context, ambientIntent(context, ACTION_UPDATE_AMBIENT, config))
+        }
+
+        fun stopAmbient(
+            context: Context,
+            status: AmbientCaptureStatus = AmbientCaptureStatus.AUTHORIZATION_REQUIRED,
+        ) {
+            startService(
+                context,
+                Intent(context, EffectsService::class.java)
+                    .setAction(ACTION_STOP_AMBIENT)
+                    .putExtra(EXTRA_STOP_STATUS, status.name),
+            )
+        }
+
         fun restore(context: Context) {
             startService(context, Intent(context, EffectsService::class.java).setAction(ACTION_RESTORE))
         }
@@ -220,6 +362,23 @@ class EffectsService : Service() {
             } else {
                 context.startService(intent)
             }
+        }
+
+        private fun ambientIntent(
+            context: Context,
+            action: String,
+            config: AmbientCaptureConfig,
+        ): Intent {
+            val grid = config.gridLayout
+            return Intent(context, EffectsService::class.java)
+                .setAction(action)
+                .putExtra(EXTRA_CAPTURE_FPS, config.captureFps)
+                .putExtra(EXTRA_SAMPLING_MODE, config.samplingMode.name)
+                .putExtra(EXTRA_ZONES, config.zones)
+                .putExtra(EXTRA_PER_ZONE, config.supportsPerZone)
+                .putExtra(EXTRA_GRID_STICKS, grid?.map { it.stick ?: -1 }?.toIntArray())
+                .putExtra(EXTRA_GRID_ROWS, grid?.map { it.row }?.toIntArray())
+                .putExtra(EXTRA_GRID_COLUMNS, grid?.map { it.col }?.toIntArray())
         }
     }
 
@@ -237,4 +396,38 @@ class EffectsService : Service() {
     private fun Intent.audioStopStatus(): AudioCaptureStatus =
         runCatching { AudioCaptureStatus.valueOf(getStringExtra(EXTRA_STOP_STATUS).orEmpty()) }
             .getOrDefault(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+
+    private fun Intent.ambientStopStatus(): AmbientCaptureStatus =
+        runCatching { AmbientCaptureStatus.valueOf(getStringExtra(EXTRA_STOP_STATUS).orEmpty()) }
+            .getOrDefault(AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
+
+    private fun Intent.ambientConfig(): AmbientCaptureConfig? {
+        val zones = getIntExtra(EXTRA_ZONES, 0)
+        if (zones <= 0) return null
+        val sticks = getIntArrayExtra(EXTRA_GRID_STICKS)
+        val rows = getIntArrayExtra(EXTRA_GRID_ROWS)
+        val columns = getIntArrayExtra(EXTRA_GRID_COLUMNS)
+        val grid =
+            if (sticks?.size == zones && rows?.size == zones && columns?.size == zones) {
+                List(zones) { index ->
+                    LedGridCell(sticks[index].takeIf { it >= 0 }, rows[index], columns[index], position = null)
+                }
+            } else {
+                null
+            }
+        return AmbientCaptureConfig(
+            zones = zones,
+            gridLayout = grid,
+            supportsPerZone = getBooleanExtra(EXTRA_PER_ZONE, false),
+            captureFps = getIntExtra(EXTRA_CAPTURE_FPS, 10),
+            samplingMode =
+                runCatching { AmbientSamplingMode.valueOf(getStringExtra(EXTRA_SAMPLING_MODE).orEmpty()) }
+                    .getOrDefault(AmbientSamplingMode.FULL_SCENE),
+        )
+    }
+
+    private enum class ProjectionOwner {
+        AUDIO,
+        AMBIENT,
+    }
 }

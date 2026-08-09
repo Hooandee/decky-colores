@@ -31,6 +31,9 @@ class ReportBundleTest {
             power = true,
             configuredProfiles = 2,
             automationStatus = "active",
+            ambientStatus = "capturing",
+            ambientCaptureFps = 10,
+            ambientSamplingMode = "full_scene",
         )
 
     @Test
@@ -53,6 +56,8 @@ class ReportBundleTest {
         assertEquals("0.1.0", bundle.getJSONObject("environment").getString("plugin_version"))
         assertEquals("htr3212", bundle.getJSONObject("capabilities").getString("driver"))
         assertEquals(2, bundle.getJSONObject("stores").getInt("profiles_configured"))
+        assertEquals(10, bundle.getJSONObject("state").getJSONObject("ambient").getInt("capture_fps"))
+        assertFalse(encoded.contains("pixels"))
         assertFalse(encoded.contains("ABC123456789"))
         assertFalse(encoded.contains("AA:BB:CC:DD:EE:FF"))
         assertFalse(encoded.contains("123e4567-e89b-12d3-a456-426614174000"))

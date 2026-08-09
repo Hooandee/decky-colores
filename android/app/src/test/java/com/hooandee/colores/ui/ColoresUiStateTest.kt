@@ -1,5 +1,7 @@
 package com.hooandee.colores.ui
 
+import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.AmbientFrameState
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.audio.AudioLevelState
 import com.hooandee.colores.control.AppMode
@@ -74,6 +76,8 @@ class ColoresUiStateTest {
 
         assertTrue(AppMode.AUDIO in connected.availableModes())
         assertFalse(AppMode.AUDIO in unavailable.availableModes())
+        assertTrue(AppMode.AMBIENT in connected.availableModes())
+        assertFalse(AppMode.AMBIENT in unavailable.availableModes())
     }
 
     @Test
@@ -87,5 +91,17 @@ class ColoresUiStateTest {
 
         assertTrue(state.audioNeedsAuthorization)
         assertEquals(0.0, state.audio.level, 0.0)
+    }
+
+    @Test
+    fun `selected ambient without a live grant asks for authorization`() {
+        val state =
+            ColoresUiState(
+                detected = thor,
+                mode = AppMode.AMBIENT,
+                ambient = AmbientFrameState(status = AmbientCaptureStatus.REVOKED),
+            )
+
+        assertTrue(state.ambientNeedsAuthorization)
     }
 }

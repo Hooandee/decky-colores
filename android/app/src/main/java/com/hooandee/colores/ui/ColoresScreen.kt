@@ -17,6 +17,7 @@ fun ColoresScreen(
     viewModel: ColoresViewModel,
     onGrantPermission: () -> Unit,
     onAudioCaptureRequest: () -> Unit,
+    onAmbientCaptureRequest: () -> Unit,
     onGrantUsage: () -> Unit,
     appearance: AppAppearance,
     onThemeModeChange: (ThemeMode) -> Unit,
@@ -80,6 +81,11 @@ fun ColoresScreen(
                 onAudioScaleChange = viewModel::setAudioScale,
                 onAudioSensitivityChange = viewModel::setAudioSensitivity,
                 onAudioCaptureRequest = onAudioCaptureRequest,
+                onAmbientCaptureRequest = onAmbientCaptureRequest,
+                onAmbientCaptureFpsChange = viewModel::setAmbientCaptureFps,
+                onAmbientSamplingModeChange = viewModel::setAmbientSamplingMode,
+                onAmbientVividnessChange = viewModel::setAmbientVividness,
+                onAmbientSmoothingChange = viewModel::setAmbientSmoothing,
             ),
     )
     if (state.profilePickerOpen) {

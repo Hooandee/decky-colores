@@ -1,5 +1,8 @@
 package com.hooandee.colores.engine
 
+import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.AmbientColorMath
+import com.hooandee.colores.ambient.AmbientFrameState
 import com.hooandee.colores.engine.FrameMath.breatheFactor
 import com.hooandee.colores.engine.FrameMath.clamp8
 import com.hooandee.colores.engine.FrameMath.lerp
@@ -13,6 +16,43 @@ data class RenderTick(
 
 interface Renderer {
     fun render(nowSeconds: Double): RenderTick
+}
+
+class AmbientRenderer(
+    private val zones: Int,
+    private val frameIntervalMs: Long,
+    private val vividness: () -> Int,
+    private val smoothing: () -> Int,
+    private val state: () -> AmbientFrameState,
+) : Renderer {
+    private var displayed: List<RgbColor>? = null
+    private var lastSeconds: Double? = null
+
+    override fun render(nowSeconds: Double): RenderTick {
+        val snapshot = state()
+        val target =
+            if (snapshot.status == AmbientCaptureStatus.CAPTURING && snapshot.colors.isNotEmpty()) {
+                snapshot.colors.fit(zones).map { AmbientColorMath.vivid(it, vividness()) }
+            } else {
+                displayed ?: List(zones) { RgbColor(0, 0, 0) }
+            }
+        val previous = displayed
+        val elapsedMs = lastSeconds?.let { ((nowSeconds - it).coerceAtLeast(0.0) * 1_000).toLong() } ?: 0L
+        val frame =
+            if (previous == null) {
+                target
+            } else {
+                previous.zip(target) { current, next -> AmbientColorMath.smooth(current, next, smoothing(), elapsedMs) }
+            }
+        displayed = frame
+        lastSeconds = nowSeconds
+        return RenderTick(frame, frameIntervalMs)
+    }
+
+    private fun List<RgbColor>.fit(count: Int): List<RgbColor> {
+        val fallback = firstOrNull() ?: RgbColor(0, 0, 0)
+        return List(count.coerceAtLeast(1)) { getOrNull(it) ?: fallback }
+    }
 }
 
 data class EffectPalette(
