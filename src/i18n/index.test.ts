@@ -79,7 +79,7 @@ describe("Italian catalog", () => {
 
   it("describes Ambilight capture in natural Italian", () => {
     expect(italianCatalog()["ambient.gameModeBanner"]).toBe(
-      "Non c’è ancora una schermata da acquisire. Ambilight funziona in GameMode quando è aperto un gioco, non in modalità Desktop né in Big Picture.",
+      "Non c’è ancora una schermata da acquisire. Ambilight funziona in modalità Gioco quando è aperto un gioco, non in modalità Desktop né in Big Picture.",
     );
   });
 

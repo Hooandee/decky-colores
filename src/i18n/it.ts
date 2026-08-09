@@ -129,7 +129,7 @@ export const it: Record<string, string> = {
   "effect.spiral.firmwareNote": "Effetto rotante integrato nel firmware di Legion Go.",
 
   "ambient.gameModeBanner":
-    "Non c’è ancora una schermata da acquisire. Ambilight funziona in GameMode quando è aperto un gioco, non in modalità Desktop né in Big Picture.",
+    "Non c’è ancora una schermata da acquisire. Ambilight funziona in modalità Gioco quando è aperto un gioco, non in modalità Desktop né in Big Picture.",
   "ambient.stickHint":
     "Le luci seguono le zone dello schermo vicine a ciascuno stick: a sinistra campionano l'area in alto a sinistra, a destra l'area centrale destra.",
   "ambient.globalHint": "Le luci seguono il colore medio dell'intero schermo.",
