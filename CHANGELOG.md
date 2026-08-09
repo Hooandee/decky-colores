@@ -1,31 +1,13 @@
 # Changelog
 
-## Unreleased
+## [0.23.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.22.0...decky-colores-v0.23.0) (2026-08-09)
 
 
 ### Novedades / Features / Novità
 
-* **ES:** Añade una traducción completa al italiano para la interfaz de Decky, que abarca los controles, los estados, el actualizador, el formato de los sensores y nombres naturales para los degradados.
-* **EN:** Add a complete Italian translation for the Decky interface, including controls, status messages, the updater, sensor formatting, and natural gradient names.
-* **IT:** Aggiunge una traduzione italiana completa all'interfaccia Decky, con comandi, messaggi di stato, aggiornamenti, valori dei sensori e nomi dei gradienti tradotti in modo naturale.
-
-## [0.23.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.22.0...decky-colores-v0.23.0) (2026-08-09)
-
-
-### Features
-
-* add per-app lighting profiles ([dc63da8](https://github.com/Hooandee/decky-colores/commit/dc63da81c99713a0ca830bc60691360061cb6d95))
-* bring advanced lighting modes to Android ([230a8f9](https://github.com/Hooandee/decky-colores/commit/230a8f94f5abc531a3f760952d789681e13e58fb))
-* bring advanced lighting modes to Android ([83b5c06](https://github.com/Hooandee/decky-colores/commit/83b5c06c1be1a4465d0041fdf3f5f6e307debd65))
-* **i18n:** add Italian localization ([81cd20a](https://github.com/Hooandee/decky-colores/commit/81cd20ae1e2ebc664ccb266bcc7f80183b93b4bc))
-* **i18n:** add Italian localization ([2e1260a](https://github.com/Hooandee/decky-colores/commit/2e1260ace44238e70a3aff819a76b99127ca028b))
-
-
-### Bug Fixes
-
-* **i18n:** address Italian review feedback ([a59b304](https://github.com/Hooandee/decky-colores/commit/a59b30429fd13cf4add19a8e3b17c6dd1fa0d2a0))
-* **i18n:** clarify Italian startup copy ([fb6bce6](https://github.com/Hooandee/decky-colores/commit/fb6bce6c652f124000c6c997dd290018e96b50ef))
-* **i18n:** refine Italian localization ([6767af0](https://github.com/Hooandee/decky-colores/commit/6767af060c4b5d32db04e5874dff78bd5cd3bce0))
+* **ES:** Añade perfiles de iluminación por aplicación y una traducción completa al italiano para la interfaz de Decky, que abarca los controles, los estados, el actualizador, el formato de los sensores y nombres naturales para los degradados. ([dc63da8](https://github.com/Hooandee/decky-colores/commit/dc63da81c99713a0ca830bc60691360061cb6d95)) ([81cd20a](https://github.com/Hooandee/decky-colores/commit/81cd20ae1e2ebc664ccb266bcc7f80183b93b4bc)) ([2e1260a](https://github.com/Hooandee/decky-colores/commit/2e1260ace44238e70a3aff819a76b99127ca028b)) ([a59b304](https://github.com/Hooandee/decky-colores/commit/a59b30429fd13cf4add19a8e3b17c6dd1fa0d2a0)) ([fb6bce6](https://github.com/Hooandee/decky-colores/commit/fb6bce6c652f124000c6c997dd290018e96b50ef)) ([6767af0](https://github.com/Hooandee/decky-colores/commit/6767af060c4b5d32db04e5874dff78bd5cd3bce0))
+* **EN:** Add per-app lighting profiles and a complete Italian translation for the Decky interface, including controls, status messages, the updater, sensor formatting, and natural gradient names. ([dc63da8](https://github.com/Hooandee/decky-colores/commit/dc63da81c99713a0ca830bc60691360061cb6d95)) ([81cd20a](https://github.com/Hooandee/decky-colores/commit/81cd20ae1e2ebc664ccb266bcc7f80183b93b4bc)) ([2e1260a](https://github.com/Hooandee/decky-colores/commit/2e1260ace44238e70a3aff819a76b99127ca028b)) ([a59b304](https://github.com/Hooandee/decky-colores/commit/a59b30429fd13cf4add19a8e3b17c6dd1fa0d2a0)) ([fb6bce6](https://github.com/Hooandee/decky-colores/commit/fb6bce6c652f124000c6c997dd290018e96b50ef)) ([6767af0](https://github.com/Hooandee/decky-colores/commit/6767af060c4b5d32db04e5874dff78bd5cd3bce0))
+* **IT:** Aggiunge profili di illuminazione per ogni applicazione e una traduzione italiana completa dell'interfaccia Decky, con comandi, messaggi di stato, aggiornamenti, valori dei sensori e nomi dei gradienti tradotti in modo naturale. ([dc63da8](https://github.com/Hooandee/decky-colores/commit/dc63da81c99713a0ca830bc60691360061cb6d95)) ([81cd20a](https://github.com/Hooandee/decky-colores/commit/81cd20ae1e2ebc664ccb266bcc7f80183b93b4bc)) ([2e1260a](https://github.com/Hooandee/decky-colores/commit/2e1260ace44238e70a3aff819a76b99127ca028b)) ([a59b304](https://github.com/Hooandee/decky-colores/commit/a59b30429fd13cf4add19a8e3b17c6dd1fa0d2a0)) ([fb6bce6](https://github.com/Hooandee/decky-colores/commit/fb6bce6c652f124000c6c997dd290018e96b50ef)) ([6767af0](https://github.com/Hooandee/decky-colores/commit/6767af060c4b5d32db04e5874dff78bd5cd3bce0))
 
 ## [0.22.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.5...decky-colores-v0.22.0) (2026-07-31)
 
