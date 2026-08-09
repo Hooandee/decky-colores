@@ -1,4 +1,5 @@
 import { hsvToRgb, rgbToHsv } from "./color";
+import type { Lang } from "./i18n";
 import { EffectMeta, GradientPreset, RGB, SensorBand, SensorBands, SensorKind } from "./types";
 
 export const GRADIENT_PRESETS: GradientPreset[] = [
@@ -345,7 +346,7 @@ export function sensorScalePosition(
 
 export function formatSensorValue(
   value: number,
-  lang: "es" | "en",
+  lang: Lang,
   fractionDigits = 1,
 ): string {
   return value.toLocaleString(lang, {
@@ -358,7 +359,7 @@ export function sensorThresholdPositions(sensor: SensorKind, bands: SensorBand[]
   return bands.slice(0, -1).map((band) => sensorScalePosition(sensor, bands, band.min));
 }
 
-const NAME_PARTS: Record<"es" | "en", { adjectives: string[]; nouns: string[] }> = {
+const NAME_PARTS: Record<Lang, { adjectives: string[]; nouns: string[] }> = {
   es: {
     adjectives: ["Borracho", "Eléctrico", "Cósmico", "Disco", "Pastel", "Neón", "Salvaje", "Turbo", "Místico", "Picante"],
     nouns: ["Atardecer", "Unicornio", "Mango", "Pulpo", "Trueno", "Gato", "Dragón", "Flamenco", "Tucán", "Cactus"],
@@ -367,13 +368,17 @@ const NAME_PARTS: Record<"es" | "en", { adjectives: string[]; nouns: string[] }>
     adjectives: ["Drunken", "Electric", "Cosmic", "Disco", "Pastel", "Neon", "Wild", "Turbo", "Mystic", "Spicy"],
     nouns: ["Sunset", "Unicorn", "Mango", "Octopus", "Thunder", "Cat", "Dragon", "Flamingo", "Toucan", "Cactus"],
   },
+  it: {
+    adjectives: ["elettrico", "cosmico", "disco", "pastello", "neon", "selvaggio", "turbo", "mistico", "piccante", "sognante"],
+    nouns: ["Tramonto", "Unicorno", "Mango", "Polpo", "Tuono", "Gatto", "Drago", "Fenicottero", "Tucano", "Cactus"],
+  },
 };
 
-export function suggestGradientName(lang: "es" | "en"): string {
+export function suggestGradientName(lang: Lang): string {
   const parts = NAME_PARTS[lang] ?? NAME_PARTS.en;
   const noun = parts.nouns[Math.floor(Math.random() * parts.nouns.length)];
   const adjective = parts.adjectives[Math.floor(Math.random() * parts.adjectives.length)];
-  return lang === "es" ? `${noun} ${adjective}` : `${adjective} ${noun}`;
+  return lang === "en" ? `${adjective} ${noun}` : `${noun} ${adjective}`;
 }
 
 export function harmoniousGradient(base: RGB): RGB[] {

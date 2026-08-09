@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+
+### Novedades / Features / Novità
+
+* **ES:** Añade una traducción completa al italiano para la interfaz de Decky, que abarca los controles, los estados, el actualizador, el formato de los sensores y nombres naturales para los degradados.
+* **EN:** Add a complete Italian translation for the Decky interface, including controls, status messages, the updater, sensor formatting, and natural gradient names.
+* **IT:** Aggiunge una traduzione italiana completa all'interfaccia Decky, con comandi, messaggi di stato, aggiornamenti, valori dei sensori e nomi dei gradienti tradotti in modo naturale.
+
 ## [0.22.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.5...decky-colores-v0.22.0) (2026-07-31)
 
 
