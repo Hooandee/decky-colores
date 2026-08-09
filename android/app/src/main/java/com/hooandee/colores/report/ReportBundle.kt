@@ -26,6 +26,9 @@ data class AndroidReportSnapshot(
     val power: Boolean,
     val configuredProfiles: Int,
     val automationStatus: String,
+    val ambientStatus: String? = null,
+    val ambientCaptureFps: Int? = null,
+    val ambientSamplingMode: String? = null,
 )
 
 sealed interface ReportResult {
@@ -85,7 +88,14 @@ fun buildReportBundle(
                 .put("mode", snapshot.mode)
                 .put("brightness", snapshot.brightnessValue)
                 .put("power", snapshot.power)
-                .put("automation_status", snapshot.automationStatus),
+                .put("automation_status", snapshot.automationStatus)
+                .put(
+                    "ambient",
+                    JSONObject()
+                        .put("status", snapshot.ambientStatus)
+                        .put("capture_fps", snapshot.ambientCaptureFps)
+                        .put("sampling_mode", snapshot.ambientSamplingMode),
+                ),
         ).put("stores", JSONObject().put("profiles_configured", snapshot.configuredProfiles))
         .put("logs", JSONArray())
         .put("kernel", JSONObject())

@@ -44,6 +44,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
+import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.AmbientSamplingMode
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.control.AppMode
 import com.hooandee.colores.engine.EffectNeed
@@ -67,6 +69,11 @@ data class ModeActions(
     val onAudioScaleChange: (AudioScale) -> Unit,
     val onAudioSensitivityChange: (Int) -> Unit,
     val onAudioCaptureRequest: () -> Unit,
+    val onAmbientCaptureRequest: () -> Unit,
+    val onAmbientCaptureFpsChange: (Int) -> Unit,
+    val onAmbientSamplingModeChange: (AmbientSamplingMode) -> Unit,
+    val onAmbientVividnessChange: (Int) -> Unit,
+    val onAmbientSmoothingChange: (Int) -> Unit,
 )
 
 @Composable
@@ -144,6 +151,10 @@ fun ModeControlPanel(
                     modeActions.onAudioScaleChange,
                     modeActions.onAudioSensitivityChange,
                 )
+            }
+        AppMode.AMBIENT ->
+            PanelSurface(modifier) {
+                AmbientPanel(state, onBrightnessChange, modeActions)
             }
     }
 }
@@ -588,6 +599,93 @@ private fun AudioPanel(
     }
 }
 
+@Composable
+private fun AmbientPanel(
+    state: ColoresUiState,
+    onBrightnessChange: (Int) -> Unit,
+    actions: ModeActions,
+) {
+    val status =
+        when (state.ambient.status) {
+            AmbientCaptureStatus.AUTHORIZATION_REQUIRED -> stringResource(R.string.ambient_status_authorization_required)
+            AmbientCaptureStatus.STARTING -> stringResource(R.string.ambient_status_starting)
+            AmbientCaptureStatus.CAPTURING -> stringResource(R.string.ambient_status_capturing)
+            AmbientCaptureStatus.NO_FRAMES -> stringResource(R.string.ambient_status_no_frames)
+            AmbientCaptureStatus.REVOKED -> stringResource(R.string.ambient_status_revoked)
+            AmbientCaptureStatus.ERROR -> stringResource(R.string.ambient_status_error)
+        }
+    ReadoutCard(
+        title = stringResource(R.string.ambient_title),
+        description = stringResource(R.string.ambient_description),
+        value = null,
+        detail = status,
+    )
+    Text(stringResource(R.string.ambient_sampling_title), style = MaterialTheme.typography.labelMedium)
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        AmbientSamplingMode.entries.forEachIndexed { index, mode ->
+            SegmentedButton(
+                selected = state.ambientSamplingMode == mode,
+                onClick = { actions.onAmbientSamplingModeChange(mode) },
+                enabled = state.canWrite,
+                shape = SegmentedButtonDefaults.itemShape(index, AmbientSamplingMode.entries.size),
+            ) {
+                Text(
+                    if (mode == AmbientSamplingMode.FULL_SCENE) {
+                        stringResource(R.string.ambient_sampling_full)
+                    } else {
+                        stringResource(R.string.ambient_sampling_bottom)
+                    },
+                )
+            }
+        }
+    }
+    DeferredIntSlider(
+        label = stringResource(R.string.ambient_capture_rate),
+        committedValue = state.ambientCaptureFps,
+        valueLabel = { stringResource(R.string.ambient_capture_rate_value, it) },
+        onValueCommit = actions.onAmbientCaptureFpsChange,
+        valueRange = 5..30,
+        steps = 4,
+        enabled = state.canWrite,
+    )
+    Text(
+        stringResource(R.string.ambient_capture_rate_hint),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    DeferredIntSlider(
+        label = stringResource(R.string.ambient_vividness),
+        committedValue = state.ambientVividness,
+        valueLabel = { stringResource(R.string.percent_value, it) },
+        onValueCommit = actions.onAmbientVividnessChange,
+        valueRange = 0..100,
+        enabled = state.canWrite,
+    )
+    DeferredIntSlider(
+        label = stringResource(R.string.ambient_smoothing),
+        committedValue = state.ambientSmoothing,
+        valueLabel = { stringResource(R.string.percent_value, it) },
+        onValueCommit = actions.onAmbientSmoothingChange,
+        valueRange = 0..100,
+        enabled = state.canWrite,
+    )
+    Text(
+        stringResource(R.string.ambient_privacy),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    if (state.ambientNeedsAuthorization) {
+        OutlinedButton(
+            onClick = actions.onAmbientCaptureRequest,
+            enabled = state.canWrite && state.ledState.power,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.ambient_activate))
+        }
+    }
+    BrightnessRow(state, onBrightnessChange)
+}
+
 private fun AudioScale.previewBrush(): Brush =
     Brush.horizontalGradient(
         0f to lowColor.toComposeColor(),
@@ -718,6 +816,7 @@ private fun navLabel(mode: AppMode): String =
         AppMode.BATTERY, AppMode.TEMPERATURE, AppMode.PERFORMANCE -> stringResource(R.string.nav_sensors)
         AppMode.CLOCK -> stringResource(R.string.nav_clock)
         AppMode.AUDIO -> stringResource(R.string.nav_audio)
+        AppMode.AMBIENT -> stringResource(R.string.nav_ambient)
     }
 
 @Composable

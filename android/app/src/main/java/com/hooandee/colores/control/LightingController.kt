@@ -1,9 +1,15 @@
 package com.hooandee.colores.control
 
+import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.AmbientFrameSource
+import com.hooandee.colores.ambient.AmbientFrameState
+import com.hooandee.colores.ambient.MutableAmbientFrameSource
+import com.hooandee.colores.ambient.keepsCaptureActive
 import com.hooandee.colores.audio.AudioLevelSource
 import com.hooandee.colores.audio.AudioLevelState
 import com.hooandee.colores.audio.MutableAudioLevelSource
 import com.hooandee.colores.engine.AudioVuRenderer
+import com.hooandee.colores.engine.AmbientRenderer
 import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.AudioSensitivity
 import com.hooandee.colores.engine.BandSet
@@ -45,6 +51,7 @@ enum class AppMode {
     PERFORMANCE,
     CLOCK,
     AUDIO,
+    AMBIENT,
     ;
 
     val isDynamic: Boolean
@@ -71,6 +78,8 @@ data class LightingIntent(
     val temperatureBreathe: Boolean = true,
     val audioScale: AudioScale = AudioScale.DEFAULT,
     val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
+    val ambientVividness: Int = 35,
+    val ambientSmoothing: Int = 45,
 )
 
 data class LightingBinding(
@@ -83,6 +92,7 @@ data class LightingBinding(
     val temperature: TemperatureSource?,
     val performance: PerformanceSource?,
     val audio: AudioLevelSource = MutableAudioLevelSource(),
+    val ambient: AmbientFrameSource = MutableAmbientFrameSource(),
 )
 
 data class LightingSnapshot(
@@ -108,6 +118,9 @@ data class LightingSnapshot(
     val audio: AudioLevelState = AudioLevelState(),
     val audioScale: AudioScale = AudioScale.DEFAULT,
     val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
+    val ambient: AmbientFrameState = AmbientFrameState(),
+    val ambientVividness: Int = 35,
+    val ambientSmoothing: Int = 45,
     val currentFrame: List<RgbColor> = emptyList(),
 )
 
@@ -223,6 +236,12 @@ class LightingController(
 
     fun onAudioStateChanged() = send(Command.AudioStateChanged)
 
+    fun setAmbientVividness(value: Int) = send(Command.SetAmbientVividness(value))
+
+    fun setAmbientSmoothing(value: Int) = send(Command.SetAmbientSmoothing(value))
+
+    fun onAmbientStateChanged() = send(Command.AmbientStateChanged)
+
     private fun send(command: Command) {
         commands.trySend(command)
     }
@@ -250,6 +269,9 @@ class LightingController(
                     it.copy(audioSensitivityDb = command.gainDb.coerceIn(AudioSensitivity.MIN_DB, AudioSensitivity.MAX_DB))
                 }
             Command.AudioStateChanged -> reconcile()
+            is Command.SetAmbientVividness -> mutateIntent { it.copy(ambientVividness = command.value.coerceIn(0, 100)) }
+            is Command.SetAmbientSmoothing -> mutateIntent { it.copy(ambientSmoothing = command.value.coerceIn(0, 100)) }
+            Command.AmbientStateChanged -> reconcile()
             is Command.SetSensorBands -> {
                 sensorBands = command.bands
                 publishSnapshot()
@@ -324,6 +346,7 @@ class LightingController(
             AppMode.GRADIENT -> intent.gradientPresentation == GradientPresentation.ANIMATED || !binding.device.supportsPerZone
             AppMode.EFFECT -> hardwareEffect(binding) == null
             AppMode.AUDIO -> binding.audio.state.value.status.keepsAudioCaptureActive
+            AppMode.AMBIENT -> binding.ambient.state.value.status.keepsCaptureActive
             else -> intent.mode.isDynamic
         }
 
@@ -346,7 +369,11 @@ class LightingController(
             }
             intent.mode == AppMode.AUDIO && !binding.audio.state.value.status.keepsAudioCaptureActive -> {
                 if (manageRenderJob) stopRenderJob()
-                applyAudioUnavailable(binding)
+                applyCaptureUnavailable(binding)
+            }
+            intent.mode == AppMode.AMBIENT && !binding.ambient.state.value.status.keepsCaptureActive -> {
+                if (manageRenderJob) stopRenderJob()
+                applyCaptureUnavailable(binding)
             }
             hwEffect != null -> {
                 if (manageRenderJob) stopRenderJob()
@@ -391,7 +418,7 @@ class LightingController(
         publishSnapshot()
     }
 
-    private suspend fun applyAudioUnavailable(binding: LightingBinding) {
+    private suspend fun applyCaptureUnavailable(binding: LightingBinding) {
         val colors = binding.offFrame()
         runCatching { binding.device.applyZones(colors, intent.brightness, effectivePower()) }.rethrowCancellation()
         lastFrame = colors
@@ -519,6 +546,14 @@ class LightingController(
                     sensitivityDb = { intent.audioSensitivityDb },
                     state = { binding.audio.state.value },
                 )
+            AppMode.AMBIENT ->
+                AmbientRenderer(
+                    zones = zones,
+                    frameIntervalMs = interval,
+                    vividness = { intent.ambientVividness },
+                    smoothing = { intent.ambientSmoothing },
+                    state = { binding.ambient.state.value },
+                )
             else ->
                 EffectRenderer(intent.effectId, zones, interval, { intent.speed }, { resolvePalette(binding) })
         }
@@ -579,6 +614,9 @@ class LightingController(
                 audio = binding?.audio?.state?.value ?: AudioLevelState(),
                 audioScale = intent.audioScale,
                 audioSensitivityDb = intent.audioSensitivityDb,
+                ambient = binding?.ambient?.state?.value ?: AmbientFrameState(),
+                ambientVividness = intent.ambientVividness,
+                ambientSmoothing = intent.ambientSmoothing,
                 currentFrame = lastFrame,
             )
     }
@@ -626,6 +664,12 @@ class LightingController(
         data class SetAudioSensitivity(val gainDb: Int) : Command
 
         data object AudioStateChanged : Command
+
+        data class SetAmbientVividness(val value: Int) : Command
+
+        data class SetAmbientSmoothing(val value: Int) : Command
+
+        data object AmbientStateChanged : Command
 
         data class SetSensorBands(val bands: BandSet) : Command
 

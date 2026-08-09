@@ -2,6 +2,8 @@ package com.hooandee.colores.control
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.hooandee.colores.ambient.AmbientSamplingMode
+import com.hooandee.colores.ambient.normalizedAmbientCaptureFps
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.AudioSensitivity
@@ -25,6 +27,10 @@ data class StoredLighting(
     val temperatureBreathe: Boolean = true,
     val audioScale: AudioScale = AudioScale.DEFAULT,
     val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
+    val ambientCaptureFps: Int = 10,
+    val ambientSamplingMode: AmbientSamplingMode = AmbientSamplingMode.FULL_SCENE,
+    val ambientVividness: Int = 35,
+    val ambientSmoothing: Int = 45,
     val sensorBands: BandSet = BandSet.FALLBACK,
 )
 
@@ -85,6 +91,15 @@ class LightingPreferences(
                 audioSensitivityDb =
                     root.optInt("audioSensitivityDb", AudioSensitivity.NORMAL_DB)
                         .coerceIn(AudioSensitivity.MIN_DB, AudioSensitivity.MAX_DB),
+                ambientCaptureFps = root.optInt("ambientCaptureFps", 10).normalizedAmbientCaptureFps(),
+                ambientSamplingMode =
+                    runCatching {
+                        AmbientSamplingMode.valueOf(
+                            root.optString("ambientSamplingMode", AmbientSamplingMode.FULL_SCENE.name),
+                        )
+                    }.getOrDefault(AmbientSamplingMode.FULL_SCENE),
+                ambientVividness = root.optInt("ambientVividness", 35).coerceIn(0, 100),
+                ambientSmoothing = root.optInt("ambientSmoothing", 45).coerceIn(0, 100),
                 sensorBands = decodeBands(root.optJSONObject("sensorBands"), defaults),
             )
         }.getOrDefault(StoredLighting(sensorBands = defaults))
@@ -115,6 +130,10 @@ class LightingPreferences(
                 "audioSensitivityDb",
                 value.audioSensitivityDb.coerceIn(AudioSensitivity.MIN_DB, AudioSensitivity.MAX_DB),
             )
+            .put("ambientCaptureFps", value.ambientCaptureFps.normalizedAmbientCaptureFps())
+            .put("ambientSamplingMode", value.ambientSamplingMode.name)
+            .put("ambientVividness", value.ambientVividness.coerceIn(0, 100))
+            .put("ambientSmoothing", value.ambientSmoothing.coerceIn(0, 100))
             .put(
                 "sensorBands",
                 JSONObject()

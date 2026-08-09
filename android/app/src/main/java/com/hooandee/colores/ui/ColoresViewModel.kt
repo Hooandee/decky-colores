@@ -3,6 +3,13 @@ package com.hooandee.colores.ui
 import android.app.Application
 import android.content.Intent
 import android.os.Build
+import com.hooandee.colores.ambient.AmbientCaptureConfig
+import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.AmbientFrameState
+import com.hooandee.colores.ambient.AmbientSamplingMode
+import com.hooandee.colores.ambient.keepsCaptureActive
+import com.hooandee.colores.ambient.needsAuthorization
+import com.hooandee.colores.ambient.normalizedAmbientCaptureFps
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hooandee.colores.ColoresApplication
@@ -106,6 +113,11 @@ data class ColoresUiState(
     val audio: AudioLevelState = AudioLevelState(),
     val audioScale: AudioScale = AudioScale.DEFAULT,
     val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
+    val ambient: AmbientFrameState = AmbientFrameState(),
+    val ambientCaptureFps: Int = 10,
+    val ambientSamplingMode: AmbientSamplingMode = AmbientSamplingMode.FULL_SCENE,
+    val ambientVividness: Int = 35,
+    val ambientSmoothing: Int = 45,
     val profileScope: ProfileScope = ProfileScope.Global,
     val profileApps: List<LaunchableApp> = emptyList(),
     val configuredProfiles: List<ConfiguredProfile> = emptyList(),
@@ -138,6 +150,9 @@ data class ColoresUiState(
             audio.status == AudioCaptureStatus.AUTHORIZATION_REQUIRED ||
                 audio.status == AudioCaptureStatus.REVOKED ||
                 audio.status == AudioCaptureStatus.ERROR
+
+    val ambientNeedsAuthorization: Boolean
+        get() = ambient.status.needsAuthorization
 
     val currentEffect: EffectPreset?
         get() = effects.firstOrNull { it.id == effectId }
@@ -183,6 +198,7 @@ data class ColoresUiState(
             if (sensorsAvailable) add(AppMode.BATTERY)
             if (colorEnabled) add(AppMode.CLOCK)
             if (colorEnabled) add(AppMode.AUDIO)
+            if (colorEnabled) add(AppMode.AMBIENT)
         }
 
     fun availableSensorModes(): List<AppMode> =
@@ -237,6 +253,9 @@ class ColoresViewModel(
                         audio = snap.audio,
                         audioScale = snap.audioScale,
                         audioSensitivityDb = snap.audioSensitivityDb,
+                        ambient = snap.ambient,
+                        ambientVividness = snap.ambientVividness,
+                        ambientSmoothing = snap.ambientSmoothing,
                         ledState = current.ledState.copy(power = snap.powerRequested, brightness = snap.brightness),
                     )
                 }
@@ -386,6 +405,7 @@ class ColoresViewModel(
                             temperature = SysfsThermalSource().takeIf { it.available },
                             performance = PerformanceSources.detect(),
                             audio = coloresApplication.audioLevelSource,
+                            ambient = coloresApplication.ambientFrameSource,
                         ),
                         LightingIntent(
                             mode = selectedProfile.mode.coerceAvailable(gradientSupported),
@@ -407,6 +427,8 @@ class ColoresViewModel(
                             temperatureBreathe = selectedProfile.temperatureBreathe,
                             audioScale = storedLighting.audioScale,
                             audioSensitivityDb = storedLighting.audioSensitivityDb,
+                            ambientVividness = storedLighting.ambientVividness,
+                            ambientSmoothing = storedLighting.ambientSmoothing,
                         ),
                     )
                 }
@@ -445,6 +467,10 @@ class ColoresViewModel(
                         sensorBands = storedLighting.sensorBands,
                         audioScale = storedLighting.audioScale,
                         audioSensitivityDb = storedLighting.audioSensitivityDb,
+                        ambientCaptureFps = storedLighting.ambientCaptureFps,
+                        ambientSamplingMode = storedLighting.ambientSamplingMode,
+                        ambientVividness = storedLighting.ambientVividness,
+                        ambientSmoothing = storedLighting.ambientSmoothing,
                         profileApps = apps,
                         configuredProfiles = configuredProfiles,
                         profileScopeState = scopeState,
@@ -520,6 +546,9 @@ class ColoresViewModel(
                 power = current.ledState.power,
                 configuredProfiles = current.configuredProfiles.size,
                 automationStatus = current.automationStatus.name.lowercase(),
+                ambientStatus = current.ambient.status.name.lowercase(),
+                ambientCaptureFps = current.ambientCaptureFps,
+                ambientSamplingMode = current.ambientSamplingMode.name.lowercase(),
             )
         mutableState.update { it.copy(reportSubmission = ReportSubmissionState(sending = true)) }
         viewModelScope.launch {
@@ -610,10 +639,13 @@ class ColoresViewModel(
                 mode
             }
         if (target == current.mode && target == current.profileStoredMode) return
-        if (target == AppMode.AUDIO) return
+        if (target == AppMode.AUDIO || target == AppMode.AMBIENT) return
         if (target == AppMode.GRADIENT && !current.gradientAvailable) return
         if (current.mode == AppMode.AUDIO) {
             EffectsService.stopAudio(getApplication(), AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+        }
+        if (current.mode == AppMode.AMBIENT) {
+            EffectsService.stopAmbient(getApplication(), AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
         }
         when (target) {
             AppMode.GRADIENT -> updateGradient(current.gradient.copy(mode = LightingMode.GRADIENT), apply = false)
@@ -683,8 +715,12 @@ class ColoresViewModel(
     }
 
     fun setPower(power: Boolean) {
-        if (!power && mutableState.value.mode == AppMode.AUDIO) {
-            EffectsService.stopAudio(getApplication(), AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+        if (!power) {
+            when (mutableState.value.mode) {
+                AppMode.AUDIO -> EffectsService.stopAudio(getApplication(), AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+                AppMode.AMBIENT -> EffectsService.stopAmbient(getApplication(), AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
+                else -> Unit
+            }
         }
         controller.setPower(power)
         mutableState.update { it.copy(ledState = it.ledState.copy(power = power)) }
@@ -697,16 +733,79 @@ class ColoresViewModel(
     ) {
         val current = mutableState.value
         if (!current.canWrite || !current.colorEnabled) return
-        EffectsService.startAudio(getApplication(), resultCode, resultData)
+        EffectsService.stopAmbient(getApplication(), AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
         coloresApplication.audioLevelSource.reset(AudioCaptureStatus.STARTING)
         controller.setMode(AppMode.AUDIO)
-        mutableState.update { it.copy(mode = AppMode.AUDIO, audio = AudioLevelState(status = AudioCaptureStatus.STARTING)) }
+        mutableState.update {
+            it.copy(
+                mode = AppMode.AUDIO,
+                profileStoredMode = AppMode.AUDIO,
+                audio = AudioLevelState(status = AudioCaptureStatus.STARTING),
+            )
+        }
+        EffectsService.startAudio(getApplication(), resultCode, resultData)
         persistLighting()
     }
 
     fun onAudioAuthorizationDenied() {
         coloresApplication.audioLevelSource.reset(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
         mutableState.update { it.copy(audio = AudioLevelState(status = AudioCaptureStatus.AUTHORIZATION_REQUIRED)) }
+    }
+
+    fun activateAmbient(
+        resultCode: Int,
+        resultData: Intent,
+    ) {
+        val current = mutableState.value
+        if (current.detected == null) return
+        if (!current.canWrite || !current.colorEnabled) return
+        EffectsService.stopAudio(getApplication(), AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+        val config = current.ambientCaptureConfig() ?: return
+        coloresApplication.ambientFrameSource.reset(AmbientCaptureStatus.STARTING)
+        controller.setMode(AppMode.AMBIENT)
+        mutableState.update {
+            it.copy(
+                mode = AppMode.AMBIENT,
+                profileStoredMode = AppMode.AMBIENT,
+                ambient = AmbientFrameState(status = AmbientCaptureStatus.STARTING),
+            )
+        }
+        EffectsService.startAmbient(getApplication(), resultCode, resultData, config)
+        persistLighting()
+    }
+
+    fun onAmbientAuthorizationDenied() {
+        coloresApplication.ambientFrameSource.reset(AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
+        mutableState.update {
+            it.copy(ambient = AmbientFrameState(status = AmbientCaptureStatus.AUTHORIZATION_REQUIRED))
+        }
+    }
+
+    fun setAmbientCaptureFps(value: Int) {
+        val fps = value.normalizedAmbientCaptureFps()
+        mutableState.update { it.copy(ambientCaptureFps = fps) }
+        updateActiveAmbientConfig()
+        persistGlobalModifiers()
+    }
+
+    fun setAmbientSamplingMode(mode: AmbientSamplingMode) {
+        mutableState.update { it.copy(ambientSamplingMode = mode) }
+        updateActiveAmbientConfig()
+        persistGlobalModifiers()
+    }
+
+    fun setAmbientVividness(value: Int) {
+        val clamped = value.coerceIn(0, 100)
+        controller.setAmbientVividness(clamped)
+        mutableState.update { it.copy(ambientVividness = clamped) }
+        persistGlobalModifiers()
+    }
+
+    fun setAmbientSmoothing(value: Int) {
+        val clamped = value.coerceIn(0, 100)
+        controller.setAmbientSmoothing(clamped)
+        mutableState.update { it.copy(ambientSmoothing = clamped) }
+        persistGlobalModifiers()
     }
 
     fun setBrightness(brightness: Int) {
@@ -968,9 +1067,23 @@ class ColoresViewModel(
                 temperatureBreathe = global.temperatureBreathe,
                 audioScale = current.audioScale,
                 audioSensitivityDb = current.audioSensitivityDb,
+                ambientCaptureFps = current.ambientCaptureFps,
+                ambientSamplingMode = current.ambientSamplingMode,
+                ambientVividness = current.ambientVividness,
+                ambientSmoothing = current.ambientSmoothing,
                 sensorBands = current.sensorBands,
             ),
         )
+    }
+
+    private fun updateActiveAmbientConfig() {
+        val current = mutableState.value
+        if (
+            current.mode == AppMode.AMBIENT &&
+            current.ambient.status.keepsCaptureActive
+        ) {
+            current.ambientCaptureConfig()?.let { EffectsService.updateAmbient(getApplication(), it) }
+        }
     }
 }
 
@@ -981,6 +1094,17 @@ private fun AppMode.coerceAvailable(gradientSupported: Boolean): AppMode =
 
 private fun ColoresUiState.gradientStopCount(): Int =
     gradientPresentation?.editorStopCount(detected?.capabilities?.zones ?: 2) ?: 2
+
+private fun ColoresUiState.ambientCaptureConfig(): AmbientCaptureConfig? {
+    val device = detected ?: return null
+    return AmbientCaptureConfig(
+        zones = device.capabilities.zones,
+        gridLayout = device.gridLayout,
+        supportsPerZone = device.capabilities.perZone,
+        captureFps = ambientCaptureFps,
+        samplingMode = ambientSamplingMode,
+    )
+}
 
 private fun android.content.Context.readAsset(name: String): String =
     assets.open(name).bufferedReader().use { it.readText() }

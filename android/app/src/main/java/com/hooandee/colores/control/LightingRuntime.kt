@@ -1,6 +1,8 @@
 package com.hooandee.colores.control
 
 import android.content.Context
+import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.audio.MutableAudioLevelSource
 import com.hooandee.colores.device.AndroidDeviceDetector
@@ -42,6 +44,7 @@ class LightingRuntime(
     private val scope: CoroutineScope,
     private val controller: LightingController,
     private val audio: MutableAudioLevelSource,
+    private val ambient: MutableAmbientFrameSource,
 ) {
     suspend fun restoreSaved(): RestoredLightingBinding? =
         withContext(Dispatchers.IO) {
@@ -89,6 +92,7 @@ class LightingRuntime(
                     stored.mode
                 }
             if (mode == AppMode.AUDIO) audio.reset(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+            if (mode == AppMode.AMBIENT) ambient.reset(AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
 
             controller.bind(
                 LightingBinding(
@@ -101,6 +105,7 @@ class LightingRuntime(
                     temperature = SysfsThermalSource().takeIf { it.available },
                     performance = PerformanceSources.detect(),
                     audio = audio,
+                    ambient = ambient,
                 ),
                 LightingIntent(
                     mode = mode,
@@ -119,6 +124,8 @@ class LightingRuntime(
                     temperatureBreathe = stored.temperatureBreathe,
                     audioScale = stored.audioScale,
                     audioSensitivityDb = stored.audioSensitivityDb,
+                    ambientVividness = stored.ambientVividness,
+                    ambientSmoothing = stored.ambientSmoothing,
                 ),
             )
             RestoredLightingBinding(

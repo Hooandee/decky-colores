@@ -1,5 +1,6 @@
 package com.hooandee.colores.control
 
+import com.hooandee.colores.ambient.AmbientSamplingMode
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.SensorBand
@@ -37,6 +38,10 @@ class LightingPreferencesTest {
                         peakAt = 76,
                     ),
                 audioSensitivityDb = -7,
+                ambientCaptureFps = 30,
+                ambientSamplingMode = AmbientSamplingMode.BOTTOM_EDGE,
+                ambientVividness = 72,
+                ambientSmoothing = 18,
             )
         prefs.save("rp5", stored)
         assertEquals(stored, prefs.load("rp5"))
@@ -63,6 +68,19 @@ class LightingPreferencesTest {
         prefs.save("thor", StoredLighting(mode = AppMode.AUDIO))
 
         assertEquals(AppMode.AUDIO, prefs.load("thor").mode)
+    }
+
+    @Test
+    fun `invalid ambient options are clamped and keep ambient intent`() {
+        val raw = """{"mode":"AMBIENT","ambientCaptureFps":28,"ambientVividness":999,"ambientSmoothing":-4}"""
+        val prefs = LightingPreferences(read = { raw }, write = { _, _ -> })
+
+        val restored = prefs.load("thor")
+
+        assertEquals(AppMode.AMBIENT, restored.mode)
+        assertEquals(30, restored.ambientCaptureFps)
+        assertEquals(100, restored.ambientVividness)
+        assertEquals(0, restored.ambientSmoothing)
     }
 
     @Test

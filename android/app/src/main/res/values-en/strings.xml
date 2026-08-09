@@ -168,6 +168,7 @@
     <string name="nav_sensors">Sensors</string>
     <string name="nav_clock">Clock</string>
     <string name="nav_audio">Audio</string>
+    <string name="nav_ambient">Ambilight</string>
 
     <string name="effects_title">Effect</string>
     <string name="effect_speed">Speed</string>
@@ -266,6 +267,25 @@
     <string name="audio_status_no_audio">No internal audio detected. Playback may be silent or the source app may block capture.</string>
     <string name="audio_status_revoked">Android revoked capture. You can enable it again.</string>
     <string name="audio_status_error">Capture could not start. You can try again.</string>
+    <string name="ambient_title">Ambilight</string>
+    <string name="ambient_description">The LEDs follow scene colors without capturing at full resolution.</string>
+    <string name="ambient_sampling_title">Capture area</string>
+    <string name="ambient_sampling_full">Full scene</string>
+    <string name="ambient_sampling_bottom">Bottom edge</string>
+    <string name="ambient_capture_rate">Capture rate</string>
+    <string name="ambient_capture_rate_value">%1$d fps</string>
+    <string name="ambient_capture_rate_hint">10 fps is recommended for gaming. A higher rate responds sooner and uses more resources.</string>
+    <string name="ambient_vividness">Color intensity</string>
+    <string name="ambient_smoothing">Smoothing</string>
+    <string name="percent_value">%1$d%%</string>
+    <string name="ambient_privacy">The image is reduced to 32 × 18 and processed in memory. No capture is stored.</string>
+    <string name="ambient_activate">Enable screen capture</string>
+    <string name="ambient_status_authorization_required">Android authorization required</string>
+    <string name="ambient_status_starting">Starting capture</string>
+    <string name="ambient_status_capturing">Screen capture active</string>
+    <string name="ambient_status_no_frames">The screen is not providing frames. The last color is preserved.</string>
+    <string name="ambient_status_revoked">Android revoked capture. You can enable it again.</string>
+    <string name="ambient_status_error">Capture could not start. You can try again.</string>
 
     <string name="charger_only_title">Only while charging</string>
     <string name="charger_only_description">LEDs turn on only while the device is charging.</string>

@@ -168,6 +168,7 @@
     <string name="nav_sensors">Sensores</string>
     <string name="nav_clock">Reloj</string>
     <string name="nav_audio">Audio</string>
+    <string name="nav_ambient">Ambilight</string>
 
     <string name="effects_title">Efecto</string>
     <string name="effect_speed">Velocidad</string>
@@ -266,6 +267,25 @@
     <string name="audio_status_no_audio">Sin audio interno detectable. Puede haber silencio o la aplicación puede impedir la captura.</string>
     <string name="audio_status_revoked">Android ha revocado la captura. Puedes activarla de nuevo.</string>
     <string name="audio_status_error">No se pudo iniciar la captura. Puedes intentarlo de nuevo.</string>
+    <string name="ambient_title">Ambilight</string>
+    <string name="ambient_description">Los LEDs siguen los colores de la escena sin capturar a resolución completa.</string>
+    <string name="ambient_sampling_title">Zona de captura</string>
+    <string name="ambient_sampling_full">Escena completa</string>
+    <string name="ambient_sampling_bottom">Borde inferior</string>
+    <string name="ambient_capture_rate">Frecuencia de captura</string>
+    <string name="ambient_capture_rate_value">%1$d fps</string>
+    <string name="ambient_capture_rate_hint">10 fps es el valor recomendado para jugar. Una frecuencia mayor responde antes y consume más recursos.</string>
+    <string name="ambient_vividness">Intensidad de color</string>
+    <string name="ambient_smoothing">Suavizado</string>
+    <string name="percent_value">%1$d%%</string>
+    <string name="ambient_privacy">La imagen se reduce a 32 × 18 y se procesa en memoria. No se guarda ninguna captura.</string>
+    <string name="ambient_activate">Activar captura de pantalla</string>
+    <string name="ambient_status_authorization_required">Necesita autorización de Android</string>
+    <string name="ambient_status_starting">Iniciando captura</string>
+    <string name="ambient_status_capturing">Captura de pantalla activa</string>
+    <string name="ambient_status_no_frames">La pantalla no está entregando imágenes. Se conserva el último color.</string>
+    <string name="ambient_status_revoked">Android ha revocado la captura. Puedes activarla de nuevo.</string>
+    <string name="ambient_status_error">No se pudo iniciar la captura. Puedes intentarlo de nuevo.</string>
 
     <string name="charger_only_title">Solo mientras carga</string>
     <string name="charger_only_description">Los LEDs se encienden solo cuando el dispositivo está cargando.</string>

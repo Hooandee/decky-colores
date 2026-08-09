@@ -75,7 +75,7 @@
     {
       "id": "ambilight",
       "contracts": [],
-      "platforms": { "decky": "validated", "android": "deferred", "windows": "deferred" }
+      "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
     },
     {
       "id": "audio_vu",
