@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.23.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.22.0...decky-colores-v0.23.0) (2026-08-09)
+## 0.23.0 (2026-08-09)
 
 
 ### Novedades / Features / Novità
