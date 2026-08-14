@@ -274,6 +274,58 @@ class DeviceRegistryTest {
     }
 
     @Test
+    fun `production registry resolves the calibrated Odin 2 Portal multipoint profile`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+
+        val match =
+            registry.match(
+                AndroidDeviceIdentity(
+                    model = "Odin2 Portal",
+                    device = "kalama",
+                    manufacturer = "AYN",
+                    productProperties = emptyMap(),
+                ),
+            )
+
+        requireNotNull(match)
+        assertEquals("ayn-odin2-portal", match.id)
+        assertEquals("AYN Odin 2 Portal", match.friendlyName)
+        assertEquals(DeviceCapabilities(color = true, brightness = true, perZone = true, zones = 8), match.capabilities)
+        val led = match.led as SettingsProviderDescriptor
+        assertEquals("htr3212", led.driver)
+        assertEquals("pserver", led.transport)
+        assertEquals(GenericVendorLed.ENABLE_KEYS, led.enableKeys)
+        assertEquals("com.odin.gameassistant", led.vendorService)
+        requireNotNull(led.htr3212)
+        assertEquals(3, led.htr3212.leftBus)
+        assertEquals(5, led.htr3212.rightBus)
+        assertEquals(0x3c, led.htr3212.address)
+        assertEquals(listOf(0, 3, 2, 1), led.htr3212.leftOrder)
+        assertEquals(listOf(2, 3, 0, 1), led.htr3212.rightOrder)
+        assertEquals(0x0d, led.htr3212.rgbStartRegister)
+        assertFalse(led.htr3212.blockWrite)
+        assertFalse(led.htr3212.pairedWrite)
+        assertEquals(
+            listOf(
+                "top_left",
+                "bottom_left",
+                "bottom_right",
+                "top_right",
+                "top_left",
+                "bottom_left",
+                "bottom_right",
+                "top_right",
+            ),
+            match.gridLayout?.map { it.position },
+        )
+    }
+
+    @Test
     fun `RP5 keeps the default rgb start register`() {
         val shared = File("../../shared")
         val registry =

@@ -96,6 +96,11 @@ internal class Htr3212LedDevice internal constructor(
         power: Boolean,
     ): Boolean = applyZones(List(TOTAL_ZONES) { color }, brightness, power)
 
+    override suspend fun close() {
+        invalidate()
+        writer.close()
+    }
+
     override fun invalidate() {
         synchronized(cacheLock) {
             cacheGeneration += 1

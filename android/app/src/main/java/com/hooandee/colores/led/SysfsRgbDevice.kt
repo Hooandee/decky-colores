@@ -90,6 +90,8 @@ class SysfsRgbDevice internal constructor(
         power: Boolean,
     ): Boolean = applyZones(List(descriptor.zones) { color }, brightness, power)
 
+    override suspend fun close() = writer.close()
+
     override fun invalidate() = Unit
 
     private fun writeState(state: LedState): Boolean {

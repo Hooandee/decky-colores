@@ -132,6 +132,32 @@ class LightingPreferencesTest {
     }
 
     @Test
+    fun `device promotion copies lighting and repoints the active device`() {
+        val (prefs, _) = preferences()
+        val learned = StoredLighting(mode = AppMode.GRADIENT, brightness = 63, power = true)
+        prefs.save("learned-portal", learned)
+
+        prefs.migrateDevice("learned-portal", "ayn-odin2-portal")
+
+        assertEquals(learned, prefs.load("ayn-odin2-portal"))
+        assertEquals("ayn-odin2-portal", prefs.activeDeviceId())
+    }
+
+    @Test
+    fun `device promotion never overwrites native lighting`() {
+        val (prefs, _) = preferences()
+        val native = StoredLighting(mode = AppMode.CLOCK, brightness = 28)
+        prefs.save("learned-portal", StoredLighting(mode = AppMode.GRADIENT, brightness = 63))
+        prefs.save("ayn-odin2-portal", native)
+        prefs.save("learned-portal", StoredLighting(mode = AppMode.AUDIO, brightness = 91))
+
+        prefs.migrateDevice("learned-portal", "ayn-odin2-portal")
+
+        assertEquals(native, prefs.load("ayn-odin2-portal"))
+        assertEquals("ayn-odin2-portal", prefs.activeDeviceId())
+    }
+
+    @Test
     fun `round trips custom sensor scales and temperature breathing per device`() {
         val (prefs, _) = preferences()
         val customBands =

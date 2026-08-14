@@ -8,6 +8,14 @@ import org.junit.Test
 
 class EffectsServiceProtocolTest {
     @Test
+    fun `foreground service types follow platform availability`() {
+        assertEquals(0, foregroundServiceTypes(sdk = 30, mediaProjection = false))
+        assertEquals(0x20, foregroundServiceTypes(sdk = 30, mediaProjection = true))
+        assertEquals(0x40000000, foregroundServiceTypes(sdk = 34, mediaProjection = false))
+        assertEquals(0x40000020, foregroundServiceTypes(sdk = 34, mediaProjection = true))
+    }
+
+    @Test
     fun `an actionless keep-alive intent is not treated as a sticky restart`() {
         assertEquals(
             EffectsServiceCommand.KEEP_ALIVE,

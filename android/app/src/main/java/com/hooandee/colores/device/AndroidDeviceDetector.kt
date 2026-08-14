@@ -3,8 +3,16 @@ package com.hooandee.colores.device
 import android.content.Context
 import android.os.Build
 import android.provider.Settings
+import com.hooandee.colores.device.learning.DetectionOutcome
+import com.hooandee.colores.device.learning.LearnedDeviceBinding
+import com.hooandee.colores.device.learning.HardwareLearningGraph
+import com.hooandee.colores.device.learning.Htr3212InformationCartridge
+import com.hooandee.colores.device.learning.InformationCartridge
+import com.hooandee.colores.device.learning.resolveLearnedDevice
+import com.hooandee.colores.device.learning.resolveDetectionOutcome
 import com.hooandee.colores.led.AndroidPServerCommandExecutor
 import com.hooandee.colores.led.LedDescriptor
+import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsRgbDescriptor
 import java.util.concurrent.TimeUnit
@@ -32,6 +40,7 @@ class AndroidDeviceDetector(
     private val readSetting: (String) -> String? = { key -> Settings.System.getString(context.contentResolver, key) },
     private val scanJoypad: () -> SingleAdcJoypadDescriptor? = { SingleAdcJoypadDiscovery.scan() },
     private val scanSysfs: () -> SysfsRgbDescriptor? = { SysfsRgbDiscovery.scan() },
+    private val informationCartridges: List<InformationCartridge> = listOf(Htr3212InformationCartridge()),
 ) {
     fun readIdentity(): AndroidDeviceIdentity {
         val properties =
@@ -45,21 +54,41 @@ class AndroidDeviceDetector(
         )
     }
 
-    fun detect(): DetectedAndroidDevice? {
+    fun detectOutcome(binding: LearnedDeviceBinding? = null): DetectionOutcome {
         val identity =
             runCatching { readIdentity() }.getOrElse {
                 AndroidDeviceIdentity(model = "", device = "", manufacturer = "", productProperties = emptyMap())
             }
         val pserver = runCatching { pserverAvailable() }.getOrDefault(false)
-        return modelMatch(identity)
-            ?: GenericLedResolver.vendor(
-                identity,
-                pserverAvailable = pserver,
-                colorKeyValue = if (pserver) runCatching { readSetting(GenericVendorLed.COLOR_KEY) }.getOrNull() else null,
+        val exact = modelMatch(identity)
+        val exactTransportAvailable = exact?.led?.isTransportAvailable(pserver) ?: false
+        if (!shouldCollectGenericCandidates(exact, exactTransportAvailable)) {
+            return DetectionOutcome.Resolved(identity, requireNotNull(exact))
+        }
+        val seedCandidates =
+            listOfNotNull(
+                GenericLedResolver.settingsCandidate(
+                    pserverAvailable = pserver,
+                    colorKeyValue = if (pserver) runCatching { readSetting(GenericVendorLed.COLOR_KEY) }.getOrNull() else null,
+                ),
+                GenericLedResolver.joypadCandidate(runCatching { scanJoypad() }.getOrNull()),
+                GenericLedResolver.sysfsCandidate(runCatching { scanSysfs() }.getOrNull()),
             )
-            ?: GenericLedResolver.joypad(identity, runCatching { scanJoypad() }.getOrNull())
-            ?: GenericLedResolver.sysfs(identity, runCatching { scanSysfs() }.getOrNull())
+        val route = HardwareLearningGraph(informationCartridges).resolve(identity, seedCandidates)
+        val candidates = route.candidates
+        val learned = resolveLearnedDevice(identity, binding, candidates)
+        return resolveDetectionOutcome(
+            identity = identity,
+            exact = exact,
+            exactTransportAvailable = exactTransportAvailable,
+            candidates = candidates,
+            learned = learned,
+            facts = route.facts,
+        )
     }
+
+    fun detect(binding: LearnedDeviceBinding? = null): DetectedAndroidDevice? =
+        (detectOutcome(binding) as? DetectionOutcome.Resolved)?.device
 
     private fun modelMatch(identity: AndroidDeviceIdentity): DetectedAndroidDevice? =
         runCatching {
@@ -92,5 +121,13 @@ class AndroidDeviceDetector(
             )
     }
 }
+
+internal fun shouldCollectGenericCandidates(
+    exact: DetectedAndroidDevice?,
+    exactTransportAvailable: Boolean,
+): Boolean = exact == null || !exactTransportAvailable
+
+private fun LedDescriptor.isTransportAvailable(pserverAvailable: Boolean): Boolean =
+    this !is SettingsProviderDescriptor || transport != "pserver" || pserverAvailable
 
 private fun Context.readAsset(name: String): String = assets.open(name).bufferedReader().use { it.readText() }

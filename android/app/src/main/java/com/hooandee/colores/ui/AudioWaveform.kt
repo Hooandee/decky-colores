@@ -1,5 +1,6 @@
 package com.hooandee.colores.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,6 +18,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -58,26 +60,42 @@ internal fun AudioLevelBars(
         stringResource(
             if (active) R.string.audio_waveform_active else R.string.audio_waveform_inactive,
         )
+    val centerLineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.24f)
     Surface(
         modifier = modifier.fillMaxWidth().height(height).semantics { contentDescription = description },
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
     ) {
         Canvas(Modifier.fillMaxSize()) {
-            val horizontalInset = 14.dp.toPx()
-            val verticalInset = 12.dp.toPx()
+            val horizontalInset = 16.dp.toPx()
+            val verticalInset = 14.dp.toPx()
             val availableWidth = size.width - horizontalInset * 2f
-            val availableHeight = size.height - verticalInset * 2f
+            val availableHalfHeight = size.height / 2f - verticalInset
             val slotWidth = availableWidth / AUDIO_BAR_COUNT
             val barWidth = (slotWidth * 0.58f).coerceIn(3.dp.toPx(), 9.dp.toPx())
-            val minimumHeight = 6.dp.toPx()
+            val restingHalfHeight = 2.dp.toPx()
             val cornerRadius = CornerRadius(barWidth / 2f, barWidth / 2f)
-            val baseline = size.height - verticalInset
+            val centerY = size.height / 2f
+
+            drawLine(
+                color = centerLineColor,
+                start = Offset(horizontalInset, centerY),
+                end = Offset(size.width - horizontalInset, centerY),
+                strokeWidth = 1.dp.toPx(),
+                cap = StrokeCap.Round,
+            )
 
             bars.forEachIndexed { index, bar ->
-                val visualHeight = minimumHeight + bar.visualLevel * (availableHeight - minimumHeight)
+                val halfHeight =
+                    if (active) {
+                        restingHalfHeight + bar.visualLevel * (availableHalfHeight - restingHalfHeight)
+                    } else {
+                        restingHalfHeight
+                    }
+                val visualHeight = halfHeight * 2f
                 val left = horizontalInset + index * slotWidth + (slotWidth - barWidth) / 2f
-                val top = baseline - visualHeight
+                val top = centerY - halfHeight
                 val color = audioBarColor(bar, scale, active).toComposeColor()
                 val ageAlpha = audioBarAgeAlpha(index, bars.size)
                 val glowAlpha = if (active) ageAlpha * bar.visualLevel * 0.20f else 0f
@@ -97,11 +115,12 @@ internal fun AudioLevelBars(
                         Brush.verticalGradient(
                             colors =
                                 listOf(
+                                    color.copy(alpha = ageAlpha * 0.42f),
                                     color.copy(alpha = ageAlpha),
-                                    color.copy(alpha = ageAlpha * 0.48f),
+                                    color.copy(alpha = ageAlpha * 0.42f),
                                 ),
                             startY = top,
-                            endY = baseline,
+                            endY = top + visualHeight,
                         ),
                     topLeft = Offset(left, top),
                     size = Size(barWidth, visualHeight),

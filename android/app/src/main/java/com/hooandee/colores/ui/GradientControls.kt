@@ -1,6 +1,7 @@
 package com.hooandee.colores.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -23,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,8 +34,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -56,6 +64,7 @@ data class GradientActions(
     val onColorChange: (RgbColor) -> Unit,
     val onSaturationChange: (Float) -> Unit,
     val onSpeedChange: (Int) -> Unit,
+    val onEditingChange: (Boolean) -> Unit,
 )
 
 @Composable
@@ -112,6 +121,10 @@ fun GradientControls(
         }
     }
     if (editorOpen) {
+        DisposableEffect(Unit) {
+            actions.onEditingChange(true)
+            onDispose { actions.onEditingChange(false) }
+        }
         GradientEditorDialog(
             state = state,
             actions = actions,
@@ -123,14 +136,95 @@ fun GradientControls(
 @Composable
 internal fun GradientPreviewBar(colors: List<RgbColor>) {
     val shown = colors.ifEmpty { listOf(RgbColor(34, 35, 43), RgbColor(34, 35, 43)) }
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(54.dp)
-                .background(Brush.horizontalGradient(shown.map(RgbColor::toComposeColor)), RoundedCornerShape(15.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(15.dp)),
-    )
+    val ribbonColors = shown.map(RgbColor::toComposeColor)
+    val lightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val outline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (lightTheme) 0.48f else 0.5f)
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(64.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = if (lightTheme) 0.72f else 0.9f),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, outline),
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val horizontalInset = 10.dp.toPx()
+            val verticalInset = 11.dp.toPx()
+            val slabTopLeft = Offset(horizontalInset, verticalInset)
+            val slabSize = Size(size.width - horizontalInset * 2f, size.height - verticalInset * 2f)
+            val slabRadius = CornerRadius(14.dp.toPx(), 14.dp.toPx())
+
+            if (!lightTheme) {
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.46f),
+                    topLeft = slabTopLeft.copy(y = slabTopLeft.y + 4.dp.toPx()),
+                    size = slabSize,
+                    cornerRadius = slabRadius,
+                )
+            }
+            drawRoundRect(
+                brush =
+                    Brush.horizontalGradient(
+                        colors = ribbonColors,
+                        startX = slabTopLeft.x,
+                        endX = slabTopLeft.x + slabSize.width,
+                    ),
+                topLeft = slabTopLeft,
+                size = slabSize,
+                cornerRadius = slabRadius,
+            )
+            drawRoundRect(
+                brush =
+                    Brush.verticalGradient(
+                        0f to Color.White.copy(alpha = if (lightTheme) 0.18f else 0.24f),
+                        0.42f to Color.White.copy(alpha = 0.03f),
+                        0.72f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = if (lightTheme) 0.10f else 0.28f),
+                        startY = slabTopLeft.y,
+                        endY = slabTopLeft.y + slabSize.height,
+                    ),
+                topLeft = slabTopLeft,
+                size = slabSize,
+                cornerRadius = slabRadius,
+            )
+            drawRoundRect(
+                brush =
+                    Brush.horizontalGradient(
+                        0f to Color.Black.copy(alpha = if (lightTheme) 0.10f else 0.20f),
+                        0.14f to Color.Transparent,
+                        0.28f to Color.Transparent,
+                        0.33f to Color.White.copy(alpha = if (lightTheme) 0.10f else 0.16f),
+                        0.38f to Color.Transparent,
+                        0.66f to Color.Transparent,
+                        0.70f to Color.White.copy(alpha = if (lightTheme) 0.07f else 0.10f),
+                        0.74f to Color.Transparent,
+                        0.88f to Color.Transparent,
+                        1f to Color.Black.copy(alpha = if (lightTheme) 0.09f else 0.18f),
+                        startX = slabTopLeft.x,
+                        endX = slabTopLeft.x + slabSize.width,
+                    ),
+                topLeft = slabTopLeft,
+                size = slabSize,
+                cornerRadius = slabRadius,
+            )
+            drawRoundRect(
+                brush =
+                    Brush.radialGradient(
+                        colors = listOf(Color.White.copy(alpha = if (lightTheme) 0.13f else 0.20f), Color.Transparent),
+                        center = Offset(size.width * 0.58f, slabTopLeft.y),
+                        radius = size.width * 0.28f,
+                    ),
+                topLeft = slabTopLeft,
+                size = slabSize,
+                cornerRadius = slabRadius,
+            )
+            drawRoundRect(
+                color = if (lightTheme) Color.White.copy(alpha = 0.48f) else Color.White.copy(alpha = 0.28f),
+                topLeft = slabTopLeft,
+                size = slabSize,
+                cornerRadius = slabRadius,
+                style = Stroke(width = 1.dp.toPx()),
+            )
+        }
+    }
 }
 
 @Composable
@@ -142,6 +236,8 @@ private fun GradientTile(
 ) {
     var focused by remember { mutableStateOf(false) }
     val shown = colors.ifEmpty { listOf(RgbColor(40, 40, 48), RgbColor(40, 40, 48)) }
+    val lightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val outline = MaterialTheme.colorScheme.outlineVariant
     Surface(
         onClick = onClick,
         modifier =
@@ -150,12 +246,16 @@ private fun GradientTile(
                 .height(68.dp)
                 .onFocusChanged { focused = it.isFocused }
                 .semantics { this.selected = selected },
-        color = Color.Transparent,
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f),
         shape = RoundedCornerShape(15.dp),
         border =
             BorderStroke(
-                if (selected || focused) 2.dp else 1.dp,
-                if (focused) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = if (selected) 0.65f else 0.12f),
+                if (focused) 2.dp else if (selected) 1.5.dp else 1.dp,
+                when {
+                    focused || selected -> MaterialTheme.colorScheme.primary
+                    lightTheme -> outline.copy(alpha = 0.48f)
+                    else -> Color.White.copy(alpha = 0.12f)
+                },
             ),
     ) {
         Column {

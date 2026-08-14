@@ -8,6 +8,11 @@
       "platforms": { "decky": "validated", "android": "validated", "windows": "deferred" }
     },
     {
+      "id": "android_identity_presentation",
+      "contracts": ["android-device-identities.json"],
+      "platforms": { "decky": "unsupported", "android": "implemented", "windows": "deferred" }
+    },
+    {
       "id": "generic_led_discovery",
       "contracts": ["devices.json"],
       "platforms": { "decky": "validated", "android": "implemented", "windows": "deferred" }

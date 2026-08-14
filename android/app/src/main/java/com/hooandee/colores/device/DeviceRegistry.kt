@@ -9,6 +9,7 @@ data class DeviceCapabilities(
     val brightness: Boolean,
     val perZone: Boolean,
     val zones: Int,
+    val power: Boolean = color,
 )
 
 internal data class AndroidDeviceDefinition(

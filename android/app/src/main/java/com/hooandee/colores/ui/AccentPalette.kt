@@ -12,6 +12,19 @@ data class AccentRoles(
     val onPrimaryContainer: RgbColor,
 )
 
+data class AtmosphereRoles(
+    val backgroundStart: RgbColor,
+    val backgroundMiddle: RgbColor,
+    val backgroundEnd: RgbColor,
+    val coolGlow: RgbColor,
+    val warmGlow: RgbColor,
+    val beam: RgbColor,
+    val panelSurface: RgbColor,
+    val panelSurfaceStrong: RgbColor,
+    val panelOutline: RgbColor,
+    val panelOutlineStrong: RgbColor,
+)
+
 fun accentRoles(
     accent: RgbColor,
     dark: Boolean,
@@ -24,6 +37,33 @@ fun accentRoles(
         onPrimary = readableForeground(primary),
         primaryContainer = primaryContainer,
         onPrimaryContainer = readableForeground(primaryContainer),
+    )
+}
+
+fun atmosphereRoles(
+    accent: RgbColor,
+    dark: Boolean,
+): AtmosphereRoles {
+    val source = accent.sanitized().toHsvColor()
+    val saturation = if (source.saturation < 0.08f) 0f else source.saturation.coerceIn(0.18f, 0.72f)
+    val cool = HsvColor(source.hue + 22f, saturation * 0.82f, if (dark) 0.72f else 0.78f).toRgbColor()
+    val warm = HsvColor(source.hue - 18f, saturation * 0.68f, if (dark) 0.58f else 0.86f).toRgbColor()
+    val beam = HsvColor(source.hue, saturation * 0.72f, if (dark) 0.92f else 0.68f).toRgbColor()
+    val darkNeutral = RgbColor(9, 10, 12)
+    val lightNeutral = RgbColor(245, 247, 249)
+    val neutral = if (dark) darkNeutral else lightNeutral
+    val surfaceNeutral = if (dark) RgbColor(20, 22, 25) else RgbColor(249, 250, 251)
+    return AtmosphereRoles(
+        backgroundStart = blend(neutral, cool, if (dark) 0.08 else 0.075),
+        backgroundMiddle = blend(neutral, accent.sanitized(), if (dark) 0.045 else 0.045),
+        backgroundEnd = blend(if (dark) RgbColor(6, 7, 9) else RgbColor(241, 240, 244), warm, if (dark) 0.05 else 0.055),
+        coolGlow = cool,
+        warmGlow = warm,
+        beam = beam,
+        panelSurface = blend(surfaceNeutral, accent.sanitized(), if (dark) 0.07 else 0.035),
+        panelSurfaceStrong = blend(surfaceNeutral, accent.sanitized(), if (dark) 0.11 else 0.055),
+        panelOutline = blend(if (dark) RgbColor(202, 217, 225) else RgbColor(87, 105, 115), cool, 0.22),
+        panelOutlineStrong = blend(if (dark) RgbColor(225, 233, 238) else RgbColor(70, 88, 99), beam, 0.28),
     )
 }
 

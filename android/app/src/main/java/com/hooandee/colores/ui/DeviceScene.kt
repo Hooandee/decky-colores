@@ -4,6 +4,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,8 +25,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -45,14 +49,15 @@ fun DeviceScene(
     perZone: Boolean,
     projection: LedColorProjection,
     onTargetChange: (EditTarget) -> Unit,
-    showBoth: Boolean = true,
     modifier: Modifier = Modifier,
+    showBoth: Boolean = true,
 ) {
     val previewStyle = LocalLedPreviewStyle.current
+    val lightPreview = previewStyle.sceneBackground.luminance() > 0.5f
     val preview = devicePreviewGroups(frame, layout)
     Surface(
-        modifier = modifier,
-        color = previewStyle.sceneBackground,
+        modifier = modifier.prismaticPanel(RoundedCornerShape(32.dp), strong = true),
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(32.dp),
     ) {
@@ -115,10 +120,18 @@ fun DeviceScene(
                     Surface(
                         onClick = { onTargetChange(EditTarget.BOTH) },
                         enabled = enabled,
-                        modifier = Modifier.heightIn(min = if (compact) 36.dp else 48.dp),
+                        modifier =
+                            Modifier
+                                .heightIn(min = if (compact) 36.dp else 48.dp)
+                                .semantics {
+                                    role = Role.RadioButton
+                                    selected = selectedTarget == EditTarget.BOTH
+                                },
                         color =
                             if (selectedTarget == EditTarget.BOTH) {
                                 MaterialTheme.colorScheme.primaryContainer
+                            } else if (lightPreview) {
+                                MaterialTheme.colorScheme.surfaceContainer
                             } else {
                                 previewStyle.capsuleMiddle
                             },
@@ -135,17 +148,23 @@ fun DeviceScene(
                                 color =
                                     if (selectedTarget == EditTarget.BOTH) {
                                         MaterialTheme.colorScheme.primary
+                                    } else if (lightPreview) {
+                                        MaterialTheme.colorScheme.outlineVariant
                                     } else {
                                         previewStyle.capsuleOutline
                                     },
                             ),
                     ) {
-                        Text(
-                            text = stringResource(R.string.target_both),
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = if (compact) 6.dp else 10.dp),
-                            style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.target_both),
+                                style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.weight(1f))
@@ -185,6 +204,7 @@ private fun StickTarget(
                     .semantics {
                         contentDescription = label
                         this.selected = selected
+                        role = Role.RadioButton
                     },
             color = Color.Transparent,
             shape = CircleShape,

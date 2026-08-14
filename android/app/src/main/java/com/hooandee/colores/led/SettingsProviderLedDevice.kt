@@ -2,9 +2,11 @@ package com.hooandee.colores.led
 
 import android.content.Context
 import android.provider.Settings
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -85,6 +87,8 @@ class SettingsProviderLedDevice internal constructor(
         brightness: Int,
         power: Boolean,
     ): Boolean = applyZones(List(descriptor.zones) { color }, brightness, power)
+
+    override suspend fun close() = writer.close()
 
     override fun invalidate() {
         cachedState = null
@@ -223,13 +227,22 @@ internal class ConflatedLedWriter<T>(
     write: suspend (T) -> Boolean,
 ) {
     private val channel = Channel<T>(Channel.CONFLATED)
+    @Volatile
+    private var closed = false
 
-    init {
+    private val worker =
         scope.launch {
             for (value in channel) {
                 var pending = value
                 while (true) {
-                    val succeeded = runCatching { write(pending) }.getOrDefault(false)
+                    val succeeded =
+                        try {
+                            write(pending)
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (_: Throwable) {
+                            false
+                        }
                     delay(if (succeeded) intervalMs else retryIntervalMs)
                     val newer = channel.tryReceive().getOrNull()
                     if (newer != null) {
@@ -240,7 +253,12 @@ internal class ConflatedLedWriter<T>(
                 }
             }
         }
-    }
 
-    fun submit(value: T): Boolean = channel.trySend(value).isSuccess
+    fun submit(value: T): Boolean = !closed && channel.trySend(value).isSuccess
+
+    suspend fun close() {
+        closed = true
+        channel.close()
+        worker.cancelAndJoin()
+    }
 }

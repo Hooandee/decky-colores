@@ -67,8 +67,8 @@ fun ColorControlPanel(
     val projection = state.ledColorProjection
     val editingHsv = state.editingColor.toHsvColor()
     Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.prismaticPanel(RoundedCornerShape(32.dp), strong = true),
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(32.dp),
     ) {

@@ -6,6 +6,9 @@ import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.audio.MutableAudioLevelSource
 import com.hooandee.colores.device.AndroidDeviceDetector
+import com.hooandee.colores.device.learning.DetectionOutcome
+import com.hooandee.colores.device.learning.HardwareLearningStore
+import com.hooandee.colores.device.learning.learnedDeviceIdForPromotion
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.EffectCatalog
 import com.hooandee.colores.gradient.GradientInterpolator
@@ -49,8 +52,13 @@ class LightingRuntime(
     suspend fun restoreSaved(): RestoredLightingBinding? =
         withContext(Dispatchers.IO) {
             val preferences = LightingPreferences(context)
+            val binding = HardwareLearningStore(context).loadBinding()
+            val outcome = AndroidDeviceDetector(context).detectOutcome(binding)
+            val detected = (outcome as? DetectionOutcome.Resolved)?.device ?: return@withContext null
+            learnedDeviceIdForPromotion(outcome.identity, detected, binding)?.let { sourceDeviceId ->
+                DevicePreferenceMigration(context).migrate(sourceDeviceId, detected.id)
+            }
             val activeDeviceId = preferences.activeDeviceId() ?: return@withContext null
-            val detected = AndroidDeviceDetector(context).detect() ?: return@withContext null
             if (detected.id != activeDeviceId) return@withContext null
 
             val device =

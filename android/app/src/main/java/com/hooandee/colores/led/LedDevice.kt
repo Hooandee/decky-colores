@@ -54,6 +54,8 @@ interface LedDevice {
         power: Boolean,
     ): Boolean = false
 
+    suspend fun close() = Unit
+
     fun invalidate()
 }
 

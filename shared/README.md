@@ -23,13 +23,25 @@ La raíz es una lista de dispositivos. Cada entrada requiere:
 
 El bloque `android` puede declarar listas `model`, `device` y un objeto `led`. Para `settings_provider`, `led` requiere `driver`, `transport`, `colorKey`, `colorFormat`, `brightnessKey`, `brightnessRange`, `enableKeys`, `zones`, `requiresPermission` y `vendorService`. `transport` admite `direct` y `pserver`; `requiresPermission` es `null` cuando el transporte no necesita una concesión del usuario. `colorFormat` admite actualmente `argb_hex_csv`. No se debe inferir sysfs cuando no aparezca en el descriptor.
 
-El driver `htr3212` conserva esos campos para el estado oficial de brillo, encendido y color de respaldo, y añade un bloque `htr3212` con `leftBus`, `rightBus`, `address`, `leftOrder` y `rightOrder`. `rgbStartRegister` cambia el registro inicial cuando la placa lo requiere, `blockWrite` habilita una escritura contigua demostrada y `pairedWrite` agrupa ambos buses en una única transacción privilegiada; los tres son opcionales. Las listas de orden traducen cada zona lógica del joystick, en orden arriba/izquierda/abajo/derecha, al grupo físico `0..3` del controlador. Deben ser permutaciones completas y calibradas en el dispositivo real.
+El driver `htr3212` conserva esos campos para el estado oficial de brillo, encendido y color de respaldo, y añade un bloque `htr3212` con `leftBus`, `rightBus`, `address`, `leftOrder` y `rightOrder`. `rgbStartRegister` cambia el registro inicial cuando la placa lo requiere, `blockWrite` habilita una escritura contigua demostrada y `pairedWrite` agrupa ambos buses en una única transacción privilegiada; los tres son opcionales. Las listas de orden traducen las cuatro posiciones lógicas de cada joystick, declaradas por `gridLayout`, al grupo físico `0..3` del controlador. Deben ser permutaciones completas y calibradas en el dispositivo real.
 
 El bloque `android` puede declarar `gridLayout`, la disposición física de las zonas para el editor de gradiente. Es una lista de celdas con exactamente una entrada por zona, en el orden lógico del dispositivo. Cada celda tiene `stick` (entero de agrupación por joystick, o `null` si no se agrupa), `row`, `col` y `position`. `position` es `null` o uno de `top`, `left`, `bottom`, `right`, `top_left`, `top_right`, `bottom_left`, `bottom_right`. Si `gridLayout` falta, su longitud no coincide con el número de zonas o alguna celda es inválida, la plataforma cae a una rejilla numerada por defecto. Es dato de calibración: añadir una máquina es dato, no código.
 
 Una entrada puede declarar `previewProfile` para aproximar en la interfaz la apariencia de sus LEDs físicos. Si la referencia falta o no se resuelve, la plataforma muestra el RGB exacto y no ofrece la vista calibrada.
 
 Cuando ninguna entrada casa por `model`/`device`, cada plataforma intenta descubrir la superficie de control de forma genérica (en Android: servicio vendor tipo PServer con las claves estándar, luego un nodo sysfs escribible), sin entrada por-modelo. El registro se reserva para lo que necesita calibración fina (mapas de registro, orden de zonas, buses, `gridLayout`).
+
+## `android-device-identities.json`
+
+Catálogo de presentación para modelos Android cuya identidad `Build.*` se ha observado, pero cuyo
+transporte LED puede seguir sin validar. Cada entrada requiere `id`, `friendlyName`, una lista no
+vacía `manufacturers` y una lista no vacía `models`. La coincidencia normaliza mayúsculas y
+separadores, pero exige fabricante y modelo.
+
+Este catálogo nunca declara driver, transporte, capacidades, zonas ni soporte. `devices.json` y la
+disponibilidad real del transporte siguen siendo la única fuente de dispositivos controlables.
+Una identidad se elimina de este catálogo cuando obtiene un perfil controlable exacto para evitar
+mantener dos fuentes del mismo nombre de producto.
 
 ## `led-preview-profiles.json`
 

@@ -61,6 +61,26 @@ internal val SmokyGlassLedPreviewStyle =
         disabledPowerAlpha = 0.18f,
     )
 
+internal val PearlCeramicLedPreviewStyle =
+    LedPreviewStyle(
+        sceneBackground = Color(0xFFF4F7F6),
+        capsuleHighlight = Color(0xFFFFFFFF),
+        capsuleMiddle = Color(0xFFEEF2F2),
+        capsuleBase = Color(0xFFD8DFE0),
+        capsuleOutline = Color(0xFFB4BEC1),
+        discHighlight = Color(0xFFFAFCFC),
+        discMiddle = Color(0xFFE2E8E9),
+        discBase = Color(0xFFC1CBCD),
+        discOutline = Color(0xFFA7B2B6),
+        ringTrack = Color(0x1855656C),
+        hubHighlight = Color(0xFF68717B),
+        hubMiddle = Color(0xFF353B43),
+        hubBase = Color(0xFF11151A),
+        hubOutline = Color(0xFF879099),
+        ringGlowAlpha = 0.20f,
+        disabledPowerAlpha = 0.16f,
+    )
+
 internal val LocalLedPreviewStyle = staticCompositionLocalOf { SmokyGlassLedPreviewStyle }
 
 internal data class LedPreviewRingSegment(

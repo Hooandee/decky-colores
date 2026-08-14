@@ -60,6 +60,16 @@ class LightingPreferences(
 
     fun activeDeviceId(): String? = read(ACTIVE_DEVICE_KEY)?.takeIf { it.isNotBlank() }
 
+    fun migrateDevice(
+        sourceDeviceId: String,
+        targetDeviceId: String,
+    ) {
+        if (sourceDeviceId == targetDeviceId) return
+        val source = read(key(sourceDeviceId)) ?: return
+        if (read(key(targetDeviceId)) == null) write(key(targetDeviceId), source)
+        if (activeDeviceId() == sourceDeviceId) write(ACTIVE_DEVICE_KEY, targetDeviceId)
+    }
+
     fun shouldRestoreInBackground(): Boolean {
         val deviceId = activeDeviceId() ?: return false
         val stored = load(deviceId)

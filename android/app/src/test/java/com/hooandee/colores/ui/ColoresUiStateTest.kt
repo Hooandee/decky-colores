@@ -6,6 +6,8 @@ import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.audio.AudioLevelState
 import com.hooandee.colores.control.AppMode
 import com.hooandee.colores.device.AndroidDeviceIdentity
+import com.hooandee.colores.device.DevicePresentation
+import com.hooandee.colores.device.DevicePresentationSource
 import com.hooandee.colores.device.DeviceRegistry
 import com.hooandee.colores.engine.EffectNeed
 import com.hooandee.colores.engine.EffectPreset
@@ -78,6 +80,25 @@ class ColoresUiStateTest {
         assertFalse(AppMode.AUDIO in unavailable.availableModes())
         assertTrue(AppMode.AMBIENT in connected.availableModes())
         assertFalse(AppMode.AMBIENT in unavailable.availableModes())
+    }
+
+    @Test
+    fun `known identity presentation does not enable LED controls`() {
+        val state =
+            ColoresUiState(
+                devicePresentation =
+                    DevicePresentation(
+                        id = "ayn-odin2-portal",
+                        friendlyName = "AYN Odin 2 Portal",
+                        source = DevicePresentationSource.KNOWN_IDENTITY,
+                    ),
+            )
+
+        assertEquals("AYN Odin 2 Portal", state.devicePresentation.friendlyName)
+        assertFalse(state.colorEnabled)
+        assertFalse(state.brightnessEnabled)
+        assertFalse(state.canWrite)
+        assertFalse(AppMode.COLOR in state.availableModes())
     }
 
     @Test

@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -47,9 +48,12 @@ internal fun AndroidReportDialog(
     state: ColoresUiState,
     onDismiss: () -> Unit,
     onSubmit: (List<String>, String) -> Unit,
+    initialCategories: Set<String> = emptySet(),
+    initialText: String = "",
+    lockedCategories: Boolean = false,
 ) {
-    var selected by remember { mutableStateOf(emptySet<String>()) }
-    var text by remember { mutableStateOf("") }
+    var selected by remember(initialCategories) { mutableStateOf(initialCategories) }
+    var text by remember(initialText) { mutableStateOf(initialText) }
     val submission = state.reportSubmission
     val context = LocalContext.current
     Dialog(
@@ -61,9 +65,15 @@ internal fun AndroidReportDialog(
             contentAlignment = Alignment.Center,
         ) {
             Surface(
-                modifier = Modifier.widthIn(max = 900.dp).fillMaxWidth().heightIn(max = 680.dp),
+                modifier =
+                    Modifier
+                        .widthIn(max = 900.dp)
+                        .fillMaxWidth()
+                        .heightIn(max = 680.dp)
+                        .prismaticPanel(RoundedCornerShape(28.dp), strong = true),
                 shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
+                color = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
                 when (val result = submission.result) {
                     is ReportResult.Success ->
@@ -94,6 +104,7 @@ internal fun AndroidReportDialog(
                                 onTextChange = { text = it },
                                 onSubmit = { onSubmit(selected.toList(), text) },
                                 onClose = onDismiss,
+                                lockedCategories = lockedCategories,
                             )
                         }
                 }
@@ -112,6 +123,7 @@ private fun ReportForm(
     onTextChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onClose: () -> Unit,
+    lockedCategories: Boolean,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxWidth().padding(22.dp),
@@ -131,7 +143,8 @@ private fun ReportForm(
                 items(REPORT_CATEGORIES) { category ->
                     FilterChip(
                         selected = category in selected,
-                        onClick = { onToggle(category) },
+                        onClick = { if (!lockedCategories) onToggle(category) },
+                        enabled = !lockedCategories || category in selected,
                         label = { Text(reportCategoryLabel(category)) },
                     )
                 }
@@ -183,6 +196,7 @@ private fun reportCategoryLabel(category: String): String =
         "sensors" -> stringResource(R.string.report_category_sensors)
         "audio" -> stringResource(R.string.report_category_audio)
         "profiles" -> stringResource(R.string.report_category_profiles)
+        "learning" -> stringResource(R.string.report_category_learning)
         else -> stringResource(R.string.report_category_other)
     }
 

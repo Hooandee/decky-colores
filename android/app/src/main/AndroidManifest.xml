@@ -22,8 +22,12 @@
 
     <application
         android:name=".ColoresApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Colores">
         <service
@@ -49,7 +53,7 @@
             android:foregroundServiceType="specialUse|mediaProjection">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="device_led_control" />
+                android:value="Controls device LEDs and keeps user-selected lighting effects or profiles running." />
         </service>
 
         <receiver

@@ -29,6 +29,15 @@ internal data class EffectsServiceCommandPolicy(
     val reconcileController: Boolean,
 )
 
+internal fun foregroundServiceTypes(
+    sdk: Int,
+    mediaProjection: Boolean,
+): Int {
+    val projection = if (mediaProjection) 0x20 else 0
+    val specialUse = if (sdk >= 34) 0x40000000 else 0
+    return projection or specialUse
+}
+
 internal fun effectsServiceCommandPolicy(command: EffectsServiceCommand): EffectsServiceCommandPolicy =
     EffectsServiceCommandPolicy(
         startMode =

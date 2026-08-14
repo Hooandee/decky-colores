@@ -44,6 +44,22 @@ class LightingProfileStoreTest {
     }
 
     @Test
+    fun `device promotion copies the complete profile envelope without overwriting native profiles`() {
+        val store = profileStore()
+        store.patch("learned-portal", ProfileScope.Global, ProfilePatch(brightness = 37))
+        store.patch("learned-portal", ProfileScope.App("org.example.game"), ProfilePatch(mode = AppMode.EFFECT))
+
+        store.migrateDevice("learned-portal", "ayn-odin2-portal")
+
+        assertEquals(37, store.global("ayn-odin2-portal").brightness)
+        assertEquals(AppMode.EFFECT, store.effective("ayn-odin2-portal", "org.example.game").mode)
+        store.patch("ayn-odin2-portal", ProfileScope.Global, ProfilePatch(brightness = 72))
+        store.patch("learned-portal", ProfileScope.Global, ProfilePatch(brightness = 12))
+        store.migrateDevice("learned-portal", "ayn-odin2-portal")
+        assertEquals(72, store.global("ayn-odin2-portal").brightness)
+    }
+
+    @Test
     fun `values are bounded and nested fields are preserved`() {
         val store = profileStore()
         store.patch(

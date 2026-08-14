@@ -4,7 +4,7 @@
   "description": "Beautiful RGB LED control for handheld gaming PCs.",
   "type": "module",
   "scripts": {
-    "build": "rollup -c",
+    "build": "rollup -c --forceExit",
     "watch": "rollup -c -w",
     "typecheck": "tsc --noEmit",
     "test:fe": "vitest run"

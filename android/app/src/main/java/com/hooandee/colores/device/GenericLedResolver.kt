@@ -1,49 +1,63 @@
 package com.hooandee.colores.device
 
-import com.hooandee.colores.led.LedDescriptor
+import com.hooandee.colores.device.learning.ProbeCandidate
+import com.hooandee.colores.device.learning.ProbeSurface
+import com.hooandee.colores.device.learning.PROBE_VERSION
+import com.hooandee.colores.device.learning.SETTINGS_PROBE_ID
+import com.hooandee.colores.device.learning.SINGLEADC_PROBE_ID
+import com.hooandee.colores.device.learning.SYSFS_PROBE_ID
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsRgbDescriptor
 
 internal object GenericLedResolver {
-    const val VENDOR_ID = "generic-vendor"
-    const val SYSFS_ID = "generic-sysfs"
-    const val JOYPAD_ID = "generic-joypad"
-
-    fun vendor(
-        identity: AndroidDeviceIdentity,
+    fun settingsCandidate(
         pserverAvailable: Boolean,
         colorKeyValue: String?,
-    ): DetectedAndroidDevice? {
-        if (!pserverAvailable || colorKeyValue.isNullOrBlank()) return null
-        val zones = GenericVendorLed.DEFAULT_ZONES
-        return build(VENDOR_ID, identity, zones, GenericVendorLed.descriptor(zones))
+    ): ProbeCandidate? {
+        if (!pserverAvailable) return null
+        val colors = colorKeyValue.parseArgbColors()
+        if (colors.isEmpty()) return null
+        return ProbeCandidate(
+            cartridgeId = SETTINGS_PROBE_ID,
+            cartridgeVersion = PROBE_VERSION,
+            surface = ProbeSurface.SETTINGS_PSERVER,
+            descriptor = GenericVendorLed.descriptor(colors.size),
+            signalKeys = setOf("observed_color_count"),
+        )
     }
 
-    fun joypad(
-        identity: AndroidDeviceIdentity,
+    fun joypadCandidate(
         descriptor: SingleAdcJoypadDescriptor?,
-    ): DetectedAndroidDevice? = descriptor?.let { build(JOYPAD_ID, identity, 1, it) }
+    ): ProbeCandidate? =
+        descriptor?.let {
+            ProbeCandidate(
+                cartridgeId = SINGLEADC_PROBE_ID,
+                cartridgeVersion = PROBE_VERSION,
+                surface = ProbeSurface.SINGLEADC_JOYPAD,
+                descriptor = it,
+                signalKeys = setOf("singleadc_surface"),
+            )
+        }
 
-    fun sysfs(
-        identity: AndroidDeviceIdentity,
+    fun sysfsCandidate(
         descriptor: SysfsRgbDescriptor?,
-    ): DetectedAndroidDevice? = descriptor?.let { build(SYSFS_ID, identity, it.zones, it) }
+    ): ProbeCandidate? =
+        descriptor?.let {
+            ProbeCandidate(
+                cartridgeId = SYSFS_PROBE_ID,
+                cartridgeVersion = PROBE_VERSION,
+                surface = ProbeSurface.SYSFS_RGB,
+                descriptor = it,
+                signalKeys = setOf("color_kind", "observed_index_count"),
+            )
+        }
 
-    private fun build(
-        id: String,
-        identity: AndroidDeviceIdentity,
-        zones: Int,
-        led: LedDescriptor,
-    ): DetectedAndroidDevice =
-        DetectedAndroidDevice(
-            id = id,
-            friendlyName = identity.friendlyName(),
-            capabilities = DeviceCapabilities(color = true, brightness = true, perZone = zones > 1, zones = zones),
-            led = led,
-            previewProfileId = null,
-            previewCalibration = null,
-        )
+    private fun String?.parseArgbColors(): List<String> =
+        this
+            ?.split(',')
+            ?.map(String::trim)
+            ?.takeIf { it.isNotEmpty() && it.all(ARGb_COLOR::matches) }
+            .orEmpty()
 
-    private fun AndroidDeviceIdentity.friendlyName(): String =
-        model.ifBlank { manufacturer }.ifBlank { device }.ifBlank { "RGB" }
+    private val ARGb_COLOR = Regex("#[0-9A-Fa-f]{8}")
 }
