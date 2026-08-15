@@ -238,12 +238,7 @@ class HardwareLearningSession(
         )
     }
 
-    private fun confirmedZones(): List<Int> =
-        evidence
-            .filter { it.step == ProbeStep.ZONE && it.level == EvidenceLevel.USER_CONFIRMED }
-            .mapNotNull(ProbeEvidence::zone)
-            .distinct()
-            .sorted()
+    private fun confirmedZones(): List<Int> = confirmedZoneIndices(evidence, candidate?.surface)
 
     private fun restoreOriginal(): RollbackStatus {
         val currentCandidate = candidate ?: return RollbackStatus.RESTORE_FAILED
@@ -269,6 +264,20 @@ class HardwareLearningSession(
         return state
     }
 }
+
+internal fun confirmedZoneIndices(
+    evidence: List<ProbeEvidence>,
+    surface: ProbeSurface?,
+): List<Int> =
+    evidence
+        .filter {
+            it.step == ProbeStep.ZONE &&
+                it.level == EvidenceLevel.USER_CONFIRMED &&
+                (surface != ProbeSurface.HTR3212 || it.location?.logicalIndex?.let { index -> index >= 0 } == true)
+        }
+        .mapNotNull(ProbeEvidence::zone)
+        .distinct()
+        .sorted()
 
 private fun com.hooandee.colores.led.LedDescriptor.zoneCount(): Int =
     when (this) {

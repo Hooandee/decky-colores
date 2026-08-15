@@ -690,7 +690,7 @@ private fun DiagnosticsCard(
                     Text(
                         stringResource(
                             if (multipointCandidate) {
-                                R.string.hardware_learning_continue_discovery
+                                R.string.hardware_learning_try_multipoint
                             } else {
                                 R.string.hardware_learning_repeat
                             },

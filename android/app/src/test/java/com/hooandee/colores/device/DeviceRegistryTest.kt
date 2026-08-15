@@ -271,6 +271,8 @@ class DeviceRegistryTest {
         assertEquals(0x0d, led.htr3212.rgbStartRegister)
         assertTrue(led.htr3212.blockWrite)
         assertTrue(led.htr3212.pairedWrite)
+        assertFalse(led.htr3212.explicitInitialization)
+        assertFalse(led.htr3212.automaticActivation)
     }
 
     @Test
@@ -310,6 +312,8 @@ class DeviceRegistryTest {
         assertEquals(0x0d, led.htr3212.rgbStartRegister)
         assertFalse(led.htr3212.blockWrite)
         assertFalse(led.htr3212.pairedWrite)
+        assertFalse(led.htr3212.explicitInitialization)
+        assertFalse(led.htr3212.automaticActivation)
         assertEquals(
             listOf(
                 "top_left",
@@ -334,9 +338,26 @@ class DeviceRegistryTest {
                 previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
             )
         val match = registry.match(rp5Identity())
-        assertEquals(0x01, (match?.led as? SettingsProviderDescriptor)?.htr3212?.rgbStartRegister)
+        assertEquals(0x0d, (match?.led as? SettingsProviderDescriptor)?.htr3212?.rgbStartRegister)
+        val hardware = (match?.led as? SettingsProviderDescriptor)?.htr3212
+        assertTrue(hardware?.explicitInitialization == true)
+        assertTrue(hardware?.automaticActivation == true)
         assertFalse((match?.led as? SettingsProviderDescriptor)?.htr3212?.blockWrite == true)
         assertFalse((match?.led as? SettingsProviderDescriptor)?.htr3212?.pairedWrite == true)
+    }
+
+    @Test
+    fun `RP5 model remains known when the device codename differs`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+
+        val match = registry.match(rp5Identity().copy(device = "future-rp5-revision"))
+
+        assertEquals("retroid-pocket-5", match?.id)
     }
 
     @Test

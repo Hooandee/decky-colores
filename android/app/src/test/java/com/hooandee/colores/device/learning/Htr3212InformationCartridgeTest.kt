@@ -4,6 +4,7 @@ import com.hooandee.colores.device.AndroidDeviceIdentity
 import com.hooandee.colores.device.GenericVendorLed
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -26,12 +27,34 @@ class Htr3212InformationCartridgeTest {
 
         val candidate = route.candidates.single { it.cartridgeId == HTR3212_PROBE_ID }
         val descriptor = candidate.descriptor as SettingsProviderDescriptor
+        assertEquals(HTR3212_PROBE_VERSION, candidate.cartridgeVersion)
         assertEquals(8, descriptor.zones)
         assertEquals(3, descriptor.htr3212?.leftBus)
         assertEquals(5, descriptor.htr3212?.rightBus)
         assertEquals(0x3c, descriptor.htr3212?.address)
         assertEquals(0x0d, descriptor.htr3212?.rgbStartRegister)
+        assertFalse(descriptor.htr3212?.explicitInitialization == true)
         assertTrue(route.facts.any { it.key == FACT_HTR3212_PAIR })
+    }
+
+    @Test
+    fun `observed RP5 pair enables only its physically validated initialization`() {
+        val cartridge =
+            Htr3212InformationCartridge(
+                topologyReader =
+                    I2cTopologyReader {
+                        listOf(
+                            I2cController(bus = 1, address = 0x3c, driver = "htr3212l"),
+                            I2cController(bus = 0, address = 0x3c, driver = "htr3212r"),
+                        )
+                    },
+            )
+        val rp5 = AndroidDeviceIdentity("Retroid Pocket 5", "kona", "Moorechip", emptyMap())
+
+        val route = HardwareLearningGraph(listOf(cartridge)).resolve(rp5, listOf(settingsCandidate()))
+        val descriptor = route.candidates.single { it.cartridgeId == HTR3212_PROBE_ID }.descriptor as SettingsProviderDescriptor
+
+        assertTrue(descriptor.htr3212?.explicitInitialization == true)
     }
 
     @Test

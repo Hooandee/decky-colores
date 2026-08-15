@@ -12,6 +12,7 @@ import com.hooandee.colores.device.learning.ProbeStep
 import com.hooandee.colores.device.learning.ProbeSurface
 import com.hooandee.colores.device.learning.RollbackStatus
 import com.hooandee.colores.device.learning.UserObservation
+import com.hooandee.colores.device.learning.ZoneLocation
 import com.hooandee.colores.device.DeviceCapabilities
 import com.hooandee.colores.device.DetectedAndroidDevice
 import com.hooandee.colores.device.GenericVendorLed
@@ -78,6 +79,34 @@ class HardwareLearningUiStateTest {
     }
 
     @Test
+    fun `whole joystick answer follows the stick under test`() {
+        assertEquals(ZoneLocation.LEFT_WHOLE, wholeStickLocation(zone = 0))
+        assertEquals(ZoneLocation.LEFT_WHOLE, wholeStickLocation(zone = 3))
+        assertEquals(ZoneLocation.RIGHT_WHOLE, wholeStickLocation(zone = 4))
+        assertEquals(ZoneLocation.RIGHT_WHOLE, wholeStickLocation(zone = 7))
+    }
+
+    @Test
+    fun `grouped HTR lights end the multipoint route without seven redundant probes`() {
+        val descriptor =
+            GenericVendorLed.descriptor(8).copy(
+                driver = "htr3212",
+                htr3212 = Htr3212Descriptor(1, 0, 0x3c, listOf(0, 1, 3, 2), listOf(1, 2, 3, 0)),
+            )
+        val htrCandidate = ProbeCandidate("htr3212-multipoint", 2, ProbeSurface.HTR3212, descriptor, emptySet())
+        val evidence =
+            listOf(
+                ProbeEvidence(ProbeStep.COLOR, null, EvidenceLevel.USER_CONFIRMED, UserObservation.YES),
+                ProbeEvidence(ProbeStep.ZONE, 0, EvidenceLevel.USER_CONFIRMED, UserObservation.YES, ZoneLocation.LEFT_WHOLE),
+            )
+        val state = HardwareLearningState.Ready(htrCandidate, listOf(ProbeStep.COLOR, ProbeStep.ZONE), evidence)
+        val ui = HardwareLearningUiState(sessionState = state)
+
+        assertNull(ui.nextProbe)
+        assertTrue(ui.canFinish)
+    }
+
+    @Test
     fun `negative color answer ends the cartridge without probing more controls`() {
         val evidence =
             listOf(
@@ -134,6 +163,7 @@ class HardwareLearningUiStateTest {
             )
 
         assertFalse(dismissed.dialogOpen)
+        assertTrue(dismissed.autoPromptDismissed)
         assertEquals(listOf(result), dismissed.results)
         assertTrue(state.hardwareLearningNeedsReport)
         assertTrue(dismissed.canOpenReport)
@@ -150,6 +180,118 @@ class HardwareLearningUiStateTest {
     }
 
     @Test
+    fun `first unverified hardware route opens discovery automatically`() {
+        val identity = com.hooandee.colores.device.AndroidDeviceIdentity("Retroid Pocket 5", "kona", "Retroid", emptyMap())
+        val state =
+            ColoresUiState(
+                loading = false,
+                detectionOutcome = DetectionOutcome.Candidates(identity, listOf(candidate)),
+            )
+
+        assertTrue(shouldAutomaticallyOpenHardwareLearning(state))
+        assertFalse(shouldAutomaticallyOpenHardwareLearning(state.copy(hardwareLearning = state.hardwareLearning.copy(dialogOpen = true))))
+    }
+
+    @Test
+    fun `dismissing the automatic prompt prevents it from reopening on refresh`() {
+        val identity = com.hooandee.colores.device.AndroidDeviceIdentity("Retroid Pocket 5", "kona", "Retroid", emptyMap())
+        val state =
+            ColoresUiState(
+                loading = false,
+                detectionOutcome = DetectionOutcome.Candidates(identity, listOf(candidate)),
+                hardwareLearning = HardwareLearningUiState(autoPromptDismissed = true),
+            )
+
+        assertFalse(shouldAutomaticallyOpenHardwareLearning(state))
+    }
+
+    @Test
+    fun `completed discovery does not reopen on every refresh`() {
+        val identity = com.hooandee.colores.device.AndroidDeviceIdentity("Retroid Pocket 5", "kona", "Retroid", emptyMap())
+        val result =
+            HardwareLearningResult(
+                status = HardwareLearningStatus.CANCELLED,
+                candidate = candidate,
+                evidence = emptyList(),
+                capabilities = DeviceCapabilities(false, false, false, 1),
+                rollbackStatus = RollbackStatus.RESTORED_AND_READ_BACK,
+            )
+        val state =
+            ColoresUiState(
+                loading = false,
+                detectionOutcome = DetectionOutcome.Candidates(identity, listOf(candidate)),
+                hardwareLearning = HardwareLearningUiState(results = listOf(result)),
+            )
+
+        assertFalse(shouldAutomaticallyOpenHardwareLearning(state))
+    }
+
+    @Test
+    fun `confirmed two-zone fallback recommends the multipoint test`() {
+        val result =
+            HardwareLearningResult(
+                status = HardwareLearningStatus.ADAPTED,
+                candidate = candidate,
+                evidence = emptyList(),
+                capabilities = DeviceCapabilities(true, true, true, 2),
+                rollbackStatus = RollbackStatus.RESTORED_AND_READ_BACK,
+            )
+        val ui =
+            HardwareLearningUiState(
+                sessionState = HardwareLearningState.Complete(result),
+                candidateIndex = 0,
+                candidateCount = 2,
+            )
+
+        assertTrue(ui.confirmedTwoZoneFallback)
+        assertFalse(ui.copy(candidateCount = 1).confirmedTwoZoneFallback)
+    }
+
+    @Test
+    fun `grouped multipoint result explains that the confirmed two-zone fallback remains active`() {
+        val fallback =
+            HardwareLearningResult(
+                status = HardwareLearningStatus.ADAPTED,
+                candidate = candidate,
+                evidence = emptyList(),
+                capabilities = DeviceCapabilities(true, false, true, 2),
+                rollbackStatus = RollbackStatus.RESTORED_AND_READ_BACK,
+            )
+        val descriptor =
+            GenericVendorLed.descriptor(8).copy(
+                driver = "htr3212",
+                htr3212 = Htr3212Descriptor(1, 0, 0x3c, listOf(0, 1, 3, 2), listOf(1, 2, 3, 0)),
+            )
+        val htrCandidate = ProbeCandidate("htr3212-multipoint", 2, ProbeSurface.HTR3212, descriptor, emptySet())
+        val grouped =
+            HardwareLearningResult(
+                status = HardwareLearningStatus.BLOCKED,
+                candidate = htrCandidate,
+                evidence =
+                    listOf(
+                        ProbeEvidence(
+                            ProbeStep.ZONE,
+                            0,
+                            EvidenceLevel.USER_CONFIRMED,
+                            UserObservation.YES,
+                            ZoneLocation.LEFT_WHOLE,
+                        ),
+                    ),
+                capabilities = DeviceCapabilities(true, false, false, 1),
+                rollbackStatus = RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK,
+            )
+        val ui =
+            HardwareLearningUiState(
+                sessionState = HardwareLearningState.Complete(grouped),
+                candidateIndex = 1,
+                candidateCount = 2,
+                results = listOf(fallback, grouped),
+            )
+
+        assertTrue(ui.groupedMultipointWithFallback)
+    }
+
+    @Test
     fun `calibrated HTR binding is not offered again after rediscovery`() {
         val identity = com.hooandee.colores.device.AndroidDeviceIdentity("Odin2 Portal", "kalama", "AYN", emptyMap())
         val observedDescriptor =
@@ -161,7 +303,7 @@ class HardwareLearningUiStateTest {
             observedDescriptor.copy(
                 htr3212 = observedDescriptor.htr3212?.copy(leftOrder = listOf(1, 3, 0, 2), rightOrder = listOf(3, 2, 1, 0)),
             )
-        val htrCandidate = ProbeCandidate("htr3212-multipoint", 1, ProbeSurface.HTR3212, observedDescriptor, emptySet())
+        val htrCandidate = ProbeCandidate("htr3212-multipoint", 2, ProbeSurface.HTR3212, observedDescriptor, emptySet())
         val learned =
             DetectedAndroidDevice(
                 id = "learned-htr3212",
