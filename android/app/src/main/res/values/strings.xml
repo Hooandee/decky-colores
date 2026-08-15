@@ -364,7 +364,7 @@
     <string name="hardware_learning_grouped_points">Los cuatro puntos se encienden juntos</string>
     <string name="hardware_learning_grouped_points_body">Las luces existen, pero esta prueba no ha conseguido aislar un punto. Por eso Colores mantiene el control confirmado de 2 zonas: un color por joystick.</string>
     <string name="hardware_learning_zone_location_title">¿Qué se ilumina en magenta?</string>
-    <string name="hardware_learning_zone_location_body">Elige una esquina solo si ves un único punto pequeño y localizado. Si ves los cuatro puntos a la vez o todo el joystick iluminado, usa esa opción. Si no se enciende ninguna luz, elige “No se ilumina nada”.</string>
+    <string name="hardware_learning_zone_location_body">Elige una esquina solo si ves un único punto. Para cuatro puntos, usa “Todo el joystick o los cuatro puntos”.</string>
     <string name="hardware_learning_left_stick">Joystick izquierdo</string>
     <string name="hardware_learning_right_stick">Joystick derecho</string>
     <string name="hardware_learning_none_visible">No se ilumina nada</string>
