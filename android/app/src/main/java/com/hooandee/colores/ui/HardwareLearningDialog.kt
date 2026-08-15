@@ -93,7 +93,11 @@ internal fun HardwareLearningDialog(
                 Column(Modifier.padding(horizontal = 26.dp, vertical = 22.dp)) {
                     LearningHeader(ui, onDismiss)
                     Spacer(Modifier.height(16.dp))
-                    if (landscape) {
+                    val compactZoneQuestion =
+                        (ui.sessionState as? HardwareLearningState.AwaitingAnswer)?.isHtrZone() == true
+                    if (compactZoneQuestion) {
+                        LearningBody(ui, textAlign = TextAlign.Start, horizontalAlignment = Alignment.Start)
+                    } else if (landscape) {
                         Row(
                             modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(28.dp),
