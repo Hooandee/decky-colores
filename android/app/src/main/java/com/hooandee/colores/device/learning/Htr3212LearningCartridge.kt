@@ -13,9 +13,10 @@ internal class Htr3212LearningCartridge(
     private val store: SystemSettingsStore,
     private val executor: PServerCommandExecutor,
     private val settleVendor: () -> Unit = { Thread.sleep(VENDOR_SETTLE_MS) },
+    private val settleRepaint: () -> Unit = { Thread.sleep(VENDOR_REPAINT_MS) },
 ) : ProbeCartridge {
     override val id = HTR3212_PROBE_ID
-    override val version = 1
+    override val version = HTR3212_PROBE_VERSION
     override val surface = ProbeSurface.HTR3212
 
     override fun accepts(candidate: ProbeCandidate): Boolean {
@@ -29,7 +30,8 @@ internal class Htr3212LearningCartridge(
             descriptor.colorKey == GenericVendorLed.COLOR_KEY &&
             descriptor.colorFormat == "argb_hex_csv" &&
             descriptor.brightnessKey == GenericVendorLed.BRIGHTNESS_KEY &&
-            descriptor.enableKeys == GenericVendorLed.ENABLE_KEYS &&
+            descriptor.enableKeys.isNotEmpty() &&
+            GenericVendorLed.ENABLE_KEYS.containsAll(descriptor.enableKeys) &&
             descriptor.zones == TOTAL_ZONES &&
             hardware.leftBus in BUS_RANGE &&
             hardware.rightBus in BUS_RANGE &&
@@ -37,9 +39,7 @@ internal class Htr3212LearningCartridge(
             hardware.address == ADDRESS &&
             hardware.leftOrder.isZoneOrder() &&
             hardware.rightOrder.isZoneOrder() &&
-            hardware.rgbStartRegister == RGB_START_REGISTER &&
-            !hardware.blockWrite &&
-            !hardware.pairedWrite
+            hardware.rgbStartRegister in RGB_START_REGISTERS
     }
 
     override fun snapshot(candidate: ProbeCandidate): ProbeSnapshot? {
@@ -84,12 +84,12 @@ internal class Htr3212LearningCartridge(
             ProbeStep.POWER_ON -> prepareVendor(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, HIGH_LEVEL)
             ProbeStep.ZONE -> {
                 val index = zone?.takeIf { it in 0 until TOTAL_ZONES } ?: return false
-                prepareVendor(descriptor) &&
-                    writeFrame(
-                        descriptor,
-                        List(TOTAL_ZONES) { if (it == index) PROBE_COLOR else OFF_COLOR },
-                        HIGH_LEVEL,
-                    )
+                if (!prepareVendor(descriptor)) return false
+                val colors = List(TOTAL_ZONES) { if (it == index) PROBE_COLOR else OFF_COLOR }
+                val firstWrite = writeFrame(descriptor, colors, HIGH_LEVEL)
+                settleRepaint()
+                val reasserted = writeFrame(descriptor, colors, HIGH_LEVEL)
+                firstWrite && reasserted
             }
         }
     }
@@ -177,28 +177,30 @@ internal class Htr3212LearningCartridge(
         val scaled = colors.map { it.scale(brightness) }
         val left = scaled.take(ZONES_PER_STICK)
         val right = scaled.drop(ZONES_PER_STICK).take(ZONES_PER_STICK)
-        val commands =
-            listOfNotNull(
-                Htr3212Command.build(
-                    hardware.leftBus,
-                    hardware.address,
-                    left,
-                    hardware.leftOrder,
-                    previous = null,
-                    rgbStartRegister = hardware.rgbStartRegister,
-                    blockWrite = false,
-                ),
-                Htr3212Command.build(
-                    hardware.rightBus,
-                    hardware.address,
-                    right,
-                    hardware.rightOrder,
-                    previous = null,
-                    rgbStartRegister = hardware.rgbStartRegister,
-                    blockWrite = false,
-                ),
-            )
-        return commands.size == STICKS && commands.all(executor::execute)
+        val leftCommand =
+            Htr3212Command.build(
+                hardware.leftBus,
+                hardware.address,
+                left,
+                hardware.leftOrder,
+                previous = null,
+                rgbStartRegister = hardware.rgbStartRegister,
+                blockWrite = hardware.blockWrite,
+                explicitInitialization = hardware.explicitInitialization,
+            ) ?: return false
+        val rightCommand =
+            Htr3212Command.build(
+                hardware.rightBus,
+                hardware.address,
+                right,
+                hardware.rightOrder,
+                previous = null,
+                rgbStartRegister = hardware.rgbStartRegister,
+                blockWrite = hardware.blockWrite,
+                explicitInitialization = hardware.explicitInitialization,
+            ) ?: return false
+        val commands = if (hardware.pairedWrite) listOf("$leftCommand && $rightCommand") else listOf(leftCommand, rightCommand)
+        return commands.all(executor::execute)
     }
 
     private fun RgbColor.scale(brightness: Int): RgbColor {
@@ -215,6 +217,7 @@ internal class Htr3212LearningCartridge(
                 .mapNotNull { item ->
                     val zone = item.zone?.takeIf { it in 0 until TOTAL_ZONES } ?: return@mapNotNull null
                     val location = item.location ?: return@mapNotNull null
+                    if (location.logicalIndex !in 0 until ZONES_PER_STICK) return null
                     zone to location
                 }
         if (placements.size != TOTAL_ZONES || placements.map { it.second }.distinct().size != TOTAL_ZONES) return null
@@ -231,7 +234,7 @@ internal class Htr3212LearningCartridge(
 
     private companion object {
         const val ADDRESS = 0x3c
-        const val RGB_START_REGISTER = 0x0d
+        val RGB_START_REGISTERS = setOf(0x0d)
         const val STICKS = 2
         const val ZONES_PER_STICK = 4
         const val TOTAL_ZONES = STICKS * ZONES_PER_STICK
@@ -239,6 +242,7 @@ internal class Htr3212LearningCartridge(
         const val HIGH_LEVEL = 55
         const val HIGH_BRIGHTNESS_SETTING = "0.55"
         const val VENDOR_SETTLE_MS = 300L
+        const val VENDOR_REPAINT_MS = 1_200L
         val BUS_RANGE = 0..31
         val PROBE_COLOR = RgbColor(255, 0, 255)
         val OFF_COLOR = RgbColor(0, 0, 0)

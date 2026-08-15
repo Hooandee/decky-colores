@@ -30,6 +30,20 @@ class AndroidStringResourcesTest {
         assertFalse(english.contains("blue"))
     }
 
+    @Test
+    fun `four grouped points and no light are presented as different observations`() {
+        val spanish = stringsFrom("src/main/res/values/strings.xml")
+        val english = stringsFrom("src/main/res/values-en/strings.xml")
+
+        assertTrue(spanish.getValue("hardware_learning_whole_stick").contains("cuatro puntos"))
+        assertTrue(spanish.getValue("hardware_learning_whole_stick").contains("Todo el joystick"))
+        assertTrue(spanish.getValue("hardware_learning_none_visible").contains("nada"))
+        assertTrue(spanish.getValue("hardware_learning_zone_location_body").contains("un único punto"))
+        assertTrue(english.getValue("hardware_learning_whole_stick").contains("four points"))
+        assertTrue(english.getValue("hardware_learning_none_visible").contains("Nothing"))
+        assertTrue(english.getValue("hardware_learning_zone_location_body").contains("only if you see one"))
+    }
+
     private fun stringsFrom(path: String): Map<String, String> {
         val document = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(File(path))
         val nodes = document.getElementsByTagName("string")

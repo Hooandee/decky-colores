@@ -33,7 +33,9 @@ internal fun encodeLearningDescriptor(descriptor: LedDescriptor): String =
                         .put("right_order", JSONArray(hardware.rightOrder))
                         .put("rgb_start_register", hardware.rgbStartRegister)
                         .put("block_write", hardware.blockWrite)
-                        .put("paired_write", hardware.pairedWrite),
+                        .put("paired_write", hardware.pairedWrite)
+                        .put("explicit_initialization", hardware.explicitInitialization)
+                        .put("automatic_activation", hardware.automaticActivation),
                 )
             }
             value.toString()
@@ -66,6 +68,8 @@ internal fun decodeLearningDescriptor(raw: String): LedDescriptor? =
                             rgbStartRegister = value.getInt("rgb_start_register"),
                             blockWrite = value.optBoolean("block_write", false),
                             pairedWrite = value.optBoolean("paired_write", false),
+                            explicitInitialization = value.optBoolean("explicit_initialization", false),
+                            automaticActivation = value.optBoolean("automatic_activation", false),
                         )
                     }
                 SettingsProviderDescriptor(

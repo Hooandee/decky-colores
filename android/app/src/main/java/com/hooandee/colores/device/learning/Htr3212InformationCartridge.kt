@@ -6,6 +6,7 @@ import java.io.File
 
 internal const val HTR3212_INFORMATION_ID = "android-i2c-htr3212"
 internal const val HTR3212_PROBE_ID = "htr3212-multipoint"
+internal const val HTR3212_PROBE_VERSION = 3
 
 data class I2cController(
     val bus: Int,
@@ -66,7 +67,7 @@ class Htr3212InformationCartridge(
             if (base != null && left != null && right != null && left.bus != right.bus) {
                 ProbeCandidate(
                     cartridgeId = HTR3212_PROBE_ID,
-                    cartridgeVersion = 1,
+                    cartridgeVersion = HTR3212_PROBE_VERSION,
                     surface = ProbeSurface.HTR3212,
                     descriptor =
                         base.copy(
@@ -80,6 +81,7 @@ class Htr3212InformationCartridge(
                                     leftOrder = DEFAULT_ORDER,
                                     rightOrder = DEFAULT_ORDER,
                                     rgbStartRegister = AYN_RGB_START_REGISTER,
+                                    explicitInitialization = context.identity.isValidatedRp5(),
                                 ),
                         ),
                     signalKeys = setOf("htr3212_left", "htr3212_right", "htr3212_pair", "htr3212_bank_0d"),
@@ -92,6 +94,9 @@ class Htr3212InformationCartridge(
 
     private fun I2cController.toFact(key: String): HardwareFact =
         HardwareFact(key, "bus=$bus,address=0x%02x".format(address), FactEvidence.OBSERVED, id)
+
+    private fun com.hooandee.colores.device.AndroidDeviceIdentity.isValidatedRp5(): Boolean =
+        model.equals("Retroid Pocket 5", ignoreCase = true)
 
     private companion object {
         const val LEFT_DRIVER = "htr3212l"

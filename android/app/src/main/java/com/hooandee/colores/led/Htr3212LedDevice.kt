@@ -277,8 +277,9 @@ internal class Htr3212LedDevice internal constructor(
             colors = colors,
             logicalToDriverOrder = logicalToDriverOrder,
             previous = previous,
-            rgbStartRegister = hardware?.rgbStartRegister ?: 0x01,
+            rgbStartRegister = hardware?.rgbStartRegister ?: 0x0d,
             blockWrite = hardware?.blockWrite == true,
+            explicitInitialization = hardware?.explicitInitialization == true,
         )
 
     private fun LedState.toVendorState(): LedState =

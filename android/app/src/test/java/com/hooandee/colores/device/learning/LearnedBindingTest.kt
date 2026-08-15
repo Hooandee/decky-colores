@@ -40,6 +40,20 @@ class LearnedBindingTest {
     }
 
     @Test
+    fun `binding is scoped to the firmware fingerprint`() {
+        val first = identity.copy(productProperties = mapOf("ro.build.fingerprint" to "maker/device:13/first"))
+        val second = identity.copy(productProperties = mapOf("ro.build.fingerprint" to "maker/device:13/second"))
+
+        assertNull(
+            resolveLearnedDevice(
+                second,
+                binding.copy(identityHash = learningIdentityHash(first)),
+                listOf(candidate),
+            ),
+        )
+    }
+
+    @Test
     fun `stale descriptor or cartridge version is ignored`() {
         assertNull(resolveLearnedDevice(identity, binding.copy(cartridgeVersion = 2), listOf(candidate)))
         assertNull(
@@ -64,6 +78,8 @@ class LearnedBindingTest {
                         leftOrder = listOf(0, 1, 2, 3),
                         rightOrder = listOf(3, 2, 1, 0),
                         rgbStartRegister = 0x0d,
+                        explicitInitialization = true,
+                        automaticActivation = true,
                     ),
             )
 
@@ -96,7 +112,7 @@ class LearnedBindingTest {
         val htrCandidate =
             ProbeCandidate(
                 cartridgeId = HTR3212_PROBE_ID,
-                cartridgeVersion = 1,
+                cartridgeVersion = HTR3212_PROBE_VERSION,
                 surface = ProbeSurface.HTR3212,
                 descriptor = observedDescriptor,
                 signalKeys = setOf("htr3212_pair"),
@@ -104,6 +120,7 @@ class LearnedBindingTest {
         val htrBinding =
             binding.copy(
                 cartridgeId = HTR3212_PROBE_ID,
+                cartridgeVersion = HTR3212_PROBE_VERSION,
                 descriptorJson = encodeLearningDescriptor(calibratedDescriptor),
                 capabilities = DeviceCapabilities(color = true, brightness = false, perZone = true, zones = 8),
             )
@@ -128,12 +145,13 @@ class LearnedBindingTest {
                         rgbStartRegister = 0x0d,
                     ),
             )
-        val htrCandidate = ProbeCandidate(HTR3212_PROBE_ID, 1, ProbeSurface.HTR3212, observedDescriptor, emptySet())
+        val htrCandidate = ProbeCandidate(HTR3212_PROBE_ID, HTR3212_PROBE_VERSION, ProbeSurface.HTR3212, observedDescriptor, emptySet())
         val changedBus = observedDescriptor.copy(htr3212 = observedDescriptor.htr3212?.copy(leftBus = 4))
         val invalidOrder = observedDescriptor.copy(htr3212 = observedDescriptor.htr3212?.copy(leftOrder = listOf(0, 0, 1, 2)))
         val baseBinding =
             binding.copy(
                 cartridgeId = HTR3212_PROBE_ID,
+                cartridgeVersion = HTR3212_PROBE_VERSION,
                 capabilities = DeviceCapabilities(color = true, brightness = false, perZone = true, zones = 8),
             )
 

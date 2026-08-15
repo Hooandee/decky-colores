@@ -56,9 +56,11 @@ class DeviceRegistry internal constructor(
                                         address = hardware.getInt("address"),
                                         leftOrder = hardware.getIntList("leftOrder"),
                                         rightOrder = hardware.getIntList("rightOrder"),
-                                        rgbStartRegister = hardware.optInt("rgbStartRegister", 0x01),
+                                        rgbStartRegister = hardware.optInt("rgbStartRegister", 0x0d),
                                         blockWrite = hardware.optBoolean("blockWrite", false),
                                         pairedWrite = hardware.optBoolean("pairedWrite", false),
+                                        explicitInitialization = hardware.optBoolean("explicitInitialization", false),
+                                        automaticActivation = hardware.optBoolean("automaticActivation", false),
                                     ).also {
                                         require(it.address in 0..0x7f)
                                         require(it.leftOrder.sorted() == listOf(0, 1, 2, 3))
