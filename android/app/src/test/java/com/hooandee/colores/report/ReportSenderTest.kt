@@ -12,14 +12,17 @@ class ReportSenderTest {
     @Test
     fun `successful send returns code without saving a local copy`() {
         var saved = false
+        var cleared = false
         val sender =
             ReportSender(
                 post = { HttpResponse(200, """{"ok":true,"code":"COL-900"}""") },
                 save = { saved = true; "/tmp/report.json" },
+                clear = { cleared = true },
             )
 
         assertEquals(ReportResult.Success("COL-900", null), sender.submit(bundle))
         assertFalse(saved)
+        assertTrue(cleared)
     }
 
     @Test
@@ -29,6 +32,7 @@ class ReportSenderTest {
             ReportSender(
                 post = { throw IllegalStateException("offline") },
                 save = { savedBundle = it; "/private/report-offline.json" },
+                clear = {},
             )
 
         val result = sender.submit(bundle)

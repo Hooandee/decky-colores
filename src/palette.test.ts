@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import {
+  GRADIENT_PRESETS,
   audioVuColors,
   formatSensorValue,
   sensorBandColor,
@@ -9,6 +10,15 @@ import {
   sensorThresholdPositions,
   suggestGradientName,
 } from "./palette";
+
+type SharedGradientPreset = {
+  id: string;
+  colors: Array<{ r: number; g: number; b: number }>;
+};
+
+const sharedGradients = JSON.parse(
+  readFileSync(new URL("../shared/gradients.json", import.meta.url), "utf8"),
+) as { presets: SharedGradientPreset[] };
 
 type VuVector = {
   id: string;
@@ -38,6 +48,24 @@ describe("audioVuColors", () => {
     for (const vector of vectors) {
       expect(vector.operation).toBe("vu_frame");
       expect(audioVuColors(vector.input.level, vector.input.zones), vector.id).toEqual(vector.expected.colors);
+    }
+  });
+});
+
+describe("shared gradient presets", () => {
+  it("keeps the Decky catalogue synchronized with the shared contract", () => {
+    expect(GRADIENT_PRESETS).toEqual(
+      sharedGradients.presets.map((preset) => ({
+        name: preset.id.charAt(0).toUpperCase() + preset.id.slice(1),
+        stops: preset.colors,
+      })),
+    );
+  });
+
+  it("keeps every built-in journey intentional and complete", () => {
+    for (const preset of sharedGradients.presets) {
+      expect(preset.colors, preset.id).toHaveLength(3);
+      expect(new Set(preset.colors.map((color) => `${color.r},${color.g},${color.b}`)).size, preset.id).toBe(3);
     }
   });
 });

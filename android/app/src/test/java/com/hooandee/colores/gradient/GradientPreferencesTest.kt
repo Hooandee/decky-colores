@@ -37,6 +37,21 @@ class GradientPreferencesTest {
     }
 
     @Test
+    fun `device promotion copies gradients only when the native record is missing`() {
+        val learned = DeviceGradientPreferences(mode = LightingMode.GRADIENT, currentStops = listOf(red, blue))
+        preferences.save("learned-portal", learned)
+
+        preferences.migrateDevice("learned-portal", "ayn-odin2-portal")
+
+        assertEquals(learned, preferences.load("ayn-odin2-portal"))
+        val native = DeviceGradientPreferences(mode = LightingMode.COLOR, currentStops = listOf(blue))
+        preferences.save("ayn-odin2-portal", native)
+        preferences.save("learned-portal", learned.copy(currentStops = listOf(red)))
+        preferences.migrateDevice("learned-portal", "ayn-odin2-portal")
+        assertEquals(native, preferences.load("ayn-odin2-portal"))
+    }
+
+    @Test
     fun `upsert replaces the same name and moves it to newest position`() {
         preferences.upsert("rp5", "Primero", listOf(red))
         preferences.upsert("rp5", "Segundo", listOf(blue))

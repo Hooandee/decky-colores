@@ -27,6 +27,7 @@ import com.hooandee.colores.ui.ColoresViewModel
 class MainActivity : AppCompatActivity() {
     private val viewModel by viewModels<ColoresViewModel>()
     private var projectionRequest = ProjectionRequest.NONE
+    private var afterNotificationPermission: (() -> Unit)? = null
     private val projectionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val data = result.data
@@ -49,6 +50,10 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) launchProjectionConsent(ProjectionRequest.AUDIO) else viewModel.onAudioAuthorizationDenied()
         }
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+            afterNotificationPermission?.also { afterNotificationPermission = null }?.invoke()
+        }
     private val screenOnReceiver =
         object : BroadcastReceiver() {
             override fun onReceive(
@@ -69,7 +74,9 @@ class MainActivity : AppCompatActivity() {
                     viewModel = viewModel,
                     onGrantPermission = { startActivity(WriteSettingsPermission.createGrantIntent(this)) },
                     onAudioCaptureRequest = ::requestAudioCapture,
-                    onAmbientCaptureRequest = { launchProjectionConsent(ProjectionRequest.AMBIENT) },
+                    onAmbientCaptureRequest = {
+                        requestNotificationPermissionIfNeeded { launchProjectionConsent(ProjectionRequest.AMBIENT) }
+                    },
                     onGrantUsage = {
                         startActivity((application as ColoresApplication).usageAccess.settingsIntent())
                     },
@@ -111,10 +118,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestAudioCapture() {
+        requestNotificationPermissionIfNeeded(::requestAudioPermission)
+    }
+
+    private fun requestAudioPermission() {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             launchProjectionConsent(ProjectionRequest.AUDIO)
         } else {
             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded(onReady: () -> Unit) {
+        val granted = ContextCompat.checkSelfPermission(this, NOTIFICATION_PERMISSION) == PackageManager.PERMISSION_GRANTED
+        if (shouldRequestNotificationPermission(Build.VERSION.SDK_INT, granted)) {
+            afterNotificationPermission = onReady
+            notificationPermissionLauncher.launch(NOTIFICATION_PERMISSION)
+        } else {
+            onReady()
         }
     }
 
@@ -130,3 +151,10 @@ class MainActivity : AppCompatActivity() {
         AMBIENT,
     }
 }
+
+internal fun shouldRequestNotificationPermission(
+    sdk: Int,
+    granted: Boolean,
+): Boolean = sdk >= Build.VERSION_CODES.TIRAMISU && !granted
+
+private const val NOTIFICATION_PERMISSION = "android.permission.POST_NOTIFICATIONS"

@@ -44,6 +44,14 @@ class GradientPreferences(
         write(key(deviceId), encode(value).toString())
     }
 
+    fun migrateDevice(
+        sourceDeviceId: String,
+        targetDeviceId: String,
+    ) {
+        if (sourceDeviceId == targetDeviceId || read(key(targetDeviceId)) != null) return
+        read(key(sourceDeviceId))?.let { write(key(targetDeviceId), it) }
+    }
+
     fun upsert(
         deviceId: String,
         name: String,

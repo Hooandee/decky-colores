@@ -1,6 +1,6 @@
 package com.hooandee.colores.device
 
-import com.hooandee.colores.led.SettingsProviderDescriptor
+import com.hooandee.colores.device.learning.ProbeSurface
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsColorKind
 import com.hooandee.colores.led.SysfsRgbDescriptor
@@ -10,77 +10,49 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GenericLedResolverTest {
-    private val identity = AndroidDeviceIdentity("ODIN2 Portal", "kalama", "AYN", emptyMap())
-
     @Test
-    fun `vendor route needs both the service and the color key`() {
-        assertNull(GenericLedResolver.vendor(identity, pserverAvailable = false, colorKeyValue = "#FF00FF00"))
-        assertNull(GenericLedResolver.vendor(identity, pserverAvailable = true, colorKeyValue = null))
-        assertNull(GenericLedResolver.vendor(identity, pserverAvailable = true, colorKeyValue = "  "))
+    fun `settings candidate needs both the service and a valid color value`() {
+        assertNull(GenericLedResolver.settingsCandidate(pserverAvailable = false, colorKeyValue = "#FF00FF00"))
+        assertNull(GenericLedResolver.settingsCandidate(pserverAvailable = true, colorKeyValue = null))
+        assertNull(GenericLedResolver.settingsCandidate(pserverAvailable = true, colorKeyValue = "invalid"))
     }
 
     @Test
-    fun `vendor route builds a two zone pserver descriptor from the product name`() {
-        val detected = requireNotNull(GenericLedResolver.vendor(identity, pserverAvailable = true, colorKeyValue = "#FF112233"))
+    fun `settings signal becomes a candidate without confirming its observed zone count`() {
+        val candidate = requireNotNull(GenericLedResolver.settingsCandidate(pserverAvailable = true, colorKeyValue = "#FF112233,#FF445566"))
 
-        assertEquals("generic-vendor", detected.id)
-        assertEquals("ODIN2 Portal", detected.friendlyName)
-        assertEquals(2, detected.capabilities.zones)
-        assertTrue(detected.capabilities.perZone)
-        val led = detected.led as SettingsProviderDescriptor
-        assertEquals("settings_provider", led.driver)
-        assertEquals("pserver", led.transport)
-        assertNull(led.requiresPermission)
-        assertEquals("joystick_led_light_picker_color", led.colorKey)
-        assertTrue(led.enableKeys.containsAll(listOf("left_handle_light_enabled", "right_handle_light_enabled")))
+        assertEquals("settings-pserver-joystick", candidate.cartridgeId)
+        assertEquals(ProbeSurface.SETTINGS_PSERVER, candidate.surface)
+        assertEquals(setOf("observed_color_count"), candidate.signalKeys)
     }
 
     @Test
-    fun `sysfs route mirrors the discovered descriptor and zone count`() {
+    fun `sysfs signal becomes a candidate without confirming zone capability`() {
         val descriptor = SysfsRgbDescriptor("/n", zones = 4, maxBrightness = 255, kind = SysfsColorKind.MULTI_INTENSITY_HEX)
 
-        val detected = requireNotNull(GenericLedResolver.sysfs(identity, descriptor))
+        val candidate = requireNotNull(GenericLedResolver.sysfsCandidate(descriptor))
 
-        assertEquals("generic-sysfs", detected.id)
-        assertEquals(4, detected.capabilities.zones)
-        assertTrue(detected.capabilities.perZone)
-        assertEquals(descriptor, detected.led)
-    }
-
-    @Test
-    fun `sysfs route reports a single zone without per zone control`() {
-        val descriptor = SysfsRgbDescriptor("/n", zones = 1, maxBrightness = 255, kind = SysfsColorKind.RGB_CHANNELS)
-
-        val detected = requireNotNull(GenericLedResolver.sysfs(identity, descriptor))
-
-        assertEquals(false, detected.capabilities.perZone)
-    }
-
-    @Test
-    fun `falls back to manufacturer then device for the friendly name`() {
-        val blankModel = AndroidDeviceIdentity(model = "", device = "kalama", manufacturer = "AYN", productProperties = emptyMap())
-        val detected = requireNotNull(GenericLedResolver.vendor(blankModel, pserverAvailable = true, colorKeyValue = "#FFFFFFFF"))
-        assertEquals("AYN", detected.friendlyName)
+        assertEquals("android-sysfs-multicolor", candidate.cartridgeId)
+        assertEquals(setOf("color_kind", "observed_index_count"), candidate.signalKeys)
+        assertEquals(descriptor, candidate.descriptor)
     }
 
     @Test
     fun `null sysfs descriptor yields no device`() {
-        assertNull(GenericLedResolver.sysfs(identity, null))
+        assertNull(GenericLedResolver.sysfsCandidate(null))
     }
 
     @Test
-    fun `joypad route builds a single zone device`() {
-        val detected = requireNotNull(GenericLedResolver.joypad(identity, SingleAdcJoypadDescriptor("/n")))
+    fun `joypad signal becomes a single zone candidate`() {
+        val candidate = requireNotNull(GenericLedResolver.joypadCandidate(SingleAdcJoypadDescriptor("/n")))
 
-        assertEquals("generic-joypad", detected.id)
-        assertEquals(1, detected.capabilities.zones)
-        assertEquals(false, detected.capabilities.perZone)
-        assertTrue(detected.capabilities.color)
-        assertTrue(detected.led is SingleAdcJoypadDescriptor)
+        assertEquals("singleadc-joypad", candidate.cartridgeId)
+        assertEquals(setOf("singleadc_surface"), candidate.signalKeys)
+        assertTrue(candidate.descriptor is SingleAdcJoypadDescriptor)
     }
 
     @Test
     fun `null joypad descriptor yields no device`() {
-        assertNull(GenericLedResolver.joypad(identity, null))
+        assertNull(GenericLedResolver.joypadCandidate(null))
     }
 }

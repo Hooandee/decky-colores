@@ -2,6 +2,7 @@ package com.hooandee.colores.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,11 +75,7 @@ internal fun GradientEditorDialog(
                 decorFitsSystemWindows = false,
             ),
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-        ) {
+        PrismaticBackdrop(modifier = Modifier.fillMaxSize()) {
             Column(
                 Modifier
                     .fillMaxSize()
@@ -141,21 +138,30 @@ private fun GradientZonesPane(
     val projection = state.ledColorProjection
     val animated = state.gradientAnimated
     Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.prismaticPanel(RoundedCornerShape(28.dp), strong = true),
+        color = Color.Transparent,
         shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            GradientPreviewBar(state.gradient.stops.map(projection::display))
-            Text(
-                text = stringResource(if (animated) R.string.gradient_editor_choose_color else R.string.gradient_editor_choose_zone),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodySmall,
-            )
+            if (animated) {
+                AnimatedGradientJourney(state.gradient.stops.map(projection::display))
+                Text(
+                    text = stringResource(R.string.gradient_editor_paused_hint),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                AnimatedStopSelector(state, actions)
+            } else {
+                GradientPreviewBar(state.gradient.stops.map(projection::display))
+                Text(
+                    text = stringResource(R.string.gradient_editor_choose_zone),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
             if (!animated && zones.any { it.stick != null }) {
                 zones.groupBy { it.stick }.toSortedMap(compareBy { it ?: -1 }).forEach { (stick, stickZones) ->
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -163,9 +169,128 @@ private fun GradientZonesPane(
                         ZoneGrid(stickZones, state, actions, colorStops = false)
                     }
                 }
-            } else {
-                SectionLabel(stringResource(if (animated) R.string.gradient_colors else R.string.gradient_stops))
-                ZoneGrid(zones, state, actions, colorStops = animated)
+            } else if (!animated) {
+                SectionLabel(stringResource(R.string.gradient_stops))
+                ZoneGrid(zones, state, actions, colorStops = false)
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnimatedGradientJourney(colors: List<RgbColor>) {
+    val shown = colors.ifEmpty { listOf(RgbColor(34, 35, 43), RgbColor(34, 35, 43)) }
+    val first = shown.first().toComposeColor()
+    val last = shown.last().toComposeColor()
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            GradientLightSample(first)
+            Box(
+                Modifier
+                    .weight(1f)
+                    .height(12.dp)
+                    .clip(CircleShape)
+                    .background(Brush.horizontalGradient(shown.map(RgbColor::toComposeColor)))
+                    .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+            )
+            GradientLightSample(last)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(
+                stringResource(R.string.gradient_editor_start_color),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                stringResource(R.string.gradient_editor_end_color),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GradientLightSample(color: Color) {
+    Box(
+        modifier =
+            Modifier
+                .size(68.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color.White.copy(alpha = 0.92f), color, color.copy(alpha = 0.42f), Color.Transparent),
+                    ),
+                )
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+    )
+}
+
+@Composable
+private fun AnimatedStopSelector(
+    state: ColoresUiState,
+    actions: GradientActions,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().focusGroup(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        state.gradient.stops.take(2).forEachIndexed { index, stop ->
+            val selected = state.gradient.selectedStopIndex == index
+            val label =
+                stringResource(
+                    if (index == 0) R.string.gradient_editor_start_color else R.string.gradient_editor_end_color,
+                )
+            var focused by remember { mutableStateOf(false) }
+            Surface(
+                onClick = { actions.onStopChange(index) },
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .heightIn(min = 92.dp)
+                        .onFocusChanged { focused = it.isFocused }
+                        .semantics {
+                            this.selected = selected
+                            this.role = Role.RadioButton
+                            contentDescription = label
+                        },
+                color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                shape = RoundedCornerShape(20.dp),
+                border =
+                    BorderStroke(
+                        if (selected || focused) 2.dp else 1.dp,
+                        if (focused || selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Surface(
+                        modifier = Modifier.size(42.dp),
+                        color = state.ledColorProjection.display(stop).toComposeColor(),
+                        shape = CircleShape,
+                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface),
+                    ) {}
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            stop.toHexString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         }
     }
@@ -222,13 +347,13 @@ private fun ZoneCell(
                     this.role = Role.RadioButton
                     contentDescription = description
                 },
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color(0xFF181920),
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
         shape = RoundedCornerShape(16.dp),
         border =
             BorderStroke(
                 if (selected || focused) 2.dp else 1.dp,
-                if (focused) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = if (selected) 0.55f else 0.1f),
+                if (focused || selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
             ),
     ) {
         Column(
@@ -240,7 +365,7 @@ private fun ZoneCell(
                 modifier = Modifier.size(30.dp),
                 color = color.toComposeColor(),
                 shape = RoundedCornerShape(999.dp),
-                border = BorderStroke(2.dp, Color.White.copy(alpha = 0.5f)),
+                border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface),
             ) {}
             Text(
                 text = if (colorStop) stringResource(R.string.gradient_color_number, zone.index + 1) else zoneShortLabel(zone),
@@ -284,78 +409,48 @@ private fun GradientColorPane(
         mutableStateOf(DeferredIntSliderState((saturation * 100f).roundToInt()))
     }
     Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.prismaticPanel(RoundedCornerShape(28.dp), strong = true),
+        color = Color.Transparent,
         shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Surface(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                color = Color(0xFF181920),
-                shape = RoundedCornerShape(18.dp),
-                border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Column(
-                    modifier = Modifier.padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    SectionLabel(stringResource(R.string.gradient_save_title))
-                    Row(
-                        modifier = Modifier.fillMaxWidth().focusGroup(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        OutlinedTextField(
-                            value = saveName,
-                            onValueChange = { saveName = it },
-                            modifier = Modifier.weight(1f).widthIn(min = 160.dp),
-                            label = { Text(stringResource(R.string.gradient_name)) },
-                            singleLine = true,
-                        )
-                        Button(
-                            onClick = {
-                                actions.onSave(saveName)
-                                saveName = ""
-                            },
-                            enabled = saveName.isNotBlank(),
-                            modifier = Modifier.height(56.dp),
-                        ) {
-                            Text(stringResource(R.string.gradient_save))
-                        }
-                    }
-                    OutlinedButton(
-                        onClick = actions.onRestore,
-                        enabled = state.gradient.selectedPresetId != null,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.gradient_restore))
-                    }
+                Surface(
+                    modifier = Modifier.size(54.dp),
+                    color = state.ledColorProjection.display(color).toComposeColor(),
+                    shape = CircleShape,
+                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.surface),
+                ) {}
+                Column {
+                    Text(
+                        text = stringResource(
+                            if (state.gradientAnimated) R.string.gradient_editor_selected_color else R.string.gradient_editor_selected_zone,
+                        ),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                    Text(
+                        text =
+                            selectedZone?.let {
+                                if (state.gradientAnimated) {
+                                    stringResource(
+                                        if (it.index == 0) R.string.gradient_editor_start_color else R.string.gradient_editor_end_color,
+                                    )
+                                } else {
+                                    zoneLongLabel(it)
+                                }
+                            }.orEmpty(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
                 }
-            }
-            Column {
-                Text(
-                    text = stringResource(
-                        if (state.gradientAnimated) R.string.gradient_editor_selected_color else R.string.gradient_editor_selected_zone,
-                    ),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelMedium,
-                )
-                Text(
-                    text =
-                        selectedZone?.let {
-                            if (state.gradientAnimated) {
-                                stringResource(R.string.gradient_color_number, it.index + 1)
-                            } else {
-                                zoneLongLabel(it)
-                            }
-                        }.orEmpty(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
             }
             Box(
                 modifier = Modifier.fillMaxWidth().height(236.dp),
@@ -416,6 +511,43 @@ private fun GradientColorPane(
                     )
                 },
             )
+            Spacer(
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)),
+            )
+            SectionLabel(stringResource(R.string.gradient_save_title))
+            Row(
+                modifier = Modifier.fillMaxWidth().focusGroup(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = saveName,
+                    onValueChange = { saveName = it },
+                    modifier = Modifier.weight(1f).widthIn(min = 160.dp),
+                    label = { Text(stringResource(R.string.gradient_name)) },
+                    singleLine = true,
+                )
+                Button(
+                    onClick = {
+                        actions.onSave(saveName)
+                        saveName = ""
+                    },
+                    enabled = saveName.isNotBlank(),
+                    modifier = Modifier.height(56.dp),
+                ) {
+                    Text(stringResource(R.string.gradient_save))
+                }
+            }
+            OutlinedButton(
+                onClick = actions.onRestore,
+                enabled = state.gradient.selectedPresetId != null,
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+            ) {
+                Text(stringResource(R.string.gradient_restore))
+            }
         }
     }
 }

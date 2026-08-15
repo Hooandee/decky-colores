@@ -8,7 +8,6 @@ import android.app.Service
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.os.Build
@@ -114,9 +113,7 @@ class EffectsService : Service() {
     private fun startForegroundCompat(mediaProjection: Boolean) {
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val type =
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
-                    if (mediaProjection) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION else 0
+            val type = foregroundServiceTypes(Build.VERSION.SDK_INT, mediaProjection)
             startForeground(NOTIFICATION_ID, notification, type)
         } else {
             startForeground(NOTIFICATION_ID, notification)

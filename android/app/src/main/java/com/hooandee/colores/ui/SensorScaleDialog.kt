@@ -66,11 +66,7 @@ internal fun SensorScaleDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-        ) {
+        PrismaticBackdrop(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 22.dp, vertical = 16.dp),
             ) {
@@ -140,10 +136,9 @@ private fun SensorBandList(
     modifier: Modifier,
 ) {
     Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.prismaticPanel(RoundedCornerShape(28.dp), strong = true),
+        color = Color.Transparent,
         shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
@@ -170,7 +165,7 @@ private fun SensorBandList(
                             this.selected = selected
                             role = Role.RadioButton
                         },
-                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color(0xFF181920),
+                        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
                         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
                         shape = RoundedCornerShape(16.dp),
                         border = BorderStroke(if (selected) 2.dp else 1.dp, Color.White.copy(alpha = if (selected) 0.48f else 0.08f)),
@@ -213,10 +208,9 @@ private fun SensorBandEditor(
     val saturation = band.color.toHsvColor().saturation
     val range = model.thresholdRange
     Surface(
-        modifier = modifier,
-        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier.prismaticPanel(RoundedCornerShape(28.dp), strong = true),
+        color = Color.Transparent,
         shape = RoundedCornerShape(28.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
     ) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),

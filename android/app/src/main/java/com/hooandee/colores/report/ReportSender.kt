@@ -16,10 +16,12 @@ data class HttpResponse(
 class ReportSender(
     private val post: (JSONObject) -> HttpResponse,
     private val save: (JSONObject) -> String?,
+    private val clear: () -> Unit,
 ) {
     constructor(context: Context) : this(
         post = { payload -> postReport(REPORT_SERVICE_URL, payload) },
         save = { bundle -> saveReport(context, bundle) },
+        clear = { clearSavedReport(context) },
     )
 
     fun submit(bundle: JSONObject): ReportResult {
@@ -28,7 +30,10 @@ class ReportSender(
                 val response = post(encodeReportPayload(bundle))
                 parseReportResponse(response.status, response.body)
             }.getOrElse { ReportResult.Failure(it.message ?: "network") }
-        if (result is ReportResult.Success) return result
+        if (result is ReportResult.Success) {
+            clear()
+            return result
+        }
         val failure = result as ReportResult.Failure
         return failure.copy(savedPath = save(bundle))
     }
@@ -76,5 +81,9 @@ private fun saveReport(
         }
         target.absolutePath
     }.getOrNull()
+
+private fun clearSavedReport(context: Context) {
+    File(File(context.filesDir, "reports"), "report-offline.json").delete()
+}
 
 private const val REPORT_SERVICE_URL = "https://bug-collector-khaki.vercel.app/api/report"

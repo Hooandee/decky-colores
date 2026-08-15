@@ -1,5 +1,5 @@
 package com.hooandee.colores.report
 
-val REPORT_CATEGORIES = listOf("color", "brightness", "effects", "sensors", "audio", "profiles", "other")
+val REPORT_CATEGORIES = listOf("color", "brightness", "effects", "sensors", "audio", "profiles", "learning", "other")
 
 fun canSubmitReport(text: String): Boolean = text.isNotBlank()

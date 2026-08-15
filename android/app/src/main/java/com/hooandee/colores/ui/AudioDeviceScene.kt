@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -44,8 +45,8 @@ internal fun AudioDeviceScene(
     val preview = devicePreviewGroups(frame, layout)
     val previewStyle = LocalLedPreviewStyle.current
     Surface(
-        modifier = modifier,
-        color = previewStyle.sceneBackground,
+        modifier = modifier.prismaticPanel(RoundedCornerShape(32.dp), strong = true),
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(32.dp),
     ) {

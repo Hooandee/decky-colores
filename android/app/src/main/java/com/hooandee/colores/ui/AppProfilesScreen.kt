@@ -2,7 +2,6 @@ package com.hooandee.colores.ui
 
 import android.graphics.drawable.Drawable
 import android.widget.ImageView
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,16 +51,20 @@ fun ProfileSelectorPill(
 ) {
     val app = state.selectedProfileApp()
     val label = app?.label ?: stringResource(R.string.profile_global)
+    val shape = RoundedCornerShape(999.dp)
     Surface(
         onClick = onOpen,
         modifier = modifier.widthIn(max = 220.dp),
-        shape = RoundedCornerShape(999.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        shape = shape,
+        color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            modifier =
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .prismaticPanel(shape)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -94,8 +98,13 @@ fun AppProfilesDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(28.dp),
-            color = MaterialTheme.colorScheme.surface,
-            modifier = Modifier.fillMaxWidth().heightIn(max = 680.dp),
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 680.dp)
+                    .prismaticPanel(RoundedCornerShape(28.dp), strong = true),
         ) {
             LazyColumn(
                 modifier = Modifier.padding(22.dp),

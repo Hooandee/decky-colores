@@ -47,6 +47,7 @@ class LightingControllerTest {
         val writes = mutableListOf<Write>()
         var invalidations = 0
         var hardwareEffectWrites = 0
+        var closed = false
 
         @Volatile
         var failOnce = false
@@ -86,6 +87,10 @@ class LightingControllerTest {
 
         override fun invalidate() {
             invalidations++
+        }
+
+        override suspend fun close() {
+            closed = true
         }
     }
 
@@ -307,6 +312,21 @@ class LightingControllerTest {
         }
 
     @Test
+    fun `awaited unbind releases the device before returning`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope)
+            controller.bind(binding(device), LightingIntent())
+            runCurrent()
+
+            controller.unbindAndAwait()
+
+            assertFalse(controller.snapshot.value.bound)
+            assertNull(controller.boundDevice("dev"))
+            assertTrue(device.closed)
+        }
+
+    @Test
     fun `static color applies once without a render loop or service`() =
         runTest {
             val device = FakeDevice()
@@ -423,6 +443,87 @@ class LightingControllerTest {
 
             assertTrue(gate.running)
             assertTrue(device.writes.size >= 2)
+        }
+
+    @Test
+    fun `editing a gradient effect freezes live changes and resumes afterward`() =
+        runTest {
+            val red = RgbColor(255, 0, 0)
+            val blue = RgbColor(0, 0, 255)
+            val green = RgbColor(0, 255, 0)
+            val device = FakeDevice(recommendedFrameIntervalMs = 80, supportsPerZone = false)
+            val gate = RecordingGate()
+            val controller = LightingController(backgroundScope, gate, clockMs = { testScheduler.currentTime })
+
+            controller.bind(
+                binding(device, zones = 1),
+                LightingIntent(
+                    mode = AppMode.EFFECT,
+                    effectId = "wave",
+                    staticColors = listOf(red),
+                    gradientStops = listOf(red, blue),
+                    gradientPresentation = GradientPresentation.ANIMATED,
+                    gradientSpeed = 70,
+                ),
+            )
+            advanceTimeBy(240)
+            runCurrent()
+            assertTrue(gate.running)
+
+            controller.setGradientEditing(true)
+            advanceTimeBy(100)
+            runCurrent()
+            val writesWhenFrozen = device.writes.size
+            advanceTimeBy(800)
+            runCurrent()
+
+            assertEquals(writesWhenFrozen, device.writes.size)
+            assertFalse(gate.running)
+
+            controller.setGradientEditingPreview(green)
+            controller.setPaletteSources(red, listOf(red, green))
+            advanceTimeBy(100)
+            runCurrent()
+            assertEquals(listOf(green), device.writes.last().colors)
+            assertFalse(gate.running)
+
+            controller.setGradientEditing(false)
+            advanceTimeBy(240)
+            runCurrent()
+
+            assertTrue(device.writes.size > writesWhenFrozen + 1)
+            assertTrue(gate.running)
+            assertEquals(70, controller.snapshot.value.gradientSpeed)
+        }
+
+    @Test
+    fun `rebinding while editing cannot leave the next device frozen`() =
+        runTest {
+            val red = RgbColor(255, 0, 0)
+            val blue = RgbColor(0, 0, 255)
+            val first = FakeDevice(recommendedFrameIntervalMs = 80, supportsPerZone = false)
+            val second = FakeDevice(recommendedFrameIntervalMs = 80, supportsPerZone = false)
+            val gate = RecordingGate()
+            val controller = LightingController(backgroundScope, gate, clockMs = { testScheduler.currentTime })
+            val intent =
+                LightingIntent(
+                    mode = AppMode.GRADIENT,
+                    gradientStops = listOf(red, blue),
+                    gradientPresentation = GradientPresentation.ANIMATED,
+                )
+
+            controller.bind(binding(first, zones = 1), intent)
+            controller.setGradientEditing(true)
+            advanceTimeBy(160)
+            runCurrent()
+            assertFalse(gate.running)
+
+            controller.bind(binding(second, zones = 1), intent)
+            advanceTimeBy(240)
+            runCurrent()
+
+            assertTrue(gate.running)
+            assertTrue(second.writes.size >= 2)
         }
 
     @Test

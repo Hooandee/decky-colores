@@ -12,6 +12,7 @@ class PlatformSupportContractTest {
     private val requiredFeatures =
         setOf(
             "device_detection",
+            "android_identity_presentation",
             "generic_led_discovery",
             "solid_color",
             "per_zone_color",

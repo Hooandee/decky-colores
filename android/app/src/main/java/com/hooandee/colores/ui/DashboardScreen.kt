@@ -14,12 +14,15 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -28,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -50,19 +54,17 @@ fun DashboardScreen(
     onBrightnessChange: (Int) -> Unit,
     onOpenProfiles: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenHardwareLearning: () -> Unit,
+    onOpenHardwareLearningReport: () -> Unit,
     gradientActions: GradientActions,
     modeActions: ModeActions,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
-        contentColor = MaterialTheme.colorScheme.onBackground,
-    ) {
+    PrismaticBackdrop(modifier = Modifier.fillMaxSize()) {
         if (state.loading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
-            return@Surface
+            return@PrismaticBackdrop
         }
         Column(
             modifier =
@@ -81,9 +83,42 @@ fun DashboardScreen(
             Spacer(Modifier.height(14.dp))
             val detected = state.detected
             if (detected == null) {
+                val canConfigure = state.hasHardwareLearningCandidates
                 ControlStatusCard(
-                    title = stringResource(R.string.no_leds_title),
-                    description = stringResource(R.string.no_leds_description),
+                    title =
+                        stringResource(
+                            when {
+                                state.hardwareLearningNeedsReport -> R.string.lights_no_match_title
+                                canConfigure -> R.string.lights_setup_title
+                                else -> R.string.no_leds_title
+                            },
+                        ),
+                    description =
+                        when {
+                            state.hardwareLearningNeedsReport -> stringResource(R.string.lights_no_match_description)
+                            canConfigure ->
+                                stringResource(
+                                    R.string.lights_setup_description,
+                                    state.devicePresentation.friendlyName.ifBlank { stringResource(R.string.device_unknown) },
+                                )
+                            else -> stringResource(R.string.no_leds_description)
+                        },
+                    action =
+                        stringResource(
+                            if (state.hardwareLearningNeedsReport) {
+                                R.string.lights_no_match_report
+                            } else {
+                                R.string.lights_setup_action
+                            },
+                        ).takeIf { state.hardwareLearningNeedsReport || canConfigure },
+                    onAction =
+                        if (state.hardwareLearningNeedsReport) {
+                            onOpenHardwareLearningReport
+                        } else {
+                            onOpenHardwareLearning.takeIf { canConfigure }
+                        },
+                    secondaryAction = stringResource(R.string.lights_no_match_retry).takeIf { state.hardwareLearningNeedsReport },
+                    onSecondaryAction = onOpenHardwareLearning.takeIf { state.hardwareLearningNeedsReport && canConfigure },
                 )
                 return@Column
             }
@@ -99,6 +134,8 @@ fun DashboardScreen(
                     ControlStatusCard(
                         title = stringResource(R.string.control_service_title),
                         description = stringResource(R.string.control_service_description),
+                        action = stringResource(R.string.hardware_learning_repair).takeIf { state.hasHardwareLearningCandidates },
+                        onAction = onOpenHardwareLearning.takeIf { state.hasHardwareLearningCandidates },
                     )
                 ControlAccess.ENABLED ->
                     DashboardBody(
@@ -127,62 +164,100 @@ private fun DashboardHeader(
     onOpenSettings: () -> Unit,
 ) {
     val settingsLabel = stringResource(R.string.settings_open)
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.app_name),
-                color = MaterialTheme.colorScheme.primary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.4.sp,
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val showSettingsLabel = maxWidth >= 720.dp
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = state.detected?.friendlyName ?: stringResource(R.string.device_unknown),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
+                    text = stringResource(R.string.app_name),
+                    color = MaterialTheme.colorScheme.primary,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 2.4.sp,
                 )
-                if (state.canWrite) ConnectedPill()
-                if (state.detected != null) {
-                    ProfileSelectorPill(state = state, onOpen = onOpenProfiles)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = state.devicePresentation.friendlyName.ifBlank { stringResource(R.string.device_unknown) },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (state.canWrite) ConnectedPill()
+                    if (state.detected == null && (state.hasHardwareLearningCandidates || state.hardwareLearningNeedsReport)) {
+                        SetupRequiredPill(needsReport = state.hardwareLearningNeedsReport)
+                    }
+                    if (state.detected != null) {
+                        ProfileSelectorPill(state = state, onOpen = onOpenProfiles)
+                    }
+                }
+            }
+            if (state.detected?.capabilities?.power == true) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.power_title),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge,
+                    )
+                    Switch(
+                        checked = state.ledState.power,
+                        onCheckedChange = onPowerChange,
+                        enabled = state.canWrite,
+                    )
+                }
+            }
+            Surface(
+                onClick = onOpenSettings,
+                modifier =
+                    Modifier
+                        .height(48.dp)
+                        .widthIn(min = 48.dp)
+                        .prismaticPanel(RoundedCornerShape(14.dp))
+                        .semantics { contentDescription = settingsLabel },
+                shape = RoundedCornerShape(14.dp),
+                color = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = if (showSettingsLabel) 16.dp else 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_settings),
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                    )
+                    if (showSettingsLabel) {
+                        Text(settingsLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
-        if (state.detected != null) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = stringResource(R.string.power_title),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                Switch(
-                    checked = state.ledState.power,
-                    onCheckedChange = onPowerChange,
-                    enabled = state.canWrite,
-                )
-            }
-        }
-        Surface(
-            onClick = onOpenSettings,
-            modifier = Modifier.size(42.dp).semantics { contentDescription = settingsLabel },
-            shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.primary,
-        ) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("⚙", style = MaterialTheme.typography.titleMedium)
-            }
-        }
+    }
+}
+
+@Composable
+private fun SetupRequiredPill(needsReport: Boolean) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = RoundedCornerShape(999.dp),
+    ) {
+        Text(
+            text = stringResource(if (needsReport) R.string.lights_no_match_pill else R.string.lights_setup_title),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -234,13 +309,7 @@ private fun DashboardBody(
             modes = state.availableModes(),
             selected = state.mode,
             enabled = state.canWrite,
-            onModeChange = { mode ->
-                when (mode) {
-                    AppMode.AUDIO -> modeActions.onAudioCaptureRequest()
-                    AppMode.AMBIENT -> modeActions.onAmbientCaptureRequest()
-                    else -> modeActions.onModeChange(mode)
-                }
-            },
+            onModeChange = modeActions.onModeChange,
         )
         DashboardModeLayout(
             state = state,
@@ -368,10 +437,12 @@ private fun ControlStatusCard(
     description: String,
     action: String? = null,
     onAction: (() -> Unit)? = null,
+    secondaryAction: String? = null,
+    onSecondaryAction: (() -> Unit)? = null,
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
+        modifier = Modifier.fillMaxWidth().prismaticPanel(RoundedCornerShape(28.dp), strong = true),
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(28.dp),
     ) {
@@ -383,6 +454,9 @@ private fun ControlStatusCard(
             Text(description, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (action != null && onAction != null) {
                 Button(onClick = onAction) { Text(action) }
+            }
+            if (secondaryAction != null && onSecondaryAction != null) {
+                OutlinedButton(onClick = onSecondaryAction) { Text(secondaryAction) }
             }
         }
     }

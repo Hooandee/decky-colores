@@ -17,9 +17,10 @@ class GradientPresetRepositoryTest {
             presets.map { it.id },
         )
         assertEquals(
-            listOf(RgbColor(255, 94, 58), RgbColor(255, 149, 0), RgbColor(255, 45, 109)),
+            listOf(RgbColor(217, 104, 90), RgbColor(229, 166, 91), RgbColor(122, 92, 133)),
             presets.first().stops,
         )
+        presets.forEach { preset -> assertEquals(preset.id, 3, preset.stops.distinct().size) }
     }
 
     @Test

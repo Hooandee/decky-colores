@@ -32,8 +32,10 @@ import com.hooandee.colores.sensor.PerformanceMetric
 import com.hooandee.colores.sensor.PerformanceSource
 import com.hooandee.colores.sensor.TemperatureSource
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -180,6 +182,8 @@ class LightingController(
     private var generation = 0L
     private var temperatureCelsius: Double? = null
     private var lastFrame: List<RgbColor> = emptyList()
+    private var gradientEditing = false
+    private var frozenGradientFrame: List<RgbColor> = emptyList()
 
     private val mutableSnapshot = MutableStateFlow(LightingSnapshot())
     val snapshot: StateFlow<LightingSnapshot> = mutableSnapshot.asStateFlow()
@@ -195,7 +199,13 @@ class LightingController(
         intent: LightingIntent,
     ) = send(Command.Bind(binding, intent))
 
-    fun unbind() = send(Command.Unbind)
+    fun unbind() = send(Command.Unbind())
+
+    suspend fun unbindAndAwait() {
+        val completion = CompletableDeferred<Unit>()
+        send(Command.Unbind(completion))
+        completion.await()
+    }
 
     fun reassert() = send(Command.Reassert)
 
@@ -208,6 +218,10 @@ class LightingController(
     fun setSpeed(speed: Int) = send(Command.SetSpeed(speed))
 
     fun setGradientSpeed(speed: Int) = send(Command.SetGradientSpeed(speed))
+
+    fun setGradientEditing(editing: Boolean) = send(Command.SetGradientEditing(editing))
+
+    fun setGradientEditingPreview(color: RgbColor) = send(Command.SetGradientEditingPreview(color))
 
     fun setEffectUsesGradient(enabled: Boolean) = send(Command.SetEffectUsesGradient(enabled))
 
@@ -249,12 +263,17 @@ class LightingController(
     private suspend fun handle(command: Command) {
         when (command) {
             is Command.Bind -> onBind(command)
-            Command.Unbind -> onUnbind()
+            is Command.Unbind -> {
+                onUnbind()
+                command.completion?.complete(Unit)
+            }
             Command.Reassert -> onReassert()
             is Command.SetMode -> mutateIntent { it.copy(mode = command.mode) }
             is Command.SetEffect -> mutateIntent { it.copy(effectId = command.effectId) }
             is Command.SetSpeed -> mutateIntent { it.copy(speed = command.speed.coerceIn(0, 100)) }
             is Command.SetGradientSpeed -> mutateIntent { it.copy(gradientSpeed = command.speed.coerceIn(0, 100)) }
+            is Command.SetGradientEditing -> onGradientEditingChanged(command.editing)
+            is Command.SetGradientEditingPreview -> onGradientEditingPreviewChanged(command.color)
             is Command.SetEffectUsesGradient -> mutateIntent { it.copy(effectUsesGradient = command.enabled) }
             is Command.SetStaticFrame -> mutateIntent { it.copy(staticColors = command.colors, solidColor = command.colors.firstOrNull() ?: it.solidColor) }
             is Command.SetPalette -> mutateIntent { it.copy(solidColor = command.solid, gradientStops = command.stops) }
@@ -281,8 +300,11 @@ class LightingController(
     }
 
     private suspend fun onBind(command: Command.Bind) {
-        stopRenderJob()
-        watchJob?.cancel()
+        stopRenderJobAndJoin()
+        watchJob?.cancelAndJoin()
+        binding?.device?.close()
+        gradientEditing = false
+        frozenGradientFrame = emptyList()
         binding = command.binding
         sensorBands = command.binding.bands
         intent = command.intent.copy(staticColors = command.intent.staticColors.fit(command.binding.zones))
@@ -298,11 +320,14 @@ class LightingController(
         reconcile()
     }
 
-    private fun onUnbind() {
-        stopRenderJob()
+    private suspend fun onUnbind() {
+        stopRenderJobAndJoin()
+        gradientEditing = false
+        frozenGradientFrame = emptyList()
         serviceGate.setRequired(ServiceOwner.EFFECTS, false)
-        watchJob?.cancel()
+        watchJob?.cancelAndJoin()
         watchJob = null
+        binding?.device?.close()
         binding = null
         serviceGate.stop()
         publishSnapshot()
@@ -343,8 +368,10 @@ class LightingController(
 
     private fun needsRenderLoop(binding: LightingBinding): Boolean =
         when (intent.mode) {
-            AppMode.GRADIENT -> intent.gradientPresentation == GradientPresentation.ANIMATED || !binding.device.supportsPerZone
-            AppMode.EFFECT -> hardwareEffect(binding) == null
+            AppMode.GRADIENT ->
+                !gradientEditing &&
+                    (intent.gradientPresentation == GradientPresentation.ANIMATED || !binding.device.supportsPerZone)
+            AppMode.EFFECT -> !gradientEditing && hardwareEffect(binding) == null
             AppMode.AUDIO -> binding.audio.state.value.status.keepsAudioCaptureActive
             AppMode.AMBIENT -> binding.ambient.state.value.status.keepsCaptureActive
             else -> intent.mode.isDynamic
@@ -442,13 +469,39 @@ class LightingController(
         generation++
     }
 
+    private suspend fun stopRenderJobAndJoin() {
+        val job = renderJob
+        stopRenderJob()
+        job?.join()
+    }
+
     private suspend fun applyStatic() {
         val binding = binding ?: return
-        val colors = intent.staticColors.fit(binding.zones)
+        val colors =
+            if (gradientEditing && (intent.mode == AppMode.GRADIENT || intent.mode == AppMode.EFFECT)) {
+                frozenGradientFrame.ifEmpty { intent.staticColors }.fit(binding.zones)
+            } else {
+                intent.staticColors.fit(binding.zones)
+            }
         val effective = effectivePower()
         runCatching { binding.device.applyZones(colors, intent.brightness, effective) }.rethrowCancellation()
         lastFrame = if (effective) colors else List(binding.zones) { RgbColor(0, 0, 0) }
         publishSnapshot()
+    }
+
+    private suspend fun onGradientEditingChanged(editing: Boolean) {
+        if (gradientEditing == editing) return
+        gradientEditing = editing
+        if (editing) frozenGradientFrame = lastFrame.ifEmpty { intent.staticColors }
+        reconcile()
+        if (!editing) frozenGradientFrame = emptyList()
+    }
+
+    private suspend fun onGradientEditingPreviewChanged(color: RgbColor) {
+        val binding = binding ?: return
+        if (!gradientEditing || (intent.mode != AppMode.GRADIENT && intent.mode != AppMode.EFFECT)) return
+        frozenGradientFrame = List(binding.zones) { color }
+        applyStatic()
     }
 
     private suspend fun renderLoop(
@@ -631,7 +684,9 @@ class LightingController(
     private sealed interface Command {
         data class Bind(val binding: LightingBinding, val intent: LightingIntent) : Command
 
-        data object Unbind : Command
+        data class Unbind(
+            val completion: CompletableDeferred<Unit>? = null,
+        ) : Command
 
         data object Reassert : Command
 
@@ -642,6 +697,10 @@ class LightingController(
         data class SetSpeed(val speed: Int) : Command
 
         data class SetGradientSpeed(val speed: Int) : Command
+
+        data class SetGradientEditing(val editing: Boolean) : Command
+
+        data class SetGradientEditingPreview(val color: RgbColor) : Command
 
         data class SetEffectUsesGradient(val enabled: Boolean) : Command
 

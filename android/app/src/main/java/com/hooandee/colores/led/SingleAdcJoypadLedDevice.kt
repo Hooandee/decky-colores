@@ -95,6 +95,8 @@ class SingleAdcJoypadLedDevice internal constructor(
         )
     }
 
+    override suspend fun close() = writer.close()
+
     override fun invalidate() = Unit
 
     private fun writeFrame(frame: Frame): Boolean {

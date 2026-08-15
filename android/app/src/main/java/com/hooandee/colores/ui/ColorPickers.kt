@@ -10,6 +10,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -20,6 +21,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -51,6 +53,9 @@ fun RingColorPicker(
         animationSpec = infiniteRepeatable(tween(1700), RepeatMode.Reverse),
         label = "pulse",
     )
+    val lightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val pickerOutline = MaterialTheme.colorScheme.outlineVariant
+    val pickerSurface = MaterialTheme.colorScheme.surface
     Canvas(
         modifier =
             modifier
@@ -73,7 +78,7 @@ fun RingColorPicker(
 
         val outlineRadius = radius - 2f
         drawCircle(
-            color = Color.White.copy(alpha = if (enabled) 0.16f else 0.06f),
+            color = if (lightTheme) pickerOutline.copy(alpha = if (enabled) 0.62f else 0.3f) else Color.White.copy(alpha = if (enabled) 0.16f else 0.06f),
             radius = outlineRadius,
             center = center,
             style = Stroke(width = 1.5f),
@@ -98,18 +103,31 @@ fun RingColorPicker(
         val orbRadius = radius * 0.24f
         val haloRadius = orbRadius * (1.5f + 0.55f * pulse)
         drawCircle(
-            brush = Brush.radialGradient(listOf(orbColor.copy(alpha = 0.55f * (0.5f + 0.5f * pulse)), Color.Transparent), center, haloRadius),
+            brush =
+                Brush.radialGradient(
+                    listOf(
+                        orbColor.copy(alpha = (if (lightTheme) 0.20f else 0.55f) * (0.5f + 0.5f * pulse)),
+                        Color.Transparent,
+                    ),
+                    center,
+                    haloRadius,
+                ),
             radius = haloRadius,
             center = center,
         )
         drawCircle(orbColor, orbRadius, center)
-        drawCircle(Color.White.copy(alpha = 0.14f), orbRadius, center, style = Stroke(width = 1.5f))
+        drawCircle(
+            if (lightTheme) pickerSurface.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.14f),
+            orbRadius,
+            center,
+            style = Stroke(width = 1.5f),
+        )
 
         val handleAngle = hsv.hue * PI.toFloat() / 180f
         val handle = Offset(center.x + cos(handleAngle) * ringRadius, center.y + sin(handleAngle) * ringRadius)
-        drawCircle(Color.Black.copy(alpha = 0.3f), band * 0.42f, handle.copy(y = handle.y + 2f))
+        drawCircle(Color.Black.copy(alpha = if (lightTheme) 0.14f else 0.3f), band * 0.42f, handle.copy(y = handle.y + 2f))
         drawCircle(projection.display(HsvColor(hsv.hue, 1f, 1f).toRgbColor()).toComposeColor(), band * 0.38f, handle)
-        drawCircle(Color.White, band * 0.38f, handle, style = Stroke(width = 5f))
+        drawCircle(if (lightTheme) pickerSurface else Color.White, band * 0.38f, handle, style = Stroke(width = 5f))
     }
 }
 
