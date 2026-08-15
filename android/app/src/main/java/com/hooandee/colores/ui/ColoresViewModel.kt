@@ -255,6 +255,16 @@ data class ColoresUiState(
         }
 }
 
+internal fun shouldAutomaticallyOpenHardwareLearning(state: ColoresUiState): Boolean =
+    !state.loading &&
+        state.detectionOutcome !is DetectionOutcome.Resolved &&
+        state.hasHardwareLearningCandidates &&
+        !state.hardwareLearning.dialogOpen &&
+        !state.hardwareLearning.busy &&
+        !state.hardwareLearning.restoreFailure &&
+        !state.hardwareLearning.autoPromptDismissed &&
+        state.hardwareLearning.results.isEmpty()
+
 class ColoresViewModel(
     application: Application,
 ) : AndroidViewModel(application) {
@@ -406,6 +416,13 @@ class ColoresViewModel(
                                     results = if (it.hardwareLearning.results.isEmpty()) storedResults else it.hardwareLearning.results,
                                 ),
                         )
+                    }
+                    if (shouldAutomaticallyOpenHardwareLearning(mutableState.value)) {
+                        val completedRefresh = refreshJob
+                        viewModelScope.launch {
+                            completedRefresh?.join()
+                            if (shouldAutomaticallyOpenHardwareLearning(mutableState.value)) openHardwareLearning()
+                        }
                     }
                     return@launch
                 }

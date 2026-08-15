@@ -48,9 +48,9 @@ class Htr3212LedDeviceTest {
             assertEquals("1,1", store.values["enabled"])
             assertEquals(2, executor.commands.size)
             assertTrue(executor.commands[0].startsWith("i2cset -f -y 1 0x3c"))
-            assertEquals(24, executor.commands[0].count { it == '&' })
+            assertEquals(54, executor.commands[0].count { it == '&' })
             assertTrue(executor.commands[1].startsWith("i2cset -f -y 0 0x3c"))
-            assertEquals(24, executor.commands[1].count { it == '&' })
+            assertEquals(54, executor.commands[1].count { it == '&' })
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -141,7 +141,7 @@ class Htr3212LedDeviceTest {
             runCurrent()
 
             assertEquals(4, executor.commands.size)
-            assertTrue(executor.commands.takeLast(2).all { command -> command.count { it == '&' } == 24 })
+            assertTrue(executor.commands.takeLast(2).all { command -> command.count { it == '&' } == 54 })
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -156,9 +156,9 @@ class Htr3212LedDeviceTest {
             runCurrent()
 
             assertEquals("0.5", store.values["brightness"])
-            assertTrue(executor.commands[0].contains("0x01 0x64 i"))
-            assertTrue(executor.commands[0].contains("0x02 0x32 i"))
-            assertTrue(executor.commands[0].contains("0x03 0x19 i"))
+            assertTrue(executor.commands[0].contains("0x0d 0x64 b"))
+            assertTrue(executor.commands[0].contains("0x0e 0x32 b"))
+            assertTrue(executor.commands[0].contains("0x0f 0x19 b"))
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -174,9 +174,9 @@ class Htr3212LedDeviceTest {
 
             assertEquals("1,1", store.values["enabled"])
             assertEquals("0.0", store.values["brightness"])
-            assertTrue(executor.commands[0].contains("0x01 0x00 i"))
-            assertTrue(executor.commands[0].contains("0x02 0x00 i"))
-            assertTrue(executor.commands[0].contains("0x03 0x00 i"))
+            assertTrue(executor.commands[0].contains("0x0d 0x00 b"))
+            assertTrue(executor.commands[0].contains("0x0e 0x00 b"))
+            assertTrue(executor.commands[0].contains("0x0f 0x00 b"))
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -216,7 +216,7 @@ class Htr3212LedDeviceTest {
             runCurrent()
 
             assertEquals(4, executor.commands.size)
-            assertTrue(executor.commands.takeLast(2).all { command -> command.count { it == '&' } == 24 })
+            assertTrue(executor.commands.takeLast(2).all { command -> command.count { it == '&' } == 54 })
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -240,9 +240,9 @@ class Htr3212LedDeviceTest {
             runCurrent()
 
             assertEquals(5, executor.commands.size)
-            assertTrue(executor.commands[3].contains("0x04 0x36 i"))
-            assertTrue(executor.commands[3].contains("0x05 0x37 i"))
-            assertTrue(executor.commands[3].contains("0x06 0x37 i"))
+            assertTrue(executor.commands[3].contains("0x10 0x36 b"))
+            assertTrue(executor.commands[3].contains("0x11 0x37 b"))
+            assertTrue(executor.commands[3].contains("0x12 0x37 b"))
         }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -353,6 +353,7 @@ class Htr3212LedDeviceTest {
                     address = 0x3c,
                     leftOrder = listOf(0, 1, 3, 2),
                     rightOrder = listOf(1, 2, 3, 0),
+                    explicitInitialization = true,
                 ),
         )
 }

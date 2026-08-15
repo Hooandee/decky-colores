@@ -6,10 +6,20 @@ import android.provider.Settings
 import com.hooandee.colores.device.learning.DetectionOutcome
 import com.hooandee.colores.device.learning.LearnedDeviceBinding
 import com.hooandee.colores.device.learning.HardwareLearningGraph
+import com.hooandee.colores.device.learning.HardwareFact
 import com.hooandee.colores.device.learning.Htr3212InformationCartridge
+import com.hooandee.colores.device.learning.HTR3212_PROBE_ID
+import com.hooandee.colores.device.learning.HTR3212_PROBE_VERSION
 import com.hooandee.colores.device.learning.InformationCartridge
+import com.hooandee.colores.device.learning.PROBE_VERSION
+import com.hooandee.colores.device.learning.ProbeCandidate
+import com.hooandee.colores.device.learning.ProbeSurface
+import com.hooandee.colores.device.learning.SETTINGS_PROBE_ID
+import com.hooandee.colores.device.learning.canActivateExactProfile
+import com.hooandee.colores.device.learning.encodeLearningDescriptor
 import com.hooandee.colores.device.learning.resolveLearnedDevice
 import com.hooandee.colores.device.learning.resolveDetectionOutcome
+import com.hooandee.colores.device.learning.usesTopologyGatedActivation
 import com.hooandee.colores.led.AndroidPServerCommandExecutor
 import com.hooandee.colores.led.LedDescriptor
 import com.hooandee.colores.led.SettingsProviderDescriptor
@@ -62,7 +72,7 @@ class AndroidDeviceDetector(
         val pserver = runCatching { pserverAvailable() }.getOrDefault(false)
         val exact = modelMatch(identity)
         val exactTransportAvailable = exact?.led?.isTransportAvailable(pserver) ?: false
-        if (!shouldCollectGenericCandidates(exact, exactTransportAvailable)) {
+        if (!shouldCollectVerificationCandidates(exact, exactTransportAvailable)) {
             return DetectionOutcome.Resolved(identity, requireNotNull(exact))
         }
         val seedCandidates =
@@ -75,7 +85,7 @@ class AndroidDeviceDetector(
                 GenericLedResolver.sysfsCandidate(runCatching { scanSysfs() }.getOrNull()),
             )
         val route = HardwareLearningGraph(informationCartridges).resolve(identity, seedCandidates)
-        val candidates = route.candidates
+        val candidates = verificationCandidates(route.candidates, exact, exactTransportAvailable, route.facts)
         val learned = resolveLearnedDevice(identity, binding, candidates)
         return resolveDetectionOutcome(
             identity = identity,
@@ -122,10 +132,58 @@ class AndroidDeviceDetector(
     }
 }
 
-internal fun shouldCollectGenericCandidates(
+internal fun exactProfileCandidate(device: DetectedAndroidDevice): ProbeCandidate? {
+    val descriptor = device.led as? SettingsProviderDescriptor ?: return null
+    return when (descriptor.driver) {
+        "settings_provider" ->
+            ProbeCandidate(
+                cartridgeId = SETTINGS_PROBE_ID,
+                cartridgeVersion = PROBE_VERSION,
+                surface = ProbeSurface.SETTINGS_PSERVER,
+                descriptor = descriptor,
+                signalKeys = setOf("exact_profile"),
+            )
+        "htr3212" ->
+            descriptor.htr3212?.let {
+                ProbeCandidate(
+                    cartridgeId = HTR3212_PROBE_ID,
+                    cartridgeVersion = HTR3212_PROBE_VERSION,
+                    surface = ProbeSurface.HTR3212,
+                    descriptor = descriptor,
+                    signalKeys = setOf("exact_profile"),
+                )
+            }
+        else -> null
+    }
+}
+
+internal fun shouldCollectVerificationCandidates(
     exact: DetectedAndroidDevice?,
     exactTransportAvailable: Boolean,
-): Boolean = exact == null || !exactTransportAvailable
+): Boolean = exact == null || !exactTransportAvailable || exact.usesTopologyGatedActivation()
+
+internal fun verificationCandidates(
+    observed: List<ProbeCandidate>,
+    exact: DetectedAndroidDevice?,
+    exactTransportAvailable: Boolean,
+    facts: List<HardwareFact>,
+): List<ProbeCandidate> {
+    val exactCandidate =
+        exact
+            ?.takeIf { exactTransportAvailable }
+            ?.takeIf { !it.usesTopologyGatedActivation() || canActivateExactProfile(it, true, facts) }
+            ?.let(::exactProfileCandidate)
+    val withoutCompetingHtr =
+        if (exactCandidate?.surface == ProbeSurface.HTR3212) observed.filterNot { it.surface == ProbeSurface.HTR3212 } else observed
+    val ordered =
+        buildList {
+            addAll(withoutCompetingHtr.filter { it.surface == ProbeSurface.SETTINGS_PSERVER })
+            exactCandidate?.let(::add)
+            addAll(withoutCompetingHtr.filter { it.surface == ProbeSurface.HTR3212 })
+            addAll(withoutCompetingHtr.filter { it.surface != ProbeSurface.SETTINGS_PSERVER && it.surface != ProbeSurface.HTR3212 })
+        }
+    return ordered.distinctBy { "${it.cartridgeId}:${it.cartridgeVersion}:${encodeLearningDescriptor(it.descriptor)}" }
+}
 
 private fun LedDescriptor.isTransportAvailable(pserverAvailable: Boolean): Boolean =
     this !is SettingsProviderDescriptor || transport != "pserver" || pserverAvailable

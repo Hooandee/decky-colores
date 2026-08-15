@@ -7,6 +7,7 @@ import com.hooandee.colores.device.learning.HardwareLearningStatus
 import com.hooandee.colores.device.learning.LearningBlockReason
 import com.hooandee.colores.device.learning.ProbeEvidence
 import com.hooandee.colores.device.learning.ProbeStep
+import com.hooandee.colores.device.learning.ProbeSurface
 import com.hooandee.colores.device.learning.RollbackStatus
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
@@ -36,6 +37,7 @@ data class HardwareLearningUiState(
     val candidateIndex: Int = 0,
     val candidateCount: Int = 0,
     val results: List<HardwareLearningResult> = emptyList(),
+    val autoPromptDismissed: Boolean = false,
 ) {
     val actionLayout: HardwareLearningActionLayout
         get() =
@@ -62,12 +64,37 @@ data class HardwareLearningUiState(
     val hasNextCandidate: Boolean
         get() = candidateIndex + 1 < candidateCount
 
+    val confirmedTwoZoneFallback: Boolean
+        get() {
+            val result = (sessionState as? HardwareLearningState.Complete)?.result ?: return false
+            return hasNextCandidate &&
+                result.status == HardwareLearningStatus.ADAPTED &&
+                result.capabilities.zones == 2
+        }
+
+    val groupedMultipointWithFallback: Boolean
+        get() {
+            val result = (sessionState as? HardwareLearningState.Complete)?.result ?: return false
+            return result.candidate.surface == ProbeSurface.HTR3212 &&
+                result.evidence.any {
+                    it.step == ProbeStep.ZONE &&
+                        it.level == EvidenceLevel.USER_CONFIRMED &&
+                        (it.location?.logicalIndex ?: -1) < 0
+                } &&
+                results.any { it.status == HardwareLearningStatus.ADAPTED && it.capabilities.zones == 2 }
+        }
+
     val nextProbe: ProbeRequest?
         get() {
             val ready = sessionState as? HardwareLearningState.Ready ?: return null
             if (!ready.evidence.hasAnswer(ProbeStep.COLOR)) return ProbeRequest(ProbeStep.COLOR, null)
             if (!ready.evidence.isConfirmed(ProbeStep.COLOR)) return null
             if (ProbeStep.ZONE in ready.supportedSteps) {
+                if (ready.candidate.surface == ProbeSurface.HTR3212 &&
+                    ready.evidence.hasNonIndependentZoneAnswer()
+                ) {
+                    return null
+                }
                 val zones = ready.candidate.observedZoneLimit()
                 (0 until zones).firstOrNull { !ready.evidence.hasAnswer(ProbeStep.ZONE, it) }?.let {
                     return ProbeRequest(ProbeStep.ZONE, it)
@@ -107,7 +134,7 @@ data class HardwareLearningUiState(
 }
 
 internal fun dismissedHardwareLearningUiState(current: HardwareLearningUiState): HardwareLearningUiState =
-    HardwareLearningUiState(results = current.results)
+    HardwareLearningUiState(results = current.results, autoPromptDismissed = true)
 
 internal fun hardwareLearningCancellationFailed(
     status: RollbackStatus?,
@@ -131,6 +158,13 @@ private fun List<ProbeEvidence>.hasAnswer(
 
 private fun List<ProbeEvidence>.isConfirmed(step: ProbeStep): Boolean =
     any { it.step == step && it.level == EvidenceLevel.USER_CONFIRMED }
+
+private fun List<ProbeEvidence>.hasNonIndependentZoneAnswer(): Boolean =
+    any {
+        it.step == ProbeStep.ZONE &&
+            it.observation != null &&
+            (it.level != EvidenceLevel.USER_CONFIRMED || (it.location?.logicalIndex ?: -1) < 0)
+    }
 
 private fun com.hooandee.colores.device.learning.ProbeCandidate.observedZoneLimit(): Int =
     when (val value = descriptor) {

@@ -21,21 +21,67 @@ class Htr3212LearningCartridgeTest {
 
         assertTrue(cartridge.execute(candidate, ProbeStep.COLOR))
         assertEquals(2, executor.commands.size)
-        assertTrue(executor.commands[0].startsWith("i2cset -f -y 3 0x3c 0x0d"))
-        assertTrue(executor.commands[1].startsWith("i2cset -f -y 5 0x3c 0x0d"))
+        assertTrue(executor.commands[0].contains("i2cset -f -y 3 0x3c 0x0d"))
+        assertTrue(executor.commands[1].contains("i2cset -f -y 5 0x3c 0x0d"))
         assertTrue(executor.commands.all { "0x25 0x00" in it })
     }
 
     @Test
-    fun `zone probe isolates one of eight logical zones`() {
+    fun `obsolete RP5 register bank is rejected`() {
         val store = FakeSettingsStore(originalSettings())
         val executor = FakeExecutor()
         val cartridge = Htr3212LearningCartridge(store, executor, settleVendor = {})
 
+        assertFalse(
+            cartridge.execute(
+                candidate(rgbStartRegister = 0x01),
+                ProbeStep.COLOR,
+            ),
+        )
+        assertTrue(executor.commands.isEmpty())
+    }
+
+    @Test
+    fun `exact paired block-write profile keeps its audited transport shape`() {
+        val store = FakeSettingsStore(originalSettings())
+        val executor = FakeExecutor()
+        val cartridge = Htr3212LearningCartridge(store, executor, settleVendor = {})
+
+        assertTrue(
+            cartridge.execute(
+                candidate(
+                    enableKeys = listOf("joystick_light_enabled"),
+                    blockWrite = true,
+                    pairedWrite = true,
+                    explicitInitialization = false,
+                ),
+                ProbeStep.COLOR,
+            ),
+        )
+        assertEquals(1, executor.commands.size)
+        assertTrue("-y 3 0x3c 0x0d" in executor.commands.single())
+        assertTrue("-y 5 0x3c 0x0d" in executor.commands.single())
+    }
+
+    @Test
+    fun `zone probe reasserts one isolated zone after the vendor repaint window`() {
+        val store = FakeSettingsStore(originalSettings())
+        val executor = FakeExecutor()
+        var repaintWindows = 0
+        val cartridge =
+            Htr3212LearningCartridge(
+                store,
+                executor,
+                settleVendor = {},
+                settleRepaint = { repaintWindows += 1 },
+            )
+
         assertTrue(cartridge.execute(candidate(), ProbeStep.ZONE, zone = 4))
-        assertEquals(2, executor.commands.size)
+        assertEquals(1, repaintWindows)
+        assertEquals(4, executor.commands.size)
         assertFalse(executor.commands[0].contains("0x0d 0x8c"))
         assertTrue(executor.commands[1].contains("0x0d 0x8c"))
+        assertEquals(executor.commands.take(2), executor.commands.takeLast(2))
     }
 
     @Test
@@ -54,11 +100,11 @@ class Htr3212LearningCartridgeTest {
     }
 
     @Test
-    fun `candidate with another register bank is rejected`() {
+    fun `candidate with an unaudited register bank is rejected`() {
         val store = FakeSettingsStore(originalSettings())
         val cartridge = Htr3212LearningCartridge(store, FakeExecutor(), settleVendor = {})
         val descriptor = candidate().descriptor as SettingsProviderDescriptor
-        val unsafe = candidate().copy(descriptor = descriptor.copy(htr3212 = descriptor.htr3212?.copy(rgbStartRegister = 0x01)))
+        val unsafe = candidate().copy(descriptor = descriptor.copy(htr3212 = descriptor.htr3212?.copy(rgbStartRegister = 0x05)))
 
         assertFalse(cartridge.accepts(unsafe))
         assertFalse(cartridge.execute(unsafe, ProbeStep.COLOR))
@@ -103,6 +149,24 @@ class Htr3212LearningCartridgeTest {
     }
 
     @Test
+    fun `whole joystick observations never promote multipoint`() {
+        val cartridge = Htr3212LearningCartridge(FakeSettingsStore(originalSettings()), FakeExecutor(), settleVendor = {})
+        val evidence =
+            (0 until 8).map { zone ->
+                ProbeEvidence(
+                    ProbeStep.ZONE,
+                    zone,
+                    EvidenceLevel.USER_CONFIRMED,
+                    UserObservation.YES,
+                    if (zone < 4) ZoneLocation.LEFT_WHOLE else ZoneLocation.RIGHT_WHOLE,
+                )
+            }
+
+        assertFalse(cartridge.canBind(candidate(), DeviceCapabilities(true, false, false, 1), evidence))
+        assertTrue(confirmedZoneIndices(evidence, ProbeSurface.HTR3212).isEmpty())
+    }
+
+    @Test
     fun `topology without confirmed color cannot promote multipoint`() {
         val cartridge = Htr3212LearningCartridge(FakeSettingsStore(originalSettings()), FakeExecutor(), settleVendor = {})
         val locations = ZoneLocation.entries
@@ -114,14 +178,21 @@ class Htr3212LearningCartridgeTest {
         assertFalse(cartridge.canBind(candidate(), DeviceCapabilities(false, false, true, 8), evidence))
     }
 
-    private fun candidate(): ProbeCandidate =
+    private fun candidate(
+        rgbStartRegister: Int = 0x0d,
+        enableKeys: List<String> = GenericVendorLed.ENABLE_KEYS,
+        blockWrite: Boolean = false,
+        pairedWrite: Boolean = false,
+        explicitInitialization: Boolean = true,
+    ): ProbeCandidate =
         ProbeCandidate(
             cartridgeId = HTR3212_PROBE_ID,
-            cartridgeVersion = 1,
+            cartridgeVersion = HTR3212_PROBE_VERSION,
             surface = ProbeSurface.HTR3212,
             descriptor =
                 GenericVendorLed.descriptor(8).copy(
                     driver = "htr3212",
+                    enableKeys = enableKeys,
                     htr3212 =
                         Htr3212Descriptor(
                             leftBus = 3,
@@ -129,7 +200,10 @@ class Htr3212LearningCartridgeTest {
                             address = 0x3c,
                             leftOrder = listOf(0, 1, 2, 3),
                             rightOrder = listOf(0, 1, 2, 3),
-                            rgbStartRegister = 0x0d,
+                            rgbStartRegister = rgbStartRegister,
+                            blockWrite = blockWrite,
+                            pairedWrite = pairedWrite,
+                            explicitInitialization = explicitInitialization,
                         ),
                 ),
             signalKeys = setOf("htr3212_pair"),

@@ -4,6 +4,7 @@ import com.hooandee.colores.device.AndroidDeviceIdentity
 import com.hooandee.colores.device.DeviceCapabilities
 import com.hooandee.colores.device.DetectedAndroidDevice
 import com.hooandee.colores.led.LedDescriptor
+import com.hooandee.colores.led.SettingsProviderDescriptor
 
 enum class ProbeSurface {
     SETTINGS_PSERVER,
@@ -47,6 +48,8 @@ enum class ZoneLocation(
     RIGHT_BOTTOM_LEFT(1, 1),
     RIGHT_BOTTOM_RIGHT(1, 2),
     RIGHT_TOP_RIGHT(1, 3),
+    LEFT_WHOLE(0, -1),
+    RIGHT_WHOLE(1, -1),
 }
 
 enum class EvidenceLevel {
@@ -128,11 +131,42 @@ internal fun resolveDetectionOutcome(
     candidates: List<ProbeCandidate>,
     learned: DetectedAndroidDevice? = null,
     facts: List<HardwareFact> = emptyList(),
-): DetectionOutcome =
-    when {
-        exact != null && exactTransportAvailable -> DetectionOutcome.Resolved(identity, exact, candidates, facts)
+): DetectionOutcome {
+    val activatedExact = exact?.takeIf { canActivateExactProfile(it, exactTransportAvailable, facts) }
+    return when {
+        exact != null && exactTransportAvailable && !exact.usesTopologyGatedActivation() ->
+            DetectionOutcome.Resolved(identity, exact, candidates, facts)
+        activatedExact != null && !learned.isCompatibleCalibrationFor(activatedExact) ->
+            DetectionOutcome.Resolved(identity, activatedExact, candidates, facts)
         learned != null -> DetectionOutcome.Resolved(identity, learned, candidates, facts)
-        exact != null -> DetectionOutcome.UnavailableKnownDevice(identity, exact, candidates, facts)
+        exact != null && !exactTransportAvailable -> DetectionOutcome.UnavailableKnownDevice(identity, exact, candidates, facts)
         candidates.isNotEmpty() -> DetectionOutcome.Candidates(identity, candidates, facts)
         else -> DetectionOutcome.Unsupported(identity, facts)
     }
+}
+
+private fun DetectedAndroidDevice?.isCompatibleCalibrationFor(exact: DetectedAndroidDevice): Boolean =
+    this != null &&
+        capabilities.zones >= exact.capabilities.zones &&
+        learningDescriptorsCompatible(exact.led, led)
+
+internal fun DetectedAndroidDevice.usesTopologyGatedActivation(): Boolean =
+    (led as? SettingsProviderDescriptor)?.htr3212?.automaticActivation == true
+
+internal fun canActivateExactProfile(
+    device: DetectedAndroidDevice,
+    transportAvailable: Boolean,
+    facts: List<HardwareFact>,
+): Boolean {
+    if (!transportAvailable) return false
+    val hardware = (device.led as? SettingsProviderDescriptor)?.htr3212 ?: return false
+    if (!hardware.automaticActivation) return false
+    return facts.hasHtrController(FACT_HTR3212_LEFT, hardware.leftBus, hardware.address) &&
+        facts.hasHtrController(FACT_HTR3212_RIGHT, hardware.rightBus, hardware.address)
+}
+
+private fun List<HardwareFact>.hasHtrController(
+    key: String,
+    bus: Int,
+    address: Int,
+): Boolean = any { it.key == key && it.value == "bus=$bus,address=0x%02x".format(address) }

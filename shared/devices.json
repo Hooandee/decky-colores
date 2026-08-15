@@ -4,7 +4,7 @@
     "friendlyName": "Retroid Pocket 5",
     "android": {
       "model": ["Retroid Pocket 5"],
-      "device": ["kona"],
+      "device": [],
       "led": {
         "driver": "htr3212",
         "transport": "pserver",
@@ -21,7 +21,10 @@
           "rightBus": 0,
           "address": 60,
           "leftOrder": [0, 1, 3, 2],
-          "rightOrder": [1, 2, 3, 0]
+          "rightOrder": [1, 2, 3, 0],
+          "rgbStartRegister": 13,
+          "explicitInitialization": true,
+          "automaticActivation": true
         }
       },
       "gridLayout": [

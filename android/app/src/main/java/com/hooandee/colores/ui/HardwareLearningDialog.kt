@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -123,7 +124,7 @@ internal fun HardwareLearningDialog(
                         Spacer(Modifier.height(16.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
                         Spacer(Modifier.height(14.dp))
-                        LearningActions(ui, onConsent, onRunProbe, onAnswer, onFinish, onNextCandidate, onReport)
+                        LearningActions(ui, onDismiss, onConsent, onRunProbe, onAnswer, onFinish, onNextCandidate, onReport)
                     }
                 }
             }
@@ -315,7 +316,14 @@ private fun LearningBody(
                         textAlign = textAlign,
                     )
                 } else {
-                    LearningResultBody(state.result.status, state.result.rollbackStatus, ui.hasNextCandidate, textAlign)
+                    LearningResultBody(
+                        state.result.status,
+                        state.result.rollbackStatus,
+                        ui.hasNextCandidate,
+                        ui.confirmedTwoZoneFallback,
+                        ui.groupedMultipointWithFallback,
+                        textAlign,
+                    )
                 }
             is HardwareLearningState.Blocked ->
                 when (state.reason) {
@@ -387,13 +395,23 @@ private fun LearningResultBody(
     status: HardwareLearningStatus,
     rollbackStatus: RollbackStatus,
     hasNextCandidate: Boolean,
+    confirmedTwoZoneFallback: Boolean,
+    groupedMultipointWithFallback: Boolean,
     textAlign: TextAlign,
 ) {
     val adapted = status == HardwareLearningStatus.ADAPTED
     LearningMessage(
-        title = if (adapted) stringResource(R.string.hardware_learning_success) else stringResource(R.string.hardware_learning_no_match),
+        title =
+            when {
+                confirmedTwoZoneFallback -> stringResource(R.string.hardware_learning_two_zones_confirmed)
+                groupedMultipointWithFallback -> stringResource(R.string.hardware_learning_grouped_points)
+                adapted -> stringResource(R.string.hardware_learning_success)
+                else -> stringResource(R.string.hardware_learning_no_match)
+            },
         body =
             when {
+                confirmedTwoZoneFallback -> stringResource(R.string.hardware_learning_two_zones_confirmed_body)
+                groupedMultipointWithFallback -> stringResource(R.string.hardware_learning_grouped_points_body)
                 hasNextCandidate -> stringResource(R.string.hardware_learning_more_routes_body)
                 adapted -> stringResource(R.string.hardware_learning_success_body)
                 else -> stringResource(R.string.hardware_learning_no_match_body)
@@ -413,6 +431,7 @@ private fun LearningResultBody(
 @Composable
 private fun LearningActions(
     ui: HardwareLearningUiState,
+    onDismiss: () -> Unit,
     onConsent: () -> Unit,
     onRunProbe: () -> Unit,
     onAnswer: (UserObservation, ZoneLocation?) -> Unit,
@@ -430,14 +449,29 @@ private fun LearningActions(
             PrimaryLearningButton(stringResource(R.string.hardware_learning_finish), ui.canFinish && !ui.busy, onFinish)
         HardwareLearningActionLayout.OBSERVATION -> {
             val awaiting = ui.sessionState as HardwareLearningState.AwaitingAnswer
-            if (awaiting.isHtrZone()) ZoneLocationActions(ui.busy, onAnswer) else ObservationActions(ui.busy, onAnswer)
+            if (awaiting.isHtrZone()) ZoneLocationActions(awaiting.zone, ui.busy, onAnswer) else ObservationActions(ui.busy, onAnswer)
         }
         HardwareLearningActionLayout.RESULT ->
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 if (ui.hasNextCandidate) {
-                    PrimaryLearningButton(stringResource(R.string.hardware_learning_continue_discovery), !ui.busy, onNextCandidate)
+                    PrimaryLearningButton(
+                        stringResource(
+                            if (ui.confirmedTwoZoneFallback) {
+                                R.string.hardware_learning_try_multipoint
+                            } else {
+                                R.string.hardware_learning_continue_discovery
+                            },
+                        ),
+                        !ui.busy,
+                        onNextCandidate,
+                    )
                 }
-                OutlinedButton(onClick = onReport, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
+                if (ui.confirmedTwoZoneFallback || ui.groupedMultipointWithFallback) {
+                    OutlinedButton(onClick = onDismiss, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
+                        Text(stringResource(R.string.hardware_learning_use_two_zones))
+                    }
+                }
+                TextButton(onClick = onReport, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
                     Text(
                         if (ui.showBlockedReport) {
                             stringResource(R.string.hardware_learning_report_blocked)
@@ -520,6 +554,7 @@ private fun ObservationActions(
 
 @Composable
 private fun ZoneLocationActions(
+    zone: Int?,
     busy: Boolean,
     onAnswer: (UserObservation, ZoneLocation?) -> Unit,
 ) {
@@ -552,6 +587,12 @@ private fun ZoneLocationActions(
                 modifier = Modifier.weight(1f),
             )
         }
+        ObservationButton(
+            label = stringResource(R.string.hardware_learning_whole_stick),
+            enabled = !busy,
+            primary = false,
+            onClick = { onAnswer(UserObservation.YES, wholeStickLocation(zone)) },
+        )
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ObservationButton(
                 label = stringResource(R.string.hardware_learning_none_visible),
@@ -570,6 +611,9 @@ private fun ZoneLocationActions(
         }
     }
 }
+
+internal fun wholeStickLocation(zone: Int?): ZoneLocation =
+    if ((zone ?: 0) < 4) ZoneLocation.LEFT_WHOLE else ZoneLocation.RIGHT_WHOLE
 
 @Composable
 private fun ZoneStickGrid(
