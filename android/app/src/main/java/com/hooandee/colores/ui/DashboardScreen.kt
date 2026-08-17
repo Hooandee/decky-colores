@@ -27,6 +27,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -164,56 +165,12 @@ private fun DashboardHeader(
     onOpenSettings: () -> Unit,
 ) {
     val settingsLabel = stringResource(R.string.settings_open)
+    val powerLabel = stringResource(R.string.power_title)
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val showSettingsLabel = maxWidth >= 720.dp
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(20.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 2.4.sp,
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = state.devicePresentation.friendlyName.ifBlank { stringResource(R.string.device_unknown) },
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    if (state.canWrite) ConnectedPill()
-                    if (state.detected == null && (state.hasHardwareLearningCandidates || state.hardwareLearningNeedsReport)) {
-                        SetupRequiredPill(needsReport = state.hardwareLearningNeedsReport)
-                    }
-                    if (state.detected != null) {
-                        ProfileSelectorPill(state = state, onOpen = onOpenProfiles)
-                    }
-                }
-            }
-            if (state.detected?.capabilities?.power == true) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = stringResource(R.string.power_title),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelLarge,
-                    )
-                    Switch(
-                        checked = state.ledState.power,
-                        onCheckedChange = onPowerChange,
-                        enabled = state.canWrite,
-                    )
-                }
-            }
+        val compact = maxWidth < 720.dp
+        @Composable
+        fun SettingsAction() {
             Surface(
                 onClick = onOpenSettings,
                 modifier =
@@ -242,6 +199,108 @@ private fun DashboardHeader(
                 }
             }
         }
+
+        if (compact) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.app_name),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 2.2.sp,
+                        )
+                        if (state.canWrite) ConnectedPill(compact = true)
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = state.devicePresentation.friendlyName.ifBlank { stringResource(R.string.device_unknown) },
+                            modifier = Modifier.weight(1f, fill = false),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                        if (state.detected == null && (state.hasHardwareLearningCandidates || state.hardwareLearningNeedsReport)) {
+                            SetupRequiredPill(needsReport = state.hardwareLearningNeedsReport)
+                        }
+                        if (state.detected != null) {
+                            ProfileSelectorPill(state = state, onOpen = onOpenProfiles, compact = true)
+                        }
+                    }
+                }
+                if (state.detected?.capabilities?.power == true) {
+                    Switch(
+                        checked = state.ledState.power,
+                        onCheckedChange = onPowerChange,
+                        enabled = state.canWrite,
+                        modifier = Modifier.semantics { contentDescription = powerLabel },
+                    )
+                }
+                SettingsAction()
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 2.4.sp,
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = state.devicePresentation.friendlyName.ifBlank { stringResource(R.string.device_unknown) },
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        if (state.canWrite) ConnectedPill()
+                        if (state.detected == null && (state.hasHardwareLearningCandidates || state.hardwareLearningNeedsReport)) {
+                            SetupRequiredPill(needsReport = state.hardwareLearningNeedsReport)
+                        }
+                        if (state.detected != null) {
+                            ProfileSelectorPill(state = state, onOpen = onOpenProfiles)
+                        }
+                    }
+                }
+                if (state.detected?.capabilities?.power == true) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = powerLabel,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                        Switch(
+                            checked = state.ledState.power,
+                            onCheckedChange = onPowerChange,
+                            enabled = state.canWrite,
+                        )
+                    }
+                }
+                SettingsAction()
+            }
+        }
     }
 }
 
@@ -262,14 +321,14 @@ private fun SetupRequiredPill(needsReport: Boolean) {
 }
 
 @Composable
-private fun ConnectedPill() {
+private fun ConnectedPill(compact: Boolean = false) {
     Surface(
         color = Color(0xFF17372F),
         contentColor = Color(0xFF82E7C7),
         shape = RoundedCornerShape(999.dp),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            modifier = Modifier.padding(horizontal = if (compact) 8.dp else 10.dp, vertical = if (compact) 3.dp else 5.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -414,18 +473,20 @@ private fun DashboardModeLayout(
             )
         }
 
-        if (maxWidth >= 760.dp) {
-            Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Scene(Modifier.weight(0.88f).fillMaxHeight())
-                Panel(Modifier.weight(1.12f).fillMaxHeight())
-            }
-        } else {
-            Column(
-                modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                Scene(Modifier.fillMaxWidth().height(360.dp))
-                Panel(Modifier.fillMaxWidth().height(440.dp))
+        CompositionLocalProvider(LocalCompactDashboard provides shouldUseCompactDashboardDensity(maxWidth, maxHeight)) {
+            if (shouldUseTwoPaneLayout(maxWidth, maxHeight, 760.dp)) {
+                Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Scene(Modifier.weight(0.88f).fillMaxHeight())
+                    Panel(Modifier.weight(1.12f).fillMaxHeight())
+                }
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Scene(Modifier.fillMaxWidth().height(360.dp))
+                    Panel(Modifier.fillMaxWidth().height(440.dp))
+                }
             }
         }
     }

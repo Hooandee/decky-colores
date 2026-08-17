@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -14,10 +15,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -64,6 +63,7 @@ fun ColorControlPanel(
     gradientActions: GradientActions,
     modifier: Modifier = Modifier,
 ) {
+    val compact = LocalCompactDashboard.current
     val projection = state.ledColorProjection
     val editingHsv = state.editingColor.toHsvColor()
     Surface(
@@ -74,13 +74,11 @@ fun ColorControlPanel(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val fontScale = LocalDensity.current.fontScale
-            val colorAreaHeight = if (maxHeight < 380.dp && fontScale <= 1.15f) 120.dp else 170.dp
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 18.dp, vertical = 14.dp),
+            val colorAreaHeight = if (compact || (maxHeight < 380.dp && fontScale <= 1.15f)) 108.dp else 170.dp
+            ScrollablePanelContent(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = if (compact) 14.dp else 18.dp, vertical = if (compact) 10.dp else 14.dp),
+                verticalArrangement = Arrangement.Top,
             ) {
                 if (colorEnabled) {
                     if (state.gradient.mode == LightingMode.GRADIENT) {
@@ -114,7 +112,7 @@ fun ColorControlPanel(
                                 modifier = Modifier.weight(1.1f),
                                 verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                CurrentColor(state, projection)
+                                CurrentColor(state)
                                 DeferredIntSlider(
                                     label = stringResource(R.string.saturation_title),
                                     committedValue = (editingHsv.saturation * 100f).roundToInt(),
@@ -159,6 +157,7 @@ private fun TargetSelector(
     enabled: Boolean,
     onTargetChange: (EditTarget) -> Unit,
 ) {
+    val compact = LocalCompactDashboard.current
     val targets =
         if (perZone) {
             EditTarget.entries
@@ -166,16 +165,21 @@ private fun TargetSelector(
             listOf(EditTarget.BOTH)
         }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = stringResource(R.string.target_title),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
-        )
+        if (!compact) {
+            Text(
+                text = stringResource(R.string.target_title),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+            )
+        }
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             targets.forEachIndexed { index, item ->
                 SegmentedButton(
-                    modifier = Modifier.height(48.dp),
+                    modifier =
+                        Modifier
+                            .weight(if (item == EditTarget.BOTH && perZone) 0.78f else 1f)
+                            .height(if (compact) 40.dp else 48.dp),
                     selected = target == item,
                     onClick = { onTargetChange(item) },
                     enabled = enabled,
@@ -198,37 +202,23 @@ private fun targetLabel(target: EditTarget): String =
 @Composable
 private fun CurrentColor(
     state: ColoresUiState,
-    projection: LedColorProjection,
 ) {
-    val shownColor = projection.display(state.editingColor)
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column {
-            Text(
-                text = stringResource(R.string.color_title),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text =
-                    if (state.mixedTarget) {
-                        stringResource(R.string.target_mixed)
-                    } else {
-                        stringResource(R.string.rgb_sent_value, state.editingColor.toHexString())
-                    },
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-            )
-        }
-        Surface(
-            modifier = Modifier.size(34.dp),
-            color = shownColor.toComposeColor(),
-            shape = CircleShape,
-            border = BorderStroke(2.dp, Color.White.copy(alpha = 0.72f)),
-        ) {}
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.color_title),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text =
+                if (state.mixedTarget) {
+                    stringResource(R.string.target_mixed)
+                } else {
+                    stringResource(R.string.rgb_sent_value, state.editingColor.toHexString())
+                },
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium,
+        )
     }
 }
 
@@ -240,16 +230,19 @@ private fun QuickColors(
     projection: LedColorProjection,
     onColorChange: (RgbColor) -> Unit,
 ) {
+    val compact = LocalCompactDashboard.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = stringResource(R.string.quick_colors),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.labelMedium,
-        )
+        if (!compact) {
+            Text(
+                text = stringResource(R.string.quick_colors),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
         Row(
             modifier = Modifier.weight(1f),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -262,8 +255,7 @@ private fun QuickColors(
                     onClick = { onColorChange(color) },
                     enabled = enabled,
                     modifier =
-                        Modifier
-                            .size(48.dp)
+                        (if (compact) Modifier.weight(1f).height(44.dp) else Modifier.size(48.dp))
                             .semantics {
                                 contentDescription = description
                                 this.selected = selected
@@ -273,7 +265,7 @@ private fun QuickColors(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Surface(
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(if (compact) 28.dp else 32.dp),
                             color = shownColor.toComposeColor(),
                             shape = CircleShape,
                             border =

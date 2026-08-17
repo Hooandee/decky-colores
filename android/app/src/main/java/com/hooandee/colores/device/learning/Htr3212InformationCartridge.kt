@@ -1,5 +1,6 @@
 package com.hooandee.colores.device.learning
 
+import com.hooandee.colores.device.GenericVendorLed
 import com.hooandee.colores.led.Htr3212Descriptor
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import java.io.File
@@ -45,7 +46,7 @@ class Htr3212InformationCartridge(
 ) : InformationCartridge {
     override val id = HTR3212_INFORMATION_ID
     override val version = 1
-    override val requiredFactKeys = setOf(FACT_SETTINGS_PSERVER)
+    override val requiredFactKeys = setOf(FACT_PSERVER)
 
     override fun inspect(context: HardwareLearningContext): InformationCartridgeResult {
         val controllers = topologyReader.read()
@@ -63,6 +64,7 @@ class Htr3212InformationCartridge(
             context.candidates
                 .firstOrNull { it.surface == ProbeSurface.SETTINGS_PSERVER }
                 ?.descriptor as? SettingsProviderDescriptor
+                ?: GenericVendorLed.descriptor(STICKS).takeIf { context.hasFact(FACT_PSERVER) }
         val candidate =
             if (base != null && left != null && right != null && left.bus != right.bus) {
                 ProbeCandidate(
@@ -102,6 +104,7 @@ class Htr3212InformationCartridge(
         const val LEFT_DRIVER = "htr3212l"
         const val RIGHT_DRIVER = "htr3212r"
         const val ADDRESS = 0x3c
+        const val STICKS = 2
         const val TOTAL_ZONES = 8
         const val AYN_RGB_START_REGISTER = 0x0d
         val DEFAULT_ORDER = listOf(0, 1, 2, 3)

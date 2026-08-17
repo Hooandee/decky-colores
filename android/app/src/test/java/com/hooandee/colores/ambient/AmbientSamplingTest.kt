@@ -8,6 +8,28 @@ import org.junit.Test
 
 class AmbientSamplingTest {
     @Test
+    fun `capture surface preserves common landscape display aspect ratios`() {
+        val cases =
+            listOf(
+                Triple(1280 to 960, AmbientCaptureDimensions(32, 24), "4:3"),
+                Triple(1920 to 1080, AmbientCaptureDimensions(32, 18), "16:9"),
+                Triple(1280 to 800, AmbientCaptureDimensions(32, 20), "16:10"),
+                Triple(2400 to 1080, AmbientCaptureDimensions(32, 14), "20:9"),
+                Triple(1024 to 1024, AmbientCaptureDimensions(32, 32), "1:1"),
+            )
+
+        cases.forEach { (display, expected, label) ->
+            assertEquals(label, expected, ambientCaptureDimensions(display.first, display.second))
+        }
+    }
+
+    @Test
+    fun `capture surface preserves portrait display aspect ratios`() {
+        assertEquals(AmbientCaptureDimensions(18, 32), ambientCaptureDimensions(1080, 1920))
+        assertEquals(AmbientCaptureDimensions(24, 32), ambientCaptureDimensions(960, 1280))
+    }
+
+    @Test
     fun `global sampling reads RGBA rows with padding and repeats the average`() {
         val frame =
             rgbaFrame(
@@ -32,7 +54,7 @@ class AmbientSamplingTest {
     }
 
     @Test
-    fun `full scene maps each stick grid cell across the whole screen`() {
+    fun `full scene maps every stick cell across different aspect ratios`() {
         val colors =
             listOf(
                 RgbColor(255, 0, 0),
@@ -43,14 +65,6 @@ class AmbientSamplingTest {
                 RgbColor(255, 0, 255),
                 RgbColor(255, 255, 255),
                 RgbColor(0, 0, 0),
-            )
-        val frame =
-            rgbaFrame(
-                rows =
-                    listOf(
-                        listOf(colors[0], colors[1], colors[4], colors[5]),
-                        listOf(colors[2], colors[3], colors[6], colors[7]),
-                    ),
             )
         val layout =
             listOf(
@@ -64,9 +78,18 @@ class AmbientSamplingTest {
                 LedGridCell(1, 1, 1, "bottom_right"),
             )
 
-        val sampled = AmbientSampler.sample(frame, 8, layout, true, AmbientSamplingMode.FULL_SCENE)
+        listOf(
+            Triple(12, 9, "4:3"),
+            Triple(16, 9, "16:9"),
+            Triple(16, 10, "16:10"),
+            Triple(20, 9, "20:9"),
+            Triple(9, 16, "9:16"),
+        ).forEach { (width, height, label) ->
+            val frame = zonedFrame(width, height, colors)
+            val sampled = AmbientSampler.sample(frame, 8, layout, true, AmbientSamplingMode.FULL_SCENE)
 
-        assertEquals(colors, sampled)
+            assertEquals(label, colors, sampled)
+        }
     }
 
     @Test
@@ -146,5 +169,24 @@ class AmbientSamplingTest {
             }
         }
         return AmbientPixelFrame(width, height, pixelStride = 4, rowStride = rowStride, bytes = bytes)
+    }
+
+    private fun zonedFrame(
+        width: Int,
+        height: Int,
+        colors: List<RgbColor>,
+    ): AmbientPixelFrame {
+        val rows = MutableList(height) { MutableList(width) { RgbColor(0, 0, 0) } }
+        repeat(2) { row ->
+            repeat(4) { column ->
+                val colorIndex = (column / 2) * 4 + row * 2 + column % 2
+                for (y in row * height / 2 until (row + 1) * height / 2) {
+                    for (x in column * width / 4 until (column + 1) * width / 4) {
+                        rows[y][x] = colors[colorIndex]
+                    }
+                }
+            }
+        }
+        return rgbaFrame(rows)
     }
 }

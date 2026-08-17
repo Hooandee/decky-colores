@@ -33,6 +33,25 @@ class Htr3212LedDeviceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `direct HTR control does not create missing optional vendor settings`() =
+        runTest {
+            val store = FakeHtrSettingsStore(existingVendorSettings = false)
+            store.values["enabled"] = "1,1"
+            val executor = FakePServerExecutor()
+            val device = device(store, executor)
+
+            device.readState()
+            assertTrue(device.applyZones(List(8) { RgbColor(20, 30, 40) }, brightness = 70, power = true))
+            runCurrent()
+
+            assertFalse(store.values.containsKey("color"))
+            assertFalse(store.values.containsKey("brightness"))
+            assertEquals("1,1", store.values["enabled"])
+            assertEquals(2, executor.commands.size)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `eight zones keep two vendor fallback colors and write both calibrated buses`() =
         runTest {
             val store = FakeHtrSettingsStore()
@@ -360,9 +379,20 @@ class Htr3212LedDeviceTest {
 
 private class FakeHtrSettingsStore(
     override val available: Boolean = true,
+    existingVendorSettings: Boolean = true,
 ) : SystemSettingsStore {
     val values = mutableMapOf<String, String>()
     val writes = mutableListOf<Pair<String, String>>()
+
+    init {
+        if (existingVendorSettings) {
+            values["color"] = "#FFFFFFFF,#FFFFFFFF"
+            values["brightness"] = "1.0"
+            values["enabled"] = "1,1"
+            values["left"] = "1"
+            values["right"] = "1"
+        }
+    }
 
     override fun get(key: String): String? = values[key]
 

@@ -30,6 +30,7 @@
     <string name="settings_accent_picker">Glass light picker</string>
     <string name="settings_accent_reset">Restore original light</string>
     <string name="mode_how_it_works">How it works</string>
+    <string name="more_settings_below">More settings below</string>
     <string name="settings_led_preview_description">Adjusts the visual representation to the real LEDs when calibration is available.</string>
     <string name="settings_diagnostics">Your device</string>
     <string name="settings_diagnostic_device">Device</string>
@@ -296,7 +297,7 @@
     <string name="audio_status_revoked">Capture stopped</string>
     <string name="audio_status_error">Could not start</string>
     <string name="ambient_title">Ambilight</string>
-    <string name="ambient_description">The screen is reduced to 32 × 18 in memory. Its colors guide the LEDs, and no capture is stored.\n\n10 fps is recommended for gaming. A higher rate responds sooner and uses more resources.</string>
+    <string name="ambient_description">Ambilight captures the complete display and reduces it in memory to at most 32 pixels on the long edge while preserving its aspect ratio. Its colors guide the LEDs, and no capture is stored.\n\n10 fps is recommended for gaming. A higher rate responds sooner and uses more resources.</string>
     <string name="ambient_sampling_title">Capture area</string>
     <string name="ambient_sampling_full">Full</string>
     <string name="ambient_sampling_bottom">Bottom</string>
@@ -308,12 +309,13 @@
     <string name="ambient_vividness">Color intensity</string>
     <string name="ambient_smoothing">Smoothing</string>
     <string name="percent_value">%1$d%%</string>
-    <string name="ambient_privacy">The image is reduced to 32 × 18 and processed in memory. No capture is stored.</string>
+    <string name="ambient_privacy">To follow every game, Ambilight captures the complete display. The image keeps its aspect ratio, is reduced to at most 32 pixels, and is not stored.</string>
     <string name="ambient_activate">Enable</string>
-    <string name="ambient_activate_accessibility">Enable screen capture</string>
+    <string name="ambient_activate_accessibility">Enable complete display capture</string>
     <string name="ambient_status_authorization_required">Authorization required</string>
     <string name="ambient_status_starting">Starting capture</string>
     <string name="ambient_status_capturing">Screen capture active</string>
+    <string name="ambient_status_capturing_compact">Capturing</string>
     <string name="ambient_status_no_frames">The screen is not providing frames. The last color is preserved.</string>
     <string name="ambient_status_revoked">Android revoked capture. You can enable it again.</string>
     <string name="ambient_status_error">Capture could not start. You can try again.</string>

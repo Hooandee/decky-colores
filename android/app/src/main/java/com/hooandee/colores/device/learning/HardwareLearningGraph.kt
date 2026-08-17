@@ -1,7 +1,9 @@
 package com.hooandee.colores.device.learning
 
 import com.hooandee.colores.device.AndroidDeviceIdentity
+import com.hooandee.colores.led.SettingsProviderDescriptor
 
+internal const val FACT_PSERVER = "transport.pserver"
 internal const val FACT_SETTINGS_PSERVER = "surface.settings_pserver"
 internal const val FACT_HTR3212_LEFT = "controller.htr3212.left"
 internal const val FACT_HTR3212_RIGHT = "controller.htr3212.right"
@@ -54,8 +56,10 @@ class HardwareLearningGraph(
     fun resolve(
         identity: AndroidDeviceIdentity,
         seedCandidates: List<ProbeCandidate>,
+        seedFacts: List<HardwareFact> = emptyList(),
     ): HardwareLearningRoute {
         val facts = linkedMapOf<String, HardwareFact>()
+        seedFacts.forEach { facts.merge(it) }
         seedCandidates.flatMap(::factsForCandidate).forEach { facts.merge(it) }
         val candidates = linkedMapOf<String, ProbeCandidate>()
         seedCandidates.forEach { candidates.putIfAbsent(it.routeKey(), it) }
@@ -78,6 +82,9 @@ class HardwareLearningGraph(
 
 private fun factsForCandidate(candidate: ProbeCandidate): List<HardwareFact> =
     buildList {
+        if ((candidate.descriptor as? SettingsProviderDescriptor)?.transport == "pserver") {
+            add(HardwareFact(FACT_PSERVER, "present", FactEvidence.OBSERVED, candidate.cartridgeId))
+        }
         val surfaceKey =
             when (candidate.surface) {
                 ProbeSurface.SETTINGS_PSERVER -> FACT_SETTINGS_PSERVER

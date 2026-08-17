@@ -23,10 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,6 +62,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hooandee.colores.R
@@ -167,19 +166,17 @@ private fun PanelSurface(
     modifier: Modifier,
     content: @Composable () -> Unit,
 ) {
+    val compact = LocalCompactDashboard.current
     Surface(
         modifier = modifier.prismaticPanel(RoundedCornerShape(32.dp), strong = true),
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(32.dp),
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ScrollablePanelContent(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = if (compact) 14.dp else 18.dp, vertical = if (compact) 12.dp else 16.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
         ) {
             content()
         }
@@ -342,18 +339,28 @@ private fun SensorsPanel(
     onBrightnessChange: (Int) -> Unit,
     modeActions: ModeActions,
 ) {
+    val compact = LocalCompactDashboard.current
     val sensorModes = state.availableSensorModes()
     var editingScale by remember { mutableStateOf<SensorKind?>(null) }
     if (sensorModes.size > 1) {
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             sensorModes.forEachIndexed { index, mode ->
                 SegmentedButton(
-                    modifier = Modifier.height(44.dp),
+                    modifier = Modifier.height(if (compact) 40.dp else 44.dp),
                     selected = state.mode == mode,
                     onClick = { modeActions.onSensorModeChange(mode) },
                     enabled = state.canWrite,
                     shape = SegmentedButtonDefaults.itemShape(index, sensorModes.size),
-                    label = { Text(sensorLabel(mode)) },
+                    contentPadding = PaddingValues(horizontal = if (compact) 4.dp else 12.dp),
+                    icon = {},
+                    label = {
+                        Text(
+                            sensorLabel(mode),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelLarge,
+                        )
+                    },
                 )
             }
         }
@@ -730,6 +737,7 @@ private fun AudioPanel(
     onScaleChange: (AudioScale) -> Unit,
     onSensitivityChange: (Int) -> Unit,
 ) {
+    val compact = LocalCompactDashboard.current
     var editingScale by remember { mutableStateOf(false) }
     val status =
         when (state.audio.status) {
@@ -813,24 +821,26 @@ private fun AudioPanel(
     OutlinedButton(
         onClick = { editingScale = true },
         enabled = state.canWrite,
-        modifier = Modifier.fillMaxWidth().height(68.dp),
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        modifier = Modifier.fillMaxWidth().height(if (compact) 58.dp else 68.dp),
+        contentPadding = PaddingValues(horizontal = if (compact) 12.dp else 16.dp, vertical = if (compact) 7.dp else 10.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 18.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(stringResource(R.string.audio_scale_title), fontWeight = FontWeight.SemiBold)
-                Text(
-                    stringResource(R.string.audio_scale_customize),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                )
+                if (!compact) {
+                    Text(
+                        stringResource(R.string.audio_scale_customize),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                    )
+                }
             }
-            Column(modifier = Modifier.width(146.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(modifier = Modifier.width(if (compact) 104.dp else 146.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Box(
                     modifier =
                         Modifier
@@ -858,12 +868,9 @@ private fun AudioPanel(
             }
         }
     }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
+    ResponsiveControlPair(
+        secondVisible = state.brightnessEnabled,
+        first = {
             DeferredIntSlider(
                 label = stringResource(R.string.audio_sensitivity_title),
                 committedValue = state.audioSensitivityDb,
@@ -873,20 +880,9 @@ private fun AudioPanel(
                 steps = AudioSensitivity.MAX_DB - AudioSensitivity.MIN_DB - 1,
                 enabled = state.canWrite,
             )
-        }
-        if (state.brightnessEnabled) {
-            Column(modifier = Modifier.weight(1f)) {
-                DeferredIntSlider(
-                    label = stringResource(R.string.brightness_title),
-                    committedValue = state.ledState.brightness,
-                    valueLabel = { stringResource(R.string.brightness_value, it) },
-                    onValueCommit = onBrightnessChange,
-                    valueRange = 0..100,
-                    enabled = state.canWrite,
-                )
-            }
-        }
-    }
+        },
+        second = { BrightnessRow(state, onBrightnessChange) },
+    )
     if (editingScale) {
         AudioScaleDialog(
             initial = state.audioScale,
@@ -948,45 +944,43 @@ private fun AmbientPanel(
         status = status,
         onActivate = actions.onAmbientCaptureRequest,
     )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(stringResource(R.string.ambient_sampling_title), style = MaterialTheme.typography.labelMedium)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 1.dp)) {
-                AmbientSamplingMode.entries.forEachIndexed { index, mode ->
-                    val label =
-                        if (mode == AmbientSamplingMode.FULL_SCENE) {
-                            stringResource(R.string.ambient_sampling_full)
-                        } else {
-                            stringResource(R.string.ambient_sampling_bottom)
+    ResponsiveControlPair(
+        first = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.ambient_sampling_title), style = MaterialTheme.typography.labelMedium)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 1.dp)) {
+                    AmbientSamplingMode.entries.forEachIndexed { index, mode ->
+                        val label =
+                            if (mode == AmbientSamplingMode.FULL_SCENE) {
+                                stringResource(R.string.ambient_sampling_full)
+                            } else {
+                                stringResource(R.string.ambient_sampling_bottom)
+                            }
+                        val accessibleLabel =
+                            if (mode == AmbientSamplingMode.FULL_SCENE) {
+                                stringResource(R.string.ambient_sampling_full_accessibility)
+                            } else {
+                                stringResource(R.string.ambient_sampling_bottom_accessibility)
+                            }
+                        SegmentedButton(
+                            modifier =
+                                Modifier
+                                    .height(46.dp)
+                                    .semantics { contentDescription = accessibleLabel },
+                            selected = state.ambientSamplingMode == mode,
+                            onClick = { actions.onAmbientSamplingModeChange(mode) },
+                            enabled = state.canWrite,
+                            shape = SegmentedButtonDefaults.itemShape(index, AmbientSamplingMode.entries.size),
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            icon = {},
+                        ) {
+                            Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
                         }
-                    val accessibleLabel =
-                        if (mode == AmbientSamplingMode.FULL_SCENE) {
-                            stringResource(R.string.ambient_sampling_full_accessibility)
-                        } else {
-                            stringResource(R.string.ambient_sampling_bottom_accessibility)
-                        }
-                    SegmentedButton(
-                        modifier =
-                            Modifier
-                                .height(46.dp)
-                                .semantics { contentDescription = accessibleLabel },
-                        selected = state.ambientSamplingMode == mode,
-                        onClick = { actions.onAmbientSamplingModeChange(mode) },
-                        enabled = state.canWrite,
-                        shape = SegmentedButtonDefaults.itemShape(index, AmbientSamplingMode.entries.size),
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        icon = {},
-                    ) {
-                        Text(label, maxLines = 1, style = MaterialTheme.typography.labelMedium)
                     }
                 }
             }
-        }
-        Column(modifier = Modifier.weight(1f)) {
+        },
+        second = {
             DeferredIntSlider(
                 label = stringResource(R.string.ambient_capture_rate),
                 committedValue = state.ambientCaptureFps,
@@ -996,14 +990,10 @@ private fun AmbientPanel(
                 steps = 4,
                 enabled = state.canWrite,
             )
-        }
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(20.dp),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
+        },
+    )
+    ResponsiveControlPair(
+        first = {
             DeferredIntSlider(
                 label = stringResource(R.string.ambient_vividness),
                 committedValue = state.ambientVividness,
@@ -1012,8 +1002,8 @@ private fun AmbientPanel(
                 valueRange = 0..100,
                 enabled = state.canWrite,
             )
-        }
-        Column(modifier = Modifier.weight(1f)) {
+        },
+        second = {
             DeferredIntSlider(
                 label = stringResource(R.string.ambient_smoothing),
                 committedValue = state.ambientSmoothing,
@@ -1022,8 +1012,8 @@ private fun AmbientPanel(
                 valueRange = 0..100,
                 enabled = state.canWrite,
             )
-        }
-    }
+        },
+    )
     BrightnessRow(state, onBrightnessChange)
 }
 
@@ -1033,7 +1023,13 @@ private fun AmbientSceneWindow(
     status: String,
     onActivate: () -> Unit,
 ) {
+    val compact = LocalCompactDashboard.current
     val capturing = state.ambient.status == AmbientCaptureStatus.CAPTURING
+    val needsAuthorization = state.ambientNeedsAuthorization
+    val lightAuthorization = needsAuthorization && MaterialTheme.colorScheme.background.luminance() > 0.5f
+    val authorizationInk = if (lightAuthorization) MaterialTheme.colorScheme.onSurface else Color(0xFFF4F7FA)
+    val authorizationSurface = MaterialTheme.colorScheme.surfaceContainer
+    val authorizationOutline = MaterialTheme.colorScheme.outlineVariant
     val frameColors =
         if (capturing) {
             state.currentFrame.map { state.ledColorProjection.display(it).toComposeColor() }
@@ -1042,7 +1038,12 @@ private fun AmbientSceneWindow(
         }
     val sceneColors =
         when (frameColors.size) {
-            0 -> listOf(Color(0xFF131A25), Color(0xFF273347), Color(0xFF111723))
+            0 ->
+                if (lightAuthorization) {
+                    listOf(MaterialTheme.colorScheme.surfaceContainerHigh, MaterialTheme.colorScheme.surfaceContainerHighest)
+                } else {
+                    listOf(Color(0xFF131A25), Color(0xFF273347), Color(0xFF111723))
+                }
             1 -> listOf(frameColors.first(), frameColors.first())
             else -> frameColors
         }
@@ -1051,10 +1052,10 @@ private fun AmbientSceneWindow(
             AmbientCaptureStatus.CAPTURING -> Color(0xFF8DE8C5)
             AmbientCaptureStatus.STARTING -> Color(0xFFF4F7FA)
             AmbientCaptureStatus.NO_FRAMES -> Color(0xFFFFC978)
-            AmbientCaptureStatus.AUTHORIZATION_REQUIRED -> Color(0xFFD8E0E7)
+            AmbientCaptureStatus.AUTHORIZATION_REQUIRED ->
+                if (lightAuthorization) MaterialTheme.colorScheme.primary else Color(0xFFD8E0E7)
             AmbientCaptureStatus.REVOKED, AmbientCaptureStatus.ERROR -> Color(0xFFFF9B8F)
         }
-    val needsAuthorization = state.ambientNeedsAuthorization
     val shape = RoundedCornerShape(22.dp)
 
     Box(
@@ -1070,15 +1071,22 @@ private fun AmbientSceneWindow(
             val sceneBrush = Brush.horizontalGradient(sceneColors)
 
             drawRect(if (capturing) sceneBrush else Brush.linearGradient(sceneColors))
-            drawRect(
-                Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.18f),
-                    0.55f to Color.Black.copy(alpha = 0.04f),
-                    1f to Color.Black.copy(alpha = 0.42f),
-                ),
-            )
+            if (!lightAuthorization) {
+                drawRect(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.18f),
+                        0.55f to Color.Black.copy(alpha = 0.04f),
+                        1f to Color.Black.copy(alpha = 0.42f),
+                    ),
+                )
+            }
             drawRoundRect(
-                color = Color(0xFF070A0F).copy(alpha = if (capturing) 0.84f else 0.94f),
+                color =
+                    if (lightAuthorization) {
+                        authorizationSurface.copy(alpha = 0.88f)
+                    } else {
+                        Color(0xFF070A0F).copy(alpha = if (capturing) 0.84f else 0.94f)
+                    },
                 topLeft = Offset(inset, inset),
                 size = androidx.compose.ui.geometry.Size(size.width - inset * 2f, size.height - inset * 2f),
                 cornerRadius = CornerRadius(innerRadius),
@@ -1124,7 +1132,12 @@ private fun AmbientSceneWindow(
                 )
             }
             drawRoundRect(
-                color = Color.White.copy(alpha = 0.18f),
+                color =
+                    if (lightAuthorization) {
+                        authorizationOutline
+                    } else {
+                        Color.White.copy(alpha = 0.18f)
+                    },
                 topLeft = Offset(inset, inset),
                 size = androidx.compose.ui.geometry.Size(size.width - inset * 2f, size.height - inset * 2f),
                 cornerRadius = CornerRadius(innerRadius),
@@ -1164,7 +1177,7 @@ private fun AmbientSceneWindow(
                 ) {
                     Text(
                         text = stringResource(R.string.ambient_title).uppercase(),
-                        color = Color.White.copy(alpha = 0.72f),
+                        color = authorizationInk.copy(alpha = 0.72f),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 1.8.sp,
@@ -1173,7 +1186,7 @@ private fun AmbientSceneWindow(
                         title = stringResource(R.string.ambient_title),
                         description = stringResource(R.string.ambient_description),
                         modifier = Modifier.height(36.dp),
-                        contentColor = Color(0xFFF4F7FA),
+                        contentColor = authorizationInk,
                     )
                 }
                 Row(
@@ -1202,8 +1215,12 @@ private fun AmbientSceneWindow(
                             Modifier
                                 .height(40.dp)
                                 .semantics { contentDescription = activationDescription },
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.58f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF4F7FA)),
+                        border =
+                            BorderStroke(
+                                1.dp,
+                                if (lightAuthorization) MaterialTheme.colorScheme.outline else Color.White.copy(alpha = 0.58f),
+                            ),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = authorizationInk),
                     ) {
                         Text(stringResource(R.string.ambient_activate))
                     }
@@ -1232,7 +1249,12 @@ private fun AmbientSceneWindow(
                     ) {
                         Box(Modifier.size(8.dp).background(statusColor, CircleShape))
                         Text(
-                            text = status,
+                            text =
+                                if (compact && state.ambient.status == AmbientCaptureStatus.CAPTURING) {
+                                    stringResource(R.string.ambient_status_capturing_compact)
+                                } else {
+                                    status
+                                },
                             color = statusColor,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
@@ -1266,6 +1288,49 @@ private fun EditorialModeLayout(
     compactValue: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val compact = LocalCompactDashboard.current
+    if (compact) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(
+                        text = title.uppercase(),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 1.2.sp,
+                    )
+                    if (status != null) {
+                        Text(
+                            text = status,
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        text = value ?: title,
+                        style = if (value != null) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        softWrap = false,
+                    )
+                    ModeExplanationAction(title = title, description = description)
+                }
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+        }
+        return
+    }
     val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f)
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1451,6 +1516,31 @@ private fun BrightnessRow(
         valueRange = 0..100,
         enabled = state.canWrite,
     )
+}
+
+@Composable
+private fun ResponsiveControlPair(
+    secondVisible: Boolean = true,
+    first: @Composable () -> Unit,
+    second: @Composable () -> Unit,
+) {
+    if (LocalCompactDashboard.current) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            first()
+            if (secondVisible) second()
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Column(modifier = Modifier.weight(1f)) { first() }
+            if (secondVisible) {
+                Column(modifier = Modifier.weight(1f)) { second() }
+            }
+        }
+    }
 }
 
 @Composable

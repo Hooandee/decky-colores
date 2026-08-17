@@ -92,7 +92,7 @@ internal fun AudioScaleDialog(
                 }
                 Spacer(Modifier.height(12.dp))
                 BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-                    if (maxWidth >= 720.dp) {
+                    if (shouldUseTwoPaneLayout(maxWidth, maxHeight, 720.dp)) {
                         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             AudioScaleOverview(model, level, active, projection, { model = model.select(it) }, Modifier.weight(1f).fillMaxHeight())
                             AudioScaleColorEditor(model, projection, { model = it }, Modifier.weight(1f).fillMaxHeight())

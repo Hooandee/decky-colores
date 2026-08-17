@@ -3,6 +3,7 @@ package com.hooandee.colores.device.learning
 import com.hooandee.colores.device.AndroidDeviceIdentity
 import com.hooandee.colores.device.DetectedAndroidDevice
 import com.hooandee.colores.device.DeviceCapabilities
+import com.hooandee.colores.device.LedGridCell
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.device.GenericVendorLed
 import com.hooandee.colores.led.Htr3212Descriptor
@@ -87,7 +88,7 @@ class LearnedBindingTest {
     }
 
     @Test
-    fun `calibrated HTR order survives candidate rediscovery`() {
+    fun `calibrated HTR binding restores its two stick grid`() {
         val observedDescriptor =
             GenericVendorLed.descriptor(8).copy(
                 driver = "htr3212",
@@ -128,6 +129,19 @@ class LearnedBindingTest {
         val resolved = requireNotNull(resolveLearnedDevice(identity, htrBinding, listOf(htrCandidate)))
 
         assertEquals(calibratedDescriptor, resolved.led)
+        assertEquals(
+            listOf(
+                LedGridCell(0, 0, 0, "top_left"),
+                LedGridCell(0, 1, 0, "bottom_left"),
+                LedGridCell(0, 1, 1, "bottom_right"),
+                LedGridCell(0, 0, 1, "top_right"),
+                LedGridCell(1, 0, 0, "top_left"),
+                LedGridCell(1, 1, 0, "bottom_left"),
+                LedGridCell(1, 1, 1, "bottom_right"),
+                LedGridCell(1, 0, 1, "top_right"),
+            ),
+            resolved.gridLayout,
+        )
     }
 
     @Test

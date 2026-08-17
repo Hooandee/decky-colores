@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -63,8 +62,17 @@ fun DeviceScene(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val compact = maxHeight < 320.dp
-            val ringSize = if (compact) (maxHeight - 150.dp).coerceIn(40.dp, 112.dp) else 112.dp
             val scenePadding = if (compact) 14.dp else 22.dp
+            val capsuleHorizontalPadding = 18.dp
+            val ringSpacing = 18.dp
+            val preferredRingSize = if (compact) (maxHeight - 150.dp).coerceIn(40.dp, 112.dp) else 112.dp
+            val ringSize =
+                previewRingDiameter(
+                    availableWidth = maxWidth - scenePadding * 2 - capsuleHorizontalPadding * 2,
+                    groupCount = preview.groups.size,
+                    spacing = ringSpacing,
+                    preferredDiameter = preferredRingSize,
+                )
             Column(
                 modifier = Modifier.fillMaxSize().padding(scenePadding),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -95,8 +103,8 @@ fun DeviceScene(
                 Spacer(Modifier.weight(1f))
                 GlassPreviewCapsule {
                     Row(
-                        modifier = Modifier.padding(horizontal = 18.dp, vertical = if (compact) 12.dp else 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(18.dp),
+                        modifier = Modifier.padding(horizontal = capsuleHorizontalPadding, vertical = if (compact) 12.dp else 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(ringSpacing),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         preview.groups.forEachIndexed { index, segments ->
@@ -122,7 +130,9 @@ fun DeviceScene(
                         enabled = enabled,
                         modifier =
                             Modifier
-                                .heightIn(min = if (compact) 36.dp else 48.dp)
+                                .align(Alignment.CenterHorizontally)
+                                .fillMaxWidth(if (compact) 0.64f else 0.72f)
+                                .height(if (compact) 44.dp else 48.dp)
                                 .semantics {
                                     role = Role.RadioButton
                                     selected = selectedTarget == EditTarget.BOTH

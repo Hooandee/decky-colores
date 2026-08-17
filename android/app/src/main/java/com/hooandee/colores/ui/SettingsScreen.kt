@@ -96,7 +96,7 @@ fun SettingsScreen(
     var legalOpen by remember { mutableStateOf(false) }
     PrismaticBackdrop(modifier = Modifier.fillMaxSize()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            if (maxWidth >= 760.dp) {
+            if (shouldUseTwoPaneLayout(maxWidth, maxHeight, 760.dp)) {
                 Column(
                     modifier =
                         Modifier
@@ -313,18 +313,19 @@ private fun ProfilesOverview(state: ColoresUiState) {
                     Text("G", fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleMedium)
                 }
             }
-            Text(
-                stringResource(R.string.settings_profiles_global_base),
-                modifier = Modifier.weight(1f),
-                fontWeight = FontWeight.Bold,
-            )
-            ProfileValue(
-                pluralStringResource(
-                    R.plurals.settings_profiles_count,
-                    state.configuredProfiles.size,
-                    state.configuredProfiles.size,
-                ),
-            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(
+                    stringResource(R.string.settings_profiles_global_base),
+                    fontWeight = FontWeight.Bold,
+                )
+                ProfileValue(
+                    pluralStringResource(
+                        R.plurals.settings_profiles_count,
+                        state.configuredProfiles.size,
+                        state.configuredProfiles.size,
+                    ),
+                )
+            }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),

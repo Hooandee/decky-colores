@@ -9,7 +9,33 @@ import android.media.projection.MediaProjection
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.SystemClock
+import android.view.WindowManager
 import com.hooandee.colores.led.RgbColor
+import kotlin.math.roundToInt
+
+internal data class AmbientCaptureDimensions(
+    val width: Int,
+    val height: Int,
+)
+
+internal fun ambientCaptureDimensions(
+    displayWidth: Int,
+    displayHeight: Int,
+    maxLongEdge: Int = 32,
+): AmbientCaptureDimensions {
+    if (displayWidth <= 0 || displayHeight <= 0 || maxLongEdge <= 0) return AmbientCaptureDimensions(32, 18)
+    return if (displayWidth >= displayHeight) {
+        AmbientCaptureDimensions(
+            width = maxLongEdge,
+            height = (maxLongEdge * displayHeight.toFloat() / displayWidth).roundToInt().coerceAtLeast(1),
+        )
+    } else {
+        AmbientCaptureDimensions(
+            width = (maxLongEdge * displayWidth.toFloat() / displayHeight).roundToInt().coerceAtLeast(1),
+            height = maxLongEdge,
+        )
+    }
+}
 
 class AndroidScreenCapture(
     private val context: Context,
@@ -44,7 +70,15 @@ class AndroidScreenCapture(
         running = true
         val captureThread = HandlerThread("ColoresAmbientCapture").apply { start() }
         val captureHandler = Handler(captureThread.looper)
-        val imageReader = ImageReader.newInstance(CAPTURE_WIDTH, CAPTURE_HEIGHT, PixelFormat.RGBA_8888, MAX_IMAGES)
+        val displayBounds = context.getSystemService(WindowManager::class.java).currentWindowMetrics.bounds
+        val captureDimensions = ambientCaptureDimensions(displayBounds.width(), displayBounds.height())
+        val imageReader =
+            ImageReader.newInstance(
+                captureDimensions.width,
+                captureDimensions.height,
+                PixelFormat.RGBA_8888,
+                MAX_IMAGES,
+            )
         thread = captureThread
         handler = captureHandler
         reader = imageReader
@@ -52,8 +86,8 @@ class AndroidScreenCapture(
         display =
             projection.createVirtualDisplay(
                 "ColoresAmbient",
-                CAPTURE_WIDTH,
-                CAPTURE_HEIGHT,
+                captureDimensions.width,
+                captureDimensions.height,
                 context.resources.displayMetrics.densityDpi,
                 DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                 imageReader.surface,
@@ -114,8 +148,6 @@ class AndroidScreenCapture(
     }
 
     private companion object {
-        const val CAPTURE_WIDTH = 32
-        const val CAPTURE_HEIGHT = 18
         const val MAX_IMAGES = 2
         const val NO_FRAME_TIMEOUT_MS = 2_000L
     }

@@ -276,6 +276,69 @@ class DeviceRegistryTest {
     }
 
     @Test
+    fun `production registry resolves the Retroid Pocket Nova multipoint profile`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+
+        val match =
+            registry.match(
+                AndroidDeviceIdentity(
+                    model = "Retroid_Pocket_Nova",
+                    device = "kalama",
+                    manufacturer = "Moorechip",
+                    productProperties = emptyMap(),
+                ),
+            )
+
+        requireNotNull(match)
+        assertEquals("retroid-pocket-nova", match.id)
+        assertEquals("Retroid Pocket Nova", match.friendlyName)
+        assertEquals(DeviceCapabilities(color = true, brightness = true, perZone = true, zones = 8), match.capabilities)
+        val led = match.led as SettingsProviderDescriptor
+        assertEquals("htr3212", led.driver)
+        assertEquals("pserver", led.transport)
+        assertEquals(GenericVendorLed.ENABLE_KEYS, led.enableKeys)
+        requireNotNull(led.htr3212)
+        assertEquals(3, led.htr3212.leftBus)
+        assertEquals(6, led.htr3212.rightBus)
+        assertEquals(0x3c, led.htr3212.address)
+        assertEquals(listOf(0, 1, 2, 3), led.htr3212.leftOrder)
+        assertEquals(listOf(0, 1, 2, 3), led.htr3212.rightOrder)
+        assertEquals(0x0d, led.htr3212.rgbStartRegister)
+        assertFalse(led.htr3212.blockWrite)
+        assertFalse(led.htr3212.pairedWrite)
+        assertFalse(led.htr3212.explicitInitialization)
+        assertTrue(led.htr3212.automaticActivation)
+        assertEquals(8, match.gridLayout?.size)
+    }
+
+    @Test
+    fun `Nova model aliases remain exact without depending on the shared kalama codename`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+
+        val match =
+            registry.match(
+                AndroidDeviceIdentity(
+                    model = "Retroid Pocket Nova",
+                    device = "future-nova-revision",
+                    manufacturer = "Retroid",
+                    productProperties = emptyMap(),
+                ),
+            )
+
+        assertEquals("retroid-pocket-nova", match?.id)
+    }
+
+    @Test
     fun `production registry resolves the calibrated Odin 2 Portal multipoint profile`() {
         val shared = File("../../shared")
         val registry =

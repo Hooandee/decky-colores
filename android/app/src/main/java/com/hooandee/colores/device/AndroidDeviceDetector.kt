@@ -4,9 +4,12 @@ import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import com.hooandee.colores.device.learning.DetectionOutcome
+import com.hooandee.colores.device.learning.FACT_PSERVER
+import com.hooandee.colores.device.learning.FactEvidence
 import com.hooandee.colores.device.learning.LearnedDeviceBinding
 import com.hooandee.colores.device.learning.HardwareLearningGraph
 import com.hooandee.colores.device.learning.HardwareFact
+import com.hooandee.colores.device.learning.HardwareLearningRoute
 import com.hooandee.colores.device.learning.Htr3212InformationCartridge
 import com.hooandee.colores.device.learning.HTR3212_PROBE_ID
 import com.hooandee.colores.device.learning.HTR3212_PROBE_VERSION
@@ -84,7 +87,7 @@ class AndroidDeviceDetector(
                 GenericLedResolver.joypadCandidate(runCatching { scanJoypad() }.getOrNull()),
                 GenericLedResolver.sysfsCandidate(runCatching { scanSysfs() }.getOrNull()),
             )
-        val route = HardwareLearningGraph(informationCartridges).resolve(identity, seedCandidates)
+        val route = resolveHardwareLearningRoute(identity, pserver, seedCandidates, informationCartridges)
         val candidates = verificationCandidates(route.candidates, exact, exactTransportAvailable, route.facts)
         val learned = resolveLearnedDevice(identity, binding, candidates)
         return resolveDetectionOutcome(
@@ -131,6 +134,23 @@ class AndroidDeviceDetector(
             )
     }
 }
+
+internal fun resolveHardwareLearningRoute(
+    identity: AndroidDeviceIdentity,
+    pserverAvailable: Boolean,
+    seedCandidates: List<ProbeCandidate>,
+    informationCartridges: List<InformationCartridge>,
+): HardwareLearningRoute =
+    HardwareLearningGraph(informationCartridges).resolve(
+        identity = identity,
+        seedCandidates = seedCandidates,
+        seedFacts =
+            if (pserverAvailable) {
+                listOf(HardwareFact(FACT_PSERVER, "present", FactEvidence.OBSERVED, "android-detector"))
+            } else {
+                emptyList()
+            },
+    )
 
 internal fun exactProfileCandidate(device: DetectedAndroidDevice): ProbeCandidate? {
     val descriptor = device.led as? SettingsProviderDescriptor ?: return null
