@@ -44,6 +44,22 @@ class HardwareLearningGraphTest {
         assertEquals(1, route.candidates.size)
     }
 
+    @Test
+    fun `observed transport facts unlock information cartridges without probe candidates`() {
+        val cartridge =
+            fakeInformationCartridge("htr", setOf(FACT_PSERVER)) {
+                InformationCartridgeResult(
+                    facts = listOf(HardwareFact("controller.count", "2", FactEvidence.OBSERVED, "htr")),
+                )
+            }
+        val pserver = HardwareFact(FACT_PSERVER, "present", FactEvidence.OBSERVED, "detector")
+
+        val route = HardwareLearningGraph(listOf(cartridge)).resolve(identity, emptyList(), seedFacts = listOf(pserver))
+
+        assertTrue(route.facts.any { it.key == "controller.count" })
+        assertEquals(listOf("htr"), route.inspectedCartridgeIds)
+    }
+
     private fun settingsCandidate() =
         ProbeCandidate(
             cartridgeId = SETTINGS_PROBE_ID,

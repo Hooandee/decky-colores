@@ -15,6 +15,7 @@ import com.hooandee.colores.effects.ContextServiceGate
 import com.hooandee.colores.device.learning.HardwareLearningStore
 import com.hooandee.colores.device.learning.HardwareLearningCoordinator
 import com.hooandee.colores.device.learning.Htr3212LearningCartridge
+import com.hooandee.colores.device.learning.PServerHtr3212RegisterReader
 import com.hooandee.colores.device.learning.ProbeCartridgeCatalog
 import com.hooandee.colores.device.learning.RollbackRecovery
 import com.hooandee.colores.device.learning.RollbackStatus
@@ -25,10 +26,10 @@ import com.hooandee.colores.device.learning.restoreAfterLearningRollback
 import com.hooandee.colores.led.PServerSystemSettingsStore
 import com.hooandee.colores.led.AndroidPServerCommandExecutor
 import com.hooandee.colores.led.VerifiedPServerCommandExecutor
-import java.io.File
 import com.hooandee.colores.profiles.LightingProfileCoordinator
 import com.hooandee.colores.profiles.LightingProfileStore
 import com.hooandee.colores.settings.AppPreferences
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -62,12 +63,13 @@ class ColoresApplication : Application() {
                 File(cacheDir, "pserver_learning_status"),
             )
         val settingsStore = PServerSystemSettingsStore(this, executor)
+        val htrRegisterReader = PServerHtr3212RegisterReader(executor, File(cacheDir, "pserver_htr_registers"))
         ProbeCartridgeCatalog(
             listOf(
                 SettingsLearningCartridge(settingsStore),
                 SingleAdcLearningCartridge(),
                 SysfsLearningCartridge(),
-                Htr3212LearningCartridge(settingsStore, executor),
+                Htr3212LearningCartridge(settingsStore, executor, htrRegisterReader),
             ),
         )
     }

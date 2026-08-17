@@ -48,13 +48,15 @@ fun ProfileSelectorPill(
     state: ColoresUiState,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val app = state.selectedProfileApp()
     val label = app?.label ?: stringResource(R.string.profile_global)
+    val description = stringResource(R.string.profile_editing, label)
     val shape = RoundedCornerShape(999.dp)
     Surface(
         onClick = onOpen,
-        modifier = modifier.widthIn(max = 220.dp),
+        modifier = modifier.widthIn(max = 220.dp).semantics { contentDescription = description },
         shape = shape,
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -70,7 +72,7 @@ fun ProfileSelectorPill(
         ) {
             ProfileIcon(app?.icon, label, 24.dp)
             Text(
-                text = stringResource(R.string.profile_editing, label),
+                text = if (compact) label else description,
                 modifier = Modifier.weight(1f, fill = false),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,

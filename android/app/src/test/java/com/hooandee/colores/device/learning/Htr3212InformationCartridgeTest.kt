@@ -38,6 +38,34 @@ class Htr3212InformationCartridgeTest {
     }
 
     @Test
+    fun `paired controllers and PServer unlock HTR without a vendor color setting`() {
+        val cartridge =
+            Htr3212InformationCartridge(
+                topologyReader =
+                    I2cTopologyReader {
+                        listOf(
+                            I2cController(bus = 3, address = 0x3c, driver = "htr3212l"),
+                            I2cController(bus = 6, address = 0x3c, driver = "htr3212r"),
+                        )
+                    },
+            )
+        val context =
+            HardwareLearningContext(
+                identity = AndroidDeviceIdentity("Retroid Pocket Nova", "kalama", "Moorechip", emptyMap()),
+                facts = listOf(HardwareFact(FACT_PSERVER, "present", FactEvidence.OBSERVED, "detector")),
+                candidates = emptyList(),
+            )
+
+        val result = cartridge.inspect(context)
+
+        val candidate = result.candidates.single()
+        val descriptor = candidate.descriptor as SettingsProviderDescriptor
+        assertEquals(3, descriptor.htr3212?.leftBus)
+        assertEquals(6, descriptor.htr3212?.rightBus)
+        assertEquals(8, descriptor.zones)
+    }
+
+    @Test
     fun `observed RP5 pair enables only its physically validated initialization`() {
         val cartridge =
             Htr3212InformationCartridge(

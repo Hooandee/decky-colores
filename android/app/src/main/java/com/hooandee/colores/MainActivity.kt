@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import android.media.projection.MediaProjectionConfig
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
@@ -142,15 +143,29 @@ class MainActivity : AppCompatActivity() {
     private fun launchProjectionConsent(request: ProjectionRequest) {
         projectionRequest = request
         val manager = getSystemService(MediaProjectionManager::class.java)
-        projectionLauncher.launch(manager.createScreenCaptureIntent())
-    }
-
-    private enum class ProjectionRequest {
-        NONE,
-        AUDIO,
-        AMBIENT,
+        val intent =
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+                shouldCaptureDefaultDisplay(request, Build.VERSION.SDK_INT)
+            ) {
+                manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
+            } else {
+                manager.createScreenCaptureIntent()
+            }
+        projectionLauncher.launch(intent)
     }
 }
+
+internal enum class ProjectionRequest {
+    NONE,
+    AUDIO,
+    AMBIENT,
+}
+
+internal fun shouldCaptureDefaultDisplay(
+    request: ProjectionRequest,
+    sdk: Int,
+): Boolean = request == ProjectionRequest.AMBIENT && sdk >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
 
 internal fun shouldRequestNotificationPermission(
     sdk: Int,

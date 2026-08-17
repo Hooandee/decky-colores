@@ -9,9 +9,18 @@ import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SystemSettingsStore
 import kotlin.math.roundToInt
 
+fun interface Htr3212RegisterReader {
+    fun read(
+        bus: Int,
+        address: Int,
+        registers: List<Int>,
+    ): List<Int>?
+}
+
 internal class Htr3212LearningCartridge(
     private val store: SystemSettingsStore,
     private val executor: PServerCommandExecutor,
+    private val registerReader: Htr3212RegisterReader = Htr3212RegisterReader { _, _, _ -> null },
     private val settleVendor: () -> Unit = { Thread.sleep(VENDOR_SETTLE_MS) },
     private val settleRepaint: () -> Unit = { Thread.sleep(VENDOR_REPAINT_MS) },
 ) : ProbeCartridge {
@@ -21,18 +30,22 @@ internal class Htr3212LearningCartridge(
 
     override fun accepts(candidate: ProbeCandidate): Boolean {
         val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return false
-        val hardware = descriptor.htr3212 ?: return false
         return candidate.cartridgeId == id &&
             candidate.cartridgeVersion == version &&
             candidate.surface == surface &&
-            descriptor.driver == "htr3212" &&
-            descriptor.transport == "pserver" &&
-            descriptor.colorKey == GenericVendorLed.COLOR_KEY &&
-            descriptor.colorFormat == "argb_hex_csv" &&
-            descriptor.brightnessKey == GenericVendorLed.BRIGHTNESS_KEY &&
-            descriptor.enableKeys.isNotEmpty() &&
-            GenericVendorLed.ENABLE_KEYS.containsAll(descriptor.enableKeys) &&
-            descriptor.zones == TOTAL_ZONES &&
+            descriptor.isAcceptedHtrDescriptor()
+    }
+
+    private fun SettingsProviderDescriptor.isAcceptedHtrDescriptor(): Boolean {
+        val hardware = htr3212 ?: return false
+        return driver == "htr3212" &&
+            transport == "pserver" &&
+            colorKey == GenericVendorLed.COLOR_KEY &&
+            colorFormat == "argb_hex_csv" &&
+            brightnessKey == GenericVendorLed.BRIGHTNESS_KEY &&
+            enableKeys.isNotEmpty() &&
+            GenericVendorLed.ENABLE_KEYS.containsAll(enableKeys) &&
+            zones == TOTAL_ZONES &&
             hardware.leftBus in BUS_RANGE &&
             hardware.rightBus in BUS_RANGE &&
             hardware.leftBus != hardware.rightBus &&
@@ -45,20 +58,27 @@ internal class Htr3212LearningCartridge(
     override fun snapshot(candidate: ProbeCandidate): ProbeSnapshot? {
         val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return null
         if (!store.available || !executor.available || !accepts(candidate)) return null
-        val color = store.get(descriptor.colorKey) ?: return null
-        val values = linkedMapOf(descriptor.colorKey to color)
-        store.get(descriptor.brightnessKey)?.let { values[descriptor.brightnessKey] = it }
-        descriptor.enableKeys.forEach { key -> store.get(key)?.let { values[key] = it } }
+        val color = store.get(descriptor.colorKey)
+        val powerValues = descriptor.enableKeys.mapNotNull { key -> store.get(key)?.let { key to it } }.toMap(linkedMapOf())
+        val values =
+            when {
+                color != null -> linkedMapOf(descriptor.colorKey to color)
+                powerValues.isNotEmpty() && powerValues.values.all(::isPowerOffValue) -> linkedMapOf()
+                else -> rawSnapshot(descriptor) ?: return null
+            }
+        if (color != null) store.get(descriptor.brightnessKey)?.let { values[descriptor.brightnessKey] = it }
+        values.putAll(powerValues)
         return ProbeSnapshot(values)
     }
 
     override fun supportedSteps(candidate: ProbeCandidate): List<ProbeStep> {
         val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return emptyList()
         if (snapshot(candidate) == null) return emptyList()
+        val direct = store.get(descriptor.colorKey) == null
         return buildList {
             add(ProbeStep.COLOR)
             add(ProbeStep.ZONE)
-            if (store.get(descriptor.brightnessKey) != null) {
+            if (direct || store.get(descriptor.brightnessKey) != null) {
                 add(ProbeStep.BRIGHTNESS_LOW)
                 add(ProbeStep.BRIGHTNESS_HIGH)
             }
@@ -77,14 +97,14 @@ internal class Htr3212LearningCartridge(
         val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return false
         if (!store.available || !executor.available || !accepts(candidate)) return false
         return when (step) {
-            ProbeStep.COLOR -> prepareVendor(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, HIGH_LEVEL)
-            ProbeStep.BRIGHTNESS_LOW -> prepareVendor(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, LOW_LEVEL)
-            ProbeStep.BRIGHTNESS_HIGH -> prepareVendor(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, HIGH_LEVEL)
+            ProbeStep.COLOR -> prepareDevice(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, HIGH_LEVEL)
+            ProbeStep.BRIGHTNESS_LOW -> prepareDevice(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, LOW_LEVEL)
+            ProbeStep.BRIGHTNESS_HIGH -> prepareDevice(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, HIGH_LEVEL)
             ProbeStep.POWER_OFF -> putPower(descriptor, false)
-            ProbeStep.POWER_ON -> prepareVendor(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, HIGH_LEVEL)
+            ProbeStep.POWER_ON -> prepareDevice(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, HIGH_LEVEL)
             ProbeStep.ZONE -> {
                 val index = zone?.takeIf { it in 0 until TOTAL_ZONES } ?: return false
-                if (!prepareVendor(descriptor)) return false
+                if (!prepareDevice(descriptor)) return false
                 val colors = List(TOTAL_ZONES) { if (it == index) PROBE_COLOR else OFF_COLOR }
                 val firstWrite = writeFrame(descriptor, colors, HIGH_LEVEL)
                 settleRepaint()
@@ -99,6 +119,7 @@ internal class Htr3212LearningCartridge(
         snapshot: ProbeSnapshot,
     ): RollbackStatus {
         val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return RollbackStatus.RESTORE_FAILED
+        if (descriptor.colorKey !in snapshot.values) return restoreRaw(descriptor, snapshot)
         val allowedKeys = setOf(descriptor.colorKey, descriptor.brightnessKey) + descriptor.enableKeys
         if (!accepts(candidate) || descriptor.colorKey !in snapshot.values || !allowedKeys.containsAll(snapshot.values.keys)) {
             return RollbackStatus.RESTORE_FAILED
@@ -156,14 +177,105 @@ internal class Htr3212LearningCartridge(
         return colorPrepared && brightnessPrepared && powerPrepared
     }
 
+    private fun prepareDevice(descriptor: SettingsProviderDescriptor): Boolean =
+        if (store.get(descriptor.colorKey) == null) {
+            val present = descriptor.enableKeys.any { store.get(it) != null }
+            !present || putPower(descriptor, true)
+        } else {
+            prepareVendor(descriptor)
+        }
+
+    private fun rawSnapshot(descriptor: SettingsProviderDescriptor): LinkedHashMap<String, String>? {
+        val hardware = descriptor.htr3212 ?: return null
+        val registers = (hardware.rgbStartRegister until hardware.rgbStartRegister + CHANNEL_COUNT).toList()
+        val left = registerReader.read(hardware.leftBus, hardware.address, registers)?.validRegisterValues() ?: return null
+        val right = registerReader.read(hardware.rightBus, hardware.address, registers)?.validRegisterValues() ?: return null
+        return linkedMapOf<String, String>().apply {
+            left.forEachIndexed { index, value -> put("$RAW_LEFT_PREFIX$index", value.toString()) }
+            right.forEachIndexed { index, value -> put("$RAW_RIGHT_PREFIX$index", value.toString()) }
+        }
+    }
+
+    private fun restoreRaw(
+        descriptor: SettingsProviderDescriptor,
+        snapshot: ProbeSnapshot,
+    ): RollbackStatus {
+        if (!descriptor.isAcceptedHtrDescriptor()) return RollbackStatus.RESTORE_FAILED
+        val settings = snapshot.values.filterKeys { it in descriptor.enableKeys }
+        val hasRawValues = snapshot.values.keys.any { it.startsWith(RAW_LEFT_PREFIX) || it.startsWith(RAW_RIGHT_PREFIX) }
+        if (!hasRawValues) {
+            if (settings.isEmpty() || settings.size != snapshot.values.size || !settings.values.all(::isPowerOffValue)) {
+                return RollbackStatus.RESTORE_FAILED
+            }
+            return restoreSettings(settings)
+        }
+        val left = snapshot.rawValues(RAW_LEFT_PREFIX) ?: return RollbackStatus.RESTORE_FAILED
+        val right = snapshot.rawValues(RAW_RIGHT_PREFIX) ?: return RollbackStatus.RESTORE_FAILED
+        val allowedKeys = settings.keys + (0 until CHANNEL_COUNT).flatMap { listOf("$RAW_LEFT_PREFIX$it", "$RAW_RIGHT_PREFIX$it") }
+        if (!allowedKeys.containsAll(snapshot.values.keys)) return RollbackStatus.RESTORE_FAILED
+        val directRestored = writeRawFrame(descriptor, left, right)
+        return if (directRestored && restoreSettings(settings) == RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK) {
+            RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK
+        } else {
+            RollbackStatus.RESTORE_FAILED
+        }
+    }
+
+    private fun restoreSettings(settings: Map<String, String>): RollbackStatus {
+        val accepted = settings.attemptAll(store::put)
+        val restored = settings.all { (key, value) -> store.get(key) == value }
+        return if (accepted && restored) RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK else RollbackStatus.RESTORE_FAILED
+    }
+
+    private fun isPowerOffValue(value: String): Boolean =
+        value.split(',').map(String::trim).filter(String::isNotEmpty).let { parts ->
+            parts.isNotEmpty() && parts.all { it.equals("0") || it.equals("false", ignoreCase = true) || it.equals("off", ignoreCase = true) }
+        }
+
+    private fun writeRawFrame(
+        descriptor: SettingsProviderDescriptor,
+        left: List<Int>,
+        right: List<Int>,
+    ): Boolean {
+        val hardware = descriptor.htr3212 ?: return false
+        val colors = { values: List<Int> -> values.chunked(CHANNELS_PER_ZONE).map { RgbColor(it[0], it[1], it[2]) } }
+        val order = (0 until ZONES_PER_STICK).toList()
+        val leftCommand =
+            Htr3212Command.build(
+                hardware.leftBus,
+                hardware.address,
+                colors(left),
+                order,
+                previous = null,
+                rgbStartRegister = hardware.rgbStartRegister,
+                blockWrite = hardware.blockWrite,
+            ) ?: return false
+        val rightCommand =
+            Htr3212Command.build(
+                hardware.rightBus,
+                hardware.address,
+                colors(right),
+                order,
+                previous = null,
+                rgbStartRegister = hardware.rgbStartRegister,
+                blockWrite = hardware.blockWrite,
+            ) ?: return false
+        return listOf(leftCommand, rightCommand).all(executor::execute)
+    }
+
+    private fun List<Int>.validRegisterValues(): List<Int>? = takeIf { size == CHANNEL_COUNT && all { value -> value in 0..255 } }
+
+    private fun ProbeSnapshot.rawValues(prefix: String): List<Int>? =
+        (0 until CHANNEL_COUNT).map { index -> values["$prefix$index"]?.toIntOrNull() ?: return null }.validRegisterValues()
+
     private fun putPower(
         descriptor: SettingsProviderDescriptor,
         enabled: Boolean,
     ): Boolean {
-        val present = descriptor.enableKeys.filter { store.get(it) != null }
+        val present = descriptor.enableKeys.withIndex().filter { (_, key) -> store.get(key) != null }
         if (present.isEmpty()) return false
         val value = if (enabled) "1" else "0"
-        return present.mapIndexed { index, key ->
+        return present.map { (index, key) ->
             store.put(key, if (index == 0) List(STICKS) { value }.joinToString(",") else value)
         }.all { it }
     }
@@ -238,6 +350,8 @@ internal class Htr3212LearningCartridge(
         const val STICKS = 2
         const val ZONES_PER_STICK = 4
         const val TOTAL_ZONES = STICKS * ZONES_PER_STICK
+        const val CHANNELS_PER_ZONE = 3
+        const val CHANNEL_COUNT = ZONES_PER_STICK * CHANNELS_PER_ZONE
         const val LOW_LEVEL = 25
         const val HIGH_LEVEL = 55
         const val HIGH_BRIGHTNESS_SETTING = "0.55"
@@ -247,5 +361,7 @@ internal class Htr3212LearningCartridge(
         val PROBE_COLOR = RgbColor(255, 0, 255)
         val OFF_COLOR = RgbColor(0, 0, 0)
         const val PROBE_COLOR_ARGB = "#FFFF00FF"
+        const val RAW_LEFT_PREFIX = "htr.left."
+        const val RAW_RIGHT_PREFIX = "htr.right."
     }
 }

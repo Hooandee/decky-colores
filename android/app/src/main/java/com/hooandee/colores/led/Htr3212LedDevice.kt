@@ -175,22 +175,24 @@ internal class Htr3212LedDevice internal constructor(
     ): VendorWriteResult {
         var succeeded = true
         var changed = false
-        if (seedColor && previous?.zoneColors != state.zoneColors) {
+        if (seedColor && previous?.zoneColors != state.zoneColors && store.get(descriptor.colorKey) != null) {
             changed = true
             if (!store.put(descriptor.colorKey, SettingsProviderCodec.encodeColors(state.zoneColors, STICKS))) {
                 succeeded = false
             }
         }
-        if (previous?.brightness != state.brightness) {
+        if (previous?.brightness != state.brightness && store.get(descriptor.brightnessKey) != null) {
             changed = true
             if (!store.put(descriptor.brightnessKey, SettingsProviderCodec.encodeBrightness(state.brightness, vendorDescriptor))) {
                 succeeded = false
             }
         }
         if (previous?.power != state.power) {
-            changed = true
             val values = SettingsProviderCodec.encodePower(state.power, STICKS, descriptor.enableKeys.size)
-            descriptor.enableKeys.zip(values).forEach { (key, value) ->
+            val presentKeys = descriptor.enableKeys.withIndex().filter { (_, key) -> store.get(key) != null }
+            if (presentKeys.isNotEmpty()) changed = true
+            presentKeys.forEach { (index, key) ->
+                val value = values[index]
                 if (!store.put(key, value)) succeeded = false
             }
         }

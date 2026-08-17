@@ -30,6 +30,7 @@
     <string name="settings_accent_picker">Selector de la luz del cristal</string>
     <string name="settings_accent_reset">Restaurar luz original</string>
     <string name="mode_how_it_works">Cómo funciona</string>
+    <string name="more_settings_below">Más ajustes abajo</string>
     <string name="settings_led_preview_description">Ajusta la representación visual al aspecto real de los LEDs cuando hay una calibración disponible.</string>
     <string name="settings_diagnostics">Tu dispositivo</string>
     <string name="settings_diagnostic_device">Dispositivo</string>
@@ -296,7 +297,7 @@
     <string name="audio_status_revoked">Captura detenida</string>
     <string name="audio_status_error">No se pudo iniciar</string>
     <string name="ambient_title">Ambilight</string>
-    <string name="ambient_description">La pantalla se reduce a 32 × 18 en memoria. Sus colores guían los LEDs y no se guarda ninguna captura.\n\n10 fps es el valor recomendado para jugar. Una frecuencia mayor responde antes y consume más recursos.</string>
+    <string name="ambient_description">Ambilight captura la pantalla completa y la reduce en memoria a un máximo de 32 píxeles en el lado largo, conservando su proporción. Sus colores guían los LEDs y no se guarda ninguna captura.\n\n10 fps es el valor recomendado para jugar. Una frecuencia mayor responde antes y consume más recursos.</string>
     <string name="ambient_sampling_title">Zona de captura</string>
     <string name="ambient_sampling_full">Completa</string>
     <string name="ambient_sampling_bottom">Inferior</string>
@@ -308,12 +309,13 @@
     <string name="ambient_vividness">Intensidad de color</string>
     <string name="ambient_smoothing">Suavizado</string>
     <string name="percent_value">%1$d%%</string>
-    <string name="ambient_privacy">La imagen se reduce a 32 × 18 y se procesa en memoria. No se guarda ninguna captura.</string>
+    <string name="ambient_privacy">Para seguir todos los juegos, Ambilight captura la pantalla completa. La imagen conserva su proporción, se reduce a un máximo de 32 píxeles y no se guarda.</string>
     <string name="ambient_activate">Activar</string>
-    <string name="ambient_activate_accessibility">Activar captura de pantalla</string>
+    <string name="ambient_activate_accessibility">Activar captura de pantalla completa</string>
     <string name="ambient_status_authorization_required">Autorización necesaria</string>
     <string name="ambient_status_starting">Iniciando captura</string>
     <string name="ambient_status_capturing">Captura de pantalla activa</string>
+    <string name="ambient_status_capturing_compact">Capturando</string>
     <string name="ambient_status_no_frames">La pantalla no está entregando imágenes. Se conserva el último color.</string>
     <string name="ambient_status_revoked">Android ha revocado la captura. Puedes activarla de nuevo.</string>
     <string name="ambient_status_error">No se pudo iniciar la captura. Puedes intentarlo de nuevo.</string>

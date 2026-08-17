@@ -2,6 +2,7 @@ package com.hooandee.colores.device.learning
 
 import com.hooandee.colores.device.AndroidDeviceIdentity
 import com.hooandee.colores.device.DetectedAndroidDevice
+import com.hooandee.colores.device.LedGridCell
 import com.hooandee.colores.led.LedDescriptor
 import com.hooandee.colores.led.SettingsProviderDescriptor
 
@@ -27,8 +28,28 @@ internal fun resolveLearnedDevice(
         led = boundDescriptor,
         previewProfileId = null,
         previewCalibration = null,
+        gridLayout = candidate.learnedGridLayout(binding.capabilities.perZone, binding.capabilities.zones),
     )
 }
+
+private fun ProbeCandidate.learnedGridLayout(
+    perZone: Boolean,
+    zones: Int,
+): List<LedGridCell>? =
+    if (surface == ProbeSurface.HTR3212 && perZone && zones == 8) {
+        listOf(
+            LedGridCell(0, 0, 0, "top_left"),
+            LedGridCell(0, 1, 0, "bottom_left"),
+            LedGridCell(0, 1, 1, "bottom_right"),
+            LedGridCell(0, 0, 1, "top_right"),
+            LedGridCell(1, 0, 0, "top_left"),
+            LedGridCell(1, 1, 0, "bottom_left"),
+            LedGridCell(1, 1, 1, "bottom_right"),
+            LedGridCell(1, 0, 1, "top_right"),
+        )
+    } else {
+        null
+    }
 
 internal fun learnedDeviceIdForPromotion(
     identity: AndroidDeviceIdentity,

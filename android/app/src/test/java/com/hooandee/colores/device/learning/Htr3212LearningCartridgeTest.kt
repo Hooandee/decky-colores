@@ -8,6 +8,7 @@ import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SystemSettingsStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -100,6 +101,69 @@ class Htr3212LearningCartridgeTest {
     }
 
     @Test
+    fun `missing vendor color uses raw PWM snapshot and restores both sticks`() {
+        val store = FakeSettingsStore(linkedMapOf("joystick_light_enabled" to "1,1"))
+        val executor = FakeExecutor()
+        val reader =
+            Htr3212RegisterReader { bus, address, registers ->
+                if (address != 0x3c || registers != (0x0d..0x18).toList()) return@Htr3212RegisterReader null
+                when (bus) {
+                    3 -> (1..12).toList()
+                    6 -> (13..24).toList()
+                    else -> null
+                }
+            }
+        val cartridge = Htr3212LearningCartridge(store, executor, reader, settleVendor = {})
+        val candidate =
+            candidate(
+                enableKeys = listOf("joystick_light_enabled"),
+                explicitInitialization = false,
+                rightBus = 6,
+            )
+
+        val snapshot = requireNotNull(cartridge.snapshot(candidate))
+        assertTrue(cartridge.execute(candidate, ProbeStep.COLOR))
+
+        assertEquals(RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK, cartridge.restore(candidate, snapshot))
+        assertEquals("1,1", store.values["joystick_light_enabled"])
+        assertTrue(executor.commands[executor.commands.lastIndex - 1].contains("0x0d 0x01"))
+        assertTrue(executor.commands[executor.commands.lastIndex - 1].contains("0x18 0x0c"))
+        assertTrue(executor.commands.last().contains("0x0d 0x0d"))
+        assertTrue(executor.commands.last().contains("0x18 0x18"))
+    }
+
+    @Test
+    fun `powered off HTR controllers restore safely without PWM readback`() {
+        val key = "joystick_light_enabled"
+        val store = FakeSettingsStore(linkedMapOf(key to "0,0"))
+        val executor = FakeExecutor()
+        val reader = Htr3212RegisterReader { _, _, _ -> null }
+        val cartridge = Htr3212LearningCartridge(store, executor, reader, settleVendor = {})
+        val candidate = candidate(enableKeys = listOf(key), explicitInitialization = false, rightBus = 6)
+
+        val snapshot = cartridge.snapshot(candidate)
+
+        assertNotNull(snapshot)
+        snapshot ?: return
+        assertTrue(cartridge.execute(candidate, ProbeStep.COLOR))
+        assertEquals("1,1", store.values[key])
+        assertEquals(RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK, cartridge.restore(candidate, snapshot))
+        assertEquals("0,0", store.values[key])
+    }
+
+    @Test
+    fun `a single side power setting keeps its scalar encoding`() {
+        val key = "right_joystick_light_enabled"
+        val store = FakeSettingsStore(linkedMapOf(key to "0"))
+        val reader = Htr3212RegisterReader { _, _, _ -> List(12) { 0 } }
+        val cartridge = Htr3212LearningCartridge(store, FakeExecutor(), reader, settleVendor = {})
+
+        assertTrue(cartridge.execute(candidate(), ProbeStep.COLOR))
+
+        assertEquals("1", store.values[key])
+    }
+
+    @Test
     fun `candidate with an unaudited register bank is rejected`() {
         val store = FakeSettingsStore(originalSettings())
         val cartridge = Htr3212LearningCartridge(store, FakeExecutor(), settleVendor = {})
@@ -184,6 +248,7 @@ class Htr3212LearningCartridgeTest {
         blockWrite: Boolean = false,
         pairedWrite: Boolean = false,
         explicitInitialization: Boolean = true,
+        rightBus: Int = 5,
     ): ProbeCandidate =
         ProbeCandidate(
             cartridgeId = HTR3212_PROBE_ID,
@@ -196,7 +261,7 @@ class Htr3212LearningCartridgeTest {
                     htr3212 =
                         Htr3212Descriptor(
                             leftBus = 3,
-                            rightBus = 5,
+                            rightBus = rightBus,
                             address = 0x3c,
                             leftOrder = listOf(0, 1, 2, 3),
                             rightOrder = listOf(0, 1, 2, 3),

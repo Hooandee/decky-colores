@@ -78,7 +78,7 @@ internal fun HardwareLearningDialog(
             modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp, vertical = 16.dp),
             contentAlignment = Alignment.Center,
         ) {
-            val landscape = maxWidth >= 700.dp && maxWidth > maxHeight
+            val landscape = isUsableLandscape(maxWidth, maxHeight)
             Surface(
                 modifier =
                     Modifier

@@ -5,6 +5,9 @@ import com.hooandee.colores.device.learning.FACT_HTR3212_LEFT
 import com.hooandee.colores.device.learning.FACT_HTR3212_RIGHT
 import com.hooandee.colores.device.learning.FactEvidence
 import com.hooandee.colores.device.learning.HardwareFact
+import com.hooandee.colores.device.learning.Htr3212InformationCartridge
+import com.hooandee.colores.device.learning.I2cController
+import com.hooandee.colores.device.learning.I2cTopologyReader
 import com.hooandee.colores.device.learning.ProbeCandidate
 import com.hooandee.colores.device.learning.ProbeSurface
 import com.hooandee.colores.device.learning.resolveDetectionOutcome
@@ -197,6 +200,32 @@ class AndroidDeviceDetectorTest {
         val result = resolveDetectionOutcome(identity, exact = null, exactTransportAvailable = false, candidates = emptyList())
 
         assertTrue(result is DetectionOutcome.Unsupported)
+    }
+
+    @Test
+    fun `PServer and an observed HTR pair reach discovery without a vendor color setting`() {
+        val nova = AndroidDeviceIdentity("Retroid Pocket Nova", "kalama", "Moorechip", emptyMap())
+        val cartridge =
+            Htr3212InformationCartridge(
+                I2cTopologyReader {
+                    listOf(
+                        I2cController(3, 0x3c, "htr3212l"),
+                        I2cController(6, 0x3c, "htr3212r"),
+                    )
+                },
+            )
+
+        val route =
+            resolveHardwareLearningRoute(
+                identity = nova,
+                pserverAvailable = true,
+                seedCandidates = emptyList(),
+                informationCartridges = listOf(cartridge),
+            )
+
+        assertEquals(listOf(ProbeSurface.HTR3212), route.candidates.map { it.surface })
+        assertTrue(route.facts.any { it.key == FACT_HTR3212_LEFT })
+        assertTrue(route.facts.any { it.key == FACT_HTR3212_RIGHT })
     }
 
     @Test
