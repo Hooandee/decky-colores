@@ -14,6 +14,7 @@ import com.hooandee.colores.device.learning.resolveDetectionOutcome
 import com.hooandee.colores.led.Htr3212Descriptor
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -52,6 +53,52 @@ class AndroidDeviceDetectorTest {
             )
 
         assertEquals(rp5, (result as DetectionOutcome.Resolved).device)
+    }
+
+    @Test
+    fun `validated Nova topology activates its native profile without a binding`() {
+        val shared = File("../../shared")
+        val nova =
+            requireNotNull(
+                DeviceRegistry.parse(
+                    devicesJson = shared.resolve("devices.json").readText(),
+                    previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+                ).match(AndroidDeviceIdentity("Retroid_Pocket_Nova", "kalama", "Moorechip", emptyMap())),
+            )
+
+        val result =
+            resolveDetectionOutcome(
+                identity = AndroidDeviceIdentity("Retroid_Pocket_Nova", "kalama", "Moorechip", emptyMap()),
+                exact = nova,
+                exactTransportAvailable = true,
+                candidates = listOf(candidate),
+                facts = htrFacts(leftBus = 3, rightBus = 6),
+            )
+
+        assertEquals("retroid-pocket-nova", (result as DetectionOutcome.Resolved).device.id)
+    }
+
+    @Test
+    fun `mismatched Nova topology stays in discovery`() {
+        val shared = File("../../shared")
+        val nova =
+            requireNotNull(
+                DeviceRegistry.parse(
+                    devicesJson = shared.resolve("devices.json").readText(),
+                    previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+                ).match(AndroidDeviceIdentity("Retroid_Pocket_Nova", "kalama", "Moorechip", emptyMap())),
+            )
+
+        val result =
+            resolveDetectionOutcome(
+                identity = AndroidDeviceIdentity("Retroid_Pocket_Nova", "kalama", "Moorechip", emptyMap()),
+                exact = nova,
+                exactTransportAvailable = true,
+                candidates = listOf(candidate),
+                facts = htrFacts(leftBus = 3, rightBus = 5),
+            )
+
+        assertTrue(result is DetectionOutcome.Candidates)
     }
 
     @Test

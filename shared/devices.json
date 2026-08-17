@@ -43,6 +43,54 @@
     "previewProfile": "retroid-stick-ring-rp5-v1"
   },
   {
+    "id": "retroid-pocket-nova",
+    "friendlyName": "Retroid Pocket Nova",
+    "android": {
+      "model": ["Retroid Pocket Nova", "Retroid_Pocket_Nova"],
+      "device": [],
+      "led": {
+        "driver": "htr3212",
+        "transport": "pserver",
+        "colorKey": "joystick_led_light_picker_color",
+        "colorFormat": "argb_hex_csv",
+        "brightnessKey": "led_light_brightness_percent",
+        "brightnessRange": [0.0, 1.0],
+        "enableKeys": [
+          "joystick_light_enabled",
+          "left_joystick_light_enabled",
+          "right_joystick_light_enabled",
+          "left_handle_light_enabled",
+          "right_handle_light_enabled"
+        ],
+        "zones": 8,
+        "requiresPermission": null,
+        "vendorService": "com.rp.gameassistant",
+        "htr3212": {
+          "leftBus": 3,
+          "rightBus": 6,
+          "address": 60,
+          "leftOrder": [0, 1, 2, 3],
+          "rightOrder": [0, 1, 2, 3],
+          "rgbStartRegister": 13,
+          "automaticActivation": true
+        }
+      },
+      "gridLayout": [
+        { "stick": 0, "row": 0, "col": 0, "position": "top_left" },
+        { "stick": 0, "row": 1, "col": 0, "position": "bottom_left" },
+        { "stick": 0, "row": 1, "col": 1, "position": "bottom_right" },
+        { "stick": 0, "row": 0, "col": 1, "position": "top_right" },
+        { "stick": 1, "row": 0, "col": 0, "position": "top_left" },
+        { "stick": 1, "row": 1, "col": 0, "position": "bottom_left" },
+        { "stick": 1, "row": 1, "col": 1, "position": "bottom_right" },
+        { "stick": 1, "row": 0, "col": 1, "position": "top_right" }
+      ]
+    },
+    "linux": null,
+    "capabilities": { "color": true, "brightness": true, "perZone": true },
+    "previewProfile": null
+  },
+  {
     "id": "ayn-odin2-portal",
     "friendlyName": "AYN Odin 2 Portal",
     "android": {
