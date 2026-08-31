@@ -71,6 +71,21 @@ def _gst_command(node, width, height):
     ]
 
 
+def _replace_queued(queue, item):
+    if queue.full():
+        queue.get_nowait()
+    queue.put_nowait(item)
+
+
+async def _read_latest_frames(reader, frame_bytes, queue):
+    try:
+        while True:
+            frame = await reader.readexactly(frame_bytes)
+            _replace_queued(queue, frame)
+    except Exception as error:
+        _replace_queued(queue, error)
+
+
 class Ambilight:
     def __init__(self, apply_zones, zones, runtime_dir, uid=None, gid=None, layout=None, max_fps=None):
         self._apply = apply_zones
@@ -179,6 +194,7 @@ class Ambilight:
             interval = self._capture_interval()
             command = _gst_command(node, CAP_W, CAP_H)
             proc = None
+            reader_task = None
             logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / interval)
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -190,8 +206,14 @@ class Ambilight:
                 )
                 self._proc = proc
                 self.status = "running"
+                frames = asyncio.Queue(maxsize=1)
+                reader_task = asyncio.create_task(
+                    _read_latest_frames(proc.stdout, frame_bytes, frames)
+                )
                 while True:
-                    frame = await proc.stdout.readexactly(frame_bytes)
+                    frame = await frames.get()
+                    if isinstance(frame, Exception):
+                        raise frame
                     self._update_targets(frame)
                     self._tick()
                     await asyncio.sleep(interval)
@@ -204,6 +226,9 @@ class Ambilight:
             except Exception:
                 logger.exception("ambilight loop failed")
             finally:
+                if reader_task is not None:
+                    reader_task.cancel()
+                    await asyncio.gather(reader_task, return_exceptions=True)
                 if proc is not None:
                     try:
                         proc.kill()
