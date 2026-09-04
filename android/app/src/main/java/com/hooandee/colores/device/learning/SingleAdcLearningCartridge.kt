@@ -72,8 +72,15 @@ class SingleAdcLearningCartridge(
         val restoredValues = snapshot.values.attemptAll(access::write)
         val latched = access.write(node(descriptor, "led_set"), "1")
         if (!restoredValues || !latched) return RollbackStatus.RESTORE_FAILED
-        val restored = snapshot.values.all { (path, value) -> access.read(path)?.trim() == value.trim() }
-        return if (restored) RollbackStatus.RESTORED_AND_READ_BACK else RollbackStatus.RESTORE_FAILED
+        val readback = snapshot.values.mapValues { (path, _) -> access.read(path)?.trim() }
+        val mismatchedPaths = snapshot.values.filter { (path, value) -> readback[path] != value.trim() }.keys
+        val brightnessPath = node(descriptor, "led_level")
+        return when {
+            mismatchedPaths.isEmpty() -> RollbackStatus.RESTORED_AND_READ_BACK
+            mismatchedPaths == setOf(brightnessPath) && readback[brightnessPath]?.toIntOrNull()?.let { it > 0 } == true ->
+                RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK
+            else -> RollbackStatus.RESTORE_FAILED
+        }
     }
 
     private fun writeAndLatch(

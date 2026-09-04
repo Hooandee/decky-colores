@@ -42,6 +42,7 @@ import com.hooandee.colores.led.RgbColor
 fun DeviceScene(
     frame: List<RgbColor>,
     layout: List<LedGridCell>?,
+    singleOutputMirrorsBothSticks: Boolean,
     selectedTarget: EditTarget,
     power: Boolean,
     enabled: Boolean,
@@ -53,7 +54,7 @@ fun DeviceScene(
 ) {
     val previewStyle = LocalLedPreviewStyle.current
     val lightPreview = previewStyle.sceneBackground.luminance() > 0.5f
-    val preview = devicePreviewGroups(frame, layout)
+    val preview = devicePreviewGroups(frame, layout, singleOutputMirrorsBothSticks)
     Surface(
         modifier = modifier.prismaticPanel(RoundedCornerShape(32.dp), strong = true),
         color = Color.Transparent,

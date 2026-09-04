@@ -48,6 +48,18 @@ class DevicePreviewModelTest {
     }
 
     @Test
+    fun `one logical output mapped across two sticks mirrors both physical rings`() {
+        val color = RgbColor(12, 34, 56)
+
+        val preview = devicePreviewGroups(listOf(color), null, singleOutputMirrorsBothSticks = true)
+
+        assertTrue(preview.representsSticks)
+        assertEquals(2, preview.groups.size)
+        assertEquals(listOf(color, color), preview.groups.map { it.single().color })
+        assertEquals(listOf(360f, 360f), preview.groups.map { it.single().sweepAngle })
+    }
+
+    @Test
     fun `one layout free output becomes one continuous light group`() {
         val color = RgbColor(1, 2, 3)
 
