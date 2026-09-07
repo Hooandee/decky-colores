@@ -1,4 +1,12 @@
-import { FC, ReactNode, createContext, useCallback, useContext, useMemo, useState } from "react";
+import {
+  FC,
+  ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 import { Focusable } from "@decky/ui";
 import { it } from "./it";
 
@@ -7,7 +15,8 @@ export type Lang = "es" | "en" | "it";
 const STORAGE_KEY = "colores-lang";
 
 const es: Record<string, string> = {
-  "load.error": "No se pudo cargar el estado del plugin. Vuelve a intentarlo en un momento.",
+  "load.error":
+    "No se pudo cargar el estado del plugin. Vuelve a intentarlo en un momento.",
   "load.retry": "Reintentar",
 
   "profiles.global": "Global",
@@ -27,25 +36,31 @@ const es: Record<string, string> = {
 
   "power.label": "Encendido",
   "chargerOnly.label": "Solo con cargador",
-  "chargerOnly.hint": "Las luces se encienden solo cuando el cargador está conectado.",
+  "chargerOnly.hint":
+    "Las luces se encienden solo cuando el cargador está conectado.",
   "startup.remember": "Recordar al arrancar",
-  "startup.remember.hint": "Al fijar un color se guarda para que la barra arranque con él. Si lo apagas, al reiniciar la barra vuelve a SteamOS.",
+  "startup.remember.hint":
+    "Al fijar un color se guarda para que la barra arranque con él. Si lo apagas, al reiniciar la barra vuelve a SteamOS.",
   "forceControl.label": "Priorizar Colores",
   "forceControl.hint": "Recupera el control de las luces al abrir Colores.",
   "forceControl.notice":
     "Para evitar conflictos, desactiva el control RGB de HHD u otros módulos que gestionen las luces.",
   "reconnect.label": "Reconectar mandos",
-  "reconnect.hint": "¿Las luces no responden tras suspender? Reinicia la conexión con los mandos.",
+  "reconnect.hint":
+    "¿Las luces no responden tras suspender? Reinicia la conexión con los mandos.",
 
   "mode.solid": "Fijo",
   "mode.gradient": "Degradado",
   "mode.effect": "Efecto",
   "mode.ambient": "Ambilight",
   "mode.clock": "Reloj",
-  "clock.hint": "El color de la barra sigue la hora del día, cálido al amanecer y anochecer, fresco al mediodía. Es automático.",
+  "clock.hint":
+    "El color de la barra sigue la hora del día, cálido al amanecer y anochecer, fresco al mediodía. Es automático.",
   "mode.vu": "Audio",
-  "vu.hint": "La barra reacciona al sonido del sistema en tiempo real, llenándose desde el centro con el volumen.",
-  "vu.noAudio": "No se detecta audio. Pon música o un juego con sonido para ver la barra moverse.",
+  "vu.hint":
+    "La barra reacciona al sonido del sistema en tiempo real, llenándose desde el centro con el volumen.",
+  "vu.noAudio":
+    "No se detecta audio. Pon música o un juego con sonido para ver la barra moverse.",
   "mode.battery": "Batería",
   "mode.temperature": "Temperatura",
 
@@ -128,10 +143,13 @@ const es: Record<string, string> = {
   "effect.ripple.label": "Onda suave",
   "effect.aurora.label": "Aurora",
   "effect.spiral.legion.label": "Espiral GO",
-  "effect.spiral.firmwareNote": "Efecto giratorio propio del firmware de tu Legion Go.",
+  "effect.spiral.firmwareNote":
+    "Efecto giratorio propio del firmware de tu Legion Go.",
 
-  "ambient.gameModeBanner": "Aún no hay pantalla que leer. Ambilight funciona en Modo Juego con un juego abierto (no en Escritorio ni Big Picture).",
-  "ambient.stickHint": "Las luces siguen la pantalla cerca de cada joystick. La izquierda desde arriba a la izquierda, la derecha desde el centro a la derecha.",
+  "ambient.gameModeBanner":
+    "Aún no hay pantalla que leer. Ambilight funciona en Modo Juego con un juego abierto (no en Escritorio ni Big Picture).",
+  "ambient.stickHint":
+    "Las luces siguen la pantalla cerca de cada joystick. La izquierda desde arriba a la izquierda, la derecha desde el centro a la derecha.",
   "ambient.globalHint": "Las luces siguen el color medio de toda la pantalla.",
   "ambient.sampling.columns": "Columnas",
   "ambient.sampling.bottom_edge": "Borde inferior",
@@ -171,19 +189,23 @@ const es: Record<string, string> = {
   "temperature.band.4": "Templada",
   "temperature.band.5": "Fría",
 
-  "battery.hint": "Las luces muestran el nivel de batería siguiendo los colores de tu escala.",
+  "battery.hint":
+    "Las luces muestran el nivel de batería siguiendo los colores de tu escala.",
   "battery.level": "{n}%",
   "battery.breathe.label": "Respirar al cargar",
   "battery.breathe.hint": "Mientras se carga, el color respira suavemente.",
 
-  "temperature.hint": "Las luces siguen la temperatura del procesador usando los colores de tu escala.",
+  "temperature.hint":
+    "Las luces siguen la temperatura del procesador usando los colores de tu escala.",
   "temperature.reading": "{n} °C",
   "temperature.noReading": "Sin lectura",
-  "performance.hint": "Las luces se llenan como una barra según la carga de la GPU, de verde a rojo.",
+  "performance.hint":
+    "Las luces se llenan como una barra según la carga de la GPU, de verde a rojo.",
   "performance.reading": "{n}%",
   "performance.noReading": "Sin lectura",
   "temperature.breathe.label": "Avisar en caliente",
-  "temperature.breathe.hint": "Cuando el procesador se pone muy caliente, el color late como aviso.",
+  "temperature.breathe.hint":
+    "Cuando el procesador se pone muy caliente, el color late como aviso.",
 
   "brightness.label": "Brillo",
 
@@ -196,7 +218,8 @@ const es: Record<string, string> = {
   "lang.italian": "Italiano",
 
   "experimental.title": "Funciones experimentales",
-  "experimental.description": "Estas funciones no han sido verificadas en este dispositivo. Puedes probarlas, pero puede que no funcionen bien. Estoy trabajando para darle soporte.",
+  "experimental.description":
+    "Estas funciones no han sido verificadas en este dispositivo. Puedes probarlas, pero puede que no funcionen bien. Estoy trabajando para darle soporte.",
   "experimental.feature.color": "Color",
   "experimental.feature.brightness": "Brillo",
   "experimental.feature.effects": "Efectos",
@@ -207,10 +230,13 @@ const es: Record<string, string> = {
   "powerLed.warning": "Apaga el LED del botón de encendido.",
 
   "report.button": "Reportar un problema",
-  "report.button.desc": "¿Las luces no van como esperas? Mándame un reporte con un toque para que pueda arreglarlo.",
-  "report.unvalidated.note": "Aún no tengo esta máquina físicamente. Hago lo posible por darle soporte y tus reportes ayudan muchísimo a afinar las luces.",
+  "report.button.desc":
+    "¿Las luces no van como esperas? Mándame un reporte con un toque para que pueda arreglarlo.",
+  "report.unvalidated.note":
+    "Aún no tengo esta máquina físicamente. Hago lo posible por darle soporte y tus reportes ayudan muchísimo a afinar las luces.",
   "report.title": "Reportar un problema",
-  "report.intro": "Marca qué falla y cuéntame lo que veas. Recojo la info técnica de las luces automáticamente.",
+  "report.intro":
+    "Marca qué falla y cuéntame lo que veas. Recojo la info técnica de las luces automáticamente.",
   "report.section.what": "¿Qué falla?",
   "report.cat.color": "Color",
   "report.cat.brightness": "Brillo",
@@ -220,22 +246,27 @@ const es: Record<string, string> = {
   "report.cat.powerLed": "LED de encendido",
   "report.cat.other": "Otro",
   "report.section.describe": "Cuéntame qué pasó (obligatorio)",
-  "report.describe.hint": "Sin una descripción no puedo saber qué falla. Dime qué esperabas y qué pasó.",
+  "report.describe.hint":
+    "Sin una descripción no puedo saber qué falla. Dime qué esperabas y qué pasó.",
   "report.privacy.title": "Qué se enviará · qué es público",
-  "report.privacy.public": "Público: en el reporte solo va un resumen (modelo, versión, categorías y tu texto).",
-  "report.privacy.private": "Privado: los logs y el estado completo NO son públicos; van comprimidos, cifrados y solo Hooandee puede verlos.",
+  "report.privacy.public":
+    "Público: en el reporte solo va un resumen (modelo, versión, categorías y tu texto).",
+  "report.privacy.private":
+    "Privado: los logs y el estado completo NO son públicos; van comprimidos, cifrados y solo Hooandee puede verlos.",
   "report.privacy.nopii": "Sin datos personales · solo para depurar.",
   "report.send": "Crear y enviar reporte",
   "report.sending": "Enviando…",
   "report.done.title": "¡Reporte enviado!",
   "report.done.thanks": "Gracias. Ya tengo lo que necesito para investigarlo.",
   "report.code.label": "Código de tu reporte",
-  "report.code.hint": "Guárdalo. Si me escribes sobre este fallo, dime este código y lo encuentro al instante (no necesitas cuenta de nada).",
+  "report.code.hint":
+    "Guárdalo. Si me escribes sobre este fallo, dime este código y lo encuentro al instante (no necesitas cuenta de nada).",
   "report.copy": "Copiar código",
   "report.copied": "¡Copiado!",
   "report.close": "Cerrar",
   "report.error.title": "No se pudo enviar (¿sin conexión?).",
-  "report.error.saved": "Guardé el reporte en {path}. Puedes mandármelo a mano.",
+  "report.error.saved":
+    "Guardé el reporte en {path}. Puedes mandármelo a mano.",
   "report.retry": "Reintentar",
 };
 
@@ -262,23 +293,28 @@ const en: Record<string, string> = {
   "chargerOnly.label": "Only while charging",
   "chargerOnly.hint": "The lights turn on only when the charger is connected.",
   "startup.remember": "Remember at startup",
-  "startup.remember.hint": "Setting a color saves it so the bar boots with it. Turn off to hand the bar back to SteamOS on the next reboot.",
+  "startup.remember.hint":
+    "Setting a color saves it so the bar boots with it. Turn off to hand the bar back to SteamOS on the next reboot.",
   "forceControl.label": "Prioritize Colores",
   "forceControl.hint": "Reclaims the lights whenever you open Colores.",
   "forceControl.notice":
     "To avoid conflicts, disable RGB control in HHD or any other module that manages the lights.",
   "reconnect.label": "Reconnect controllers",
-  "reconnect.hint": "Lights not responding after sleep? Restart the connection to the controllers.",
+  "reconnect.hint":
+    "Lights not responding after sleep? Restart the connection to the controllers.",
 
   "mode.solid": "Solid",
   "mode.gradient": "Gradient",
   "mode.effect": "Effect",
   "mode.ambient": "Ambient",
   "mode.clock": "Clock",
-  "clock.hint": "The bar color follows the time of day, warm at sunrise and sunset, cool at midday. It is automatic.",
+  "clock.hint":
+    "The bar color follows the time of day, warm at sunrise and sunset, cool at midday. It is automatic.",
   "mode.vu": "Audio",
-  "vu.hint": "The bar reacts to system sound in real time, filling from the center with the volume.",
-  "vu.noAudio": "No audio detected. Play music or a game with sound to see the bar move.",
+  "vu.hint":
+    "The bar reacts to system sound in real time, filling from the center with the volume.",
+  "vu.noAudio":
+    "No audio detected. Play music or a game with sound to see the bar move.",
   "mode.battery": "Battery",
   "mode.temperature": "Temperature",
 
@@ -361,14 +397,20 @@ const en: Record<string, string> = {
   "effect.ripple.label": "Ripple",
   "effect.aurora.label": "Aurora",
   "effect.spiral.legion.label": "Spiral GO",
-  "effect.spiral.firmwareNote": "Your Legion Go's built-in rotating firmware effect.",
+  "effect.spiral.firmwareNote":
+    "Your Legion Go's built-in rotating firmware effect.",
 
-  "ambient.gameModeBanner": "No screen to read yet. Ambient works in Game Mode with a game running (not in Desktop or Big Picture).",
-  "ambient.stickHint": "Lights follow the screen near each stick. Left from the top-left, right from the mid-right.",
-  "ambient.globalHint": "Lights follow the average color across the whole screen.",
+  "ambient.gameModeBanner":
+    "No screen to read yet. Ambient works in Game Mode with a game running (not in Desktop or Big Picture).",
+  "ambient.averageHint":
+    "Lights follow the screen near each stick. Left from the top-left, right from the mid-right.",
+  "ambient.dominantHint":
+    "Lights follow the dominant colors from the screen using an Color Quantization algorithm. Left and Right corresponding to each half of the screen.",
+  "ambient.globalHint":
+    "Lights follow the average color across the whole screen.",
   "ambient.sampling.columns": "Columns",
   "ambient.sampling.bottom_edge": "Bottom edge",
-  "ambient.algorithm.dominant": "Dominant color",
+  "ambient.algorithm.dominant": "Dominant",
   "ambient.algorithm.average": "Average",
   "ambient.vividness": "Vividness",
   "ambient.smoothing": "Smoothing",
@@ -379,7 +421,8 @@ const en: Record<string, string> = {
   "sensors.performance": "Performance",
 
   "sensorScale.customize": "Customize scale",
-  "sensorScale.customizeHint": "Change the thresholds and colors in this scale.",
+  "sensorScale.customizeHint":
+    "Change the thresholds and colors in this scale.",
   "sensorScale.title": "Customize scale",
   "sensorScale.subtitle": "Choose when each color changes.",
   "sensorScale.reset": "Reset",
@@ -404,19 +447,23 @@ const en: Record<string, string> = {
   "temperature.band.4": "Warm",
   "temperature.band.5": "Cool",
 
-  "battery.hint": "The lights show the battery level using the colors in your scale.",
+  "battery.hint":
+    "The lights show the battery level using the colors in your scale.",
   "battery.level": "{n}%",
   "battery.breathe.label": "Breathe while charging",
   "battery.breathe.hint": "While charging, the color gently breathes.",
 
-  "temperature.hint": "The lights follow the processor temperature using the colors in your scale.",
+  "temperature.hint":
+    "The lights follow the processor temperature using the colors in your scale.",
   "temperature.reading": "{n} °C",
   "temperature.noReading": "No reading",
-  "performance.hint": "The lights fill like a bar with GPU load, from green to red.",
+  "performance.hint":
+    "The lights fill like a bar with GPU load, from green to red.",
   "performance.reading": "{n}%",
   "performance.noReading": "No reading",
   "temperature.breathe.label": "Warn when hot",
-  "temperature.breathe.hint": "When the processor gets very hot, the color pulses as a warning.",
+  "temperature.breathe.hint":
+    "When the processor gets very hot, the color pulses as a warning.",
 
   "brightness.label": "Brightness",
 
@@ -429,7 +476,8 @@ const en: Record<string, string> = {
   "lang.italian": "Italian",
 
   "experimental.title": "Experimental features",
-  "experimental.description": "These features have not been verified on this device. You can try them, but they may not work correctly. I'm working on support.",
+  "experimental.description":
+    "These features have not been verified on this device. You can try them, but they may not work correctly. I'm working on support.",
   "experimental.feature.color": "Color",
   "experimental.feature.brightness": "Brightness",
   "experimental.feature.effects": "Effects",
@@ -440,10 +488,13 @@ const en: Record<string, string> = {
   "powerLed.warning": "Turns off the power button LED.",
 
   "report.button": "Report a problem",
-  "report.button.desc": "Lights not behaving? Send me a report in one tap so I can fix it.",
-  "report.unvalidated.note": "I don't have this machine physically yet. I'm doing my best to support it, and your reports help a lot to fine-tune the lights.",
+  "report.button.desc":
+    "Lights not behaving? Send me a report in one tap so I can fix it.",
+  "report.unvalidated.note":
+    "I don't have this machine physically yet. I'm doing my best to support it, and your reports help a lot to fine-tune the lights.",
   "report.title": "Report a problem",
-  "report.intro": "Tick what's wrong and tell me what you saw. I collect the technical LED info automatically.",
+  "report.intro":
+    "Tick what's wrong and tell me what you saw. I collect the technical LED info automatically.",
   "report.section.what": "What's wrong?",
   "report.cat.color": "Color",
   "report.cat.brightness": "Brightness",
@@ -453,22 +504,27 @@ const en: Record<string, string> = {
   "report.cat.powerLed": "Power LED",
   "report.cat.other": "Other",
   "report.section.describe": "Tell me what happened (required)",
-  "report.describe.hint": "Without a description I can't tell what's wrong. Say what you expected and what happened.",
+  "report.describe.hint":
+    "Without a description I can't tell what's wrong. Say what you expected and what happened.",
   "report.privacy.title": "What gets sent · what's public",
-  "report.privacy.public": "Public: the report only shows a summary (model, version, categories and your text).",
-  "report.privacy.private": "Private: the full logs and state are NOT public; they're compressed, encrypted and only Hooandee can read them.",
+  "report.privacy.public":
+    "Public: the report only shows a summary (model, version, categories and your text).",
+  "report.privacy.private":
+    "Private: the full logs and state are NOT public; they're compressed, encrypted and only Hooandee can read them.",
   "report.privacy.nopii": "No personal data · debugging only.",
   "report.send": "Create and send report",
   "report.sending": "Sending…",
   "report.done.title": "Report sent!",
   "report.done.thanks": "Thanks. I've got what I need to look into it.",
   "report.code.label": "Your report code",
-  "report.code.hint": "Keep it. If you message me about this issue, quote this code and I'll find it instantly (no account needed).",
+  "report.code.hint":
+    "Keep it. If you message me about this issue, quote this code and I'll find it instantly (no account needed).",
   "report.copy": "Copy code",
   "report.copied": "Copied!",
   "report.close": "Close",
   "report.error.title": "Couldn't send (offline?).",
-  "report.error.saved": "I saved the report to {path}. You can send it to me by hand.",
+  "report.error.saved":
+    "I saved the report to {path}. You can send it to me by hand.",
   "report.retry": "Retry",
 };
 
@@ -537,14 +593,24 @@ export function useI18n(): I18nValue {
 }
 
 const FlagES: FC = () => (
-  <svg width={20} height={14} viewBox="0 0 20 14" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width={20}
+    height={14}
+    viewBox="0 0 20 14"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <rect width={20} height={14} fill="#c60b1e" />
     <rect y={3.5} width={20} height={7} fill="#ffc400" />
   </svg>
 );
 
 const FlagEN: FC = () => (
-  <svg width={20} height={14} viewBox="0 0 60 42" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width={20}
+    height={14}
+    viewBox="0 0 60 42"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <rect width={60} height={42} fill="#012169" />
     <path d="M0,0 60,42 M60,0 0,42" stroke="#fff" strokeWidth={8} />
     <path d="M0,0 60,42 M60,0 0,42" stroke="#c8102e" strokeWidth={4} />
@@ -554,7 +620,12 @@ const FlagEN: FC = () => (
 );
 
 const FlagIT: FC = () => (
-  <svg width={20} height={14} viewBox="0 0 3 2" xmlns="http://www.w3.org/2000/svg">
+  <svg
+    width={20}
+    height={14}
+    viewBox="0 0 3 2"
+    xmlns="http://www.w3.org/2000/svg"
+  >
     <rect width={1} height={2} fill="#009246" />
     <rect x={1} width={1} height={2} fill="#fff" />
     <rect x={2} width={1} height={2} fill="#ce2b37" />
@@ -573,12 +644,21 @@ export const LangToggle: FC = () => {
     borderRadius: 5,
     cursor: "pointer",
     opacity: active ? 1 : 0.4,
-    boxShadow: active ? "0 0 0 1.5px rgba(255,255,255,0.85)" : "0 0 0 1px rgba(255,255,255,0.15)",
+    boxShadow: active
+      ? "0 0 0 1.5px rgba(255,255,255,0.85)"
+      : "0 0 0 1px rgba(255,255,255,0.15)",
     transition: "opacity 120ms ease, box-shadow 120ms ease",
   });
 
   return (
-    <Focusable style={{ display: "flex", gap: 6, justifyContent: "flex-end", padding: "2px 2px 0" }}>
+    <Focusable
+      style={{
+        display: "flex",
+        gap: 6,
+        justifyContent: "flex-end",
+        padding: "2px 2px 0",
+      }}
+    >
       <Focusable
         onActivate={() => setLang("es")}
         onClick={() => setLang("es")}

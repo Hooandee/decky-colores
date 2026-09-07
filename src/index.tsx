@@ -14,9 +14,25 @@ import { definePlugin } from "@decky/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus, getAudioStatus, getTemperature, getPerformance, reconnect as apiReconnect } from "./api";
+import {
+  getAmbilightStatus,
+  getAudioStatus,
+  getTemperature,
+  getPerformance,
+  reconnect as apiReconnect,
+} from "./api";
 import { rgbToCss, gradientCss, unifyColors } from "./color";
-import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities, SensorBand, SensorBands, SensorKind } from "./types";
+import {
+  Mode,
+  RGB,
+  ZoneGroup,
+  GradientPreset,
+  EffectColorNeed,
+  Capabilities,
+  SensorBand,
+  SensorBands,
+  SensorKind,
+} from "./types";
 import { DevicePreview } from "./components/DevicePreview";
 import { ColorEditor } from "./components/ColorEditor";
 import { EffectsGallery } from "./components/EffectsGallery";
@@ -47,9 +63,21 @@ import { useUpdate } from "./updater/useUpdate";
 import { AlertDot } from "./updater/AlertDot";
 import { useLayout } from "./nav/store";
 import { visibleIds } from "./nav/layout";
-import { PINNED_TAB, tabMeta, TAB_META, SENSOR_TAB, SENSOR_MODES, tabForMode } from "./nav/manifest";
+import {
+  PINNED_TAB,
+  tabMeta,
+  TAB_META,
+  SENSOR_TAB,
+  SENSOR_MODES,
+  tabForMode,
+} from "./nav/manifest";
 import { useShoulderNav } from "./nav/useShoulderNav";
-import { readActiveTab, writeActiveTab, readSensorMode, writeSensorMode } from "./nav/activeTab";
+import {
+  readActiveTab,
+  writeActiveTab,
+  readSensorMode,
+  writeSensorMode,
+} from "./nav/activeTab";
 import { startGameWatcher } from "./apps/gameWatcher";
 import { ProfileScopeSelector } from "./components/ProfileScopeSelector";
 
@@ -174,7 +202,12 @@ function GradientControls({
       </PanelSectionRow>
       <PanelSectionRow>
         <Focusable
-          style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6, paddingTop: 4 }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 6,
+            paddingTop: 4,
+          }}
         >
           {allPresets.map((preset) => (
             <Focusable
@@ -245,7 +278,9 @@ function EffectSource({
             lineHeight: 1.45,
           }}
         >
-          {kind === "gradient" ? t("effect.usesGradient") : t("effect.usesColor")}
+          {kind === "gradient"
+            ? t("effect.usesGradient")
+            : t("effect.usesColor")}
         </div>
       </PanelSectionRow>
     </>
@@ -348,7 +383,9 @@ function SensorMeter({
             }}
           >
             <span>{leftLabel}</span>
-            <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>{centerLabel}</span>
+            <span style={{ color: "rgba(255,255,255,0.8)", fontWeight: 600 }}>
+              {centerLabel}
+            </span>
             <span>{rightLabel}</span>
           </div>
         </div>
@@ -395,7 +432,10 @@ function BatteryPanel({
   disabled?: boolean;
   onBreathe: (on: boolean) => void;
   bands: SensorBand[];
-  onSaveBands: (sensor: SensorKind, bands: SensorBand[]) => Promise<SensorBand[]>;
+  onSaveBands: (
+    sensor: SensorKind,
+    bands: SensorBand[],
+  ) => Promise<SensorBand[]>;
 }) {
   const { t, lang } = useI18n();
   const marker = sensorScalePosition("battery", bands, level);
@@ -440,11 +480,15 @@ function TemperaturePanel({
   disabled?: boolean;
   onBreathe: (on: boolean) => void;
   bands: SensorBand[];
-  onSaveBands: (sensor: SensorKind, bands: SensorBand[]) => Promise<SensorBand[]>;
+  onSaveBands: (
+    sensor: SensorKind,
+    bands: SensorBand[],
+  ) => Promise<SensorBand[]>;
 }) {
   const { t, lang } = useI18n();
   const { min, max } = sensorScaleRange("temperature", bands);
-  const markerPct = temp === null ? null : sensorScalePosition("temperature", bands, temp);
+  const markerPct =
+    temp === null ? null : sensorScalePosition("temperature", bands, temp);
   return (
     <SensorMeter
       hint={t("temperature.hint")}
@@ -477,7 +521,13 @@ function TemperaturePanel({
   );
 }
 
-function PerformancePanel({ load, disabled }: { load: number | null; disabled?: boolean }) {
+function PerformancePanel({
+  load,
+  disabled,
+}: {
+  load: number | null;
+  disabled?: boolean;
+}) {
   const { t } = useI18n();
   return (
     <SensorMeter
@@ -485,7 +535,11 @@ function PerformancePanel({ load, disabled }: { load: number | null; disabled?: 
       barStops={PERFORMANCE_STOPS}
       markerPct={load}
       leftLabel="0%"
-      centerLabel={load === null ? t("performance.noReading") : t("performance.reading", { n: Math.round(load) })}
+      centerLabel={
+        load === null
+          ? t("performance.noReading")
+          : t("performance.reading", { n: Math.round(load) })
+      }
       rightLabel="100%"
       disabled={disabled}
     />
@@ -519,7 +573,10 @@ function SensorsPanel({
   onBatteryBreathe: (on: boolean) => void;
   onTemperatureBreathe: (on: boolean) => void;
   sensorBands: SensorBands;
-  onSaveBands: (sensor: SensorKind, bands: SensorBand[]) => Promise<SensorBand[]>;
+  onSaveBands: (
+    sensor: SensorKind,
+    bands: SensorBand[],
+  ) => Promise<SensorBand[]>;
 }) {
   const { t } = useI18n();
   return (
@@ -531,7 +588,14 @@ function SensorsPanel({
               value={mode}
               tabs={availableModes}
               onChange={onSelectMode}
-              label={(m) => t(`sensors.${m}` as "sensors.battery" | "sensors.temperature" | "sensors.performance")}
+              label={(m) =>
+                t(
+                  `sensors.${m}` as
+                    | "sensors.battery"
+                    | "sensors.temperature"
+                    | "sensors.performance",
+                )
+              }
             />
           </div>
         </PanelSectionRow>
@@ -624,14 +688,23 @@ function Content() {
   const modeIds = modeIdsFor(caps);
   const availableTabSet = new Set(modeIds.map((m) => tabForMode(m)));
   const availableTabIds = [
-    ...TAB_META.filter((m) => m.id !== PINNED_TAB && availableTabSet.has(m.id)).map((m) => m.id),
+    ...TAB_META.filter(
+      (m) => m.id !== PINNED_TAB && availableTabSet.has(m.id),
+    ).map((m) => m.id),
     PINNED_TAB,
   ];
   const visibleTabIds = visibleIds(availableTabIds, layout.tabs, [PINNED_TAB]);
-  const visibleModeCount = visibleTabIds.filter((id) => id !== PINNED_TAB).length;
-  const availableSensorModes = SENSOR_MODES.filter((m) => modeIds.includes(m)) as Mode[];
-  const desiredTab = viewingSettings || !state ? PINNED_TAB : tabForMode(state.mode);
-  const activeTab = visibleTabIds.includes(desiredTab) ? desiredTab : PINNED_TAB;
+  const visibleModeCount = visibleTabIds.filter(
+    (id) => id !== PINNED_TAB,
+  ).length;
+  const availableSensorModes = SENSOR_MODES.filter((m) =>
+    modeIds.includes(m),
+  ) as Mode[];
+  const desiredTab =
+    viewingSettings || !state ? PINNED_TAB : tabForMode(state.mode);
+  const activeTab = visibleTabIds.includes(desiredTab)
+    ? desiredTab
+    : PINNED_TAB;
   const currentSensorMode: Mode | null =
     state && availableSensorModes.includes(state.mode)
       ? state.mode
@@ -740,7 +813,8 @@ function Content() {
   }, [performanceActive]);
 
   useEffect(() => {
-    if (!state?.capabilities.conflictsWithSystemRgb || !state?.forceControl) return;
+    if (!state?.capabilities.conflictsWithSystemRgb || !state?.forceControl)
+      return;
     apiReconnect().catch(() => {});
   }, [state?.capabilities.conflictsWithSystemRgb, state?.forceControl]);
 
@@ -771,7 +845,9 @@ function Content() {
           </>
         ) : (
           <PanelSectionRow>
-            <div style={{ display: "flex", justifyContent: "center", padding: 20 }}>
+            <div
+              style={{ display: "flex", justifyContent: "center", padding: 20 }}
+            >
               <Spinner width={32} height={32} />
             </div>
           </PanelSectionRow>
@@ -803,16 +879,21 @@ function Content() {
   } = state;
   const currentTemp = tempReading ?? state.temperature;
   const hasLeds = capabilities.color || capabilities.brightness;
-  const showDeviceControls = hasLeds && (contentMode !== null || visibleModeCount === 0);
+  const showDeviceControls =
+    hasLeds && (contentMode !== null || visibleModeCount === 0);
 
   const canGradient = capabilities.color && capabilities.zones >= 1;
   const gradientAnimated = canGradient && !capabilities.perZone;
 
-  const visibleEffects = capabilities.supportedEffects.length > 0
-    ? EFFECT_PRESETS.filter((e) => capabilities.supportedEffects.includes(e.id))
-    : EFFECT_PRESETS;
+  const visibleEffects =
+    capabilities.supportedEffects.length > 0
+      ? EFFECT_PRESETS.filter((e) =>
+          capabilities.supportedEffects.includes(e.id),
+        )
+      : EFFECT_PRESETS;
 
-  const selectedEffect = visibleEffects.find((e) => e.id === effect.id) ?? visibleEffects[0];
+  const selectedEffect =
+    visibleEffects.find((e) => e.id === effect.id) ?? visibleEffects[0];
 
   const firmwareSpiral = capabilities.hardwareEffects;
   const isFirmwareSpiral = selectedEffect?.id === "spiral" && firmwareSpiral;
@@ -823,7 +904,8 @@ function Content() {
       : (selectedEffect?.needs ?? "none");
 
   const effectPreview = (): RGB[] => {
-    if (!selectedEffect || effectNeed === "none") return selectedEffect?.colors ?? [color];
+    if (!selectedEffect || effectNeed === "none")
+      return selectedEffect?.colors ?? [color];
     if (effectNeed === "gradient" || effect.useGradient) return gradient;
     return [color];
   };
@@ -859,7 +941,9 @@ function Content() {
   };
   const sampledPreviewColors = previewColorsFor();
   const previewColors: RGB[] =
-    mode === "ambient" && !capabilities.perZone && !capabilities.perControllerColor
+    mode === "ambient" &&
+    !capabilities.perZone &&
+    !capabilities.perControllerColor
       ? unifyColors(sampledPreviewColors)
       : sampledPreviewColors;
 
@@ -876,7 +960,9 @@ function Content() {
   const renderModeContent = () => {
     switch (contentMode) {
       case "solid":
-        return <ColorEditor color={color} disabled={!power} onChange={setColor} />;
+        return (
+          <ColorEditor color={color} disabled={!power} onChange={setColor} />
+        );
       case "gradient":
         return canGradient ? (
           <GradientControls
@@ -919,7 +1005,9 @@ function Content() {
                   </PanelSectionRow>
                 )}
                 <EffectSource
-                  kind={canGradient && effect.useGradient ? "gradient" : "color"}
+                  kind={
+                    canGradient && effect.useGradient ? "gradient" : "color"
+                  }
                   color={color}
                   gradient={gradient}
                 />
@@ -930,14 +1018,26 @@ function Content() {
             )}
             {effectNeed === "none" && (
               <PanelSectionRow>
-                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", padding: "4px 2px 8px" }}>
-                  {isFirmwareSpiral ? t("effect.spiral.firmwareNote") : t("effect.spectrumNote")}
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "rgba(255,255,255,0.5)",
+                    padding: "4px 2px 8px",
+                  }}
+                >
+                  {isFirmwareSpiral
+                    ? t("effect.spiral.firmwareNote")
+                    : t("effect.spectrumNote")}
                 </div>
               </PanelSectionRow>
             )}
           </>
         );
       case "ambient":
+        const description =
+          ambilight.algorithm == "dominant"
+            ? t("ambient.dominantHint")
+            : t("ambient.averageHint");
         return (
           <>
             {power && ambStatus === "no_source" && (
@@ -958,9 +1058,16 @@ function Content() {
               </PanelSectionRow>
             )}
             <PanelSectionRow>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "4px 2px 12px", lineHeight: 1.45 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.55)",
+                  padding: "4px 2px 12px",
+                  lineHeight: 1.45,
+                }}
+              >
                 {capabilities.perZone || capabilities.perControllerColor
-                  ? t("ambient.stickHint")
+                  ? description
                   : t("ambient.globalHint")}
               </div>
             </PanelSectionRow>
@@ -971,7 +1078,11 @@ function Content() {
                   tabs={["dominant", "average"]}
                   onChange={setAmbilightAlgorithm}
                   label={(a) =>
-                    t(`ambient.algorithm.${a}` as "ambient.algorithm.dominant" | "ambient.algorithm.average")
+                    t(
+                      `ambient.algorithm.${a}` as
+                        | "ambient.algorithm.dominant"
+                        | "ambient.algorithm.average",
+                    )
                   }
                 />
               </div>
@@ -984,7 +1095,11 @@ function Content() {
                     tabs={["columns", "bottom_edge"]}
                     onChange={setAmbilightSampling}
                     label={(m) =>
-                      t(`ambient.sampling.${m}` as "ambient.sampling.columns" | "ambient.sampling.bottom_edge")
+                      t(
+                        `ambient.sampling.${m}` as
+                          | "ambient.sampling.columns"
+                          | "ambient.sampling.bottom_edge",
+                      )
                     }
                   />
                 </div>
@@ -1000,7 +1115,9 @@ function Content() {
                 valueSuffix="%"
                 showValue
                 disabled={!power}
-                onChange={(v) => setAmbilight(v, ambilight.smoothing, ambilight.fps)}
+                onChange={(v) =>
+                  setAmbilight(v, ambilight.smoothing, ambilight.fps)
+                }
               />
             </PanelSectionRow>
             <PanelSectionRow>
@@ -1013,7 +1130,9 @@ function Content() {
                 valueSuffix="%"
                 showValue
                 disabled={!power}
-                onChange={(v) => setAmbilight(ambilight.vividness, v, ambilight.fps)}
+                onChange={(v) =>
+                  setAmbilight(ambilight.vividness, v, ambilight.fps)
+                }
               />
             </PanelSectionRow>
             <PanelSectionRow>
@@ -1026,7 +1145,9 @@ function Content() {
                 valueSuffix=" fps"
                 showValue
                 disabled={!power}
-                onChange={(v) => setAmbilight(ambilight.vividness, ambilight.smoothing, v)}
+                onChange={(v) =>
+                  setAmbilight(ambilight.vividness, ambilight.smoothing, v)
+                }
                 bottomSeparator="none"
               />
             </PanelSectionRow>
@@ -1055,7 +1176,14 @@ function Content() {
       case "clock":
         return (
           <PanelSectionRow>
-            <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "4px 2px 8px", lineHeight: 1.45 }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: "rgba(255,255,255,0.55)",
+                padding: "4px 2px 8px",
+                lineHeight: 1.45,
+              }}
+            >
               {t("clock.hint")}
             </div>
           </PanelSectionRow>
@@ -1081,7 +1209,14 @@ function Content() {
               </PanelSectionRow>
             )}
             <PanelSectionRow>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.55)", padding: "4px 2px 8px", lineHeight: 1.45 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "rgba(255,255,255,0.55)",
+                  padding: "4px 2px 8px",
+                  lineHeight: 1.45,
+                }}
+              >
                 {t("vu.hint")}
               </div>
             </PanelSectionRow>
@@ -1120,7 +1255,11 @@ function Content() {
               power={power}
               layoutKind={capabilities.layoutKind}
               segments={capabilities.zones}
-              label={contentMode === "ambient" ? t("device.preview.ambient") : undefined}
+              label={
+                contentMode === "ambient"
+                  ? t("device.preview.ambient")
+                  : undefined
+              }
             />
           </div>
         </PanelSectionRow>
@@ -1129,7 +1268,12 @@ function Content() {
       {showDeviceControls && (
         <>
           <PanelSectionRow>
-            <ToggleField label={t("power.label")} checked={power} onChange={setPower} bottomSeparator="none" />
+            <ToggleField
+              label={t("power.label")}
+              checked={power}
+              onChange={setPower}
+              bottomSeparator="none"
+            />
           </PanelSectionRow>
           {capabilities.hasBattery && (
             <PanelSectionRow>
@@ -1184,7 +1328,13 @@ function Content() {
         <>
           {!hasLeds && (
             <PanelSectionRow>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.55)", padding: "8px 2px 4px" }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "rgba(255,255,255,0.55)",
+                  padding: "8px 2px 4px",
+                }}
+              >
                 {t("device.noLeds")}
               </div>
             </PanelSectionRow>

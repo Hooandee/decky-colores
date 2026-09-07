@@ -74,7 +74,7 @@ export interface AmbilightState {
   smoothing: number;
   fps: number;
   sampling: string;
-  algorithm?: "dominant" | "average";
+  algorithm: "dominant" | "average";
 }
 
 export type EffectId =
