@@ -47,7 +47,13 @@ DEFAULTS = {
     "gradient": [[0, 196, 255], [136, 86, 255]],
     "gradient_speed": 30,
     "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
-    "ambilight": {"vividness": 27, "smoothing": 75, "fps": 10, "sampling": "columns"},
+    "ambilight": {
+        "vividness": 27,
+        "smoothing": 75,
+        "fps": 10,
+        "sampling": "columns",
+        "algorithm": "dominant",
+    },
     "saved_gradients": [],
     "enabled_experiments": [],
     "power_led_off": False,
@@ -181,6 +187,8 @@ def _normalize_ambilight_settings(settings: dict | None) -> dict:
         saturation = max(100, min(250, int(stored.get("saturation", 140))))
         vividness = round((saturation - 100) / 1.5)
     normalized["vividness"] = max(0, min(100, int(vividness)))
+    if normalized.get("algorithm") not in ("dominant", "average"):
+        normalized["algorithm"] = "dominant"
     normalized.pop("saturation", None)
     return normalized
 
@@ -870,6 +878,9 @@ class Plugin:
     async def set_ambilight_sampling(self, mode: str) -> None:
         await self.patch_profile("global", None, {"ambilight": {"sampling": mode}})
 
+    async def set_ambilight_algorithm(self, algorithm: str) -> None:
+        await self.patch_profile("global", None, {"ambilight": {"algorithm": algorithm}})
+
     async def set_power_led(self, off: bool) -> None:
         self._init()
         self._settings["power_led_off"] = off
@@ -1027,6 +1038,7 @@ class Plugin:
                     "smoothing": amb["smoothing"],
                     "fps": amb.get("fps", 10),
                     "sampling": amb.get("sampling", "columns"),
+                    "algorithm": amb.get("algorithm", "dominant"),
                     "global_color": not (
                         self._capabilities.get("perZone")
                         or self._capabilities.get("perControllerColor")

@@ -220,6 +220,11 @@ export function useColores() {
     void pushProfile({ ambilight: { sampling } });
   };
 
+  const setAmbilightAlgorithm = (algorithm: "dominant" | "average") => {
+    setState((s) => (s ? { ...s, ambilight: { ...s.ambilight, algorithm } } : s));
+    void pushProfile({ ambilight: { algorithm } });
+  };
+
   const saveGradient = (name: string, stops: RGB[]) => {
     api
       .saveGradient(name, stops.map((c) => [c.r, c.g, c.b]))
@@ -329,6 +334,7 @@ export function useColores() {
     setEffectGradient,
     setAmbilight,
     setAmbilightSampling,
+    setAmbilightAlgorithm,
     saveGradient,
     deleteGradient,
     setExperiment,

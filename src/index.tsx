@@ -597,6 +597,7 @@ function Content() {
     setEffectGradient,
     setAmbilight,
     setAmbilightSampling,
+    setAmbilightAlgorithm,
     saveGradient,
     deleteGradient,
     setExperiment,
@@ -961,6 +962,18 @@ function Content() {
                 {capabilities.perZone || capabilities.perControllerColor
                   ? t("ambient.stickHint")
                   : t("ambient.globalHint")}
+              </div>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <div style={{ padding: "2px 0 10px" }}>
+                <Tabs<"dominant" | "average">
+                  value={ambilight.algorithm ?? "dominant"}
+                  tabs={["dominant", "average"]}
+                  onChange={setAmbilightAlgorithm}
+                  label={(a) =>
+                    t(`ambient.algorithm.${a}` as "ambient.algorithm.dominant" | "ambient.algorithm.average")
+                  }
+                />
               </div>
             </PanelSectionRow>
             {capabilities.layoutKind === "bar" && (

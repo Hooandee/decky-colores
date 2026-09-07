@@ -61,6 +61,120 @@ def avg_region(frame, width, height, region):
     return (0, 0, 0)
 
 
+def dominant_colors_region(frame, width, height, region, count=1):
+    count = max(1, count)
+    x0, y0, x1, y1 = region
+    cx0 = max(0, int(x0 * width))
+    cx1 = min(width, max(cx0 + 1, int(x1 * width)))
+    cy0 = max(0, int(y0 * height))
+    cy1 = min(height, max(cy0 + 1, int(y1 * height)))
+
+    all_pixels = []
+    filtered_pixels = []
+
+    for y in range(cy0, cy1):
+        base = y * width * 3
+        for x in range(cx0, cx1):
+            i = base + x * 3
+            r, g, b = frame[i], frame[i + 1], frame[i + 2]
+
+            sat = max(r, g, b) - min(r, g, b)
+            # Quadratic saturation boost to prevent grey muddle and prioritize vivid gaming elements
+            weight = 1 + (sat * sat) // 256
+
+            pixel = (r, g, b, weight)
+            all_pixels.append(pixel)
+
+            # Filter out extreme darks (e.g. letterbox bars) unless scene is entirely dark
+            if r + g + b < 12:
+                continue
+            # Filter out extreme washed-out whites unless dominant
+            if r > 245 and g > 245 and b > 245 and sat < 15:
+                continue
+
+            filtered_pixels.append(pixel)
+
+    candidates = filtered_pixels if filtered_pixels else all_pixels
+    if not candidates:
+        return [(0, 0, 0)] * count
+
+    # Median Cut quantization to find up to `count` distinct dominant color clusters
+    boxes = [candidates]
+    while len(boxes) < count:
+        best_box_idx = -1
+        best_span = -1
+        best_channel = 0
+
+        for idx, box in enumerate(boxes):
+            if len(box) <= 1:
+                continue
+            min_r = min(p[0] for p in box)
+            max_r = max(p[0] for p in box)
+            min_g = min(p[1] for p in box)
+            max_g = max(p[1] for p in box)
+            min_b = min(p[2] for p in box)
+            max_b = max(p[2] for p in box)
+
+            spans = (max_r - min_r, max_g - min_g, max_b - min_b)
+            max_s = max(spans)
+            if max_s > best_span:
+                best_span = max_s
+                best_box_idx = idx
+                best_channel = spans.index(max_s)
+
+        if best_box_idx == -1 or best_span <= 0:
+            break
+
+        box_to_split = boxes[best_box_idx]
+        box_to_split.sort(key=lambda p: p[best_channel])
+        target_mid = len(box_to_split) // 2
+
+        # Find split index at a value transition closest to target_mid
+        best_split = target_mid
+        min_dist = float("inf")
+        for i in range(1, len(box_to_split)):
+            if box_to_split[i - 1][best_channel] != box_to_split[i][best_channel]:
+                dist = abs(i - target_mid)
+                if dist < min_dist:
+                    min_dist = dist
+                    best_split = i
+
+        boxes[best_box_idx] = box_to_split[:best_split]
+        boxes.append(box_to_split[best_split:])
+
+    # Compute weighted average for each box
+    extracted = []
+    for box in boxes:
+        if not box:
+            continue
+        total_w = sum(p[3] for p in box)
+        if total_w > 0:
+            avg_r = sum(p[0] * p[3] for p in box) // total_w
+            avg_g = sum(p[1] * p[3] for p in box) // total_w
+            avg_b = sum(p[2] * p[3] for p in box) // total_w
+            extracted.append(((avg_r, avg_g, avg_b), total_w))
+        else:
+            avg_r = sum(p[0] for p in box) // len(box)
+            avg_g = sum(p[1] for p in box) // len(box)
+            avg_b = sum(p[2] for p in box) // len(box)
+            extracted.append(((avg_r, avg_g, avg_b), 1))
+
+    # Sort boxes by total weight so primary dominant color comes first
+    extracted.sort(key=lambda item: item[1], reverse=True)
+    colors = [color for color, _ in extracted]
+
+    if not colors:
+        return [(0, 0, 0)] * count
+
+    # If fewer clusters found than requested `count`, pad by cycling the dominant colors
+    if len(colors) < count:
+        base_colors = list(colors)
+        while len(colors) < count:
+            colors.append(base_colors[len(colors) % len(base_colors)])
+
+    return colors[:count]
+
+
 def boost_saturation(color, factor):
     r, g, b = color
     gray = r * 0.299 + g * 0.587 + b * 0.114
@@ -268,6 +382,7 @@ class Ambilight:
 
     def _update_targets(self, frame):
         sat = float(self._options.get("saturation", 1.4))
+        algo = self._options.get("algorithm", "dominant")
         if self._options.get("global_color"):
             target = boost_saturation(avg_region(frame, CAP_W, CAP_H, _FULL_REGION), sat)
             self._targets = [target] * self._zones
@@ -279,9 +394,20 @@ class Ambilight:
             if bottom_edge:
                 x0, y0, x1, y1 = region
                 region = (x0, y1 - (y1 - y0) * 0.28, x1, y1)
-            for sub, zone in zip(subdivide(region, len(indices)), indices):
-                if 0 <= zone < self._zones:
-                    self._targets[zone] = boost_saturation(avg_region(frame, CAP_W, CAP_H, sub), sat)
+            if algo == "average":
+                for sub, zone in zip(subdivide(region, len(indices)), indices):
+                    if 0 <= zone < self._zones:
+                        self._targets[zone] = boost_saturation(avg_region(frame, CAP_W, CAP_H, sub), sat)
+            elif group.get("kind") == "bar":
+                for sub, zone in zip(subdivide(region, len(indices)), indices):
+                    if 0 <= zone < self._zones:
+                        colors = dominant_colors_region(frame, CAP_W, CAP_H, sub, count=1)
+                        self._targets[zone] = boost_saturation(colors[0], sat)
+            else:
+                colors = dominant_colors_region(frame, CAP_W, CAP_H, region, count=len(indices))
+                for zone, color in zip(indices, colors):
+                    if 0 <= zone < self._zones:
+                        self._targets[zone] = boost_saturation(color, sat)
 
     def _tick(self):
         base_alpha = alpha_for(self._options.get("smoothing", 75))

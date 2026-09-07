@@ -212,3 +212,98 @@ def test_subdivide_splits_region_horizontally():
 def test_subdivide_single_returns_region():
     assert subdivide([0.1, 0.2, 0.3, 0.4], 1) == [(0.1, 0.2, 0.3, 0.4)]
 
+
+def test_dominant_colors_region_extracts_four_distinct_colors():
+    from py_modules.ambilight import dominant_colors_region
+
+    # Frame with 4 distinct quadrants: Red, Green, Blue, Yellow
+    frame = bytearray(CAP_W * CAP_H * 3)
+    half_w = CAP_W // 2
+    half_h = CAP_H // 2
+    for y in range(CAP_H):
+        for x in range(CAP_W):
+            if y < half_h and x < half_w:
+                c = (255, 0, 0)
+            elif y < half_h and x >= half_w:
+                c = (0, 255, 0)
+            elif y >= half_h and x < half_w:
+                c = (0, 0, 255)
+            else:
+                c = (255, 255, 0)
+            i = (y * CAP_W + x) * 3
+            frame[i], frame[i + 1], frame[i + 2] = c
+
+    dom = dominant_colors_region(bytes(frame), CAP_W, CAP_H, (0.0, 0.0, 1.0, 1.0), count=4)
+    assert len(dom) == 4
+    # All 4 colors must be represented
+    for expected in [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]:
+        assert any(max(abs(c[j] - expected[j]) for j in range(3)) < 16 for c in dom)
+
+
+def test_dominant_colors_pads_single_color():
+    from py_modules.ambilight import dominant_colors_region
+
+    frame = _solid_frame(CAP_W, CAP_H, (200, 50, 150))
+    dom = dominant_colors_region(frame, CAP_W, CAP_H, (0.0, 0.0, 1.0, 1.0), count=4)
+    assert len(dom) == 4
+    assert all(c == (200, 50, 150) for c in dom)
+
+
+def test_dominant_colors_black_fallback():
+    from py_modules.ambilight import dominant_colors_region
+
+    frame = _solid_frame(CAP_W, CAP_H, (0, 0, 0))
+    dom = dominant_colors_region(frame, CAP_W, CAP_H, (0.0, 0.0, 1.0, 1.0), count=4)
+    assert len(dom) == 4
+    assert all(c == (0, 0, 0) for c in dom)
+
+
+def test_update_targets_maps_left_and_right_dominant_colors_to_sticks():
+    # Left half: Red, Green, Blue, Yellow in 4 strips
+    # Right half: Cyan, Magenta, White, Orange in 4 strips
+    frame = bytearray(CAP_W * CAP_H * 3)
+    left_palette = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)]
+    right_palette = [(0, 255, 255), (255, 0, 255), (240, 240, 240), (255, 128, 0)]
+
+    for y in range(CAP_H):
+        band = min(3, y // (CAP_H // 4 + 1))
+        for x in range(CAP_W):
+            c = left_palette[band] if x < CAP_W // 2 else right_palette[band]
+            i = (y * CAP_W + x) * 3
+            frame[i], frame[i + 1], frame[i + 2] = c
+
+    # 8 zones total: 4 for left stick, 4 for right stick
+    layout = [
+        {"name": "Left stick", "region": [0.0, 0.0, 0.30, 0.35], "zones": [0, 1, 2, 3]},
+        {"name": "Right stick", "region": [0.70, 0.33, 1.0, 0.67], "zones": [4, 5, 6, 7]},
+    ]
+    amb = Ambilight(lambda c: None, zones=8, runtime_dir=None, layout=layout)
+    amb._options = {"saturation": 1.0}
+    amb._update_targets(bytes(frame))
+
+    # Left stick zones (0..3) should match left palette colors
+    for zone in range(4):
+        target = amb._targets[zone]
+        assert any(max(abs(target[j] - c[j]) for j in range(3)) < 20 for c in left_palette)
+
+    # Right stick zones (4..7) should match right palette colors
+    for zone in range(4, 8):
+        target = amb._targets[zone]
+        assert any(max(abs(target[j] - c[j]) for j in range(3)) < 20 for c in right_palette)
+
+
+def test_update_targets_respects_average_algorithm():
+    layout = [
+        {"name": "Left stick", "region": [0.0, 0.0, 0.5, 1.0], "zones": [0, 1]},
+    ]
+    # Split frame: top half red (255, 0, 0), bottom half blue (0, 0, 255)
+    amb = Ambilight(lambda c: None, zones=2, runtime_dir=None, layout=layout)
+    amb._options = {"saturation": 1.0, "algorithm": "average"}
+    amb._update_targets(_split_frame())
+
+    # In average mode, both sub-regions span full height (y 0..1) so they average red & blue
+    assert amb._targets[0] == (127, 0, 127)
+    assert amb._targets[1] == (127, 0, 127)
+
+
+

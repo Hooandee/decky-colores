@@ -135,6 +135,8 @@ export const it: Record<string, string> = {
   "ambient.globalHint": "Le luci seguono il colore medio dell'intero schermo.",
   "ambient.sampling.columns": "Colonne",
   "ambient.sampling.bottom_edge": "Bordo inferiore",
+  "ambient.algorithm.dominant": "Colore dominante",
+  "ambient.algorithm.average": "Media",
   "ambient.vividness": "Vividezza",
   "ambient.smoothing": "Fluidità",
   "ambient.captureRate": "Frequenza di acquisizione",
