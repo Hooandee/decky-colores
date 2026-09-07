@@ -3,43 +3,26 @@
 ## [0.24.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.23.0...decky-colores-v0.24.0) (2026-09-07)
 
 
-### Features
+### Español
 
-* add per-app lighting profiles ([dc63da8](https://github.com/Hooandee/decky-colores/commit/dc63da81c99713a0ca830bc60691360061cb6d95))
-* **android:** overhaul app and add hardware learning ([f6535f8](https://github.com/Hooandee/decky-colores/commit/f6535f886524e51ecd9163f6cf037dad9dcf3858))
-* bring advanced lighting modes to Android ([230a8f9](https://github.com/Hooandee/decky-colores/commit/230a8f94f5abc531a3f760952d789681e13e58fb))
-* bring advanced lighting modes to Android ([83b5c06](https://github.com/Hooandee/decky-colores/commit/83b5c06c1be1a4465d0041fdf3f5f6e307debd65))
-* customize sensor scales ([1d73b23](https://github.com/Hooandee/decky-colores/commit/1d73b2348646d0211a86f8fb7188a3b47aa89c8e))
-* customize sensor scales ([139e9b8](https://github.com/Hooandee/decky-colores/commit/139e9b8d0dccbb088c3f47c206a29f4427ec7d62))
-* **i18n:** add Italian localization ([81cd20a](https://github.com/Hooandee/decky-colores/commit/81cd20ae1e2ebc664ccb266bcc7f80183b93b4bc))
-* **i18n:** add Italian localization ([2e1260a](https://github.com/Hooandee/decky-colores/commit/2e1260ace44238e70a3aff819a76b99127ca028b))
-* OneXPlayer OneXFly Apex / F1 Pro joystick-ring LEDs ([be64221](https://github.com/Hooandee/decky-colores/commit/be642215130499f643e8a1d5972f11a64535f15d))
-* **oxp:** add OxpLedsDevice with enabled/monocolor latch ([fd6f39a](https://github.com/Hooandee/decky-colores/commit/fd6f39af84999c70a3ed4c1d5292dd20db884c9e))
-* **oxp:** OneXPlayer profile for OneXFly Apex and F1 Pro joystick rings ([755b41f](https://github.com/Hooandee/decky-colores/commit/755b41f5509edd2b7e3f9bbe75e79fb1a4dbbd7d))
-* **oxp:** raw-HID fallback for OneXFly/Apex without the hid-oxp node ([1742034](https://github.com/Hooandee/decky-colores/commit/1742034b289811a2a22f39222360dd199de31dec))
-* **report:** snapshot LED latch attrs (enabled/effect/speed) ([0a588a9](https://github.com/Hooandee/decky-colores/commit/0a588a9ad6b04a37cb10bdab7adf319a2693cabe))
+* **Nueva app Android:** Renueva por completo la interfaz con un diseño prismático, navegación y ajustes más claros, perfiles, gradientes mejorados y layouts adaptados a pantallas compactas, verticales, 4:3, 16:9, 16:10 y ultraanchas. ([#118](https://github.com/Hooandee/decky-colores/pull/118)) ([#121](https://github.com/Hooandee/decky-colores/pull/121)) ([#123](https://github.com/Hooandee/decky-colores/pull/123))
+* **Aprendizaje y dispositivos Android:** Añade aprendizaje guiado de hardware con sondeo defensivo, rollback y diagnósticos, junto con perfiles nativos multipunto para AYN Odin 2 Portal, Retroid Pocket 5 y Retroid Pocket Nova. Mejora el descubrimiento HTR3212 y restaura y representa correctamente la iluminación SingleADC de un solo canal en ambos sticks. ([#118](https://github.com/Hooandee/decky-colores/pull/118)) ([#120](https://github.com/Hooandee/decky-colores/pull/120)) ([#123](https://github.com/Hooandee/decky-colores/pull/123)) ([#134](https://github.com/Hooandee/decky-colores/pull/134))
+* **Ambilight para Android:** Incorpora captura nativa eficiente de la pantalla completa, muestreo por escena o borde inferior, vivacidad y suavizado configurables y un ciclo de vida seguro que no guarda capturas. ([#115](https://github.com/Hooandee/decky-colores/pull/115)) ([#123](https://github.com/Hooandee/decky-colores/pull/123))
+* **Decky y Anatase:** Evita que el módulo de sistema `report` incluido por Anatase oculte el recolector interno de Colores e impida arrancar el plugin. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
 
+### English
 
-### Bug Fixes
+* **New Android app:** Completely refreshes the interface with a prismatic design, clearer navigation and settings, profiles, improved gradients, and layouts adapted to compact, portrait, 4:3, 16:9, 16:10, and ultrawide screens. ([#118](https://github.com/Hooandee/decky-colores/pull/118)) ([#121](https://github.com/Hooandee/decky-colores/pull/121)) ([#123](https://github.com/Hooandee/decky-colores/pull/123))
+* **Android hardware learning and devices:** Adds guided hardware learning with defensive probing, rollback, and diagnostics, together with native multi-zone profiles for AYN Odin 2 Portal, Retroid Pocket 5, and Retroid Pocket Nova. HTR3212 discovery is improved, and single-channel SingleADC lighting is correctly restored and represented on both sticks. ([#118](https://github.com/Hooandee/decky-colores/pull/118)) ([#120](https://github.com/Hooandee/decky-colores/pull/120)) ([#123](https://github.com/Hooandee/decky-colores/pull/123)) ([#134](https://github.com/Hooandee/decky-colores/pull/134))
+* **Ambilight for Android:** Adds efficient native full-screen capture, full-scene or bottom-edge sampling, configurable vividness and smoothing, and a safe lifecycle that never stores captured frames. ([#115](https://github.com/Hooandee/decky-colores/pull/115)) ([#123](https://github.com/Hooandee/decky-colores/pull/123))
+* **Decky and Anatase:** Prevents Anatase's system `report` module from shadowing Colores' internal report collector and stopping the plugin from loading. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
 
-* avoid report module collision on Anatase ([7379d37](https://github.com/Hooandee/decky-colores/commit/7379d37ea2a871bbb2402c9ff15212ccf3ffc905))
-* avoid report module collision on Anatase ([3050094](https://github.com/Hooandee/decky-colores/commit/3050094ba55e4ef6de058920ddb71186c0f5b258))
-* correct OneXPlayer Apex RGB output ([f2e32ce](https://github.com/Hooandee/decky-colores/commit/f2e32cec116860f939c1f66480e3561db07eed97))
-* correct OneXPlayer Apex RGB output ([84091d3](https://github.com/Hooandee/decky-colores/commit/84091d3c3292c2b07177346b53459758aee0efea))
-* format sensor readings ([0300ec9](https://github.com/Hooandee/decky-colores/commit/0300ec9c6ee74959d46dcef5b4aa7cf81a6e5763))
-* harden OneXPlayer Apex RGB control ([55f2792](https://github.com/Hooandee/decky-colores/commit/55f279254ee2d85f5f297106b84714d4413e284d))
-* harden OneXPlayer Apex RGB control ([aeb842b](https://github.com/Hooandee/decky-colores/commit/aeb842bedeb8519553c80c8635be42954c4e5964))
-* harden OneXPlayer LED writes ([12762c8](https://github.com/Hooandee/decky-colores/commit/12762c8af5028767523275cda0b110b15731a403))
-* **i18n:** address Italian review feedback ([a59b304](https://github.com/Hooandee/decky-colores/commit/a59b30429fd13cf4add19a8e3b17c6dd1fa0d2a0))
-* **i18n:** clarify Italian startup copy ([fb6bce6](https://github.com/Hooandee/decky-colores/commit/fb6bce6c652f124000c6c997dd290018e96b50ef))
-* **i18n:** refine Italian localization ([6767af0](https://github.com/Hooandee/decky-colores/commit/6767af060c4b5d32db04e5874dff78bd5cd3bce0))
-* improve global Ambilight controls ([fb78fe1](https://github.com/Hooandee/decky-colores/commit/fb78fe1edca6a7ee4f5deb610b976bc1ebac70ef))
-* improve global Ambilight sampling and vividness ([0421032](https://github.com/Hooandee/decky-colores/commit/042103240131daafede6e3c0bb6bfa09be3f6eea))
-* improve tab navigation and audio VU ([0458670](https://github.com/Hooandee/decky-colores/commit/0458670caa2635137eb1ce2e886aab2cbd9f1764))
-* improve tab navigation and audio VU ([ab4ce87](https://github.com/Hooandee/decky-colores/commit/ab4ce87b8631a0c4b40680eca8585392549a990d))
-* **oxp:** match HID by VID+usage and drop unused effect scaffolding per review ([e8a450f](https://github.com/Hooandee/decky-colores/commit/e8a450f361ffd60a32f7adcd4775e67f6c9e102d))
-* recover handheld lighting across suspend and drivers ([756d432](https://github.com/Hooandee/decky-colores/commit/756d432ca854b0939e2df5d64ca0fb913dcdd767))
-* recover handheld lighting across suspend and drivers ([5d3a2c0](https://github.com/Hooandee/decky-colores/commit/5d3a2c00c2ebb0a0d1eb5aada60c0c113fc0bca3))
+### Italiano
+
+* **Nuova app Android:** Rinnova completamente l’interfaccia con un design prismatico, navigazione e impostazioni più chiare, profili, gradienti migliorati e layout adattati agli schermi compatti, verticali, 4:3, 16:9, 16:10 e ultrawide. ([#118](https://github.com/Hooandee/decky-colores/pull/118)) ([#121](https://github.com/Hooandee/decky-colores/pull/121)) ([#123](https://github.com/Hooandee/decky-colores/pull/123))
+* **Apprendimento hardware e dispositivi Android:** Aggiunge l’apprendimento guidato dell’hardware con rilevamento prudente, rollback e diagnostica, insieme a profili multipunto nativi per AYN Odin 2 Portal, Retroid Pocket 5 e Retroid Pocket Nova. Migliora il rilevamento HTR3212 e ripristina e rappresenta correttamente su entrambi gli stick l’illuminazione SingleADC a canale singolo. ([#118](https://github.com/Hooandee/decky-colores/pull/118)) ([#120](https://github.com/Hooandee/decky-colores/pull/120)) ([#123](https://github.com/Hooandee/decky-colores/pull/123)) ([#134](https://github.com/Hooandee/decky-colores/pull/134))
+* **Ambilight per Android:** Aggiunge una cattura nativa efficiente dello schermo intero, campionamento dell’intera scena o del bordo inferiore, vivacità e attenuazione configurabili e un ciclo di vita sicuro che non salva mai i fotogrammi acquisiti. ([#115](https://github.com/Hooandee/decky-colores/pull/115)) ([#123](https://github.com/Hooandee/decky-colores/pull/123))
+* **Decky e Anatase:** Impedisce al modulo di sistema `report` incluso in Anatase di nascondere il raccoglitore interno dei report di Colores e bloccare il caricamento del plugin. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
 
 ## 0.23.0 (2026-08-09)
 
