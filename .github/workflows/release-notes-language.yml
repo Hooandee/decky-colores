@@ -1,0 +1,27 @@
+name: release-notes-language
+
+on:
+  release:
+    types: [published, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  check-multilingual:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every supported language section
+        env:
+          BODY: ${{ github.event.release.body }}
+        run: |
+          set -euo pipefail
+          missing=""
+          printf '%s' "$BODY" | grep -qF "### Novedades" || missing="$missing '### Novedades' (español)"
+          printf '%s' "$BODY" | grep -qF "### What's new" || missing="$missing '### What's new' (English)"
+          printf '%s' "$BODY" | grep -qF "### Novità" || missing="$missing '### Novità' (italiano)"
+          printf '%s' "$BODY" | grep -qF "### Neuigkeiten" || missing="$missing '### Neuigkeiten' (Deutsch)"
+          if [ -n "$missing" ]; then
+            echo "::error::Release notes are missing:$missing"
+            exit 1
+          fi

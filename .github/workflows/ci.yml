@@ -5,15 +5,19 @@ on:
     branches: ["**"]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
       decky: ${{ steps.scope.outputs.decky }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - id: scope
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -34,8 +38,10 @@ jobs:
     if: needs.changes.outputs.decky == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
       - run: pip install -r requirements-dev.txt
@@ -47,16 +53,24 @@ jobs:
     if: needs.changes.outputs.decky == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 10
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm build
+      - name: Type-check the frontend
+        run: pnpm typecheck
+      - name: Validate translation content and terminology
+        run: pnpm test:i18n
+      - name: Run the frontend test suite
+        run: pnpm test:fe
+      - name: Build the frontend
+        run: pnpm build
       - name: Verify build output exists
         run: test -f dist/index.js

@@ -23,6 +23,15 @@ El backend es Python (`main.py` + `py_modules/`). El frontend es React/TypeScrip
 - El plugin se adapta solo a cada consola: la interfaz muestra únicamente lo que
   el dispositivo soporta. Mantén esa idea al añadir cosas.
 
+### Calidad de las traducciones
+
+El español, el inglés, el italiano y el alemán son textos de producto, no destinos
+de una traducción literal. Cada frase nueva o modificada debe sonar natural, usar
+la jerga habitual de juegos y hardware, y conservar la intención y el tono. Evita
+giros de traducción automática y tics editoriales como los guiones largos.
+`pnpm test:i18n` comprueba claves, parámetros, puntuación prohibida y terminología
+revisada, pero el sentido y la naturalidad siempre requieren revisión humana.
+
 ## Añadir soporte para una consola
 
 La detección y las capacidades viven en `py_modules/`. Para una máquina nueva
@@ -60,6 +69,15 @@ The backend is Python (`main.py` + `py_modules/`). The frontend is React/TypeScr
 - No code comments unless they're genuinely needed.
 - The plugin adapts to each device: the UI shows only what the hardware supports.
   Keep that in mind when adding features.
+
+### Localization quality
+
+Spanish, English, Italian, and German are product copy, not literal translation
+targets. New or changed strings must read naturally to a native speaker, use the
+established gaming and hardware terminology, and preserve the original intent and
+tone. Avoid machine-translation phrasing and editorial tics such as em dashes.
+`pnpm test:i18n` checks keys, placeholders, banned punctuation, and reviewed
+terminology; a human content review is still required for meaning and naturalness.
 
 ## Adding a device
 

@@ -375,13 +375,17 @@ const NAME_PARTS: Record<Lang, { adjectives: string[]; nouns: string[] }> = {
     adjectives: ["elettrico", "cosmico", "disco", "pastello", "neon", "selvaggio", "turbo", "mistico", "piccante", "sognante"],
     nouns: ["Tramonto", "Unicorno", "Mango", "Polpo", "Tuono", "Gatto", "Drago", "Fenicottero", "Tucano", "Cactus"],
   },
+  de: {
+    adjectives: ["Elektrischer", "Kosmischer", "Wilder", "Mystischer", "Feuriger", "Leuchtender", "Verträumter", "Schillernder", "Galaktischer", "Funkelnder"],
+    nouns: ["Sonnenuntergang", "Regenbogen", "Blitz", "Ozean", "Kosmos", "Wirbel", "Funke", "Traum", "Drache", "Komet"],
+  },
 };
 
 export function suggestGradientName(lang: Lang): string {
   const parts = NAME_PARTS[lang] ?? NAME_PARTS.en;
   const noun = parts.nouns[Math.floor(Math.random() * parts.nouns.length)];
   const adjective = parts.adjectives[Math.floor(Math.random() * parts.adjectives.length)];
-  return lang === "en" ? `${adjective} ${noun}` : `${noun} ${adjective}`;
+  return lang === "en" || lang === "de" ? `${adjective} ${noun}` : `${noun} ${adjective}`;
 }
 
 export function harmoniousGradient(base: RGB): RGB[] {
