@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.24.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.23.0...decky-colores-v0.24.0) (2026-09-07)
+
+
+### Español
+
+* **Decky y Anatase:** Evita que el módulo de sistema `report` incluido por Anatase oculte el recolector interno de Colores e impida arrancar el plugin. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
+
+### English
+
+* **Decky and Anatase:** Prevents Anatase's system `report` module from shadowing Colores' internal report collector and stopping the plugin from loading. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
+
+### Italiano
+
+* **Decky e Anatase:** Impedisce al modulo di sistema `report` incluso in Anatase di nascondere il raccoglitore interno dei report di Colores e bloccare il caricamento del plugin. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
+
 ## 0.23.0 (2026-08-09)
 
 
