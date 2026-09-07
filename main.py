@@ -25,8 +25,8 @@ from performance import gpu_busy_percent, CpuSampler
 from saved_gradients import upsert_gradient, remove_gradient
 from hhd_rgb_control import HhdRgbControl
 import self_updater
-from report import collector as report_collector
-from report import client as report_client
+from colores_report import collector as report_collector
+from colores_report import client as report_client
 
 _REPORT_APP = "colores"
 _REPORT_SERVICE_URL = os.environ.get(
