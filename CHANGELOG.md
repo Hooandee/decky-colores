@@ -15,6 +15,10 @@
 
 * **Decky e Anatase:** Impedisce al modulo di sistema `report` incluso in Anatase di nascondere il raccoglitore interno dei report di Colores e bloccare il caricamento del plugin. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
 
+### Deutsch
+
+* **Decky und Anatase:** Verhindert, dass das von Anatase mitgelieferte Systemmodul `report` die interne Berichtserfassung von Colores verdeckt und dadurch das Laden des Plugins verhindert. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
+
 ## 0.23.0 (2026-08-09)
 
 
