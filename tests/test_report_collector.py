@@ -1,6 +1,6 @@
 import os
 
-from report.collector import (
+from colores_report.collector import (
     SCHEMA,
     build_bundle,
     capabilities_from,
