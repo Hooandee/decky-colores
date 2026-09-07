@@ -3,7 +3,7 @@ import gzip
 import json
 import os
 
-from report.client import encode_payload, parse_response, save_local
+from colores_report.client import encode_payload, parse_response, save_local
 
 
 def test_encode_payload_round_trips():

@@ -17,8 +17,13 @@ internal data class DevicePreviewGroups(
 internal fun devicePreviewGroups(
     frame: List<RgbColor>,
     layout: List<LedGridCell>?,
+    singleOutputMirrorsBothSticks: Boolean = false,
 ): DevicePreviewGroups {
     if (frame.isEmpty()) return DevicePreviewGroups(emptyList(), representsSticks = false)
+    if (frame.size == 1 && singleOutputMirrorsBothSticks) {
+        val sharedSegments = listOf(0).toSegments(frame, null)
+        return DevicePreviewGroups(List(2) { sharedSegments }, representsSticks = true)
+    }
     val validLayout =
         layout?.takeIf {
             it.size == frame.size &&

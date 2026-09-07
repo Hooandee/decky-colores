@@ -35,6 +35,7 @@ import com.hooandee.colores.led.RgbColor
 internal fun AudioDeviceScene(
     frame: List<RgbColor>,
     layout: List<LedGridCell>?,
+    singleOutputMirrorsBothSticks: Boolean,
     level: Double,
     capturing: Boolean,
     scale: AudioScale,
@@ -42,7 +43,7 @@ internal fun AudioDeviceScene(
     projection: LedColorProjection,
     modifier: Modifier = Modifier,
 ) {
-    val preview = devicePreviewGroups(frame, layout)
+    val preview = devicePreviewGroups(frame, layout, singleOutputMirrorsBothSticks)
     val previewStyle = LocalLedPreviewStyle.current
     Surface(
         modifier = modifier.prismaticPanel(RoundedCornerShape(32.dp), strong = true),

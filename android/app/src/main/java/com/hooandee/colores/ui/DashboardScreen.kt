@@ -43,6 +43,7 @@ import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.control.AppMode
 import com.hooandee.colores.engine.AudioSensitivity
 import com.hooandee.colores.led.RgbColor
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 
 @Composable
 fun DashboardScreen(
@@ -404,6 +405,7 @@ private fun DashboardModeLayout(
         val dynamic = state.mode.isDynamic || (state.mode == AppMode.GRADIENT && state.gradientAnimated)
         val gradientMode = state.mode == AppMode.GRADIENT
         val previewFrame = state.devicePreviewFrame()
+        val singleOutputMirrorsBothSticks = state.detected?.led is SingleAdcJoypadDescriptor
         val sceneTarget =
             if (gradientMode) {
                 when (state.gradient.selectedStopIndex) {
@@ -433,6 +435,7 @@ private fun DashboardModeLayout(
                 AudioDeviceScene(
                     frame = state.currentFrame,
                     layout = state.detected?.gridLayout,
+                    singleOutputMirrorsBothSticks = singleOutputMirrorsBothSticks,
                     level = AudioSensitivity.adjust(state.audio.level, state.audioSensitivityDb),
                     capturing = state.audio.status == AudioCaptureStatus.CAPTURING,
                     scale = state.audioScale,
@@ -444,6 +447,7 @@ private fun DashboardModeLayout(
                 DeviceScene(
                     frame = previewFrame,
                     layout = state.detected?.gridLayout,
+                    singleOutputMirrorsBothSticks = singleOutputMirrorsBothSticks,
                     selectedTarget = sceneTarget,
                     power = state.effectivePower,
                     enabled = sceneEnabled,
