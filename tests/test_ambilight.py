@@ -8,6 +8,7 @@ from py_modules.ambilight import (
     CAP_W,
     CAP_H,
     _gst_command,
+    adaptive_alpha,
     alpha_for,
     avg_region,
     boost_saturation,
@@ -57,6 +58,7 @@ def test_run_retries_when_source_missing(monkeypatch):
     # Cold boot: the gamescope node isn't there yet. The capture must keep retrying
     # (and stay alive) instead of giving up after one miss — otherwise ambient mode
     # never recovers without manual intervention.
+    monkeypatch.setattr(ambilight_mod, "FAST_RETRY_INTERVAL", 0.001)
     monkeypatch.setattr(ambilight_mod, "RETRY_INTERVAL", 0.001)
     applied = []
     amb = Ambilight(lambda colors: applied.append(list(colors)), zones=4, runtime_dir=None)
@@ -85,6 +87,7 @@ def test_run_retries_when_source_missing(monkeypatch):
 
 def test_run_shows_fallback_color_when_source_missing(monkeypatch):
     # No game source -> hold the user's last solid color instead of going dark.
+    monkeypatch.setattr(ambilight_mod, "FAST_RETRY_INTERVAL", 0.001)
     monkeypatch.setattr(ambilight_mod, "RETRY_INTERVAL", 0.001)
     applied = []
     amb = Ambilight(lambda colors: applied.append(list(colors)), zones=4, runtime_dir=None)
@@ -116,6 +119,12 @@ def test_gst_command_uses_leaky_queue_before_scaling():
     assert "path=68" in cmd
 
 
+def test_gst_command_supports_framerate_throttling():
+    cmd = _gst_command(42, 32, 18, fps=15)
+    assert "videorate" in cmd
+    assert "framerate=15/1" in " ".join(cmd)
+
+
 def test_capture_interval_respects_device_render_limit():
     amb = Ambilight(lambda colors: None, zones=1, runtime_dir=None, max_fps=10)
     amb._options = {"fps": 30}
@@ -141,6 +150,25 @@ def test_avg_region_isolates_corner():
     assert avg[0] > 0 and avg[1] > 0
 
 
+def test_avg_region_weights_vibrant_colors_over_muted():
+    # 4 pixels: 3 muted grey-browns, 1 vibrant red laser
+    frame = bytearray(4 * 3)
+    # 3 muted pixels (100, 100, 100)
+    for p in range(3):
+        frame[p * 3] = 100
+        frame[p * 3 + 1] = 100
+        frame[p * 3 + 2] = 100
+    # 1 vibrant red pixel (255, 0, 0)
+    frame[3 * 3] = 255
+    frame[3 * 3 + 1] = 0
+    frame[3 * 3 + 2] = 0
+    avg = avg_region(bytes(frame), 2, 2, (0.0, 0.0, 1.0, 1.0))
+    # Red should strongly dominate over grey
+    assert avg[0] > 180
+    assert avg[1] < 60
+    assert avg[2] < 60
+
+
 def test_boost_saturation_increases_spread():
     base = (140, 120, 100)
     boosted = boost_saturation(base, 1.6)
@@ -154,6 +182,18 @@ def test_boost_saturation_identity():
 def test_lerp_moves_toward_target():
     assert lerp((0, 0, 0), (100, 100, 100), 0.5) == (50, 50, 50)
     assert lerp((0, 0, 0), (100, 0, 0), 1.0) == (100, 0, 0)
+
+
+def test_adaptive_alpha_snaps_on_large_diff():
+    base = 0.25
+    # Small change stays close to base alpha
+    subtle = adaptive_alpha(base, (50, 50, 50), (55, 55, 55))
+    assert subtle == base
+
+    # Huge explosion / flashbang increases alpha for instant response
+    flash = adaptive_alpha(base, (0, 0, 0), (255, 255, 255))
+    assert flash > base * 2.0
+    assert flash <= 1.0
 
 
 def test_alpha_for_mapping():
@@ -171,3 +211,4 @@ def test_subdivide_splits_region_horizontally():
 
 def test_subdivide_single_returns_region():
     assert subdivide([0.1, 0.2, 0.3, 0.4], 1) == [(0.1, 0.2, 0.3, 0.4)]
+

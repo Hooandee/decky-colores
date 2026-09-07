@@ -11,10 +11,10 @@ CAP_W = 32
 CAP_H = 18
 
 # Seconds between reconnect attempts when the gamescope source is missing or the
-# stream drops. On a cold boot the user's PipeWire/gamescope session isn't ready when
-# the (root) plugin loads, so the capture must keep retrying instead of giving up —
-# otherwise ambient mode stays dark until the user manually re-selects it.
-RETRY_INTERVAL = 3.0
+# stream drops. Fast retry quickly checks on cold boot / game startup, then backs off.
+RETRY_INTERVAL = 2.0
+FAST_RETRY_INTERVAL = 0.25
+MAX_FAST_RETRIES = 12
 
 _FULL_REGION = [0.0, 0.0, 1.0, 1.0]
 
@@ -33,18 +33,32 @@ def avg_region(frame, width, height, region):
     cx1 = min(width, max(cx0 + 1, int(x1 * width)))
     cy0 = max(0, int(y0 * height))
     cy1 = min(height, max(cy0 + 1, int(y1 * height)))
-    r = g = b = n = 0
+    r_sum = g_sum = b_sum = total_weight = 0
+    fallback_r = fallback_g = fallback_b = fallback_n = 0
     for y in range(cy0, cy1):
         base = y * width * 3
         for x in range(cx0, cx1):
             i = base + x * 3
-            r += frame[i]
-            g += frame[i + 1]
-            b += frame[i + 2]
-            n += 1
-    if n == 0:
-        return (0, 0, 0)
-    return (r // n, g // n, b // n)
+            r, g, b = frame[i], frame[i + 1], frame[i + 2]
+            fallback_r += r
+            fallback_g += g
+            fallback_b += b
+            fallback_n += 1
+            # Filter out near-black / letterbox bar pixels unless scene is entirely dark
+            if r + g + b < 12:
+                continue
+            # Weight saturated colors quadratically to prevent vibrant game lights from diluting
+            sat = max(r, g, b) - min(r, g, b)
+            weight = 1 + (sat * sat) // 256
+            r_sum += r * weight
+            g_sum += g * weight
+            b_sum += b * weight
+            total_weight += weight
+    if total_weight > 0:
+        return (r_sum // total_weight, g_sum // total_weight, b_sum // total_weight)
+    if fallback_n > 0:
+        return (fallback_r // fallback_n, fallback_g // fallback_n, fallback_b // fallback_n)
+    return (0, 0, 0)
 
 
 def boost_saturation(color, factor):
@@ -62,7 +76,22 @@ def alpha_for(smoothing):
     return max(0.04, 1.0 - s / 100.0)
 
 
-def _gst_command(node, width, height):
+def adaptive_alpha(base_alpha, current, target):
+    diff = sum(abs(t - c) for c, t in zip(current, target)) / 3.0
+    if diff > 15:
+        return min(1.0, base_alpha * (1.0 + (diff - 15) / 60.0))
+    return base_alpha
+
+
+def _gst_command(node, width, height, fps=None):
+    if fps:
+        caps = f"video/x-raw,format=RGB,width={width},height={height},framerate={int(fps)}/1"
+        return [
+            "gst-launch-1.0", "-q", "pipewiresrc", f"path={int(node)}",
+            "!", "queue", "leaky=downstream", "max-size-buffers=2",
+            "!", "videoconvert", "!", "videorate", "!", "videoscale", "!", caps,
+            "!", "fdsink", "fd=1",
+        ]
     caps = f"video/x-raw,format=RGB,width={width},height={height}"
     return [
         "gst-launch-1.0", "-q", "pipewiresrc", f"path={int(node)}",
@@ -164,20 +193,29 @@ class Ambilight:
 
     async def _run(self):
         # Outer reconnect loop: keep trying to find the gamescope source and capture it
-        # until stop() cancels us. The source can be absent at boot (session not up yet)
-        # or vanish (leaving Game Mode) and reappear — we recover from both automatically.
+        # until stop() cancels us. Fast polling checks frequently when a game is booting,
+        # then backs off if idle.
         frame_bytes = CAP_W * CAP_H * 3
+        consecutive_misses = 0
         while True:
             node = await self._find_node()
             if node is None:
-                logger.warning("gamescope PipeWire node not found; retrying")
+                consecutive_misses += 1
+                retry_interval = FAST_RETRY_INTERVAL if consecutive_misses <= MAX_FAST_RETRIES else RETRY_INTERVAL
+                logger.warning(
+                    "gamescope PipeWire node not found (attempt %d); retrying in %.2fs",
+                    consecutive_misses,
+                    retry_interval,
+                )
                 self.status = "no_source"
                 self._apply(self._fallback())
-                await asyncio.sleep(RETRY_INTERVAL)
+                await asyncio.sleep(retry_interval)
                 continue
 
+            consecutive_misses = 0
             interval = self._capture_interval()
-            command = _gst_command(node, CAP_W, CAP_H)
+            fps = max(1, int(1.0 / interval))
+            command = _gst_command(node, CAP_W, CAP_H, fps=fps)
             proc = None
             logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / interval)
             try:
@@ -211,7 +249,8 @@ class Ambilight:
                         pass
                 if self._proc is proc:
                     self._proc = None
-            await asyncio.sleep(RETRY_INTERVAL)
+            consecutive_misses = 0
+            await asyncio.sleep(FAST_RETRY_INTERVAL)
 
     async def _log_exit(self, proc):
         if proc is None:
@@ -245,6 +284,9 @@ class Ambilight:
                     self._targets[zone] = boost_saturation(avg_region(frame, CAP_W, CAP_H, sub), sat)
 
     def _tick(self):
-        alpha = alpha_for(self._options.get("smoothing", 75))
-        self._current = [lerp(c, t, alpha) for c, t in zip(self._current, self._targets)]
+        base_alpha = alpha_for(self._options.get("smoothing", 75))
+        self._current = [
+            lerp(c, t, adaptive_alpha(base_alpha, c, t))
+            for c, t in zip(self._current, self._targets)
+        ]
         self._apply(list(self._current))
