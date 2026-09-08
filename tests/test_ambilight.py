@@ -8,6 +8,8 @@ from py_modules.ambilight import (
     CAP_W,
     CAP_H,
     _gst_command,
+    _read_latest_frames,
+    _replace_queued,
     alpha_for,
     avg_region,
     boost_saturation,
@@ -114,6 +116,26 @@ def test_gst_command_uses_leaky_queue_before_scaling():
     assert "leaky=downstream" in cmd
     assert cmd.index("queue") < cmd.index("videoscale")
     assert "path=68" in cmd
+
+
+def test_replace_queued_keeps_only_latest_item():
+    queue = asyncio.Queue(maxsize=1)
+    _replace_queued(queue, b"old")
+    _replace_queued(queue, b"new")
+    assert queue.get_nowait() == b"new"
+
+
+def test_frame_reader_drains_stream_and_reports_eof():
+    async def drive():
+        reader = asyncio.StreamReader()
+        queue = asyncio.Queue(maxsize=1)
+        reader.feed_data(b"oldnew")
+        reader.feed_eof()
+
+        await _read_latest_frames(reader, 3, queue)
+        return queue.get_nowait()
+
+    assert isinstance(asyncio.run(drive()), asyncio.IncompleteReadError)
 
 
 def test_capture_interval_respects_device_render_limit():
