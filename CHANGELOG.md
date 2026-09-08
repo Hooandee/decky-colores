@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.25.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.0...decky-colores-v0.25.1) (2026-09-08)
+
+
+### Español
+
+* **Ambilight:** Mejora notablemente la velocidad de respuesta para que los colores de los LED sigan la imagen del juego prácticamente al instante, sin quedarse atrás.
+
+### English
+
+* **Ambilight:** Significantly improves response speed so the LED colors follow the game image almost instantly without falling behind.
+
+### Italiano
+
+* **Ambilight:** Migliora sensibilmente la velocità di risposta, così i colori dei LED seguono l'immagine del gioco quasi all'istante, senza ritardi.
+
+### Deutsch
+
+* **Ambilight:** Verbessert die Reaktionsgeschwindigkeit deutlich, sodass die LED-Farben dem Spielgeschehen nahezu unmittelbar und ohne Verzögerung folgen.
+
 ## [0.25.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.24.0...decky-colores-v0.25.0) (2026-09-08)
 
 
