@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.25.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.0...decky-colores-v0.25.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **ambilight:** process the latest captured frame without backlog ([a23b181](https://github.com/Hooandee/decky-colores/commit/a23b18114763c2276475e1d5f301b4c29ed46158))
+* **ambilight:** process the latest captured frame without backlog ([c44975d](https://github.com/Hooandee/decky-colores/commit/c44975dc5881cf389c7573e9671877abd729493d))
+
 ## [0.25.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.24.0...decky-colores-v0.25.0) (2026-09-08)
 
 
