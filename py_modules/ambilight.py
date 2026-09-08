@@ -71,7 +71,7 @@ def _gst_command(node, width, height):
     ]
 
 
-def _replace_queued(queue, item):
+def _replace_with_latest(queue, item):
     if queue.full():
         queue.get_nowait()
     queue.put_nowait(item)
@@ -81,9 +81,9 @@ async def _read_latest_frames(reader, frame_bytes, queue):
     try:
         while True:
             frame = await reader.readexactly(frame_bytes)
-            _replace_queued(queue, frame)
+            _replace_with_latest(queue, frame)
     except Exception as error:
-        _replace_queued(queue, error)
+        _replace_with_latest(queue, error)
 
 
 class Ambilight:

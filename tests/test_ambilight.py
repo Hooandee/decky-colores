@@ -9,7 +9,7 @@ from py_modules.ambilight import (
     CAP_H,
     _gst_command,
     _read_latest_frames,
-    _replace_queued,
+    _replace_with_latest,
     alpha_for,
     avg_region,
     boost_saturation,
@@ -118,11 +118,27 @@ def test_gst_command_uses_leaky_queue_before_scaling():
     assert "path=68" in cmd
 
 
-def test_replace_queued_keeps_only_latest_item():
+def test_replace_with_latest_keeps_only_latest_item():
     queue = asyncio.Queue(maxsize=1)
-    _replace_queued(queue, b"old")
-    _replace_queued(queue, b"new")
+    _replace_with_latest(queue, b"old")
+    _replace_with_latest(queue, b"new")
     assert queue.get_nowait() == b"new"
+
+
+def test_frame_reader_keeps_latest_frame_while_stream_is_open():
+    async def drive():
+        reader = asyncio.StreamReader()
+        queue = asyncio.Queue(maxsize=1)
+        reader.feed_data(b"oldnew")
+        task = asyncio.create_task(_read_latest_frames(reader, 3, queue))
+
+        await asyncio.sleep(0)
+        latest = queue.get_nowait()
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        return latest
+
+    assert asyncio.run(drive()) == b"new"
 
 
 def test_frame_reader_drains_stream_and_reports_eof():
