@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.25.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.24.0...decky-colores-v0.25.0) (2026-09-08)
+
+
+### Español
+
+* **Idiomas:** Añade alemán como idioma completo de la interfaz Decky de Colores y mantiene el español como predeterminado. El selector, los controles y estados, los nombres de los degradados, la preferencia guardada, el actualizador y las notas de versión pasan a cubrir español, inglés, italiano y alemán.
+
+### English
+
+* **Languages:** Adds German as a fully supported language in Colores' Decky interface while keeping Spanish as the default. The selector, controls and status messages, gradient names, saved preference, updater, and release notes now cover Spanish, English, Italian, and German.
+
+### Italiano
+
+* **Lingue:** Aggiunge il tedesco tra le lingue pienamente supportate dall'interfaccia Decky di Colores e mantiene lo spagnolo come predefinito. Il selettore, i controlli e i messaggi di stato, i nomi dei gradienti, la preferenza salvata, il sistema di aggiornamento e le note di versione ora coprono spagnolo, inglese, italiano e tedesco.
+
+### Deutsch
+
+* **Sprachen:** Fügt Deutsch als vollständig unterstützte Sprache der Decky-Oberfläche von Colores hinzu. Spanisch bleibt die Standardsprache. Sprachauswahl, Bedienelemente und Statusmeldungen, Namen der Farbverläufe, gespeicherte Spracheinstellung, Update-Funktion und Versionshinweise unterstützen jetzt Spanisch, Englisch, Italienisch und Deutsch.
+
 ## [0.24.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.23.0...decky-colores-v0.24.0) (2026-09-07)
 
 
