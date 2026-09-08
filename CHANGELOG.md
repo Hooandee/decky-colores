@@ -3,10 +3,21 @@
 ## [0.25.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.24.0...decky-colores-v0.25.0) (2026-09-08)
 
 
-### Features
+### Español
 
-* add German localization ([dbdaeb7](https://github.com/Hooandee/decky-colores/commit/dbdaeb7bb9e36bfa6c00e0242b5d9c042132759b))
-* add German localization ([62bdb21](https://github.com/Hooandee/decky-colores/commit/62bdb213a1246a5e099c90ad34ab0777c3ce42a9))
+* **Idiomas:** Añade alemán como idioma completo de la interfaz Decky de Colores y mantiene el español como predeterminado. El selector, los controles y estados, los nombres de los degradados, la preferencia guardada, el actualizador y las notas de versión pasan a cubrir español, inglés, italiano y alemán. Los flujos de CI, prerelease y release comprueban que los cuatro catálogos mantengan las mismas claves y parámetros y conserven la terminología y la redacción revisadas. ([#138](https://github.com/Hooandee/decky-colores/pull/138)) ([dbdaeb7](https://github.com/Hooandee/decky-colores/commit/dbdaeb7bb9e36bfa6c00e0242b5d9c042132759b))
+
+### English
+
+* **Languages:** Adds German as a fully supported language in Colores' Decky interface while keeping Spanish as the default. The selector, controls and status messages, gradient names, saved preference, updater, and release notes now cover Spanish, English, Italian, and German. CI, prerelease, and release workflows check that all four catalogs keep matching keys and placeholders and preserve the reviewed terminology and copy. ([#138](https://github.com/Hooandee/decky-colores/pull/138)) ([dbdaeb7](https://github.com/Hooandee/decky-colores/commit/dbdaeb7bb9e36bfa6c00e0242b5d9c042132759b))
+
+### Italiano
+
+* **Lingue:** Aggiunge il tedesco tra le lingue pienamente supportate dall'interfaccia Decky di Colores e mantiene lo spagnolo come predefinito. Il selettore, i controlli e i messaggi di stato, i nomi dei gradienti, la preferenza salvata, il sistema di aggiornamento e le note di versione ora coprono spagnolo, inglese, italiano e tedesco. I flussi di CI, prerelease e release verificano che chiavi e segnaposto coincidano nei quattro cataloghi e mantengono la terminologia e i testi rivisti. ([#138](https://github.com/Hooandee/decky-colores/pull/138)) ([dbdaeb7](https://github.com/Hooandee/decky-colores/commit/dbdaeb7bb9e36bfa6c00e0242b5d9c042132759b))
+
+### Deutsch
+
+* **Sprachen:** Fügt Deutsch als vollständig unterstützte Sprache der Decky-Oberfläche von Colores hinzu. Spanisch bleibt die Standardsprache. Sprachauswahl, Bedienelemente und Statusmeldungen, Namen der Farbverläufe, gespeicherte Spracheinstellung, Update-Funktion und Versionshinweise unterstützen jetzt Spanisch, Englisch, Italienisch und Deutsch. CI-, Vorabversions- und Release-Workflows stellen sicher, dass Schlüssel und Platzhalter in allen vier Katalogen übereinstimmen und die geprüfte Terminologie sowie die natürlichen Formulierungen erhalten bleiben. ([#138](https://github.com/Hooandee/decky-colores/pull/138)) ([dbdaeb7](https://github.com/Hooandee/decky-colores/commit/dbdaeb7bb9e36bfa6c00e0242b5d9c042132759b))
 
 ## [0.24.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.23.0...decky-colores-v0.24.0) (2026-09-07)
 
