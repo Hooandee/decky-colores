@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.25.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.24.0...decky-colores-v0.25.0) (2026-09-08)
+
+
+### Features
+
+* add German localization ([dbdaeb7](https://github.com/Hooandee/decky-colores/commit/dbdaeb7bb9e36bfa6c00e0242b5d9c042132759b))
+* add German localization ([62bdb21](https://github.com/Hooandee/decky-colores/commit/62bdb213a1246a5e099c90ad34ab0777c3ce42a9))
+
 ## [0.24.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.23.0...decky-colores-v0.24.0) (2026-09-07)
 
 
