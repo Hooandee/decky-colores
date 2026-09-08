@@ -15,14 +15,19 @@
 
 * **Decky e Anatase:** Impedisce al modulo di sistema `report` incluso in Anatase di nascondere il raccoglitore interno dei report di Colores e bloccare il caricamento del plugin. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
 
+### Deutsch
+
+* **Decky und Anatase:** Verhindert, dass das von Anatase mitgelieferte Systemmodul `report` die interne Berichtserfassung von Colores verdeckt und dadurch das Laden des Plugins verhindert. ([#137](https://github.com/Hooandee/decky-colores/pull/137))
+
 ## 0.23.0 (2026-08-09)
 
 
-### Novedades / Features / Novità
+### Novedades / Features / Novità / Neuigkeiten
 
 * **ES:** Añade perfiles de iluminación por aplicación y una traducción completa al italiano para la interfaz de Decky, que abarca los controles, los estados, el actualizador, el formato de los sensores y nombres naturales para los degradados.
 * **EN:** Add per-app lighting profiles and a complete Italian translation for the Decky interface, including controls, status messages, the updater, sensor formatting, and natural gradient names.
 * **IT:** Aggiunge profili di illuminazione per ogni applicazione e una traduzione italiana completa dell'interfaccia Decky, con comandi, messaggi di stato, aggiornamenti, valori dei sensori e nomi dei gradienti tradotti in modo naturale.
+* **DE:** Fügt Beleuchtungsprofile pro Anwendung und eine vollständige italienische Übersetzung der Decky-Oberfläche hinzu, einschließlich Steuerelementen, Statusmeldungen, Aktualisierung, Sensorformatierung und natürlich klingender Namen für Farbverläufe.
 
 ## [0.22.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.21.5...decky-colores-v0.22.0) (2026-07-31)
 

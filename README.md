@@ -42,7 +42,7 @@ En este vídeo enseño y explico el plugin a fondo:
 - **Degradados.** Un editor con presets (Atardecer, Océano, Aurora, Lava, Galaxia y más), ajuste color a color por zona, una paleta automática y un botón de "Sorpréndeme" para cuando no te decidas. Puedes guardar tus degradados favoritos y reutilizarlos.
 - **Efectos.** Respiración, arcoíris, onda, ciclo y espiral. Los efectos de color usan tu color fijo, y varios pueden correr sobre tu degradado personalizado si activas esa opción.
 - **Ambilight.** Las luces siguen lo que pasa en pantalla, tomando el color de la zona cercana a cada joystick. Tiene controles de intensidad, suavizado y tasa de captura.
-- **Español e inglés.** Cambias de idioma con las banderas, arriba a la derecha. El plugin arranca en español.
+- **Español, inglés, italiano y alemán.** Cambias de idioma con las banderas, arriba a la derecha. El plugin arranca en español.
 
 Todo se adapta a tu consola. Si tu máquina solo tiene un color global, no te muestro un editor de zonas que no va a hacer nada.
 

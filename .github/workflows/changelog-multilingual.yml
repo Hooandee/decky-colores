@@ -1,0 +1,21 @@
+name: changelog-multilingual
+
+# This workflow validates release-note structure. Catalog wording and terminology
+# are reviewed by the translation-content tests in the main CI.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+    paths: ["CHANGELOG.md"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require every supported language
+        run: python3 scripts/changelog_notes.py --check

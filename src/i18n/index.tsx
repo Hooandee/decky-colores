@@ -1,8 +1,10 @@
-import { FC, ReactNode, createContext, useCallback, useContext, useMemo, useState } from "react";
+import { CSSProperties, FC, ReactNode, createContext, useCallback, useContext, useMemo, useState } from "react";
 import { Focusable } from "@decky/ui";
 import { it } from "./it";
+import { de } from "./de";
 
-export type Lang = "es" | "en" | "it";
+export const SUPPORTED_LANGUAGES = ["es", "en", "it", "de"] as const;
+export type Lang = (typeof SUPPORTED_LANGUAGES)[number];
 
 const STORAGE_KEY = "colores-lang";
 
@@ -192,9 +194,10 @@ const es: Record<string, string> = {
   "lang.spanish": "Español",
   "lang.english": "Inglés",
   "lang.italian": "Italiano",
+  "lang.german": "Alemán",
 
   "experimental.title": "Funciones experimentales",
-  "experimental.description": "Estas funciones no han sido verificadas en este dispositivo. Puedes probarlas, pero puede que no funcionen bien. Estoy trabajando para darle soporte.",
+  "experimental.description": "Estas funciones no se han verificado en este dispositivo. Puedes probarlas, pero puede que aún no funcionen bien. Estoy trabajando para añadir compatibilidad.",
   "experimental.feature.color": "Color",
   "experimental.feature.brightness": "Brillo",
   "experimental.feature.effects": "Efectos",
@@ -423,9 +426,10 @@ const en: Record<string, string> = {
   "lang.spanish": "Spanish",
   "lang.english": "English",
   "lang.italian": "Italian",
+  "lang.german": "German",
 
   "experimental.title": "Experimental features",
-  "experimental.description": "These features have not been verified on this device. You can try them, but they may not work correctly. I'm working on support.",
+  "experimental.description": "These features have not been verified on this device. You can try them, but they may not work correctly yet. I'm still working on support for this device.",
   "experimental.feature.color": "Color",
   "experimental.feature.brightness": "Brightness",
   "experimental.feature.effects": "Effects",
@@ -468,7 +472,7 @@ const en: Record<string, string> = {
   "report.retry": "Retry",
 };
 
-export const DICTS: Record<Lang, Record<string, string>> = { es, en, it };
+export const DICTS: Record<Lang, Record<string, string>> = { es, en, it, de };
 
 type Params = Record<string, string | number>;
 
@@ -497,7 +501,7 @@ const I18nContext = createContext<I18nValue | null>(null);
 export function readInitialLang(): Lang {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "es" || stored === "en" || stored === "it") return stored;
+    if (SUPPORTED_LANGUAGES.includes(stored as Lang)) return stored as Lang;
   } catch {
     void 0;
   }
@@ -557,48 +561,50 @@ const FlagIT: FC = () => (
   </svg>
 );
 
+const FlagDE: FC = () => (
+  <svg width={20} height={14} viewBox="0 0 20 14" xmlns="http://www.w3.org/2000/svg">
+    <rect width={20} height={14 / 3} fill="#000" />
+    <rect y={14 / 3} width={20} height={14 / 3} fill="#dd0000" />
+    <rect y={(14 / 3) * 2} width={20} height={14 / 3} fill="#ffce00" />
+  </svg>
+);
+
+const LANGUAGE_OPTIONS = [
+  { lang: "es", label: "lang.spanish", Flag: FlagES },
+  { lang: "en", label: "lang.english", Flag: FlagEN },
+  { lang: "it", label: "lang.italian", Flag: FlagIT },
+  { lang: "de", label: "lang.german", Flag: FlagDE },
+] satisfies ReadonlyArray<{ lang: Lang; label: string; Flag: FC }>;
+
+const buttonStyle = (active: boolean): CSSProperties => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 28,
+  height: 20,
+  borderRadius: 5,
+  cursor: "pointer",
+  opacity: active ? 1 : 0.4,
+  boxShadow: active ? "0 0 0 1.5px rgba(255,255,255,0.85)" : "0 0 0 1px rgba(255,255,255,0.15)",
+  transition: "opacity 120ms ease, box-shadow 120ms ease",
+});
+
 export const LangToggle: FC = () => {
   const { lang, setLang, t } = useI18n();
 
-  const buttonStyle = (active: boolean): React.CSSProperties => ({
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: 28,
-    height: 20,
-    borderRadius: 5,
-    cursor: "pointer",
-    opacity: active ? 1 : 0.4,
-    boxShadow: active ? "0 0 0 1.5px rgba(255,255,255,0.85)" : "0 0 0 1px rgba(255,255,255,0.15)",
-    transition: "opacity 120ms ease, box-shadow 120ms ease",
-  });
-
   return (
     <Focusable style={{ display: "flex", gap: 6, justifyContent: "flex-end", padding: "2px 2px 0" }}>
-      <Focusable
-        onActivate={() => setLang("es")}
-        onClick={() => setLang("es")}
-        aria-label={t("lang.spanish")}
-        style={buttonStyle(lang === "es")}
-      >
-        <FlagES />
-      </Focusable>
-      <Focusable
-        onActivate={() => setLang("en")}
-        onClick={() => setLang("en")}
-        aria-label={t("lang.english")}
-        style={buttonStyle(lang === "en")}
-      >
-        <FlagEN />
-      </Focusable>
-      <Focusable
-        onActivate={() => setLang("it")}
-        onClick={() => setLang("it")}
-        aria-label={t("lang.italian")}
-        style={buttonStyle(lang === "it")}
-      >
-        <FlagIT />
-      </Focusable>
+      {LANGUAGE_OPTIONS.map(({ lang: option, label, Flag }) => (
+        <Focusable
+          key={option}
+          onActivate={() => setLang(option)}
+          onClick={() => setLang(option)}
+          aria-label={t(label)}
+          style={buttonStyle(lang === option)}
+        >
+          <Flag />
+        </Focusable>
+      ))}
     </Focusable>
   );
 };

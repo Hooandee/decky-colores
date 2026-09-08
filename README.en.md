@@ -42,7 +42,7 @@ Not on the list? Colores still tries to use your device by reading whatever LEDs
 - **Gradients.** An editor with presets (Sunset, Ocean, Aurora, Lava, Galaxy and more), per-zone color tuning, an auto palette, and a "Surprise me" button for when you can't decide. You can save your favorite gradients and reuse them.
 - **Effects.** Breathing, rainbow, wave, cycle and spiral. Color effects use your solid color, and several can run over your custom gradient if you turn that on.
 - **Ambient (Ambilight).** The lights follow what's on screen, taking color from the region near each joystick. It has vividness, smoothing and capture-rate controls.
-- **Spanish and English.** Switch language with the flags, top right. The plugin starts in Spanish.
+- **Spanish, English, Italian, and German.** Switch language with the flags, top right. The plugin starts in Spanish.
 
 Everything adapts to your handheld. If your machine only has a single global color, I won't show you a zone editor that wouldn't do anything.
 

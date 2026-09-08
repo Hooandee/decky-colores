@@ -107,6 +107,7 @@ describe("custom sensor bands", () => {
     expect(formatSensorValue(89.6, "es")).toBe("89,6");
     expect(formatSensorValue(89.6, "en")).toBe("89.6");
     expect(formatSensorValue(89.6, "it")).toBe("89,6");
+    expect(formatSensorValue(89.6, "de")).toBe("89,6");
   });
 
   it("formats battery percentages without floating point artifacts", () => {
@@ -132,5 +133,17 @@ describe("Italian gradient names", () => {
       random.mockReturnValue((index + 0.5) / 10);
       expect(suggestGradientName("it"), `name parts at index ${index}`).not.toContain("—");
     }
+  });
+});
+
+describe("German gradient names", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("combines a German adjective and noun in natural order", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    expect(suggestGradientName("de")).toBe("Elektrischer Sonnenuntergang");
   });
 });

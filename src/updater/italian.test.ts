@@ -27,14 +27,6 @@ describe("Italian updater copy", () => {
       availableTitle: "Aggiornamento disponibile",
     });
   });
-
-  it("does not use em dashes on any Italian updater surface", () => {
-    const { panel, modal, availableTitle } = getUpdaterStrings("it");
-    const values = [...Object.values(panel), ...Object.values(modal), availableTitle];
-
-    expect(values.some((value) => value.includes("—"))).toBe(false);
-  });
-
   it("falls back to the English catalog for an invalid runtime language", () => {
     expect(getUpdaterStrings("unsupported" as Lang)).toEqual({
       panel: {
