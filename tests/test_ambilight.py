@@ -160,6 +160,38 @@ def test_capture_interval_respects_device_render_limit():
     assert amb._capture_interval() == pytest.approx(0.1)
 
 
+def test_stop_and_wait_reaps_capture_before_returning():
+    class FakeProcess:
+        def __init__(self):
+            self.killed = False
+            self.waited = False
+
+        def kill(self):
+            self.killed = True
+
+        async def wait(self):
+            self.waited = True
+
+    async def drive():
+        amb = Ambilight(lambda colors: None, zones=1, runtime_dir=None)
+        process = FakeProcess()
+        task = asyncio.create_task(asyncio.sleep(60))
+        amb._proc = process
+        amb._task = task
+        amb.status = "running"
+
+        await amb.stop_and_wait()
+
+        assert task.done()
+        assert process.killed
+        assert process.waited
+        assert amb._task is None
+        assert amb._proc is None
+        assert amb.status == "idle"
+
+    asyncio.run(drive())
+
+
 def _solid_frame(width, height, color):
     return bytes(list(color) * (width * height))
 

@@ -847,6 +847,13 @@ class Plugin:
         self._init()
         return self._ambilight.status
 
+    async def prepare_suspend(self) -> None:
+        self._init()
+        if self._settings["mode"] != "ambient":
+            return
+        await self._ambilight.stop_and_wait()
+        decky.logger.info("Colores: ambilight capture stopped for suspend")
+
     async def get_audio_status(self) -> str:
         self._init()
         return self._audio.status

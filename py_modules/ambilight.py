@@ -169,6 +169,15 @@ class Ambilight:
             self._task = None
         self._kill()
 
+    async def stop_and_wait(self):
+        task = self._task
+        proc = self._proc
+        self.stop()
+        pending = [task] if task is not None else []
+        if proc is not None:
+            pending.append(proc.wait())
+        await asyncio.gather(*pending, return_exceptions=True)
+
     def _kill(self):
         if self._proc is not None:
             try:

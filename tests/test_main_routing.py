@@ -113,6 +113,9 @@ class FakeAmbilight:
     def stop(self):
         self.events.append(("stop",))
 
+    async def stop_and_wait(self):
+        self.events.append(("stop_and_wait",))
+
     def start(self, cfg):
         self.events.append(("start", cfg))
 
@@ -499,6 +502,16 @@ def test_reconnect_restarts_ambient_capture(main_module):
     ok = asyncio.run(p.reconnect())
     assert ok is True
     assert [event[0] for event in p._ambilight.events] == ["stop", "start"]
+
+
+def test_prepare_suspend_stops_capture_without_changing_user_intent(main_module):
+    p = _plugin(main_module, "ambient", power=True, per_zone=True)
+
+    asyncio.run(p.prepare_suspend())
+
+    assert p._ambilight.events == [("stop_and_wait",)]
+    assert p._settings["mode"] == "ambient"
+    assert p._settings["power"] is True
 
 
 def test_resume_watch_reconnects_after_suspend_clock_jump(main_module, monkeypatch):
