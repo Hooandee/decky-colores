@@ -14,7 +14,7 @@ import { definePlugin } from "@decky/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus, getAudioStatus, getTemperature, getPerformance, reconnect as apiReconnect } from "./api";
+import { getAmbilightStatus, getAudioStatus, getTemperature, getPerformance, prepareSuspend, reconnect as apiReconnect } from "./api";
 import { rgbToCss, gradientCss, unifyColors } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities, SensorBand, SensorBands, SensorKind } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -51,6 +51,7 @@ import { PINNED_TAB, tabMeta, TAB_META, SENSOR_TAB, SENSOR_MODES, tabForMode } f
 import { useShoulderNav } from "./nav/useShoulderNav";
 import { readActiveTab, writeActiveTab, readSensorMode, writeSensorMode } from "./nav/activeTab";
 import { startGameWatcher } from "./apps/gameWatcher";
+import { startSuspendPreparation } from "./lifecycle/suspend";
 import { ProfileScopeSelector } from "./components/ProfileScopeSelector";
 
 function DeviceHeader({ name, color }: { name: string; color: RGB }) {
@@ -1195,6 +1196,7 @@ function Content() {
 
 export default definePlugin(() => {
   const stopGameWatcher = startGameWatcher();
+  const stopSuspendPreparation = startSuspendPreparation(prepareSuspend);
   return {
     name: "Colores",
     titleView: <div className={staticClasses.Title}>Colores</div>,
@@ -1209,6 +1211,7 @@ export default definePlugin(() => {
     ),
     icon: <ColorWheelIcon />,
     onDismount() {
+      stopSuspendPreparation();
       stopGameWatcher();
     },
   };
