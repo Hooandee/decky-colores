@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.25.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.1...decky-colores-v0.25.2) (2026-09-09)
+
+
+### Español
+
+* **Ambilight:** Detiene la captura antes de suspender el sistema para que no bloquee la suspensión y pueda restaurarse al reanudar. ([#143](https://github.com/Hooandee/decky-colores/pull/143))
+
+### English
+
+* **Ambilight:** Stops capture before system suspend so it does not block sleep and can be restored on resume. ([#143](https://github.com/Hooandee/decky-colores/pull/143))
+
+### Italiano
+
+* **Ambilight:** Arresta l'acquisizione prima della sospensione del sistema affinché non blocchi lo standby e possa essere ripristinata alla ripresa. ([#143](https://github.com/Hooandee/decky-colores/pull/143))
+
+### Deutsch
+
+* **Ambilight:** Beendet die Aufnahme vor dem Ruhezustand, damit sie den Suspend-Vorgang nicht blockiert und beim Fortsetzen wiederhergestellt werden kann. ([#143](https://github.com/Hooandee/decky-colores/pull/143))
+
 ## [0.25.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.0...decky-colores-v0.25.1) (2026-09-08)
 
 
