@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.25.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.1...decky-colores-v0.25.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* stop ambilight capture before suspend ([2b54b84](https://github.com/Hooandee/decky-colores/commit/2b54b841460e292c83abad9893aa9a36319f14d3))
+* stop Ambilight capture before suspend ([93164de](https://github.com/Hooandee/decky-colores/commit/93164de9ed671a3f2152971ede7a8323d56301ed))
+
 ## [0.25.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.0...decky-colores-v0.25.1) (2026-09-08)
 
 
