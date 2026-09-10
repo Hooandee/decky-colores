@@ -310,16 +310,22 @@ class Plugin:
     async def restart_loader(self) -> None:
         self_updater.restart_loader()
 
-    async def submit_report(self, categories=None, text: str = "") -> dict:
+    async def submit_report(
+        self, categories=None, text: str = "", kind: str = "bug"
+    ) -> dict:
         self._init()
         home, hostname = self._redact_ids()
+        report_kind = report_collector.normalize_report_kind(kind)
         try:
-            bundle = await self._build_report_bundle(categories, text, home, hostname)
+            bundle = await self._build_report_bundle(
+                categories, text, home, hostname, report_kind
+            )
         except Exception as e:  # noqa: BLE001
             decky.logger.error("Colores: report bundle failed: %s", e)
             bundle = report_collector.build_bundle(
                 app=_REPORT_APP, categories=categories, text=text,
                 environment={}, capabilities={}, state={}, stores={}, logs=[],
+                kind=report_kind,
                 home=home, hostname=hostname,
             )
             bundle["error"] = "bundle_incomplete"
@@ -347,7 +353,9 @@ class Plugin:
             hostname = None
         return home, hostname
 
-    async def _build_report_bundle(self, categories, text, home, hostname) -> dict:
+    async def _build_report_bundle(
+        self, categories, text, home, hostname, kind: str = "bug"
+    ) -> dict:
         loop = asyncio.get_running_loop()
         try:
             state = await self.get_state()
@@ -376,6 +384,7 @@ class Plugin:
             )
             return report_collector.build_bundle(
                 app=_REPORT_APP,
+                kind=kind,
                 categories=categories,
                 text=text,
                 environment=self._report_environment(),

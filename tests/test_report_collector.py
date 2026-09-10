@@ -171,11 +171,33 @@ def test_build_bundle_shape():
         state={}, stores={}, logs=[], kernel={"dmesg": "x", "journal": None},
         sysfs={"leds": []},
     )
-    assert b["schema"] == SCHEMA and b["app"] == "colores"
+    assert b["schema"] == SCHEMA == 2
+    assert b["app"] == "colores" and b["kind"] == "bug"
     assert b["categories"] == ["color"]
     assert len(b["text"]) == 4000
     assert b["kernel"] == {"dmesg": "x", "journal": None}
     assert b["sysfs"] == {"leds": []}
+
+
+def test_build_bundle_marks_feature_without_changing_logs():
+    logs = [{"name": "colores.log", "text": "diagnostic context"}]
+    common = {
+        "app": "colores",
+        "categories": ["effects"],
+        "text": "please add an effect",
+        "environment": {},
+        "capabilities": {},
+        "state": {},
+        "stores": {},
+        "logs": logs,
+    }
+
+    feature = build_bundle(**common, kind="feature")
+    invalid = build_bundle(**common, kind="unexpected")
+
+    assert feature["kind"] == "feature"
+    assert invalid["kind"] == "bug"
+    assert feature["logs"] == invalid["logs"] == logs
 
 
 def test_sysfs_snapshot_captures_led_latch_attrs(tmp_path):

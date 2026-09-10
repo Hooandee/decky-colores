@@ -8,7 +8,9 @@ import { getState, submitReport, ReportResult } from "../api";
 import {
   REPORT_CATEGORIES,
   ReportCategory,
+  ReportKind,
   canSubmit,
+  reportPresentation,
   toggleCategory,
 } from "../report/logic";
 
@@ -19,12 +21,21 @@ const ACCENT_TINT = `rgba(var(--colores-accent-rgb, ${FALLBACK_ACCENT_RGB}), 0.1
 const MUTED = "rgba(255,255,255,0.55)";
 const HAIRLINE = "rgba(255,255,255,0.14)";
 
-const CategoryChip: FC<{ label: string; on: boolean; onClick: () => void }> = ({
+const SelectionChip: FC<{
+  label: string;
+  on: boolean;
+  onClick: () => void;
+  radio?: boolean;
+}> = ({
   label,
   on,
   onClick,
+  radio = false,
 }) => (
   <Focusable
+    role={radio ? "radio" : undefined}
+    aria-label={label}
+    aria-checked={radio ? on : undefined}
     onActivate={onClick}
     onClick={onClick}
     style={{
@@ -79,6 +90,7 @@ const card: React.CSSProperties = {
 const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
   const { t } = useI18n();
   const [deviceName, setDeviceName] = useState<string>("");
+  const [kind, setKind] = useState<ReportKind>("bug");
   const [selected, setSelected] = useState<ReportCategory[]>([]);
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>("form");
@@ -97,7 +109,7 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
 
   const submit = () => {
     setPhase("sending");
-    submitReport(selected, text)
+    submitReport(selected, text, kind)
       .then((r) => {
         setResult(r);
         setPhase(r.ok ? "done" : "error");
@@ -136,6 +148,7 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
       {children}
     </div>
   );
+  const presentation = reportPresentation(kind);
 
   if (phase === "sending") {
     return wrap(<div style={{ fontSize: 14, color: MUTED }}>{t("report.sending")}</div>);
@@ -146,7 +159,7 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
       <div style={{ display: "flex", flexDirection: "column", gap: 14, alignItems: "center", textAlign: "center" }}>
         <div style={{ fontSize: 40 }}>✅</div>
         <div style={{ fontSize: 16, color: "rgba(255,255,255,0.95)" }}>{t("report.done.title")}</div>
-        <div style={{ fontSize: 14, color: MUTED }}>{t("report.done.thanks")}</div>
+        <div style={{ fontSize: 14, color: MUTED }}>{t(presentation.doneThanks)}</div>
         <div style={{ ...card, padding: 14, minWidth: 220 }}>
           <div style={sectionLabel}>{t("report.code.label")}</div>
           <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: 2, color: ACCENT, fontFamily: "monospace" }}>
@@ -154,7 +167,7 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
           </div>
         </div>
         <div style={{ fontSize: 12, color: MUTED, maxWidth: 340, lineHeight: 1.45 }}>
-          {t("report.code.hint")}
+          {t(presentation.codeHint)}
         </div>
         <Focusable style={{ display: "flex", gap: 8 }}>
           <DialogButton onClick={copy}>{copied ? t("report.copied") : t("report.copy")}</DialogButton>
@@ -183,13 +196,32 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
 
   return wrap(
     <>
-      <div style={{ fontSize: 14, color: MUTED, lineHeight: 1.45 }}>{t("report.intro")}</div>
+      <div style={{ fontSize: 14, color: MUTED, lineHeight: 1.45 }}>{t(presentation.intro)}</div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={sectionLabel}>{t("report.section.what")}</div>
+        <div style={sectionLabel}>{t("report.section.kind")}</div>
+        <div
+          role="radiogroup"
+          aria-label={t("report.section.kind")}
+          style={{ display: "flex", gap: 8 }}
+        >
+          {(["bug", "feature"] as const).map((id) => (
+            <SelectionChip
+              key={id}
+              label={t(`report.kind.${id}`)}
+              on={kind === id}
+              onClick={() => setKind(id)}
+              radio
+            />
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={sectionLabel}>{t(presentation.sectionWhat)}</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {REPORT_CATEGORIES.map((id) => (
-            <CategoryChip
+            <SelectionChip
               key={id}
               label={t(`report.cat.${id}`)}
               on={selected.includes(id)}
@@ -200,10 +232,10 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={sectionLabel}>{t("report.section.describe")}</div>
+        <div style={sectionLabel}>{t(presentation.sectionDescribe)}</div>
         <TextField value={text} onChange={(e) => setText(e.target.value)} />
         {text.trim().length === 0 && (
-          <div style={{ fontSize: 12, color: MUTED }}>{t("report.describe.hint")}</div>
+          <div style={{ fontSize: 12, color: MUTED }}>{t(presentation.describeHint)}</div>
         )}
       </div>
 
