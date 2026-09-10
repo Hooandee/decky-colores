@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.2...decky-colores-v0.26.0) (2026-09-10)
+
+
+### Features
+
+* add feature request reports ([8638d81](https://github.com/Hooandee/decky-colores/commit/8638d8103a19d97262c8d8cf681d64e1c2d5e5de))
+* add feature request reports ([cca976d](https://github.com/Hooandee/decky-colores/commit/cca976d2f303cddcbc14ef209bee3c59d1d396ef))
+
 ## [0.25.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.1...decky-colores-v0.25.2) (2026-09-09)
 
 
