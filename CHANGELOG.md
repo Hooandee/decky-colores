@@ -3,10 +3,21 @@
 ## [0.26.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.2...decky-colores-v0.26.0) (2026-09-10)
 
 
-### Features
+### Español
 
-* add feature request reports ([8638d81](https://github.com/Hooandee/decky-colores/commit/8638d8103a19d97262c8d8cf681d64e1c2d5e5de))
-* add feature request reports ([cca976d](https://github.com/Hooandee/decky-colores/commit/cca976d2f303cddcbc14ef209bee3c59d1d396ef))
+* **Reportes:** Ahora puedes elegir entre comunicar un problema o proponer una función o mejora. Las peticiones muestran indicaciones adaptadas y se identifican claramente, mientras Colores sigue adjuntando el contexto técnico necesario.
+
+### English
+
+* **Reports:** You can now choose between reporting a problem and suggesting a feature or improvement. Requests show tailored guidance and are clearly identified, while Colores still includes the technical context needed to review them.
+
+### Italiano
+
+* **Segnalazioni:** Ora puoi scegliere se segnalare un problema o proporre una funzione o un miglioramento. Le richieste mostrano indicazioni dedicate e vengono identificate chiaramente, mentre Colores continua a includere il contesto tecnico necessario per valutarle.
+
+### Deutsch
+
+* **Berichte:** Du kannst jetzt wählen, ob du ein Problem meldest oder eine neue Funktion beziehungsweise Verbesserung vorschlägst. Anfragen zeigen passende Hinweise und werden klar gekennzeichnet; Colores fügt weiterhin den nötigen technischen Kontext hinzu.
 
 ## [0.25.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.1...decky-colores-v0.25.2) (2026-09-09)
 
