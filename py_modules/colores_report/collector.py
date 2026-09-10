@@ -5,7 +5,7 @@ import json
 import os
 import re
 
-SCHEMA = 1
+SCHEMA = 2
 
 _MAX_TEXT = 4000
 
@@ -22,6 +22,10 @@ _SERIAL_LABELED = re.compile(
 _SERIAL_RUN = re.compile(
     r"\b(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{10,}\b"
 )
+
+
+def normalize_report_kind(kind) -> str:
+    return "feature" if kind == "feature" else "bug"
 
 
 def redact_text(s, *, home: str | None = None, hostname: str | None = None):
@@ -283,6 +287,7 @@ def build_bundle(
     state: dict,
     stores: dict,
     logs: list,
+    kind: str = "bug",
     kernel: dict | None = None,
     sysfs: dict | None = None,
     home: str | None = None,
@@ -291,6 +296,7 @@ def build_bundle(
     bundle = {
         "schema": SCHEMA,
         "app": app,
+        "kind": normalize_report_kind(kind),
         "categories": list(categories or []),
         "text": (text or "")[:_MAX_TEXT],
         "environment": environment or {},

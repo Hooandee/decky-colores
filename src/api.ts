@@ -65,4 +65,7 @@ export interface ReportResult {
 }
 
 export const submitReport =
-  callable<[categories: string[], text: string], ReportResult>("submit_report");
+  callable<
+    [categories: string[], text: string, kind: "bug" | "feature"],
+    ReportResult
+  >("submit_report");

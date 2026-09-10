@@ -201,6 +201,43 @@ def _hhd_plugin(
     return plugin, saved
 
 
+def test_submit_report_forwards_feature_kind(main_module, monkeypatch):
+    plugin = main_module.Plugin()
+    plugin._ready = True
+    plugin._redact_ids = lambda: ("/home/deck", "deck")
+    captured = {}
+
+    async def build_bundle(categories, text, home, hostname, kind):
+        captured.update(
+            categories=categories,
+            text=text,
+            home=home,
+            hostname=hostname,
+            kind=kind,
+        )
+        return {"app": "colores", "kind": kind, "logs": ["context"]}
+
+    plugin._build_report_bundle = build_bundle
+    monkeypatch.setattr(
+        main_module.report_client,
+        "submit",
+        lambda *_args, **_kwargs: {"ok": True, "code": "COL-TEST"},
+    )
+
+    result = asyncio.run(
+        plugin.submit_report(["effects"], "Please add an effect", "feature")
+    )
+
+    assert result == {"ok": True, "code": "COL-TEST", "issue_url": None}
+    assert captured == {
+        "categories": ["effects"],
+        "text": "Please add an effect",
+        "home": "/home/deck",
+        "hostname": "deck",
+        "kind": "feature",
+    }
+
+
 @pytest.mark.parametrize(
     "power,charger_only,ac_online,expected",
     [
