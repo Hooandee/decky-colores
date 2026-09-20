@@ -88,10 +88,16 @@ class OxpHidTransport:
                 return True
         self.last_error = "matching HID interface not found"
         if not self._reported_missing:
+            vid = ",".join(f"{value:04x}" for value in self._vid) or "*"
             pid = ",".join(f"{value:04x}" for value in self._pid) or "*"
+            usage_page = ",".join(f"{value:04x}" for value in self._usage_page) or "*"
+            usage = ",".join(f"{value:04x}" for value in self._usage) or "*"
             logger.warning(
-                "OneXPlayer HID interface unavailable vid=1a2c pid=%s usage_page=ff01 usage=0001",
+                "OneXPlayer HID interface unavailable vid=%s pid=%s usage_page=%s usage=%s",
+                vid,
                 pid,
+                usage_page,
+                usage,
             )
             self._reported_missing = True
         return False

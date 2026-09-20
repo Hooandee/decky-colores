@@ -1,4 +1,4 @@
-from py_modules.device_profiles import resolve_profile
+from py_modules.device_profiles import resolve_profile, resolve_profile_match
 
 
 def test_ally_x_profile_is_supported_sysfs_rgb():
@@ -20,6 +20,27 @@ def test_msi_claw_8_profile_is_bgr_hid():
     assert p["name"] == "MSI Claw 8 AI+"
     assert p["driver"] == "hid_msi"
     assert p["color_order"] == "bgr"
+
+
+def test_msi_claw_a8_bz2em_uses_existing_msi_hid_route():
+    profile, matched = resolve_profile_match("MS-1T8K", "Claw A8 BZ2EM")
+
+    assert matched is True
+    assert profile["name"] == "MSI Claw A8 BZ2EM"
+    assert profile["driver"] == "hid_msi"
+    assert profile["zones"] == 9
+    assert profile["color_order"] == "bgr"
+    assert profile["allow_sysfs_fallback"] is False
+
+
+def test_profile_match_distinguishes_generic_fallback():
+    known, known_match = resolve_profile_match("RC72LA", "ROG Ally X")
+    unknown, unknown_match = resolve_profile_match("X", "MysteryHandheld")
+
+    assert known_match is True
+    assert known["name"] == "ROG Ally X"
+    assert unknown_match is False
+    assert unknown["name"] == "MysteryHandheld"
 
 
 def test_ambilight_is_not_experimental_on_hid_profiles():

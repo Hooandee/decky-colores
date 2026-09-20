@@ -1,8 +1,18 @@
 import os
 
-from device_profiles import resolve_profile
-from led_device import ApexRgbDevice, SysfsRgbDevice, NullDevice, ValveLedsDevice, discover_valve_leds
-from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device
+from device_profiles import profile_for_discovered_adapter, profile_for_hid_signatures, resolve_profile_match
+from led_device import (
+    ApexRgbDevice,
+    HpOmenRgbDevice,
+    MultiSysfsRgbDevice,
+    NullDevice,
+    PORTAL_LED_NAMES,
+    SysfsRgbDevice,
+    ValveLedsDevice,
+    discover_portal_leds,
+    discover_valve_leds,
+)
+from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device, discover_hid_drivers
 from power_led import PowerLedController
 from power_supply import battery_present
 from thermal import temperature_available
@@ -30,7 +40,7 @@ DEVICE_REGISTRY = [
 def _read(path):
     try:
         with open(path) as handle:
-            return handle.read().strip()
+            return handle.read().strip().strip("\x00")
     except OSError:
         return ""
 
@@ -47,10 +57,16 @@ def detect_device(sysfs_root="/"):
     dmi = os.path.join(sysfs_root, "sys/class/dmi/id")
     board = _read(os.path.join(dmi, "board_name"))
     product = _read(os.path.join(dmi, "product_name"))
+    vendor = _read(os.path.join(dmi, "sys_vendor"))
+    model = product or _read(os.path.join(sysfs_root, "sys/firmware/devicetree/base/model"))
+    if not model:
+        model = _read(os.path.join(sysfs_root, "proc/device-tree/model"))
     return {
-        "name": lookup_name(board, product),
+        "name": lookup_name(board, product) if product or board else model or "Unknown device",
         "board": board,
         "product": product,
+        "vendor": vendor,
+        "model": model,
     }
 
 
@@ -72,6 +88,8 @@ def build_layout(zones, swap_sticks=False, layout_kind="rings"):
         return []
     if layout_kind == "bar":
         return [{"name": "Bar", "region": [0.0, 0.0, 1.0, 1.0], "zones": list(range(zones)), "kind": "bar"}]
+    if layout_kind == "uniform":
+        return [{"name": "Lights", "region": [0.0, 0.0, 1.0, 1.0], "zones": list(range(zones)), "kind": "uniform"}]
     if zones == 1:
         return [{"name": "Lights", "region": [0.0, 0.0, 1.0, 1.0], "zones": [0]}]
     groups = list(reversed(_STICK_ANCHORS)) if swap_sticks else _STICK_ANCHORS
@@ -111,15 +129,17 @@ def _all_experimental(profile):
 
 
 def _feature_state(profile, feature, present):
+    if not present:
+        return "unsupported"
     if feature in profile.get("experimental", []):
         return "experimental"
-    return "supported" if present else "unsupported"
+    return "supported"
 
 
 def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power_led=None, battery=False, temperature=False):
     present = {
         "color": has_led,
-        "brightness": has_led,
+        "brightness": has_led and profile.get("brightness", True),
         "effects": has_led,
         "ambilight": bool(ambilight),
     }
@@ -156,7 +176,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
     }
 
 
-def _find_rgb_led(leds_dir, required_name=None):
+def _find_rgb_led(leds_dir, required_name=None, allow_packed=False):
     if not os.path.isdir(leds_dir):
         return None
 
@@ -169,12 +189,33 @@ def _find_rgb_led(leds_dir, required_name=None):
     except OSError:
         return None
 
-    candidates = sorted(entries, key=lambda c: "rgb" not in c.lower())
+    candidates = sorted(entries, key=lambda c: ("rgb" not in c.lower(), c.lower()))
     for name in candidates:
+        if name in PORTAL_LED_NAMES:
+            continue
         path = os.path.join(leds_dir, name)
-        if os.path.exists(os.path.join(path, "multi_intensity")):
+        if os.path.exists(os.path.join(path, "multi_intensity")) and _valid_rgb_schema(
+            path, allow_packed=allow_packed
+        ):
             return path
     return None
+
+
+def _valid_rgb_schema(led_path, allow_packed=False):
+    tokens = _read(os.path.join(led_path, "multi_index")).lower().split()
+    if tokens and all(token == _PACKED_COLOR_NAME for token in tokens):
+        return allow_packed or os.path.basename(led_path) == _ALLY_RGB_NODE
+    if not tokens or len(tokens) % 3:
+        return False
+    groups = [tokens[index : index + 3] for index in range(0, len(tokens), 3)]
+    return all(set(group) == _CHANNEL_NAMES and group == groups[0] for group in groups)
+
+
+def _rgb_channel_order(led_path, default="rgb"):
+    tokens = _read(os.path.join(led_path, "multi_index")).lower().split()
+    if len(tokens) >= 3 and set(tokens[:3]) == _CHANNEL_NAMES:
+        return "".join(token[0] for token in tokens[:3])
+    return default
 
 
 _IMPLEMENTED_DRIVERS = {
@@ -184,6 +225,8 @@ _IMPLEMENTED_DRIVERS = {
     "hid_legion_go_s",
     "hid_asus_ally",
     "valve_leds",
+    "multi_sysfs",
+    "hp_omen_platform",
 }
 
 
@@ -220,7 +263,13 @@ def _build_valve_context(profile, sysfs_root, ambilight, power_led=None, battery
 
 def build_device(sysfs_root="/", ambilight=False):
     info = detect_device(sysfs_root)
-    profile = resolve_profile(info["board"], info["product"])
+    profile, matched = resolve_profile_match(info["board"], info["product"])
+    hid_drivers = discover_hid_drivers() if HID_AVAILABLE else set()
+    hid_profile = profile_for_hid_signatures(info, hid_drivers)
+    if not matched and hid_profile is not None:
+        profile = hid_profile
+    elif hid_profile is not None and profile.get("fallback", {}).get("driver") == "hid_oxp_v2":
+        profile["fallback"]["driver"] = hid_profile["driver"]
     info["name"] = profile["name"]
     power_led = PowerLedController(profile.get("power_led"))
     battery = battery_present(os.path.join(sysfs_root, "sys/class/power_supply"))
@@ -253,14 +302,63 @@ def build_device(sysfs_root="/", ambilight=False):
         profile["experimental"] = _all_experimental(profile)
 
     leds_dir = os.path.join(sysfs_root, "sys/class/leds")
+    portal_nodes = discover_portal_leds(leds_dir) if not matched else []
+    if portal_nodes:
+        portal_name = info.get("model") or "Multizone RGB device"
+        profile = profile_for_discovered_adapter("portal_sysfs", portal_name)
+        info["name"] = profile["name"]
+        device = MultiSysfsRgbDevice(portal_nodes, color_order=profile["color_order"])
+        capabilities = build_capabilities(
+            profile, device.available, profile["zones"], 255, ambilight,
+            power_led, battery, temperature,
+        )
+        capabilities["perZone"] = device.supports_per_zone()
+        return {
+            "info": info,
+            "capabilities": capabilities,
+            "device": device,
+            "power_led": power_led,
+        }
+
+    identity = " ".join(
+        str(info.get(field) or "") for field in ("vendor", "product", "board", "model")
+    ).lower()
+    omen_path = os.path.join(sysfs_root, "sys/devices/platform/hp-rgb-lighting")
+    omen_device = HpOmenRgbDevice(omen_path) if not matched and "omen" in identity else None
+    if omen_device is not None and omen_device.available:
+        profile = profile_for_discovered_adapter(
+            "hp_omen_platform", info.get("product") or info.get("model") or "HP OMEN"
+        )
+        info["name"] = profile["name"]
+        capabilities = build_capabilities(
+            profile, True, profile["zones"], 1, ambilight,
+            power_led, battery, temperature,
+        )
+        capabilities["perZone"] = omen_device.supports_per_zone()
+        return {
+            "info": info,
+            "capabilities": capabilities,
+            "device": omen_device,
+            "power_led": power_led,
+        }
+
     led_path = (
-        _find_rgb_led(leds_dir, profile.get("led_name"))
+        _find_rgb_led(
+            leds_dir,
+            profile.get("led_name"),
+            allow_packed=matched,
+        )
         if profile.get("allow_sysfs_fallback", True)
         else None
     )
 
     if led_path:
         zones, index_format = read_zone_format(led_path)
+        if not matched:
+            profile["color_order"] = _rgb_channel_order(led_path, profile["color_order"])
+            profile["experimental"] = []
+            profile["layout_kind"] = "uniform"
+            profile["per_zone"] = False
         if profile.get("zones"):
             zones = profile["zones"]
         max_brightness = _max_brightness(_read(os.path.join(led_path, "max_brightness")))
@@ -268,6 +366,7 @@ def build_device(sysfs_root="/", ambilight=False):
             led_path, zones, max_brightness, profile["color_order"], index_format,
             color_correction=profile.get("color_correction", [1.0, 1.0, 1.0]),
             latch=profile.get("latch"),
+            per_zone=profile.get("per_zone", True),
         )
         has_led = device.available
         if has_led and profile.get("prefer_hid") and HID_AVAILABLE:
@@ -300,6 +399,9 @@ def build_device(sysfs_root="/", ambilight=False):
         profile["experimental"] = _all_experimental(profile)
 
     capabilities = build_capabilities(profile, has_led, zones, max_brightness, ambilight, power_led, battery, temperature)
+    capabilities["perZone"] = bool(
+        has_led and zones > 1 and profile.get("per_zone", device.supports_per_zone())
+    )
     if isinstance(device, ApexRgbDevice):
         capabilities["reconnectable"] = True
     return {

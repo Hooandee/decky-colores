@@ -65,7 +65,7 @@ def redact_obj(obj, *, home: str | None = None, hostname: str | None = None):
 def _read_str(path: str) -> str | None:
     try:
         with open(path) as f:
-            return f.read().strip()
+            return f.read().strip().strip("\x00")
     except OSError:
         return None
 
@@ -275,6 +275,38 @@ def _snap_power_supply(root: str) -> dict:
     return out
 
 
+def _snap_identity(root: str) -> dict:
+    dmi = os.path.join(root, "sys/class/dmi/id")
+    product = _read_str(os.path.join(dmi, "product_name"))
+    model = product or _read_str(os.path.join(root, "sys/firmware/devicetree/base/model"))
+    if not model:
+        model = _read_str(os.path.join(root, "proc/device-tree/model"))
+    return {
+        "board": _read_str(os.path.join(dmi, "board_name")),
+        "product": product,
+        "vendor": _read_str(os.path.join(dmi, "sys_vendor")),
+        "model": model,
+    }
+
+
+def _snap_platform_rgb(root: str) -> dict:
+    path = os.path.join(root, "sys/devices/platform/hp-rgb-lighting")
+    zone_paths = [os.path.join(path, f"zone{index}") for index in range(8)]
+    brightness = _read_str(os.path.join(path, "brightness"))
+    if brightness is None and not any(os.path.isfile(zone) for zone in zone_paths):
+        return {}
+    return {
+        "hp-rgb-lighting": {
+            "brightness": brightness,
+            "zones": {
+                os.path.basename(zone): _read_str(zone)
+                for zone in zone_paths
+                if os.path.isfile(zone)
+            },
+        }
+    }
+
+
 def _within(obj, cap: int) -> bool:
     try:
         return len(json.dumps(obj, default=str)) <= cap
@@ -289,11 +321,20 @@ def sysfs_snapshot(
     home: str | None = None,
     hostname: str | None = None,
 ) -> dict:
-    snap: dict = {"leds": [], "hid": [], "modules": [], "power_supply": {}}
+    snap: dict = {
+        "identity": {},
+        "leds": [],
+        "hid": [],
+        "modules": [],
+        "platform_rgb": {},
+        "power_supply": {},
+    }
     for key, fn in (
+        ("identity", _snap_identity),
         ("leds", _snap_leds),
         ("hid", _snap_hid),
         ("modules", _snap_modules),
+        ("platform_rgb", _snap_platform_rgb),
         ("power_supply", _snap_power_supply),
     ):
         try:
@@ -302,7 +343,7 @@ def sysfs_snapshot(
             pass
     if not _within(snap, cap):
         snap["truncated"] = True
-        for key in ("modules", "hid", "leds", "power_supply"):
+        for key in ("modules", "hid", "leds", "platform_rgb", "power_supply", "identity"):
             if _within(snap, cap):
                 break
             snap[key] = [] if isinstance(snap[key], list) else {}

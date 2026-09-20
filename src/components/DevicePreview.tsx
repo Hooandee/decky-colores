@@ -118,12 +118,40 @@ const Bar: FC<{ colors: RGB[]; intensity: number }> = ({ colors, intensity }) =>
   </div>
 );
 
+const Uniform: FC<{ color: RGB; intensity: number }> = ({ color, intensity }) => {
+  const css = rgbToCss(color);
+  return (
+    <div
+      style={{
+        width: 116,
+        height: 34,
+        margin: "28px auto 29px",
+        borderRadius: 18,
+        background: css,
+        color: css,
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)",
+        filter: `drop-shadow(0 0 ${5 + intensity * 10}px currentColor)`,
+        opacity: 0.45 + intensity * 0.55,
+        transition: "opacity 140ms ease, filter 140ms ease, background 140ms ease",
+      }}
+    />
+  );
+};
+
 export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, power, label, layoutKind, segments }) => {
   const { t } = useI18n();
   const source = power && colors.length ? colors : [OFF];
   const lit = source.map((c) => dim(softenForDisplay(c), power ? Math.max(brightness, 12) : 100));
   const intensity = power ? brightness / 100 : 0;
   const caption = (fallback: string) => (power ? label ?? t(fallback) : t("device.preview.off"));
+
+  if (layoutKind === "uniform") {
+    return (
+      <PreviewFrame caption={caption("layout.lights")}>
+        <Uniform color={lit[0] ?? OFF} intensity={intensity} />
+      </PreviewFrame>
+    );
+  }
 
   if (layoutKind === "bar") {
     const n = Math.max(1, segments ?? lit.length);
