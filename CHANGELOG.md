@@ -27,6 +27,12 @@
 * **Automatische Erkennung:** Colores bevorzugt das passende Geräteprofil und kann ohne vorhandenes Profil kompatible HID-Familien sowie standardisierte Linux-RGB-Schnittstellen erkennen. Dadurch funktionieren mehr Geräte, ohne dass jedes Modell einzeln hinzugefügt werden muss.
 * **Oberfläche und Berichte:** Geräte mit noch unbekannter physischer Lichtanordnung verwenden eine neutrale Vorschau, statt nicht vorhandene Joystick-Ringe darzustellen. Berichte enthalten mehr Angaben zur Geräteidentität und RGB-Schnittstelle, damit neue Hardware leichter diagnostiziert werden kann. ([#158](https://github.com/Hooandee/decky-colores/pull/158))
 
+### Português (Brasil)
+
+* **Mais dispositivos:** Adiciona suporte nativo ao AYN Odin 2 Portal, OneXPlayer X2 Mini Pro, MSI Claw A8 BZ2EM e HP OMEN 16.
+* **Detecção automática:** O Colores prioriza o perfil específico de cada dispositivo e, quando ele não existe, pode reconhecer famílias HID compatíveis e interfaces RGB padrão do Linux. Assim, mais dispositivos podem funcionar sem esperar que cada modelo seja adicionado manualmente.
+* **Interface e relatórios:** Dispositivos cuja disposição física das luzes ainda não conhecemos exibem uma prévia neutra em vez de inventar anéis de joystick. Os relatórios incluem mais dados de identidade e da interface RGB para facilitar o diagnóstico de novos dispositivos. ([#158](https://github.com/Hooandee/decky-colores/pull/158))
+
 ## [0.26.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.0...decky-colores-v0.26.1) (2026-09-20)
 
 

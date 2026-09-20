@@ -9,13 +9,30 @@ type FocusableProps = {
   "aria-label"?: string;
 };
 
-const { renderedFocusables } = vi.hoisted(() => ({
+type DropdownOption = {
+  data: string;
+  label: ReactNode;
+};
+
+type DropdownProps = {
+  rgOptions: DropdownOption[];
+  selectedOption: string;
+  menuLabel: string;
+  onChange: (option: DropdownOption) => void;
+};
+
+const { renderedDropdowns, renderedFocusables } = vi.hoisted(() => ({
+  renderedDropdowns: [] as DropdownProps[],
   renderedFocusables: [] as FocusableProps[],
 }));
 
 vi.mock("@decky/ui", async () => {
   const React = await import("react");
   return {
+    Dropdown: (props: DropdownProps) => {
+      renderedDropdowns.push(props);
+      return React.createElement("div", { "aria-label": props.menuLabel });
+    },
     Focusable: ({ children, onActivate, onClick, ...props }: FocusableProps) => {
       renderedFocusables.push({ children, onActivate, onClick, ...props });
       return React.createElement("div", props, children);
@@ -40,6 +57,16 @@ function italianCatalog(): Record<string, string> {
 function germanCatalog(): Record<string, string> {
   return i18n.DICTS.de;
 }
+
+function brazilianPortugueseCatalog(): Record<string, string> {
+  return i18n.DICTS["pt-BR"];
+}
+
+afterEach(() => {
+  renderedDropdowns.length = 0;
+  renderedFocusables.length = 0;
+  vi.unstubAllGlobals();
+});
 
 describe("Every supported translation catalog", () => {
   it.each(CATALOGS)("%s has exactly the Spanish keys", (_lang, catalog) => {
@@ -157,12 +184,39 @@ describe("German catalog", () => {
   });
 });
 
-describe("Italian persistence", () => {
-  afterEach(() => {
-    renderedFocusables.length = 0;
-    vi.unstubAllGlobals();
+describe("Brazilian Portuguese catalog", () => {
+  it("has full key and placeholder parity with Spanish", () => {
+    const portuguese = brazilianPortugueseCatalog();
+
+    expect(i18n.SUPPORTED_LANGUAGES).toContain("pt-BR");
+    expect(Object.keys(portuguese).sort()).toEqual(Object.keys(i18n.DICTS.es).sort());
+    for (const key of Object.keys(i18n.DICTS.es)) {
+      expect(placeholders(portuguese[key] ?? ""), key)
+        .toEqual(placeholders(i18n.DICTS.es[key]));
+    }
   });
 
+  it("keeps product terms and key journeys natural in Brazilian Portuguese", () => {
+    const portuguese = brazilianPortugueseCatalog();
+
+    expect(portuguese).toMatchObject({
+      "settings.language": "Idioma",
+      "startup.remember.hint": "Ao definir uma cor, o Colores a salva para que a barra use essa cor ao iniciar. Desative esta opção para devolver o controle da barra ao SteamOS na próxima reinicialização.",
+      "forceControl.hint": "Retoma o controle das luzes sempre que você abre o Colores.",
+      "performance.hint": "As luzes se preenchem como uma barra de acordo com o uso da GPU, do verde ao vermelho.",
+      "experimental.description": "Estes recursos ainda não foram verificados neste dispositivo. Você pode testá-los, mas talvez ainda não funcionem corretamente. Estou trabalhando para adicionar compatibilidade.",
+    });
+    expect(portuguese["forceControl.notice"]).toContain("RGB");
+    expect(portuguese["startup.remember.hint"]).toContain("SteamOS");
+    expect(portuguese["performance.hint"]).toContain("GPU");
+    expect(Object.values(portuguese).some((value) => value.includes("—"))).toBe(false);
+    expect(i18n.translate("pt-BR", "profiles.game", { name: "Hades" })).toBe(
+      "Jogo: Hades",
+    );
+  });
+});
+
+describe("Italian persistence", () => {
   it("restores a persisted Italian selection", () => {
     vi.stubGlobal("localStorage", {
       getItem: vi.fn(() => "it"),
@@ -170,28 +224,6 @@ describe("Italian persistence", () => {
     });
 
     expect(i18n.readInitialLang()).toBe("it");
-  });
-
-  it("offers an Italian selector for controller and pointer activation", () => {
-    const setItem = vi.fn();
-    vi.stubGlobal("localStorage", {
-      getItem: vi.fn(() => "es"),
-      setItem,
-    });
-
-    renderToStaticMarkup(
-      createElement(i18n.I18nProvider, null, createElement(i18n.LangToggle)),
-    );
-    const italianButton = renderedFocusables.find(
-      (props) => props["aria-label"] === "Italiano",
-    );
-
-    expect(italianButton).toBeDefined();
-    italianButton?.onActivate?.();
-    italianButton?.onClick?.();
-    expect(setItem).toHaveBeenCalledTimes(2);
-    expect(setItem).toHaveBeenNthCalledWith(1, "colores-lang", "it");
-    expect(setItem).toHaveBeenNthCalledWith(2, "colores-lang", "it");
   });
 
   it("keeps Spanish as the safe fallback", () => {
@@ -212,11 +244,6 @@ describe("Italian persistence", () => {
 });
 
 describe("German persistence", () => {
-  afterEach(() => {
-    renderedFocusables.length = 0;
-    vi.unstubAllGlobals();
-  });
-
   it("restores a persisted German selection", () => {
     vi.stubGlobal("localStorage", {
       getItem: vi.fn(() => "de"),
@@ -226,7 +253,19 @@ describe("German persistence", () => {
     expect(i18n.readInitialLang()).toBe("de");
   });
 
-  it("offers a German selector for controller and pointer activation", () => {
+});
+
+describe("Brazilian Portuguese persistence and selector", () => {
+  it("restores a persisted Brazilian Portuguese selection", () => {
+    vi.stubGlobal("localStorage", {
+      getItem: vi.fn(() => "pt-BR"),
+      setItem: vi.fn(),
+    });
+
+    expect(i18n.readInitialLang()).toBe("pt-BR");
+  });
+
+  it("uses one compact dropdown and persists every language selection", () => {
     const setItem = vi.fn();
     vi.stubGlobal("localStorage", {
       getItem: vi.fn(() => "es"),
@@ -234,16 +273,44 @@ describe("German persistence", () => {
     });
 
     renderToStaticMarkup(
-      createElement(i18n.I18nProvider, null, createElement(i18n.LangToggle)),
-    );
-    const germanButton = renderedFocusables.find(
-      (props) => props["aria-label"] === "Alemán",
+      createElement(i18n.I18nProvider, null, createElement(i18n.LanguageSelector)),
     );
 
-    expect(germanButton).toBeDefined();
-    germanButton?.onActivate?.();
-    germanButton?.onClick?.();
-    expect(setItem).toHaveBeenNthCalledWith(1, "colores-lang", "de");
-    expect(setItem).toHaveBeenNthCalledWith(2, "colores-lang", "de");
+    expect(renderedFocusables).toHaveLength(0);
+    expect(renderedDropdowns).toHaveLength(1);
+    const selector = renderedDropdowns[0];
+    expect(selector.menuLabel).toBe("Idioma");
+    expect(selector.selectedOption).toBe("es");
+    expect(selector.rgOptions.map((option) => option.data)).toEqual([
+      "es",
+      "en",
+      "it",
+      "de",
+      "pt-BR",
+    ]);
+    expect(
+      selector.rgOptions.map((option) => renderToStaticMarkup(option.label)),
+    ).toEqual([
+      expect.stringContaining("Español"),
+      expect.stringContaining("English"),
+      expect.stringContaining("Italiano"),
+      expect.stringContaining("Deutsch"),
+      expect.stringContaining("Português (Brasil)"),
+    ]);
+    expect(
+      selector.rgOptions.every((option) =>
+        renderToStaticMarkup(option.label).includes(`data-language-flag="${option.data}"`),
+      ),
+    ).toBe(true);
+
+    selector.rgOptions.forEach(selector.onChange);
+
+    expect(setItem.mock.calls).toEqual([
+      ["colores-lang", "es"],
+      ["colores-lang", "en"],
+      ["colores-lang", "it"],
+      ["colores-lang", "de"],
+      ["colores-lang", "pt-BR"],
+    ]);
   });
 });

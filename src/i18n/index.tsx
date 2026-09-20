@@ -1,9 +1,10 @@
-import { CSSProperties, FC, ReactNode, createContext, useCallback, useContext, useMemo, useState } from "react";
-import { Focusable } from "@decky/ui";
+import { FC, ReactNode, createContext, useCallback, useContext, useMemo, useState } from "react";
+import { Dropdown } from "@decky/ui";
 import { it } from "./it";
 import { de } from "./de";
+import { ptBR } from "./ptBR";
 
-export const SUPPORTED_LANGUAGES = ["es", "en", "it", "de"] as const;
+export const SUPPORTED_LANGUAGES = ["es", "en", "it", "de", "pt-BR"] as const;
 export type Lang = (typeof SUPPORTED_LANGUAGES)[number];
 
 const STORAGE_KEY = "colores-lang";
@@ -496,7 +497,7 @@ const en: Record<string, string> = {
   "report.retry": "Retry",
 };
 
-export const DICTS: Record<Lang, Record<string, string>> = { es, en, it, de };
+export const DICTS: Record<Lang, Record<string, string>> = { es, en, it, de, "pt-BR": ptBR };
 
 type Params = Record<string, string | number>;
 
@@ -560,75 +561,55 @@ export function useI18n(): I18nValue {
   return useContext(I18nContext) ?? FALLBACK_I18N;
 }
 
-const FlagES: FC = () => (
-  <svg width={20} height={14} viewBox="0 0 20 14" xmlns="http://www.w3.org/2000/svg">
-    <rect width={20} height={14} fill="#c60b1e" />
-    <rect y={3.5} width={20} height={7} fill="#ffc400" />
-  </svg>
+const FLAG_SVGS: Record<Lang, string> = {
+  es: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path fill="#c60b1e" d="M0 0h24v16H0z"/><path fill="#ffc400" d="M0 4h24v8H0z"/></svg>',
+  en: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path fill="#012169" d="M0 0h24v16H0z"/><path stroke="#fff" stroke-width="3.4" d="m0 0 24 16M24 0 0 16"/><path stroke="#c8102e" stroke-width="1.6" d="m0 0 24 16M24 0 0 16"/><path stroke="#fff" stroke-width="4.6" d="M12 0v16M0 8h24"/><path stroke="#c8102e" stroke-width="2.6" d="M12 0v16M0 8h24"/></svg>',
+  it: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path fill="#009246" d="M0 0h8v16H0z"/><path fill="#fff" d="M8 0h8v16H8z"/><path fill="#ce2b37" d="M16 0h8v16h-8z"/></svg>',
+  de: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path d="M0 0h24v5.33H0z"/><path fill="#d00" d="M0 5.33h24v5.34H0z"/><path fill="#ffce00" d="M0 10.67h24V16H0z"/></svg>',
+  "pt-BR": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path fill="#009739" d="M0 0h24v16H0z"/><path fill="#fedd00" d="m12 2 9 6-9 6-9-6z"/><circle cx="12" cy="8" r="3.5" fill="#012169"/><path fill="none" stroke="#fff" stroke-width=".7" d="M8.8 7.2c2.2-.7 4.4-.3 6.5 1"/></svg>',
+};
+
+const LANGUAGE_OPTIONS: ReadonlyArray<{ data: Lang; label: string }> = [
+  { data: "es", label: "Español" },
+  { data: "en", label: "English" },
+  { data: "it", label: "Italiano" },
+  { data: "de", label: "Deutsch" },
+  { data: "pt-BR", label: "Português (Brasil)" },
+];
+
+const LanguageFlag: FC<{ lang: Lang }> = ({ lang }) => (
+  <img
+    src={`data:image/svg+xml,${encodeURIComponent(FLAG_SVGS[lang])}`}
+    width={24}
+    height={16}
+    alt=""
+    aria-hidden="true"
+    data-language-flag={lang}
+    style={{ flexShrink: 0, display: "block", borderRadius: 2, boxShadow: "0 0 0 1px rgba(255,255,255,0.22)" }}
+  />
 );
 
-const FlagEN: FC = () => (
-  <svg width={20} height={14} viewBox="0 0 60 42" xmlns="http://www.w3.org/2000/svg">
-    <rect width={60} height={42} fill="#012169" />
-    <path d="M0,0 60,42 M60,0 0,42" stroke="#fff" strokeWidth={8} />
-    <path d="M0,0 60,42 M60,0 0,42" stroke="#c8102e" strokeWidth={4} />
-    <path d="M30,0 V42 M0,21 H60" stroke="#fff" strokeWidth={12} />
-    <path d="M30,0 V42 M0,21 H60" stroke="#c8102e" strokeWidth={7} />
-  </svg>
-);
+const DROPDOWN_OPTIONS = LANGUAGE_OPTIONS.map(({ data, label }) => ({
+  data,
+  label: (
+    <span style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      <LanguageFlag lang={data} />
+      <span>{label}</span>
+    </span>
+  ),
+}));
 
-const FlagIT: FC = () => (
-  <svg width={20} height={14} viewBox="0 0 3 2" xmlns="http://www.w3.org/2000/svg">
-    <rect width={1} height={2} fill="#009246" />
-    <rect x={1} width={1} height={2} fill="#fff" />
-    <rect x={2} width={1} height={2} fill="#ce2b37" />
-  </svg>
-);
-
-const FlagDE: FC = () => (
-  <svg width={20} height={14} viewBox="0 0 20 14" xmlns="http://www.w3.org/2000/svg">
-    <rect width={20} height={14 / 3} fill="#000" />
-    <rect y={14 / 3} width={20} height={14 / 3} fill="#dd0000" />
-    <rect y={(14 / 3) * 2} width={20} height={14 / 3} fill="#ffce00" />
-  </svg>
-);
-
-const LANGUAGE_OPTIONS = [
-  { lang: "es", label: "lang.spanish", Flag: FlagES },
-  { lang: "en", label: "lang.english", Flag: FlagEN },
-  { lang: "it", label: "lang.italian", Flag: FlagIT },
-  { lang: "de", label: "lang.german", Flag: FlagDE },
-] satisfies ReadonlyArray<{ lang: Lang; label: string; Flag: FC }>;
-
-const buttonStyle = (active: boolean): CSSProperties => ({
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 28,
-  height: 20,
-  borderRadius: 5,
-  cursor: "pointer",
-  opacity: active ? 1 : 0.4,
-  boxShadow: active ? "0 0 0 1.5px rgba(255,255,255,0.85)" : "0 0 0 1px rgba(255,255,255,0.15)",
-  transition: "opacity 120ms ease, box-shadow 120ms ease",
-});
-
-export const LangToggle: FC = () => {
+export const LanguageSelector: FC = () => {
   const { lang, setLang, t } = useI18n();
 
   return (
-    <Focusable style={{ display: "flex", gap: 6, justifyContent: "flex-end", padding: "2px 2px 0" }}>
-      {LANGUAGE_OPTIONS.map(({ lang: option, label, Flag }) => (
-        <Focusable
-          key={option}
-          onActivate={() => setLang(option)}
-          onClick={() => setLang(option)}
-          aria-label={t(label)}
-          style={buttonStyle(lang === option)}
-        >
-          <Flag />
-        </Focusable>
-      ))}
-    </Focusable>
+    <div style={{ width: 190, minWidth: 0 }}>
+      <Dropdown
+        rgOptions={DROPDOWN_OPTIONS}
+        selectedOption={lang}
+        menuLabel={t("settings.language")}
+        onChange={(option) => setLang(option.data)}
+      />
+    </div>
   );
 };

@@ -147,3 +147,15 @@ describe("German gradient names", () => {
     expect(suggestGradientName("de")).toBe("Elektrischer Sonnenuntergang");
   });
 });
+
+describe("Brazilian Portuguese gradient names", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("combines a Brazilian Portuguese noun and adjective in natural order", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    expect(suggestGradientName("pt-BR")).toBe("Pôr do sol elétrico");
+  });
+});

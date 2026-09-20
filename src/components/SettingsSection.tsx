@@ -2,7 +2,7 @@ import { FC, Fragment, ReactNode, useEffect, useState } from "react";
 import { ButtonItem, Focusable, Navigation, PanelSectionRow, ToggleField } from "@decky/ui";
 
 import { getVersion } from "../api";
-import { useI18n, LangToggle, type Lang } from "../i18n";
+import { useI18n, LanguageSelector, type Lang } from "../i18n";
 import { UpdatePanel } from "../updater/UpdatePanel";
 import { openCustomizeModal } from "./CustomizeModal";
 import { openReportModal } from "./ReportModal";
@@ -86,7 +86,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         }}
       >
         <span style={{ fontSize: 13, color: "rgba(255,255,255,0.9)" }}>{t("settings.language")}</span>
-        <LangToggle />
+        <LanguageSelector />
       </div>
     </PanelSectionRow>,
 

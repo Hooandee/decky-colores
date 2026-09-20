@@ -379,6 +379,10 @@ const NAME_PARTS: Record<Lang, { adjectives: string[]; nouns: string[] }> = {
     adjectives: ["Elektrischer", "Kosmischer", "Wilder", "Mystischer", "Feuriger", "Leuchtender", "Verträumter", "Schillernder", "Galaktischer", "Funkelnder"],
     nouns: ["Sonnenuntergang", "Regenbogen", "Blitz", "Ozean", "Kosmos", "Wirbel", "Funke", "Traum", "Drache", "Komet"],
   },
+  "pt-BR": {
+    adjectives: ["elétrico", "cósmico", "disco", "pastel", "neon", "selvagem", "turbo", "místico", "picante", "radiante"],
+    nouns: ["Pôr do sol", "Unicórnio", "Oceano", "Polvo", "Trovão", "Gato", "Dragão", "Flamingo", "Tucano", "Cacto"],
+  },
 };
 
 export function suggestGradientName(lang: Lang): string {
