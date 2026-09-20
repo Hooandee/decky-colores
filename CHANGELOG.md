@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.0...decky-colores-v0.26.1) (2026-09-20)
+
+
+### Bug Fixes
+
+* harden RGB lifecycle and diagnostics ([d593d06](https://github.com/Hooandee/decky-colores/commit/d593d06d28d784ecd89efc4e0bb2fe6988166b40))
+* harden RGB lifecycle, brightness and diagnostics ([0019d47](https://github.com/Hooandee/decky-colores/commit/0019d4731be4f58004a0d593fa19ee198cf4b299))
+
 ## [0.26.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.2...decky-colores-v0.26.0) (2026-09-10)
 
 
