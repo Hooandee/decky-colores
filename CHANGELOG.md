@@ -4,27 +4,27 @@
 
 ### Español
 
-* **Interfaz:** Renueva la cabecera del dispositivo y la navegación entre secciones con una vista más compacta, clara y cómoda con el mando.
-* **Perfiles por juego:** Simplifica el selector Global/Juego, lo coloca debajo de las pestañas y conserva ambas configuraciones al cambiar de ámbito o de juego.
-* **Reportes:** Estrena un flujo guiado para enviar problemas o ideas, muestra el modelo del dispositivo como título y mantiene el foco del mando en cada paso.
+* Encontrar y cambiar el tipo de iluminación es ahora mucho más cómodo: el nombre de tu dispositivo permanece visible arriba y puedes moverte entre color, degradados, efectos y el resto de secciones con una navegación más clara y pensada para el mando.
+* Cuando estás jugando, un selector sencillo te permite cambiar entre los ajustes globales y los de ese juego. Colores conserva ambos para que puedas alternar sin perder lo que ya habías configurado.
+* Enviar un reporte también es más fácil: primero eliges si quieres contar un problema o proponer una idea y después Colores te guía paso a paso, muestra siempre el modelo de tu dispositivo y mantiene el foco del mando donde corresponde.
 
 ### English
 
-* **Interface:** Refreshes the device header and section navigation with a more compact, clearer, and gamepad-friendly layout.
-* **Per-game profiles:** Simplifies the Global/Game selector, places it below the tabs, and preserves both configurations when switching scope or games.
-* **Reports:** Adds a guided flow for sending problems or ideas, shows the device model as the title, and keeps gamepad focus in the right place at every step.
+* Finding and changing the lighting mode is now much easier: your device name stays visible at the top, and moving between colors, gradients, effects, and the other sections is clearer and feels better with a gamepad.
+* While a game is running, a simple selector lets you switch between your global settings and that game's settings. Colores keeps both, so you can move between them without losing what you already configured.
+* Sending a report is easier too: first choose whether you want to report a problem or suggest an idea, then Colores guides you step by step, keeps your device model visible, and moves gamepad focus to the right place.
 
 ### Italiano
 
-* **Interfaccia:** Rinnova l'intestazione del dispositivo e la navigazione tra le sezioni con una vista più compatta, chiara e comoda da usare con il controller.
-* **Profili per gioco:** Semplifica il selettore Globale/Gioco, lo colloca sotto le schede e conserva entrambe le configurazioni quando si cambia ambito o gioco.
-* **Segnalazioni:** Introduce un flusso guidato per inviare problemi o idee, mostra il modello del dispositivo come titolo e mantiene il focus del controller in ogni fase.
+* Trovare e cambiare il tipo di illuminazione ora è molto più comodo: il nome del dispositivo resta visibile in alto e la navigazione tra colori, gradienti, effetti e le altre sezioni è più chiara e pensata per il controller.
+* Mentre giochi, un selettore semplice ti permette di passare dalle impostazioni globali a quelle del gioco. Colores conserva entrambe, così puoi alternarle senza perdere ciò che avevi già configurato.
+* Anche inviare una segnalazione è più semplice: prima scegli se vuoi comunicare un problema o proporre un'idea, poi Colores ti guida passo dopo passo, mantiene visibile il modello del dispositivo e sposta il focus del controller nel punto giusto.
 
 ### Deutsch
 
-* **Oberfläche:** Überarbeitet die Geräte-Kopfzeile und die Bereichsnavigation mit einer kompakteren, übersichtlicheren und controllerfreundlichen Darstellung.
-* **Spielprofile:** Vereinfacht die Auswahl Global/Spiel, platziert sie unter den Tabs und behält beide Konfigurationen beim Wechsel des Bereichs oder Spiels bei.
-* **Berichte:** Führt einen geführten Ablauf zum Senden von Problemen oder Ideen ein, zeigt das Gerätemodell als Titel und hält den Controller-Fokus in jedem Schritt auf dem richtigen Element.
+* Die Beleuchtungsart zu finden und zu wechseln ist jetzt deutlich angenehmer: Der Gerätename bleibt oben sichtbar und die Navigation zwischen Farben, Farbverläufen, Effekten und den übrigen Bereichen ist übersichtlicher und auf die Bedienung mit dem Controller ausgelegt.
+* Während ein Spiel läuft, kannst du mit einer einfachen Auswahl zwischen den globalen Einstellungen und den Einstellungen für dieses Spiel wechseln. Colores behält beide, damit beim Umschalten nichts verloren geht.
+* Auch das Senden eines Berichts ist einfacher: Du wählst zuerst, ob du ein Problem melden oder eine Idee vorschlagen möchtest. Danach führt dich Colores Schritt für Schritt weiter, zeigt weiterhin dein Gerätemodell und setzt den Controller-Fokus an die richtige Stelle.
 
 ## [0.27.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.1...decky-colores-v0.27.0) (2026-09-20)
 
