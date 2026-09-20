@@ -1,101 +1,81 @@
 import { Focusable } from "@decky/ui";
+import { LuGamepad2 } from "react-icons/lu";
 
 import { RunningApp } from "../apps/runningApp";
 import { useI18n } from "../i18n";
-import { ProfileScope, ProfileState } from "../types";
+import { ProfileScope } from "../types";
+import { segmentGroupStyle, segmentItemStyle } from "./segmented";
 
 interface Props {
   scope: ProfileScope;
   runningApp: RunningApp | null;
-  context: ProfileState;
+  disabled?: boolean;
   onSelect: (scope: ProfileScope) => void;
-  onFollowGlobal: (follow: boolean) => void;
-  onForget: () => void;
 }
 
 export function ProfileScopeSelector({
   scope,
   runningApp,
-  context,
+  disabled = false,
   onSelect,
-  onFollowGlobal,
-  onForget,
 }: Props) {
   const { t } = useI18n();
   const option = (selected: boolean): React.CSSProperties => ({
+    ...segmentItemStyle(selected),
     flex: 1,
     minWidth: 0,
-    padding: "8px 10px",
-    borderRadius: 9,
-    background: selected ? "rgba(80, 160, 255, 0.28)" : "rgba(255,255,255,0.055)",
-    boxShadow: selected
-      ? "inset 0 0 0 1px rgba(130,190,255,0.75)"
-      : "inset 0 0 0 1px rgba(255,255,255,0.08)",
-    overflow: "hidden",
-    whiteSpace: "nowrap",
-    textOverflow: "ellipsis",
-    fontSize: 13,
-    fontWeight: selected ? 650 : 500,
+    padding: "6px 10px",
+    textAlign: "center",
+    cursor: disabled ? "default" : "pointer",
   });
+  const select = (next: ProfileScope) => {
+    if (!disabled) onSelect(next);
+  };
 
   return (
-    <div style={{ display: "grid", gap: 7, padding: "0 0 4px" }}>
-      <Focusable style={{ display: "flex", gap: 6 }}>
+    <div style={{ padding: "0 0 4px" }}>
+      <Focusable
+        role="radiogroup"
+        aria-label={`${t("profiles.global")} / ${t("profiles.gameShort")}`}
+        aria-busy={disabled || undefined}
+        style={segmentGroupStyle}
+      >
         <Focusable
-          onActivate={() => onSelect("global")}
-          onClick={() => onSelect("global")}
+          role="radio"
+          aria-checked={scope === "global"}
+          aria-disabled={disabled || undefined}
+          onActivate={() => select("global")}
+          onClick={() => select("global")}
           style={option(scope === "global")}
         >
           {t("profiles.global")}
         </Focusable>
         {runningApp && (
           <Focusable
-            onActivate={() => onSelect("game")}
-            onClick={() => onSelect("game")}
+            role="radio"
+            aria-checked={scope === "game"}
+            aria-disabled={disabled || undefined}
+            onActivate={() => select("game")}
+            onClick={() => select("game")}
             title={runningApp.name}
             style={option(scope === "game")}
           >
-            {t("profiles.game", { name: runningApp.name })}
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 4,
+                minWidth: 0,
+                width: "100%",
+              }}
+            >
+              <LuGamepad2 size={13} style={{ flexShrink: 0 }} />
+              <span>{t("profiles.gameShort")}</span>
+            </span>
           </Focusable>
         )}
       </Focusable>
-      {scope === "game" && runningApp && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 8,
-            color: "rgba(255,255,255,0.58)",
-            fontSize: 11,
-            padding: "0 2px",
-          }}
-        >
-          <span>
-            {context.followsGlobal
-              ? t("profiles.followingGlobal")
-              : t("profiles.usingOwn")}
-          </span>
-          <Focusable style={{ display: "flex", gap: 5 }}>
-            <Focusable
-              onActivate={() => onFollowGlobal(!context.followsGlobal)}
-              onClick={() => onFollowGlobal(!context.followsGlobal)}
-              style={{ padding: "4px 7px", borderRadius: 6, background: "rgba(255,255,255,0.07)" }}
-            >
-              {context.followsGlobal ? t("profiles.useOwn") : t("profiles.followGlobal")}
-            </Focusable>
-            {context.hasGameProfile && (
-              <Focusable
-                onActivate={onForget}
-                onClick={onForget}
-                style={{ padding: "4px 7px", borderRadius: 6, background: "rgba(255,255,255,0.07)" }}
-              >
-                {t("profiles.forget")}
-              </Focusable>
-            )}
-          </Focusable>
-        </div>
-      )}
     </div>
   );
 }

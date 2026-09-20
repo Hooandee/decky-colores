@@ -4,6 +4,7 @@ export const de: Record<string, string> = {
 
   "profiles.global": "Global",
   "profiles.game": "Spiel: {name}",
+  "profiles.gameShort": "Spiel",
   "profiles.followingGlobal": "Folgt dem globalen Profil",
   "profiles.usingOwn": "Verwendet ein eigenes Profil",
   "profiles.useOwn": "Eigenes Profil verwenden",
@@ -42,6 +43,7 @@ export const de: Record<string, string> = {
 
   "nav.sensors": "Sensoren",
   "nav.settings": "Einstellungen",
+  "nav.changeSection": "Bereich wechseln",
   "settings.language": "Sprache",
   "customize.title": "Personalisierung",
   "customize.accent": "Primärfarbe",
@@ -205,6 +207,7 @@ export const de: Record<string, string> = {
   "report.section.kind": "Was möchtest du senden?",
   "report.kind.bug": "Ein Problem",
   "report.kind.feature": "Eine Anfrage oder Idee",
+  "report.kind.change": "Ändern",
   "report.section.what": "Was funktioniert nicht?",
   "report.section.what.feature": "Um welchen Bereich geht es?",
   "report.cat.color": "Farbe",

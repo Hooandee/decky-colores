@@ -47,55 +47,22 @@ import { useUpdate } from "./updater/useUpdate";
 import { AlertDot } from "./updater/AlertDot";
 import { useLayout } from "./nav/store";
 import { visibleIds } from "./nav/layout";
-import { PINNED_TAB, tabMeta, TAB_META, SENSOR_TAB, SENSOR_MODES, tabForMode } from "./nav/manifest";
+import {
+  isProfileScopeVisible,
+  PINNED_TAB,
+  tabMeta,
+  TAB_META,
+  SENSOR_TAB,
+  SENSOR_MODES,
+  tabForMode,
+} from "./nav/manifest";
 import { useShoulderNav } from "./nav/useShoulderNav";
 import { readActiveTab, writeActiveTab, readSensorMode, writeSensorMode } from "./nav/activeTab";
 import { startGameWatcher } from "./apps/gameWatcher";
 import { startSuspendPreparation } from "./lifecycle/suspend";
 import { ProfileScopeSelector } from "./components/ProfileScopeSelector";
-
-function DeviceHeader({ name, color }: { name: string; color: RGB }) {
-  const css = rgbToCss(color);
-  const tint = `rgba(${color.r}, ${color.g}, ${color.b}, 0.55)`;
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "7px 12px",
-        marginBottom: 10,
-        borderRadius: 10,
-        background: "rgba(255,255,255,0.04)",
-        border: `1.5px solid ${tint}`,
-        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.05)",
-      }}
-    >
-      <div
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: "50%",
-          flexShrink: 0,
-          background: css,
-          boxShadow: `0 0 8px ${css}`,
-        }}
-      />
-      <div
-        style={{
-          fontWeight: 600,
-          fontSize: 14,
-          minWidth: 0,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {name}
-      </div>
-    </div>
-  );
-}
+import { DeviceHeader } from "./components/DeviceHeader";
+import { theme } from "./theme";
 
 const AMBIENT_HINT: RGB[] = [
   { r: 0, g: 196, b: 255 },
@@ -583,9 +550,10 @@ function Content() {
     retry,
     runningApp,
     profileScope,
+    profilePending,
+    profileError,
     selectScope,
-    setFollowGlobal,
-    forgetGameProfile,
+    retryProfile,
     setBrightness,
     setPower,
     setChargerOnly,
@@ -654,6 +622,7 @@ function Content() {
 
   const select = useCallback(
     (id: string) => {
+      if (profilePending) return;
       if (id === PINNED_TAB) {
         setViewingSettings(true);
         writeActiveTab(PINNED_TAB);
@@ -672,7 +641,7 @@ function Content() {
         }
       }
     },
-    [setMode, availableSensorModes],
+    [setMode, availableSensorModes, profilePending],
   );
 
   const ambientActive = state?.mode === "ambient" && state?.power;
@@ -869,6 +838,7 @@ function Content() {
       id,
       icon: meta?.icon,
       label: meta ? t(meta.labelKey) : id,
+      accent: meta?.accent ?? theme.color.accent,
       badge: id === PINNED_TAB ? <AlertDot show={hasUpdate} /> : undefined,
     };
   });
@@ -1080,25 +1050,66 @@ function Content() {
     }
   };
 
+  const navigation = (
+    <PanelSectionRow>
+      <div style={{ display: "flex", flexDirection: "column", gap: theme.space.section }}>
+        <DeviceHeader device={device} color={previewColors[0] ?? color} />
+        <TabBar
+          tabs={tabItems}
+          activeId={highlight}
+          disabled={profilePending}
+          onSelect={select}
+        />
+        {isProfileScopeVisible(activeTab) && (
+          <ProfileScopeSelector
+            scope={profileScope}
+            runningApp={runningApp}
+            disabled={profilePending}
+            onSelect={selectScope}
+          />
+        )}
+      </div>
+    </PanelSectionRow>
+  );
+
+  if (profilePending) {
+    return (
+      <PanelSection>
+        {navigation}
+        {profileError ? (
+          <>
+            <PanelSectionRow>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: "rgba(255,255,255,0.7)",
+                  padding: "8px 2px",
+                  lineHeight: 1.45,
+                }}
+              >
+                {t("load.error")}
+              </div>
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <ButtonItem layout="below" onClick={retryProfile}>
+                {t("load.retry")}
+              </ButtonItem>
+            </PanelSectionRow>
+          </>
+        ) : (
+          <PanelSectionRow>
+            <div style={{ display: "flex", justifyContent: "center", padding: 20 }}>
+              <Spinner width={32} height={32} />
+            </div>
+          </PanelSectionRow>
+        )}
+      </PanelSection>
+    );
+  }
+
   return (
     <PanelSection>
-      <PanelSectionRow>
-        <DeviceHeader name={device.name} color={previewColors[0] ?? color} />
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <ProfileScopeSelector
-          scope={profileScope}
-          runningApp={runningApp}
-          context={state.profileContext}
-          onSelect={selectScope}
-          onFollowGlobal={setFollowGlobal}
-          onForget={forgetGameProfile}
-        />
-      </PanelSectionRow>
-      <PanelSectionRow>
-        <TabBar tabs={tabItems} activeId={highlight} onSelect={select} />
-      </PanelSectionRow>
-
+      {navigation}
       {contentMode && (
         <PanelSectionRow>
           <div style={{ marginTop: 12 }}>
@@ -1179,6 +1190,7 @@ function Content() {
           )}
           <SettingsSection
             caps={capabilities}
+            device={device}
             availableTabIds={availableTabIds}
             lang={lang}
             forceControl={forceControl}

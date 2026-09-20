@@ -12,7 +12,20 @@ import {
 } from "./types";
 import * as api from "./api";
 import { useRunningApp } from "./apps/useRunningApp";
-import { nextProfileScope } from "./profiles/scope";
+import {
+  profileScopeFor,
+  profileStateForApp,
+  selectProfileScope as applyProfileScope,
+} from "./profiles/scope";
+import {
+  createStateSnapshotGate,
+  createProfileTransitionRunner,
+  ProfileTarget,
+  ProfileTransitionRunner,
+  snapshotProfileTarget,
+} from "./profiles/transition";
+import { createRefreshQueue, RefreshQueue } from "./profiles/refreshQueue";
+import { createThrottle, Throttled } from "./throttle";
 
 function withProfile(state: ColoresState, profileState: ProfileState): ColoresState {
   return {
@@ -22,32 +35,18 @@ function withProfile(state: ColoresState, profileState: ProfileState): ColoresSt
   };
 }
 
-function useThrottle<A extends unknown[]>(fn: (...args: A) => void, ms: number) {
+function useThrottle<A extends unknown[]>(
+  fn: (...args: A) => void | Promise<unknown>,
+  ms: number,
+): Throttled<A> {
   const fnRef = useRef(fn);
   fnRef.current = fn;
-  const last = useRef(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const latest = useRef<A | undefined>(undefined);
-
-  useEffect(() => () => clearTimeout(timer.current), []);
-
-  return useCallback(
-    (...args: A) => {
-      latest.current = args;
-      const elapsed = Date.now() - last.current;
-      if (elapsed >= ms) {
-        last.current = Date.now();
-        fnRef.current(...args);
-      } else if (!timer.current) {
-        timer.current = setTimeout(() => {
-          last.current = Date.now();
-          timer.current = undefined;
-          if (latest.current) fnRef.current(...latest.current);
-        }, ms - elapsed);
-      }
-    },
-    [ms],
-  );
+  const throttled = useRef<Throttled<A> | null>(null);
+  if (throttled.current === null) {
+    throttled.current = createThrottle((...args: A) => fnRef.current(...args), ms);
+  }
+  useEffect(() => () => throttled.current?.cancel(), []);
+  return throttled.current;
 }
 
 export function useColores() {
@@ -56,77 +55,146 @@ export function useColores() {
   const [profileScope, setProfileScope] = useState<ProfileScope>("global");
   const runningApp = useRunningApp();
   const initializedScope = useRef(false);
-  const profileTarget = useRef<{ scope: ProfileScope; appKey: string | null }>({
+  const [resolvedAppKey, setResolvedAppKey] = useState<string | null | undefined>(undefined);
+  const [profileStatus, setProfileStatus] = useState<"idle" | "loading" | "error">("idle");
+  const stateSnapshotGate = useRef(createStateSnapshotGate());
+  const flushProfileWritesRef = useRef<() => Promise<void>>(async () => {});
+  const profileTarget = useRef<ProfileTarget>({
     scope: "global",
     appKey: null,
   });
 
-  const refreshState = useCallback(() => {
-    api.getState()
-      .then((s) => {
-        setState(s);
-        if (!initializedScope.current) {
-          const scope = s.profileContext.scope;
-          setProfileScope(scope);
-          profileTarget.current = {
-            scope,
-            appKey: scope === "game" ? s.profileContext.appKey : null,
-          };
-          initializedScope.current = true;
-        }
-        setLoadError(false);
-      })
-      .catch((e) => {
-        console.error("Colores: getState failed", e);
-        setLoadError(true);
-      });
+  const acceptStateSnapshot = useCallback((snapshot: ColoresState) => {
+    const scope = profileScopeFor(
+      snapshot.profileContext.appKey,
+      snapshot.profileContext.followsGlobal,
+    );
+    profileTarget.current = {
+      scope,
+      appKey: scope === "game" ? snapshot.profileContext.appKey : null,
+    };
+    setState(snapshot);
+    setProfileScope(scope);
+    setResolvedAppKey(snapshot.profileContext.appKey);
+    setProfileStatus("idle");
+    initializedScope.current = true;
   }, []);
+
+  const performRefresh = useCallback(async () => {
+    const token = stateSnapshotGate.current.begin();
+    await flushProfileWritesRef.current();
+    if (!stateSnapshotGate.current.isCurrent(token)) return;
+    try {
+      const snapshot = await api.getState();
+      if (!stateSnapshotGate.current.isCurrent(token)) return;
+      acceptStateSnapshot(snapshot);
+      setLoadError(false);
+    } catch (e) {
+      if (!stateSnapshotGate.current.isCurrent(token)) return;
+      console.error("Colores: getState failed", e);
+      setLoadError(true);
+    }
+  }, [acceptStateSnapshot]);
+
+  const performRefreshRef = useRef(performRefresh);
+  performRefreshRef.current = performRefresh;
+  const refreshQueue = useRef<RefreshQueue | null>(null);
+  if (refreshQueue.current === null) {
+    refreshQueue.current = createRefreshQueue(() => performRefreshRef.current());
+  }
+  const refreshState = useCallback(() => refreshQueue.current?.request(), []);
 
   useEffect(() => {
     refreshState();
   }, [refreshState]);
 
-  const loadProfile = useCallback((scope: ProfileScope, appKey: string | null) => {
-    profileTarget.current = { scope, appKey };
-    setProfileScope(scope);
-    return api
-      .getProfileState(scope, appKey)
-      .then((profileState) => setState((current) => (current ? withProfile(current, profileState) : current)))
-      .catch((error) => console.error("Colores: getProfileState failed", error));
+  const acceptProfileState = useCallback((appKey: string | null, profileState: ProfileState) => {
+    profileTarget.current = {
+      scope: profileState.scope,
+      appKey: profileState.scope === "game" ? profileState.appKey : null,
+    };
+    setProfileScope(profileState.scope);
+    setResolvedAppKey(appKey);
+    setProfileStatus("idle");
+    setState((current) => (current ? withProfile(current, profileState) : current));
   }, []);
+
+  const acceptProfileStateRef = useRef(acceptProfileState);
+  acceptProfileStateRef.current = acceptProfileState;
+  const transitionRunner = useRef<ProfileTransitionRunner | null>(null);
+  if (transitionRunner.current === null) {
+    transitionRunner.current = createProfileTransitionRunner(api, {
+      onStart: () => {
+        refreshQueue.current?.block();
+        stateSnapshotGate.current.invalidate();
+        setProfileStatus("loading");
+      },
+      onAccept: (appKey, profileState) => {
+        stateSnapshotGate.current.invalidate();
+        acceptProfileStateRef.current(appKey, profileState);
+        refreshQueue.current?.release();
+      },
+      onError: (_appKey, error) => {
+        stateSnapshotGate.current.invalidate();
+        console.error("Colores: profile transition failed", error);
+        setProfileStatus("error");
+      },
+    });
+  }
+
+  const runningAppKey = runningApp?.key ?? null;
+  const profilePending =
+    state !== null && (profileStatus !== "idle" || resolvedAppKey !== runningAppKey);
 
   useEffect(() => {
     if (!initializedScope.current) return;
-    const next = nextProfileScope(profileScope, runningApp);
-    if (next !== profileScope) {
-      void loadProfile("global", null);
-      return;
-    }
-    if (
-      profileScope === "game" &&
-      runningApp &&
-      profileTarget.current.appKey !== runningApp.key
-    ) {
-      void loadProfile("game", runningApp.key);
-    }
-  }, [loadProfile, profileScope, runningApp]);
+    const appKey = runningApp?.key ?? null;
+    if (resolvedAppKey === appKey && profileStatus === "idle") return;
+    if (transitionRunner.current?.isActiveFor(appKey)) return;
+    void transitionRunner.current?.run(appKey, async () => {
+      await flushProfileWritesRef.current();
+      return profileStateForApp(appKey, api);
+    });
+  }, [profileStatus, resolvedAppKey, runningApp]);
 
   const selectScope = (scope: ProfileScope) => {
-    const appKey = scope === "game" ? runningApp?.key ?? null : null;
+    const appKey = runningAppKey;
+    if (profilePending) return;
     if (scope === "game" && appKey === null) return;
-    void loadProfile(scope, appKey);
+    if (scope === profileScope) return;
+    void transitionRunner.current?.run(appKey, async () => {
+      await flushProfileWritesRef.current();
+      const profileState = await applyProfileScope(scope, appKey, api);
+      if (!profileState) throw new Error("Invalid profile scope for the current app");
+      return profileState;
+    });
   };
 
-  const pushProfile = useCallback((changes: Record<string, unknown>) => {
-    const target = profileTarget.current;
-    return api
-      .patchProfile(target.scope, target.appKey, changes)
-      .then((profileState) =>
-        setState((current) =>
-          current ? { ...current, profileContext: profileState } : current,
-        ),
-      )
+  const retryProfile = () => {
+    const appKey = runningAppKey;
+    void transitionRunner.current?.run(appKey, async () => {
+      await flushProfileWritesRef.current();
+      return profileStateForApp(appKey, api);
+    });
+  };
+
+  const profileWriteQueue = useRef<Promise<void>>(Promise.resolve());
+  const pushProfile = useCallback((target: ProfileTarget, changes: Record<string, unknown>) => {
+    const request = profileWriteQueue.current.then(() =>
+      api.patchProfile(target.scope, target.appKey, changes),
+    );
+    const settled = request
+      .then((profileState) => {
+        const visible = profileTarget.current;
+        if (visible.scope === target.scope && visible.appKey === target.appKey) {
+          setState((current) =>
+            current ? withProfile(current, profileState) : current,
+          );
+        }
+      })
       .catch((error) => console.error("Colores: patchProfile failed", error));
+    profileWriteQueue.current = settled;
+    return settled;
   }, []);
 
   const noLeds = !!state && !state.capabilities.color && !state.capabilities.brightness;
@@ -147,22 +215,42 @@ export function useColores() {
     if (state) effectRef.current = state.effect;
   }, [state]);
 
-  const pushSolid = useThrottle((c: RGB) => pushProfile({ color: [c.r, c.g, c.b] }), 60);
-  const pushBrightness = useThrottle((v: number) => pushProfile({ brightness: v }), 60);
+  const pushSolid = useThrottle(
+    (target: ProfileTarget, c: RGB) => pushProfile(target, { color: [c.r, c.g, c.b] }),
+    60,
+  );
+  const pushBrightness = useThrottle(
+    (target: ProfileTarget, v: number) => pushProfile(target, { brightness: v }),
+    60,
+  );
   const pushEffect = useThrottle(
-    (id: EffectId, speed: number, useGradient: boolean) =>
-      pushProfile({ effect: { id, speed, use_gradient: useGradient } }),
+    (target: ProfileTarget, id: EffectId, speed: number, useGradient: boolean) =>
+      pushProfile(target, { effect: { id, speed, use_gradient: useGradient } }),
     60,
   );
   const pushAmbilight = useThrottle(
-    (vividness: number, sm: number, fps: number) =>
-      pushProfile({ ambilight: { vividness, smoothing: sm, fps } }),
+    (target: ProfileTarget, vividness: number, sm: number, fps: number) =>
+      pushProfile(target, { ambilight: { vividness, smoothing: sm, fps } }),
     80,
   );
+  const pushGradientSpeed = useThrottle(
+    (target: ProfileTarget, v: number) => pushProfile(target, { gradient_speed: v }),
+    60,
+  );
+  flushProfileWritesRef.current = async () => {
+    await Promise.all([
+      pushSolid.flush(),
+      pushBrightness.flush(),
+      pushEffect.flush(),
+      pushAmbilight.flush(),
+      pushGradientSpeed.flush(),
+    ]);
+    await profileWriteQueue.current;
+  };
 
   const setBrightness = (brightness: number) => {
     setState((s) => (s ? { ...s, brightness } : s));
-    pushBrightness(brightness);
+    pushBrightness.run(snapshotProfileTarget(profileTarget.current), brightness);
   };
 
   const setPower = (power: boolean) => {
@@ -179,23 +267,24 @@ export function useColores() {
 
   const setMode = (mode: Mode) => {
     setState((s) => (s ? { ...s, mode } : s));
-    void pushProfile({ mode });
+    void pushProfile(snapshotProfileTarget(profileTarget.current), { mode });
   };
 
   const setColor = (color: RGB) => {
     setState((s) => (s ? { ...s, color } : s));
-    pushSolid(color);
+    pushSolid.run(snapshotProfileTarget(profileTarget.current), color);
   };
 
   const setGradient = (gradient: RGB[]) => {
     setState((s) => (s ? { ...s, gradient } : s));
-    void pushProfile({ gradient: gradient.map((c) => [c.r, c.g, c.b]) });
+    void pushProfile(snapshotProfileTarget(profileTarget.current), {
+      gradient: gradient.map((c) => [c.r, c.g, c.b]),
+    });
   };
 
-  const pushGradientSpeed = useThrottle((v: number) => pushProfile({ gradient_speed: v }), 60);
   const setGradientSpeed = (gradientSpeed: number) => {
     setState((s) => (s ? { ...s, gradientSpeed } : s));
-    pushGradientSpeed(gradientSpeed);
+    pushGradientSpeed.run(snapshotProfileTarget(profileTarget.current), gradientSpeed);
   };
 
   const updateEffect = (patch: Partial<EffectState>) => {
@@ -203,7 +292,12 @@ export function useColores() {
     const next: EffectState = { ...base, ...patch };
     effectRef.current = next;
     setState((s) => (s ? { ...s, effect: next } : s));
-    pushEffect(next.id, next.speed, next.useGradient);
+    pushEffect.run(
+      snapshotProfileTarget(profileTarget.current),
+      next.id,
+      next.speed,
+      next.useGradient,
+    );
   };
 
   const setEffectId = (id: EffectId) => updateEffect({ id });
@@ -212,12 +306,19 @@ export function useColores() {
 
   const setAmbilight = (vividness: number, smoothing: number, fps: number) => {
     setState((s) => (s ? { ...s, ambilight: { ...s.ambilight, vividness, smoothing, fps } } : s));
-    pushAmbilight(vividness, smoothing, fps);
+    pushAmbilight.run(
+      snapshotProfileTarget(profileTarget.current),
+      vividness,
+      smoothing,
+      fps,
+    );
   };
 
   const setAmbilightSampling = (sampling: string) => {
     setState((s) => (s ? { ...s, ambilight: { ...s.ambilight, sampling } } : s));
-    void pushProfile({ ambilight: { sampling } });
+    void pushProfile(snapshotProfileTarget(profileTarget.current), {
+      ambilight: { sampling },
+    });
   };
 
   const saveGradient = (name: string, stops: RGB[]) => {
@@ -258,28 +359,16 @@ export function useColores() {
 
   const setBatteryBreathe = (batteryBreathe: boolean) => {
     setState((s) => (s ? { ...s, batteryBreathe } : s));
-    void pushProfile({ battery_breathe: batteryBreathe });
+    void pushProfile(snapshotProfileTarget(profileTarget.current), {
+      battery_breathe: batteryBreathe,
+    });
   };
 
   const setTemperatureBreathe = (temperatureBreathe: boolean) => {
     setState((s) => (s ? { ...s, temperatureBreathe } : s));
-    void pushProfile({ temperature_breathe: temperatureBreathe });
-  };
-
-  const setFollowGlobal = (follow: boolean) => {
-    if (!runningApp) return;
-    api
-      .setProfileFollowGlobal(runningApp.key, follow)
-      .then(() => loadProfile("game", runningApp.key))
-      .catch((error) => console.error("Colores: setProfileFollowGlobal failed", error));
-  };
-
-  const forgetGameProfile = () => {
-    if (!runningApp) return;
-    api
-      .forgetProfile(runningApp.key)
-      .then(() => loadProfile("game", runningApp.key))
-      .catch((error) => console.error("Colores: forgetProfile failed", error));
+    void pushProfile(snapshotProfileTarget(profileTarget.current), {
+      temperature_breathe: temperatureBreathe,
+    });
   };
 
   const setSensorBands = (
@@ -314,9 +403,10 @@ export function useColores() {
     retry: refreshState,
     runningApp,
     profileScope,
+    profilePending,
+    profileError: profileStatus === "error",
     selectScope,
-    setFollowGlobal,
-    forgetGameProfile,
+    retryProfile,
     setBrightness,
     setPower,
     setChargerOnly,

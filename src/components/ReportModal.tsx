@@ -1,67 +1,124 @@
-import { FC, useEffect, useState } from "react";
-import { ModalRoot, showModal, Focusable, DialogButton, TextField } from "@decky/ui";
-
-import { I18nProvider, useI18n } from "../i18n";
-import { FocusRoot } from "./FocusRoot";
-import { FALLBACK_ACCENT_RGB } from "../accent";
-import { getState, submitReport, ReportResult } from "../api";
 import {
+  CSSProperties,
+  FC,
+  ReactNode,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  DialogButton,
+  Focusable,
+  getFocusNavController,
+  ModalRoot,
+  showModal,
+  TextField,
+} from "@decky/ui";
+import { LuBug, LuLightbulb } from "react-icons/lu";
+
+import { ReportResult, submitReport } from "../api";
+import { I18nProvider, useI18n } from "../i18n";
+import {
+  canSubmit,
   REPORT_CATEGORIES,
   ReportCategory,
   ReportKind,
-  canSubmit,
   reportPresentation,
   toggleCategory,
 } from "../report/logic";
+import { theme } from "../theme";
+import { DeviceInfo } from "../types";
+import { FocusRoot } from "./FocusRoot";
 
 type Phase = "form" | "sending" | "done" | "error";
 
-const ACCENT = `rgb(var(--colores-accent-rgb, ${FALLBACK_ACCENT_RGB}))`;
-const ACCENT_TINT = `rgba(var(--colores-accent-rgb, ${FALLBACK_ACCENT_RGB}), 0.12)`;
-const MUTED = "rgba(255,255,255,0.55)";
-const HAIRLINE = "rgba(255,255,255,0.14)";
+const ReportKindCard: FC<{
+  label: string;
+  icon: ReactNode;
+  selected: boolean;
+  color: string;
+  tint: string;
+  preferredFocus?: boolean;
+  onSelect: () => void;
+}> = ({ label, icon, selected, color, tint, preferredFocus, onSelect }) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Focusable
+      role="radio"
+      aria-label={label}
+      aria-checked={selected}
+      {...(preferredFocus ? { preferredFocus: true } : {})}
+      onActivate={onSelect}
+      onClick={onSelect}
+      onGamepadFocus={() => setFocused(true)}
+      onGamepadBlur={() => setFocused(false)}
+      noFocusRing
+      style={{
+        ...theme.card,
+        flex: "1 1 0",
+        minWidth: 0,
+        minHeight: 150,
+        padding: theme.space.lg,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: theme.space.md,
+        textAlign: "center",
+        color: theme.color.textPrimary,
+        background: focused || selected ? tint : theme.color.surfaceRaised,
+        boxShadow: `inset 0 0 0 ${focused ? 2 : 1}px ${focused || selected ? color : theme.color.hairline}`,
+      }}
+    >
+      <div
+        aria-hidden="true"
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: theme.radius.md,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color,
+          background: tint,
+          boxShadow: `inset 0 0 0 1px ${color}55`,
+        }}
+      >
+        {icon}
+      </div>
+      <span style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.15 }}>{label}</span>
+    </Focusable>
+  );
+};
 
 const SelectionChip: FC<{
   label: string;
   on: boolean;
   onClick: () => void;
-  radio?: boolean;
-}> = ({
-  label,
-  on,
-  onClick,
-  radio = false,
-}) => (
-  <Focusable
-    role={radio ? "radio" : undefined}
-    aria-label={label}
-    aria-checked={radio ? on : undefined}
-    onActivate={onClick}
-    onClick={onClick}
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      padding: "8px 12px",
-      borderRadius: 8,
-      boxShadow: `inset 0 0 0 1px ${on ? ACCENT : HAIRLINE}`,
-      background: on ? ACCENT_TINT : "transparent",
-      fontSize: 14,
-      color: "rgba(255,255,255,0.92)",
-      flex: "1 1 45%",
-      minWidth: 0,
-      cursor: "pointer",
-    }}
-  >
+}> = ({ label, on, onClick }) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Focusable
+      {...selectionChipA11y(on)}
+      data-report-category="true"
+      aria-label={label}
+      onActivate={onClick}
+      onClick={onClick}
+      onGamepadFocus={() => setFocused(true)}
+      onGamepadBlur={() => setFocused(false)}
+      noFocusRing
+      style={selectionChipStyle(on, focused)}
+    >
     <div
+      aria-hidden="true"
       style={{
         width: 18,
         height: 18,
         flex: "0 0 auto",
         borderRadius: 5,
-        boxShadow: `inset 0 0 0 2px ${on ? ACCENT : "rgba(255,255,255,0.4)"}`,
-        background: on ? ACCENT : "transparent",
-        color: "#08131f",
+        boxShadow: `inset 0 0 0 2px ${on ? theme.color.accent : theme.color.textMuted}`,
+        background: on ? theme.color.accent : "transparent",
+        color: theme.color.onAccent,
         fontSize: 12,
         lineHeight: "18px",
         textAlign: "center",
@@ -70,49 +127,68 @@ const SelectionChip: FC<{
       {on ? "✓" : ""}
     </div>
     <span>{label}</span>
-  </Focusable>
-);
-
-const sectionLabel: React.CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  letterSpacing: "0.14em",
-  textTransform: "uppercase",
-  color: MUTED,
+    </Focusable>
+  );
 };
 
-const card: React.CSSProperties = {
-  borderRadius: 12,
-  background: "rgba(255,255,255,0.04)",
-  boxShadow: `inset 0 0 0 1px ${HAIRLINE}`,
-};
+export function selectionChipStyle(on: boolean, focused: boolean): CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.space.sm,
+    padding: `${theme.space.sm}px ${theme.space.md}px`,
+    borderRadius: theme.radius.sm,
+    boxShadow: `inset 0 0 0 ${focused ? 2 : 1}px ${focused || on ? theme.color.accent : theme.color.hairline}`,
+    background: on ? `rgba(${theme.color.accentRgb},0.12)` : "transparent",
+    fontSize: theme.font.body,
+    color: theme.color.textPrimary,
+    flex: "1 1 45%",
+    minWidth: 0,
+  };
+}
 
-const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
+export function selectionChipA11y(on: boolean) {
+  return { role: "checkbox" as const, "aria-checked": on };
+}
+
+export function reportFocusTarget(
+  root: Pick<HTMLElement, "querySelector">,
+  phase: Phase,
+  choosingKind: boolean,
+  kind: ReportKind | null,
+): HTMLElement | null {
+  if (phase === "sending") return null;
+  if (phase === "done" || phase === "error") {
+    return root.querySelector<HTMLElement>('[data-report-primary-action="true"]');
+  }
+  if (kind === null) return null;
+  const selector = choosingKind
+    ? '[role="radio"][aria-checked="true"]'
+    : '[data-report-category="true"]';
+  return root.querySelector<HTMLElement>(selector);
+}
+
+const ReportBody: FC<{ device: DeviceInfo; closeModal?: () => void }> = ({
+  device,
+  closeModal,
+}) => {
   const { t } = useI18n();
-  const [deviceName, setDeviceName] = useState<string>("");
-  const [kind, setKind] = useState<ReportKind>("bug");
+  const [kind, setKind] = useState<ReportKind | null>(null);
+  const [choosingKind, setChoosingKind] = useState(true);
   const [selected, setSelected] = useState<ReportCategory[]>([]);
   const [text, setText] = useState("");
   const [phase, setPhase] = useState<Phase>("form");
   const [result, setResult] = useState<ReportResult | null>(null);
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    getState()
-      .then((s) => alive && setDeviceName(s?.device?.name ?? ""))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const submit = () => {
+    if (kind === null) return;
     setPhase("sending");
     submitReport(selected, text, kind)
-      .then((r) => {
-        setResult(r);
-        setPhase(r.ok ? "done" : "error");
+      .then((response) => {
+        setResult(response);
+        setPhase(response.ok ? "done" : "error");
       })
       .catch(() => {
         setResult({ ok: false, error: "network" });
@@ -123,54 +199,97 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
   const copy = () => {
     const code = result?.code;
     if (!code) return;
-    const p = navigator.clipboard?.writeText(code);
-    if (p) p.then(() => setCopied(true)).catch(() => setCopied(false));
+    const promise = navigator.clipboard?.writeText(code);
+    if (promise) promise.then(() => setCopied(true)).catch(() => setCopied(false));
   };
 
-  const wrap = (children: React.ReactNode) => (
+  const wrap = (children: ReactNode) => (
     <div
+      ref={rootRef}
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 18,
-        padding: 8,
+        gap: theme.space.lg,
+        padding: theme.space.sm,
         maxWidth: 720,
         width: "100%",
         margin: "0 auto",
       }}
     >
-      <div style={{ fontSize: 20, fontWeight: 700, color: "rgba(255,255,255,0.95)" }}>
-        {t("report.title")}
+      <div style={{ fontSize: theme.font.value, color: theme.color.textPrimary }}>
+        {device.name}
       </div>
-      {deviceName && (
-        <div style={{ fontSize: 15, color: "rgba(255,255,255,0.85)" }}>{deviceName}</div>
-      )}
       {children}
     </div>
   );
-  const presentation = reportPresentation(kind);
+  const presentation = reportPresentation(kind ?? "bug");
+  const chooseKind = (next: ReportKind) => {
+    setKind(next);
+    setChoosingKind(false);
+  };
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const target = reportFocusTarget(root, phase, choosingKind, kind);
+    if (!target) return;
+    try {
+      const controller = getFocusNavController();
+      if (typeof controller?.FocusElement === "function") {
+        controller.FocusElement(target);
+        return;
+      }
+    } catch {}
+    target.focus({ preventScroll: true });
+  }, [phase, choosingKind, kind]);
 
   if (phase === "sending") {
-    return wrap(<div style={{ fontSize: 14, color: MUTED }}>{t("report.sending")}</div>);
+    return wrap(
+      <div style={{ fontSize: theme.font.body, color: theme.color.textMuted }}>
+        {t("report.sending")}
+      </div>,
+    );
   }
 
   if (phase === "done") {
     return wrap(
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, alignItems: "center", textAlign: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: theme.space.md,
+          alignItems: "center",
+          textAlign: "center",
+        }}
+      >
         <div style={{ fontSize: 40 }}>✅</div>
-        <div style={{ fontSize: 16, color: "rgba(255,255,255,0.95)" }}>{t("report.done.title")}</div>
-        <div style={{ fontSize: 14, color: MUTED }}>{t(presentation.doneThanks)}</div>
-        <div style={{ ...card, padding: 14, minWidth: 220 }}>
-          <div style={sectionLabel}>{t("report.code.label")}</div>
-          <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: 2, color: ACCENT, fontFamily: "monospace" }}>
+        <div style={{ fontSize: theme.font.value, color: theme.color.textPrimary }}>
+          {t("report.done.title")}
+        </div>
+        <div style={{ fontSize: theme.font.body, color: theme.color.textMuted }}>
+          {t(presentation.doneThanks)}
+        </div>
+        <div style={{ ...theme.card, padding: theme.space.md, minWidth: 220 }}>
+          <div style={theme.sectionLabel}>{t("report.code.label")}</div>
+          <div
+            style={{
+              fontSize: 26,
+              fontWeight: 700,
+              letterSpacing: 2,
+              color: theme.color.accent,
+              fontFamily: "monospace",
+            }}
+          >
             {result?.code}
           </div>
         </div>
-        <div style={{ fontSize: 12, color: MUTED, maxWidth: 340, lineHeight: 1.45 }}>
+        <div style={{ fontSize: theme.font.caption, color: theme.color.textMuted, maxWidth: 340 }}>
           {t(presentation.codeHint)}
         </div>
-        <Focusable style={{ display: "flex", gap: 8 }}>
-          <DialogButton onClick={copy}>{copied ? t("report.copied") : t("report.copy")}</DialogButton>
+        <Focusable style={{ display: "flex", gap: theme.space.sm }}>
+          <DialogButton data-report-primary-action="true" onClick={copy}>
+            {copied ? t("report.copied") : t("report.copy")}
+          </DialogButton>
           <DialogButton onClick={() => closeModal?.()}>{t("report.close")}</DialogButton>
         </Focusable>
       </div>,
@@ -179,82 +298,164 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
 
   if (phase === "error") {
     return wrap(
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <div style={{ fontSize: 14, color: "#ff7b72" }}>{t("report.error.title")}</div>
-        {result?.saved_path && (
-          <div style={{ fontSize: 12, color: MUTED }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: theme.space.md }}>
+        <div style={{ fontSize: theme.font.body, color: theme.color.danger }}>
+          {t("report.error.title")}
+        </div>
+        {result?.saved_path ? (
+          <div style={{ fontSize: theme.font.caption, color: theme.color.textMuted }}>
             {t("report.error.saved", { path: result.saved_path })}
           </div>
-        )}
-        <Focusable style={{ display: "flex", gap: 8 }}>
-          <DialogButton onClick={submit}>{t("report.retry")}</DialogButton>
+        ) : null}
+        <Focusable style={{ display: "flex", gap: theme.space.sm }}>
+          <DialogButton data-report-primary-action="true" onClick={submit}>
+            {t("report.retry")}
+          </DialogButton>
           <DialogButton onClick={() => closeModal?.()}>{t("report.close")}</DialogButton>
         </Focusable>
       </div>,
     );
   }
 
-  return wrap(
-    <>
-      <div style={{ fontSize: 14, color: MUTED, lineHeight: 1.45 }}>{t(presentation.intro)}</div>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={sectionLabel}>{t("report.section.kind")}</div>
-        <div
+  if (choosingKind || kind === null) {
+    return wrap(
+      <>
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              fontSize: theme.font.value,
+              fontWeight: 700,
+              color: theme.color.textPrimary,
+            }}
+          >
+            {t("report.title")}
+          </div>
+          <div
+            style={{
+              marginTop: theme.space.xs,
+              fontSize: theme.font.body,
+              color: theme.color.textMuted,
+            }}
+          >
+            {t("report.section.kind")}
+          </div>
+        </div>
+        <Focusable
           role="radiogroup"
           aria-label={t("report.section.kind")}
-          style={{ display: "flex", gap: 8 }}
+          flow-children="row"
+          noFocusRing
+          style={{ display: "flex", gap: theme.space.md, width: "100%" }}
         >
-          {(["bug", "feature"] as const).map((id) => (
-            <SelectionChip
-              key={id}
-              label={t(`report.kind.${id}`)}
-              on={kind === id}
-              onClick={() => setKind(id)}
-              radio
-            />
-          ))}
+          <ReportKindCard
+            label={t("report.kind.bug")}
+            icon={<LuBug size={36} />}
+            selected={kind === "bug"}
+            color={theme.color.danger}
+            tint="rgba(224,90,90,0.12)"
+            preferredFocus={kind === null}
+            onSelect={() => chooseKind("bug")}
+          />
+          <ReportKindCard
+            label={t("report.kind.feature")}
+            icon={<LuLightbulb size={36} />}
+            selected={kind === "feature"}
+            color={theme.color.accent}
+            tint={`rgba(${theme.color.accentRgb},0.12)`}
+            onSelect={() => chooseKind("feature")}
+          />
+        </Focusable>
+      </>,
+    );
+  }
+
+  return wrap(
+    <>
+      <div
+        style={{
+          ...theme.card,
+          padding: `${theme.space.sm}px ${theme.space.md}px`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: theme.space.md,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            flex: "1 1 auto",
+            minWidth: 0,
+            alignItems: "center",
+            gap: theme.space.sm,
+            color: theme.color.textPrimary,
+          }}
+        >
+          {kind === "bug"
+            ? <LuBug size={22} color={theme.color.danger} aria-hidden="true" />
+            : <LuLightbulb size={22} color={theme.color.accent} aria-hidden="true" />}
+          <span style={{ fontSize: theme.font.body, fontWeight: 700 }}>
+            {t(`report.kind.${kind}`)}
+          </span>
         </div>
+        <DialogButton
+          style={{ width: 112, minWidth: 112, flex: "0 0 auto" }}
+          onClick={() => setChoosingKind(true)}
+        >
+          {t("report.kind.change")}
+        </DialogButton>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={sectionLabel}>{t(presentation.sectionWhat)}</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div style={{ fontSize: theme.font.body, color: theme.color.textMuted }}>
+        {t(presentation.intro)}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: theme.space.sm }}>
+        <div style={theme.sectionLabel}>{t(presentation.sectionWhat)}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: theme.space.sm }}>
           {REPORT_CATEGORIES.map((id) => (
             <SelectionChip
               key={id}
               label={t(`report.cat.${id}`)}
               on={selected.includes(id)}
-              onClick={() => setSelected((s) => toggleCategory(s, id))}
+              onClick={() => setSelected((current) => toggleCategory(current, id))}
             />
           ))}
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={sectionLabel}>{t(presentation.sectionDescribe)}</div>
-        <TextField value={text} onChange={(e) => setText(e.target.value)} />
-        {text.trim().length === 0 && (
-          <div style={{ fontSize: 12, color: MUTED }}>{t(presentation.describeHint)}</div>
-        )}
+      <div style={{ display: "flex", flexDirection: "column", gap: theme.space.sm }}>
+        <div style={theme.sectionLabel}>{t(presentation.sectionDescribe)}</div>
+        <TextField value={text} onChange={(event) => setText(event.target.value)} />
+        {text.trim().length === 0 ? (
+          <div style={{ fontSize: theme.font.caption, color: theme.color.textMuted }}>
+            {t(presentation.describeHint)}
+          </div>
+        ) : null}
       </div>
 
       <div
         style={{
-          ...card,
-          padding: 14,
+          ...theme.card,
+          padding: theme.space.md,
           display: "flex",
           flexDirection: "column",
-          gap: 4,
-          fontSize: 12,
-          color: MUTED,
+          gap: theme.space.xs,
+          fontSize: theme.font.caption,
+          color: theme.color.textMuted,
           lineHeight: 1.5,
         }}
       >
-        <div style={sectionLabel}>{t("report.privacy.title")}</div>
-        <div><span style={{ color: "#3fb950" }}>●</span> {t("report.privacy.public")}</div>
-        <div><span style={{ color: "#d29922" }}>●</span> {t("report.privacy.private")}</div>
-        <div><span style={{ color: "#3fb950" }}>✓</span> {t("report.privacy.nopii")}</div>
+        <div style={theme.sectionLabel}>{t("report.privacy.title")}</div>
+        <div>
+          <span style={{ color: theme.color.ok }}>●</span> {t("report.privacy.public")}
+        </div>
+        <div>
+          <span style={{ color: theme.color.warn }}>●</span> {t("report.privacy.private")}
+        </div>
+        <div>
+          <span style={{ color: theme.color.ok }}>✓</span> {t("report.privacy.nopii")}
+        </div>
       </div>
 
       <Focusable>
@@ -266,16 +467,19 @@ const ReportBody: FC<{ closeModal?: () => void }> = ({ closeModal }) => {
   );
 };
 
-const ReportModal: FC<{ closeModal?: () => void }> = ({ closeModal }) => (
+const ReportModal: FC<{ device: DeviceInfo; closeModal?: () => void }> = ({
+  device,
+  closeModal,
+}) => (
   <ModalRoot closeModal={closeModal} bAllowFullSize>
     <FocusRoot>
       <I18nProvider>
-        <ReportBody closeModal={closeModal} />
+        <ReportBody device={device} closeModal={closeModal} />
       </I18nProvider>
     </FocusRoot>
   </ModalRoot>
 );
 
-export function openReportModal(): void {
-  showModal(<ReportModal />, window);
+export function openReportModal(device: DeviceInfo): void {
+  showModal(<ReportModal device={device} />, window);
 }
