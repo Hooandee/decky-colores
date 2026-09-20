@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.1...decky-colores-v0.27.0) (2026-09-20)
+
+
+### Features
+
+* add capability-first RGB device discovery ([c0653f8](https://github.com/Hooandee/decky-colores/commit/c0653f8831167d9c9147cec5b8a659b9c2c7d6ff))
+* auto-discover compatible RGB devices ([91855a5](https://github.com/Hooandee/decky-colores/commit/91855a597985157691b82d42e7fa8bfdd8cb4feb))
+
 ## [0.26.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.0...decky-colores-v0.26.1) (2026-09-20)
 
 
