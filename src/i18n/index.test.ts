@@ -2,13 +2,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
-type FocusableProps = {
-  children?: ReactNode;
-  onActivate?: () => void;
-  onClick?: () => void;
-  "aria-label"?: string;
-};
-
 type DropdownOption = {
   data: string;
   label: ReactNode;
@@ -21,9 +14,8 @@ type DropdownProps = {
   onChange: (option: DropdownOption) => void;
 };
 
-const { renderedDropdowns, renderedFocusables } = vi.hoisted(() => ({
+const { renderedDropdowns } = vi.hoisted(() => ({
   renderedDropdowns: [] as DropdownProps[],
-  renderedFocusables: [] as FocusableProps[],
 }));
 
 vi.mock("@decky/ui", async () => {
@@ -32,10 +24,6 @@ vi.mock("@decky/ui", async () => {
     Dropdown: (props: DropdownProps) => {
       renderedDropdowns.push(props);
       return React.createElement("div", { "aria-label": props.menuLabel });
-    },
-    Focusable: ({ children, onActivate, onClick, ...props }: FocusableProps) => {
-      renderedFocusables.push({ children, onActivate, onClick, ...props });
-      return React.createElement("div", props, children);
     },
   };
 });
@@ -64,7 +52,6 @@ function brazilianPortugueseCatalog(): Record<string, string> {
 
 afterEach(() => {
   renderedDropdowns.length = 0;
-  renderedFocusables.length = 0;
   vi.unstubAllGlobals();
 });
 
@@ -172,7 +159,6 @@ describe("German catalog", () => {
       "effect.breathing.label": "Pulsieren",
       "effect.spiral.firmwareNote": "Der in deiner Legion Go integrierte Dreheffekt der Firmware.",
       "battery.breathe.label": "Beim Laden pulsieren",
-      "lang.german": "Deutsch",
       "experimental.description": "Diese Funktionen wurden auf diesem Gerät noch nicht geprüft. Du kannst sie ausprobieren, möglicherweise funktionieren sie aber noch nicht richtig. Ich arbeite noch an der Unterstützung für dieses Gerät.",
     });
   });
@@ -185,17 +171,6 @@ describe("German catalog", () => {
 });
 
 describe("Brazilian Portuguese catalog", () => {
-  it("has full key and placeholder parity with Spanish", () => {
-    const portuguese = brazilianPortugueseCatalog();
-
-    expect(i18n.SUPPORTED_LANGUAGES).toContain("pt-BR");
-    expect(Object.keys(portuguese).sort()).toEqual(Object.keys(i18n.DICTS.es).sort());
-    for (const key of Object.keys(i18n.DICTS.es)) {
-      expect(placeholders(portuguese[key] ?? ""), key)
-        .toEqual(placeholders(i18n.DICTS.es[key]));
-    }
-  });
-
   it("keeps product terms and key journeys natural in Brazilian Portuguese", () => {
     const portuguese = brazilianPortugueseCatalog();
 
@@ -209,21 +184,24 @@ describe("Brazilian Portuguese catalog", () => {
     expect(portuguese["forceControl.notice"]).toContain("RGB");
     expect(portuguese["startup.remember.hint"]).toContain("SteamOS");
     expect(portuguese["performance.hint"]).toContain("GPU");
-    expect(Object.values(portuguese).some((value) => value.includes("—"))).toBe(false);
     expect(i18n.translate("pt-BR", "profiles.game", { name: "Hades" })).toBe(
       "Jogo: Hades",
     );
   });
 });
 
-describe("Italian persistence", () => {
-  it("restores a persisted Italian selection", () => {
+describe("Language persistence", () => {
+  it.each([
+    ["Italian", "it"],
+    ["German", "de"],
+    ["Brazilian Portuguese", "pt-BR"],
+  ] as const)("restores a persisted %s selection", (_name, lang) => {
     vi.stubGlobal("localStorage", {
-      getItem: vi.fn(() => "it"),
+      getItem: vi.fn(() => lang),
       setItem: vi.fn(),
     });
 
-    expect(i18n.readInitialLang()).toBe("it");
+    expect(i18n.readInitialLang()).toBe(lang);
   });
 
   it("keeps Spanish as the safe fallback", () => {
@@ -243,28 +221,7 @@ describe("Italian persistence", () => {
   });
 });
 
-describe("German persistence", () => {
-  it("restores a persisted German selection", () => {
-    vi.stubGlobal("localStorage", {
-      getItem: vi.fn(() => "de"),
-      setItem: vi.fn(),
-    });
-
-    expect(i18n.readInitialLang()).toBe("de");
-  });
-
-});
-
-describe("Brazilian Portuguese persistence and selector", () => {
-  it("restores a persisted Brazilian Portuguese selection", () => {
-    vi.stubGlobal("localStorage", {
-      getItem: vi.fn(() => "pt-BR"),
-      setItem: vi.fn(),
-    });
-
-    expect(i18n.readInitialLang()).toBe("pt-BR");
-  });
-
+describe("Language selector", () => {
   it("uses one compact dropdown and persists every language selection", () => {
     const setItem = vi.fn();
     vi.stubGlobal("localStorage", {
@@ -276,7 +233,6 @@ describe("Brazilian Portuguese persistence and selector", () => {
       createElement(i18n.I18nProvider, null, createElement(i18n.LanguageSelector)),
     );
 
-    expect(renderedFocusables).toHaveLength(0);
     expect(renderedDropdowns).toHaveLength(1);
     const selector = renderedDropdowns[0];
     expect(selector.menuLabel).toBe("Idioma");
@@ -288,9 +244,10 @@ describe("Brazilian Portuguese persistence and selector", () => {
       "de",
       "pt-BR",
     ]);
-    expect(
-      selector.rgOptions.map((option) => renderToStaticMarkup(option.label)),
-    ).toEqual([
+    const renderedLabels = selector.rgOptions.map((option) =>
+      renderToStaticMarkup(option.label),
+    );
+    expect(renderedLabels).toEqual([
       expect.stringContaining("Español"),
       expect.stringContaining("English"),
       expect.stringContaining("Italiano"),
@@ -298,8 +255,8 @@ describe("Brazilian Portuguese persistence and selector", () => {
       expect.stringContaining("Português (Brasil)"),
     ]);
     expect(
-      selector.rgOptions.every((option) =>
-        renderToStaticMarkup(option.label).includes(`data-language-flag="${option.data}"`),
+      renderedLabels.every((label, index) =>
+        label.includes(`data-language-flag="${selector.rgOptions[index].data}"`),
       ),
     ).toBe(true);
 

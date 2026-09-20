@@ -4,8 +4,18 @@ import { it } from "./it";
 import { de } from "./de";
 import { ptBR } from "./ptBR";
 
-export const SUPPORTED_LANGUAGES = ["es", "en", "it", "de", "pt-BR"] as const;
-export type Lang = (typeof SUPPORTED_LANGUAGES)[number];
+const LANGUAGE_OPTIONS = [
+  { data: "es", label: "Español" },
+  { data: "en", label: "English" },
+  { data: "it", label: "Italiano" },
+  { data: "de", label: "Deutsch" },
+  { data: "pt-BR", label: "Português (Brasil)" },
+] as const;
+
+export type Lang = (typeof LANGUAGE_OPTIONS)[number]["data"];
+export const SUPPORTED_LANGUAGES: readonly Lang[] = LANGUAGE_OPTIONS.map(
+  ({ data }) => data,
+);
 
 const STORAGE_KEY = "colores-lang";
 
@@ -193,11 +203,6 @@ const es: Record<string, string> = {
   "about.title": "Acerca de",
   "about.version": "Versión {v}",
   "about.madeBy": "Hecho por {name}",
-
-  "lang.spanish": "Español",
-  "lang.english": "Inglés",
-  "lang.italian": "Italiano",
-  "lang.german": "Alemán",
 
   "experimental.title": "Funciones experimentales",
   "experimental.description": "Estas funciones no se han verificado en este dispositivo. Puedes probarlas, pero puede que aún no funcionen bien. Estoy trabajando para añadir compatibilidad.",
@@ -438,11 +443,6 @@ const en: Record<string, string> = {
   "about.version": "Version {v}",
   "about.madeBy": "Made by {name}",
 
-  "lang.spanish": "Spanish",
-  "lang.english": "English",
-  "lang.italian": "Italian",
-  "lang.german": "German",
-
   "experimental.title": "Experimental features",
   "experimental.description": "These features have not been verified on this device. You can try them, but they may not work correctly yet. I'm still working on support for this device.",
   "experimental.feature.color": "Color",
@@ -568,14 +568,6 @@ const FLAG_SVGS: Record<Lang, string> = {
   de: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path d="M0 0h24v5.33H0z"/><path fill="#d00" d="M0 5.33h24v5.34H0z"/><path fill="#ffce00" d="M0 10.67h24V16H0z"/></svg>',
   "pt-BR": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path fill="#009739" d="M0 0h24v16H0z"/><path fill="#fedd00" d="m12 2 9 6-9 6-9-6z"/><circle cx="12" cy="8" r="3.5" fill="#012169"/><path fill="none" stroke="#fff" stroke-width=".7" d="M8.8 7.2c2.2-.7 4.4-.3 6.5 1"/></svg>',
 };
-
-const LANGUAGE_OPTIONS: ReadonlyArray<{ data: Lang; label: string }> = [
-  { data: "es", label: "Español" },
-  { data: "en", label: "English" },
-  { data: "it", label: "Italiano" },
-  { data: "de", label: "Deutsch" },
-  { data: "pt-BR", label: "Português (Brasil)" },
-];
 
 const LanguageFlag: FC<{ lang: Lang }> = ({ lang }) => (
   <img

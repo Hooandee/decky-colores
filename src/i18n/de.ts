@@ -182,11 +182,6 @@ export const de: Record<string, string> = {
   "about.version": "Version {v}",
   "about.madeBy": "Von {name}",
 
-  "lang.spanish": "Spanisch",
-  "lang.english": "Englisch",
-  "lang.italian": "Italienisch",
-  "lang.german": "Deutsch",
-
   "experimental.title": "Experimentelle Funktionen",
   "experimental.description": "Diese Funktionen wurden auf diesem Gerät noch nicht geprüft. Du kannst sie ausprobieren, möglicherweise funktionieren sie aber noch nicht richtig. Ich arbeite noch an der Unterstützung für dieses Gerät.",
   "experimental.feature.color": "Farbe",

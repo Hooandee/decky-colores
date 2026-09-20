@@ -108,6 +108,7 @@ describe("custom sensor bands", () => {
     expect(formatSensorValue(89.6, "en")).toBe("89.6");
     expect(formatSensorValue(89.6, "it")).toBe("89,6");
     expect(formatSensorValue(89.6, "de")).toBe("89,6");
+    expect(formatSensorValue(89.6, "pt-BR")).toBe("89,6");
   });
 
   it("formats battery percentages without floating point artifacts", () => {

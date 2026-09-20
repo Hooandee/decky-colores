@@ -4,6 +4,7 @@ export const ptBR: Record<string, string> = {
 
   "profiles.global": "Global",
   "profiles.game": "Jogo: {name}",
+  "profiles.gameShort": "Jogo",
   "profiles.followingGlobal": "Segue o perfil global",
   "profiles.usingOwn": "Usa um perfil próprio",
   "profiles.useOwn": "Usar perfil próprio",
@@ -42,6 +43,7 @@ export const ptBR: Record<string, string> = {
 
   "nav.sensors": "Sensores",
   "nav.settings": "Configurações",
+  "nav.changeSection": "Mudar de seção",
   "settings.language": "Idioma",
   "customize.title": "Personalização",
   "customize.accent": "Cor de destaque",
@@ -180,11 +182,6 @@ export const ptBR: Record<string, string> = {
   "about.version": "Versão {v}",
   "about.madeBy": "Criado por {name}",
 
-  "lang.spanish": "Espanhol",
-  "lang.english": "Inglês",
-  "lang.italian": "Italiano",
-  "lang.german": "Alemão",
-
   "experimental.title": "Recursos experimentais",
   "experimental.description": "Estes recursos ainda não foram verificados neste dispositivo. Você pode testá-los, mas talvez ainda não funcionem corretamente. Estou trabalhando para oferecer suporte.",
   "experimental.feature.color": "Cor",
@@ -205,6 +202,7 @@ export const ptBR: Record<string, string> = {
   "report.section.kind": "O que você gostaria de enviar?",
   "report.kind.bug": "Um problema",
   "report.kind.feature": "Um pedido ou uma ideia",
+  "report.kind.change": "Alterar",
   "report.section.what": "O que está errado?",
   "report.section.what.feature": "Sobre qual área é?",
   "report.cat.color": "Cor",
