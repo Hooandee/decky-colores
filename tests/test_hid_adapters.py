@@ -138,6 +138,17 @@ def test_msi_per_zone_uses_distinct_zones(hid_env):
     assert triples == zone_colors
 
 
+def test_msi_hardware_effect_honors_brightness(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_msi_device_entry()]
+    dev = adapters.MsiHidDevice.create()
+    writes.clear()
+
+    assert dev.apply_hardware_effect("rainbow", (0, 255, 0), 50, 25, True) is True
+
+    assert writes[0][13] == 25
+
+
 def test_legion_tablet_solid_sequence(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
@@ -198,6 +209,30 @@ def test_legion_go_one_percent_uses_minimum_visible_brightness(hid_env):
     dev = adapters.LegionGoHidDevice.create()
     writes.clear()
     assert dev.apply_solid((255, 255, 255), 1, True) is True
+    set_profiles = [w for w in writes if len(w) >= 10 and w[2] == 0x72]
+    assert [packet[9] for packet in set_profiles] == [1, 1]
+
+
+def test_legion_native_effect_honors_brightness(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
+    dev = adapters.LegionGoHidDevice.create()
+    writes.clear()
+
+    assert dev.apply_hardware_effect("spiral", (255, 0, 0), 50, 5, True) is True
+
+    set_profiles = [w for w in writes if len(w) >= 10 and w[2] == 0x72]
+    assert [packet[9] for packet in set_profiles] == [3, 3]
+
+
+def test_legion_native_effect_one_percent_uses_minimum_visible_brightness(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_tablet_entry()]
+    dev = adapters.LegionGoHidDevice.create()
+    writes.clear()
+
+    assert dev.apply_hardware_effect("spiral", (255, 0, 0), 50, 1, True) is True
+
     set_profiles = [w for w in writes if len(w) >= 10 and w[2] == 0x72]
     assert [packet[9] for packet in set_profiles] == [1, 1]
 
@@ -273,6 +308,17 @@ def test_legion_go_s_solid_honors_brightness(hid_env):
     ]
     profile = writes[-1]
     assert profile[6] == 0x20
+
+
+def test_legion_go_s_native_effect_honors_brightness(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_go_s_entry()]
+    dev = adapters.LegionGoSHidDevice.create()
+    writes.clear()
+
+    assert dev.apply_hardware_effect("spiral", (255, 0, 0), 50, 25, True) is True
+
+    assert writes[-1][6] == 0x10
 
 
 def test_legion_go_s_power_off_disables(hid_env):
@@ -484,6 +530,7 @@ def test_build_device_ally_x_falls_back_to_hid_without_sysfs(hid_env, tmp_path):
     assert caps["hardwareEffects"] is True
     assert caps["reconnectable"] is True
     assert caps["conflictsWithSystemRgb"] is True
+    assert caps["hhdRgbTakeover"] is True
     assert "spiral" not in caps["supportedEffects"]
     assert ctx["info"]["name"] == "ROG Ally X"
     sys.modules.pop("device", None)
@@ -569,6 +616,34 @@ def test_ally_per_zone_distinct_colors(hid_env):
     assert [tuple(p[4:7]) for p in zone_packets] == colors
 
 
+def test_ally_software_frames_have_fine_brightness_scale(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+
+    for brightness, expected_channel in ((1, 3), (20, 51), (50, 128), (100, 255)):
+        writes.clear()
+        assert dev.apply_solid((255, 255, 255), brightness, True) is True
+        brightness_packets = [p for p in writes if p[:4] == bytes.fromhex("5abac5c4")]
+        zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
+        assert brightness_packets[0][4] == 3
+        assert all(
+            tuple(p[4:7]) == (expected_channel,) * 3 for p in zone_packets
+        )
+
+
+def test_ally_zero_brightness_turns_off_while_power_stays_on(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    writes.clear()
+
+    assert dev.apply_solid((255, 255, 255), 0, True) is True
+
+    assert writes[0][:5] == bytes.fromhex("5abac5c400")
+    assert tuple(writes[1][4:7]) == (0, 0, 0)
+
+
 def test_ally_power_off_blacks_out(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
@@ -585,8 +660,10 @@ def test_ally_hardware_effect_uses_mode_and_speed(hid_env):
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
     dev = adapters.AsusAllyHidDevice.create()
     writes.clear()
-    assert dev.apply_hardware_effect("rainbow", (0, 255, 0), 90, True) is True
+    assert dev.apply_hardware_effect("rainbow", (0, 255, 0), 90, 20, True) is True
+    brightness_packets = [p for p in writes if p[:4] == bytes.fromhex("5abac5c4")]
     zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
+    assert brightness_packets[0][4] == 1
     assert zone_packets
     assert all(p[3] == 0x02 for p in zone_packets)
     assert all(p[7] == 0xF5 for p in zone_packets)

@@ -22,6 +22,10 @@ _SERIAL_LABELED = re.compile(
 _SERIAL_RUN = re.compile(
     r"\b(?=[A-Za-z0-9]*[A-Za-z])(?=[A-Za-z0-9]*\d)[A-Za-z0-9]{10,}\b"
 )
+_ERROR_LINE = re.compile(
+    r"\b(?:error|exception|traceback|failed|failure|warning|warn|errno|\w+error)\b",
+    re.I,
+)
 
 
 def normalize_report_kind(kind) -> str:
@@ -81,6 +85,15 @@ def _tail_file(path: str, n: int) -> str:
     return txt
 
 
+def _cap_text(text: str, max_bytes: int) -> str:
+    if max_bytes <= 0:
+        return ""
+    raw = text.encode("utf-8")
+    if len(raw) <= max_bytes:
+        return text
+    return raw[-max_bytes:].decode("utf-8", "ignore")
+
+
 def tail_logs(
     log_dir: str,
     *,
@@ -97,20 +110,69 @@ def tail_logs(
         )
     except Exception:  # noqa: BLE001
         return []
+    selected = files[:max_files]
     out: list[dict] = []
-    budget = max_bytes
-    for path in files[:max_files]:
+    budget = max(0, max_bytes)
+    for index, path in enumerate(selected):
+        if budget <= 0:
+            break
+        share = max(1, budget // (len(selected) - index))
+        try:
+            data = _tail_file(path, share)
+        except Exception:  # noqa: BLE001
+            continue
+        text = _cap_text(
+            redact_text(data, home=home, hostname=hostname),
+            share,
+        )
+        out.append({
+            "name": os.path.basename(path),
+            "text": text,
+        })
+        budget -= len(text.encode("utf-8"))
+    return out
+
+
+def tail_error_logs(
+    log_dir: str,
+    *,
+    max_files: int = 3,
+    max_bytes: int = 32_000,
+    scan_bytes_per_file: int = 1_000_000,
+    home: str | None = None,
+    hostname: str | None = None,
+) -> list[dict]:
+    try:
+        files = sorted(
+            glob.glob(os.path.join(log_dir, "*.log")),
+            key=os.path.getmtime,
+            reverse=True,
+        )[:max_files]
+    except Exception:  # noqa: BLE001
+        return []
+    out: list[dict] = []
+    budget = max(0, max_bytes)
+    for index, path in enumerate(files):
         if budget <= 0:
             break
         try:
-            data = _tail_file(path, budget)
+            data = _tail_file(path, scan_bytes_per_file)
         except Exception:  # noqa: BLE001
             continue
-        out.append({
-            "name": os.path.basename(path),
-            "text": redact_text(data, home=home, hostname=hostname),
-        })
-        budget -= len(data)
+        matches = "\n".join(
+            line for line in data.splitlines() if _ERROR_LINE.search(line)
+        )
+        if not matches:
+            continue
+        share = max(1, budget // (len(files) - index))
+        text = _cap_text(
+            redact_text(matches, home=home, hostname=hostname),
+            share,
+        )
+        if not text:
+            continue
+        out.append({"name": os.path.basename(path), "text": text})
+        budget -= len(text.encode("utf-8"))
     return out
 
 
@@ -273,6 +335,7 @@ def capabilities_from(state: dict, *, driver=None, route=None, led_path=None, la
         "power_led": bool(caps.get("powerLed")),
         "reconnectable": bool(caps.get("reconnectable")),
         "conflicts_with_system_rgb": bool(caps.get("conflictsWithSystemRgb")),
+        "hhd_rgb_takeover": bool(caps.get("hhdRgbTakeover")),
         "enabled_experiments": caps.get("enabledExperiments") or [],
     }
 
@@ -287,6 +350,8 @@ def build_bundle(
     state: dict,
     stores: dict,
     logs: list,
+    errors: list | None = None,
+    runtime: dict | None = None,
     kind: str = "bug",
     kernel: dict | None = None,
     sysfs: dict | None = None,
@@ -304,6 +369,8 @@ def build_bundle(
         "state": state or {},
         "stores": stores or {},
         "logs": logs or [],
+        "errors": errors or [],
+        "runtime": runtime or {},
         "kernel": kernel or {},
         "sysfs": sysfs or {},
     }

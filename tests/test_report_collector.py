@@ -1,5 +1,6 @@
 import os
 
+import colores_report.collector as report_collector
 from colores_report.collector import (
     SCHEMA,
     build_bundle,
@@ -56,6 +57,48 @@ def test_tail_logs_missing_dir_is_empty():
     assert tail_logs("/nope/nope") == []
 
 
+def test_tail_logs_reserves_space_for_each_selected_file(tmp_path):
+    old = tmp_path / "old.log"
+    new = tmp_path / "new.log"
+    old.write_text("old " + "o" * 200)
+    new.write_text("new " + "n" * 200)
+    os.utime(old, (1, 1))
+    os.utime(new, (2, 2))
+
+    logs = tail_logs(str(tmp_path), max_files=2, max_bytes=80)
+
+    assert [entry["name"] for entry in logs] == ["new.log", "old.log"]
+    assert sum(len(entry["text"].encode()) for entry in logs) <= 80
+
+
+def test_tail_logs_keeps_utf8_output_within_byte_budget(tmp_path):
+    (tmp_path / "unicode.log").write_text("🙂")
+
+    logs = tail_logs(str(tmp_path), max_files=1, max_bytes=1)
+
+    assert len(logs[0]["text"].encode("utf-8")) <= 1
+
+
+def test_error_log_summary_finds_older_failure_and_redacts_it(tmp_path):
+    log = tmp_path / "colores.log"
+    log.write_text(
+        "[ERROR] write failed for serial: RC73XA12345 at /home/deck/private\n"
+        + "ordinary frame\n" * 100
+    )
+
+    errors = report_collector.tail_error_logs(
+        str(tmp_path),
+        max_bytes=200,
+        scan_bytes_per_file=4_000,
+        home="/home/deck",
+    )
+
+    assert errors == [{
+        "name": "colores.log",
+        "text": "[ERROR] write failed for serial: [serial] at ~/private",
+    }]
+
+
 def test_kernel_logs_redacts_and_caps():
     def run(cmd):
         return "error /home/deck/x failed" if "dmesg" in cmd[0] else None
@@ -92,6 +135,7 @@ def test_capabilities_from_distils_led_caps():
             "color": True, "brightness": True, "zones": 4, "maxBrightness": 255,
             "perZone": True, "hardwareEffects": False, "ambilight": True,
             "batteryMode": True, "powerLed": False, "conflictsWithSystemRgb": False,
+            "hhdRgbTakeover": True,
             "supportedEffects": ["breathing", "wave"], "enabledExperiments": [],
         },
     }
@@ -101,6 +145,7 @@ def test_capabilities_from_distils_led_caps():
     assert caps["color"] is True and caps["ambilight"] is True
     assert caps["supported_effects"] == ["breathing", "wave"]
     assert caps["conflicts_with_system_rgb"] is False
+    assert caps["hhd_rgb_takeover"] is True
 
 
 def test_capabilities_from_empty_is_safe():
@@ -169,7 +214,8 @@ def test_build_bundle_shape():
         app="colores", categories=["color"], text="x" * 5000,
         environment={"os": "Bazzite"}, capabilities={"color": True},
         state={}, stores={}, logs=[], kernel={"dmesg": "x", "journal": None},
-        sysfs={"leds": []},
+        sysfs={"leds": []}, errors=[{"name": "x.log", "text": "failed"}],
+        runtime={"suspend": {"last_error": "serial: RC73XA12345"}},
     )
     assert b["schema"] == SCHEMA == 2
     assert b["app"] == "colores" and b["kind"] == "bug"
@@ -177,6 +223,8 @@ def test_build_bundle_shape():
     assert len(b["text"]) == 4000
     assert b["kernel"] == {"dmesg": "x", "journal": None}
     assert b["sysfs"] == {"leds": []}
+    assert b["errors"] == [{"name": "x.log", "text": "failed"}]
+    assert b["runtime"] == {"suspend": {"last_error": "serial: [serial]"}}
 
 
 def test_build_bundle_marks_feature_without_changing_logs():

@@ -1,6 +1,6 @@
 import os
 
-from py_modules.device import build_layout, detect_device, detect_capabilities, lookup_name, read_zone_format, build_capabilities, build_device
+from py_modules.device import build_layout, detect_device, lookup_name, read_zone_format, build_capabilities, build_device
 import led_device as _led_device_mod
 SysfsRgbDevice = _led_device_mod.SysfsRgbDevice
 NullDevice = _led_device_mod.NullDevice
@@ -68,47 +68,6 @@ def test_detect_device_reads_dmi(tmp_path):
     device = detect_device(str(tmp_path))
     assert device["name"] == "ROG Xbox Ally X"
     assert device["board"] == "RC73XA"
-
-
-def test_detect_capabilities_ally_rgb(tmp_path):
-    _make_led(
-        str(tmp_path),
-        "ally:rgb:joystick_rings",
-        {
-            "multi_intensity": "0 0 0 0",
-            "multi_index": "rgb rgb rgb rgb",
-            "max_brightness": "255",
-            "brightness": "0",
-        },
-    )
-    caps = detect_capabilities(str(tmp_path))
-    assert caps["color"] is True
-    assert caps["zones"] == 4
-    assert caps["maxBrightness"] == 255
-    assert caps["ledPath"].endswith("ally:rgb:joystick_rings")
-
-
-def test_detect_capabilities_no_rgb_led(tmp_path):
-    _make_led(str(tmp_path), "input1::capslock", {"max_brightness": "1", "brightness": "0"})
-    caps = detect_capabilities(str(tmp_path))
-    assert caps["color"] is False
-    assert caps["ledPath"] is None
-
-
-def test_detect_capabilities_zero_max_brightness_falls_back(tmp_path):
-    _make_led(
-        str(tmp_path),
-        "ally:rgb:joystick_rings",
-        {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb", "max_brightness": "0"},
-    )
-    caps = detect_capabilities(str(tmp_path))
-    assert caps["maxBrightness"] == 255
-
-
-def test_detect_capabilities_no_leds_dir(tmp_path):
-    caps = detect_capabilities(str(tmp_path))
-    assert caps["color"] is False
-    assert caps["zones"] == 0
 
 
 def test_read_zone_format_packed_decimal(tmp_path):
@@ -190,6 +149,53 @@ def test_build_device_ally_returns_sysfs_writer(tmp_path):
     assert ctx["device"].apply_zones([(255, 0, 0)], 100, True) is True
     intensity = os.path.join(str(tmp_path), "sys/class/leds/ally:rgb:joystick_rings/multi_intensity")
     assert open(intensity).read() == "16711680 16711680 16711680 16711680"
+
+
+def test_build_device_ally_uses_canonical_node_when_input_rgb_competes(tmp_path):
+    root = str(tmp_path)
+    leds_dir = os.path.join(root, "sys/class/leds")
+    input_name = "input29:rgb:indicator"
+    ally_name = "ally:rgb:joystick_rings"
+    _make_dmi(root, "RC73YA", "ROG Xbox Ally RC73YA")
+    _make_led(root, input_name,
+              {"multi_intensity": "0 0 0", "multi_index": "red green blue",
+               "max_brightness": "255", "brightness": "0"})
+    _make_led(root, ally_name,
+              {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb",
+               "max_brightness": "255", "brightness": "0"})
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], SysfsRgbDevice)
+    assert ctx["device"].apply_zones([(255, 0, 0)], 100, True) is True
+    assert open(os.path.join(leds_dir, ally_name, "multi_intensity")).read() == (
+        "16711680 16711680 16711680 16711680"
+    )
+    assert open(os.path.join(leds_dir, input_name, "multi_intensity")).read() == "0 0 0"
+
+
+def test_build_device_ally_uses_hid_fallback_when_only_input_rgb_exists(tmp_path, monkeypatch):
+    import py_modules.device as device_module
+
+    fallback_device = object()
+    root = str(tmp_path)
+    _make_dmi(root, "RC73XA", "ROG Xbox Ally X RC73XA")
+    _make_led(root, "input20:rgb:indicator",
+              {"multi_intensity": "0 0 0", "multi_index": "red green blue",
+               "max_brightness": "255", "brightness": "0"})
+    monkeypatch.setattr(device_module, "HID_AVAILABLE", True)
+    monkeypatch.setattr(
+        device_module,
+        "_build_hid_context",
+        lambda *args: {"device": fallback_device, "capabilities": {"color": True}},
+    )
+
+    ctx = build_device(root)
+
+    assert ctx["device"] is fallback_device
+    input_intensity = os.path.join(
+        root, "sys/class/leds/input20:rgb:indicator/multi_intensity"
+    )
+    assert open(input_intensity).read() == "0 0 0"
 
 
 def test_build_device_ally_uses_hid_fallback_for_incompatible_packed_maxima(tmp_path, monkeypatch):

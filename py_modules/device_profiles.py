@@ -1,5 +1,6 @@
 ASUS_SYSFS = {
     "driver": "sysfs",
+    "led_name": "ally:rgb:joystick_rings",
     "color_order": "rgb",
     "zones": 4,
     "supported_effects": ["breathing", "rainbow", "wave", "cycle", "spiral"],
@@ -16,6 +17,7 @@ ASUS_ALLY_HID = {
     "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
     "color_correction": [1.0, 0.85, 1.0],
     "conflicts_with_system_rgb": True,
+    "hhd_rgb_takeover": True,
     "experimental": [],
 }
 

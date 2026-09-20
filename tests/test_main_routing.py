@@ -72,8 +72,10 @@ class FakeController:
         self.calls.append(("solid", tuple(color), brightness, power))
         return True
 
-    def apply_hardware_effect(self, effect_id, color, speed, power):
-        self.calls.append(("hw_effect", effect_id, tuple(color), speed, power))
+    def apply_hardware_effect(self, effect_id, color, speed, brightness, power):
+        self.calls.append(
+            ("hw_effect", effect_id, tuple(color), speed, brightness, power)
+        )
         return True
 
     def reconnect(self):
@@ -91,6 +93,10 @@ class FakeEngine:
 
     def stop(self):
         self.events.append(("stop",))
+
+    @property
+    def running(self):
+        return False
 
     def set_static(self, zone_colors):
         self.events.append(("static", list(zone_colors)))
@@ -112,6 +118,10 @@ class FakeAmbilight:
 
     def stop(self):
         self.events.append(("stop",))
+
+    @property
+    def running(self):
+        return False
 
     async def stop_and_wait(self):
         self.events.append(("stop_and_wait",))
@@ -147,6 +157,53 @@ class FakeHhdRgb:
         return self.writes.pop(0) if self.writes else True
 
 
+class FakeSuspendMonitor:
+    def __init__(self):
+        self.events = []
+
+    def start(self):
+        self.events.append(("start",))
+
+    async def stop_and_wait(self):
+        self.events.append(("stop_and_wait",))
+
+    def diagnostics(self):
+        return {
+            "running": True,
+            "connected": True,
+            "inhibitor_armed": True,
+            "sleeping": False,
+            "last_error": None,
+        }
+
+
+class FakeSuspendConnection:
+    def __init__(self):
+        self.callback = None
+        self.ready = asyncio.Event()
+        self.disconnected = asyncio.Event()
+        self.inhibitors = iter((41, 42, 43))
+        self.acquire_count = 0
+
+    async def connect(self, callback):
+        self.callback = callback
+        return self
+
+    async def acquire_inhibitor(self):
+        self.acquire_count += 1
+        self.ready.set()
+        return next(self.inhibitors)
+
+    async def wait_closed(self):
+        await self.disconnected.wait()
+
+    def disconnect(self):
+        self.disconnected.set()
+
+    def emit(self, sleeping):
+        self.callback(sleeping)
+
+
 def _plugin(
     main_module,
     mode,
@@ -160,6 +217,10 @@ def _plugin(
     p = main_module.Plugin()
     p._ready = True
     p._stopping = False
+    p._suspend_prepared = False
+    p._suspend_lock = asyncio.Lock()
+    p._resume_lock = asyncio.Lock()
+    p._resume_handled_at = None
     p._hhd_rgb_lock = asyncio.Lock()
     p._hhd_rgb_status = None
     p._controller = FakeController(hw, per_zone)
@@ -236,6 +297,76 @@ def test_submit_report_forwards_feature_kind(main_module, monkeypatch):
         "hostname": "deck",
         "kind": "feature",
     }
+
+
+def test_report_runtime_diagnostics_exposes_lifecycle_and_rgb_ownership(main_module):
+    plugin = _plugin(main_module, "ambient", hhd_takeover=True)
+    plugin._suspend_monitor = FakeSuspendMonitor()
+    plugin._suspend_prepared = True
+    plugin._settings.update(force_control=True, hhd_rgb_restore=True)
+    plugin._hhd_rgb_status = "disabled"
+
+    runtime = plugin._report_runtime_diagnostics()
+
+    assert runtime == {
+        "suspend": {
+            "running": True,
+            "connected": True,
+            "inhibitor_armed": True,
+            "sleeping": False,
+            "last_error": None,
+            "prepared": True,
+        },
+        "render": {
+            "engine_running": False,
+            "ambilight_running": False,
+            "ambilight_status": "idle",
+            "audio_status": "idle",
+        },
+        "hhd_rgb": {
+            "takeover_supported": True,
+            "force_control": True,
+            "status": "disabled",
+            "restore_pending": True,
+        },
+    }
+
+
+def test_report_bundle_wires_error_summary_and_runtime_diagnostics(
+    main_module, monkeypatch, tmp_path
+):
+    plugin = _plugin(main_module, "solid", hhd_takeover=True)
+    plugin._suspend_monitor = FakeSuspendMonitor()
+    plugin._device = {"name": "ROG Ally", "board": "RC71L", "product": "RC71L"}
+    log = tmp_path / "colores.log"
+    log.write_text("[ERROR] failed at /home/deck/private\nordinary frame\n")
+    monkeypatch.setattr(
+        main_module.decky,
+        "DECKY_PLUGIN_LOG_DIR",
+        str(tmp_path),
+        raising=False,
+    )
+    plugin._report_environment = lambda: {"os": "SteamOS"}
+    plugin._report_stores = lambda: {}
+    plugin._run_capture = lambda command: None
+
+    async def get_state():
+        return {"device": plugin._device, "capabilities": plugin._capabilities}
+
+    plugin.get_state = get_state
+
+    bundle = asyncio.run(
+        plugin._build_report_bundle(
+            ["color"], "does not light", "/home/deck", "handheld", "bug"
+        )
+    )
+
+    assert bundle["errors"] == [{
+        "name": "colores.log",
+        "text": "[ERROR] failed at ~/private",
+    }]
+    assert bundle["runtime"]["suspend"]["connected"] is True
+    assert bundle["capabilities"]["hhd_rgb_takeover"] is True
 
 
 @pytest.mark.parametrize(
@@ -440,6 +571,15 @@ def test_plain_breathing_uses_hardware_effect(main_module):
     assert not any(e[0] == "effect" for e in p._engine.events)
 
 
+def test_hardware_effect_receives_active_brightness(main_module):
+    p = _plugin(main_module, "effect", {"id": "spiral", "speed": 50, "use_gradient": False})
+    p._settings["brightness"] = 5
+
+    p._apply()
+
+    assert ("hw_effect", "spiral", (255, 0, 0), 50, 5, True) in p._controller.calls
+
+
 def test_ambient_runs_capture_on_hardware_device(main_module):
     p = _plugin(main_module, "ambient")
     p._apply()
@@ -551,6 +691,126 @@ def test_prepare_suspend_stops_capture_without_changing_user_intent(main_module)
     assert p._settings["power"] is True
 
 
+def test_prepare_suspend_is_idempotent_when_hooks_overlap(main_module):
+    async def drive():
+        p = _plugin(main_module, "ambient", power=True, per_zone=True)
+
+        await asyncio.gather(p.prepare_suspend(), p.prepare_suspend())
+
+        assert p._ambilight.events == [("stop_and_wait",)]
+
+    asyncio.run(drive())
+
+
+def test_prepare_suspend_reaps_battery_loop_without_changing_user_intent(main_module):
+    async def drive():
+        p = _plugin(main_module, "battery", power=True, per_zone=True)
+        p._engine = main_module.EffectEngine(p._render, p._zones)
+        p._engine.start_battery(p._battery_state)
+        task = p._engine._task
+        await asyncio.sleep(0)
+
+        await p.prepare_suspend()
+
+        assert task.done()
+        assert task.cancelled()
+        assert not p._engine.running
+        assert p._settings["mode"] == "battery"
+        assert p._settings["power"] is True
+
+    asyncio.run(drive())
+
+
+def test_prepare_suspend_blocks_late_battery_writes(main_module):
+    async def drive():
+        p = _plugin(main_module, "battery", power=True, per_zone=True)
+        p._engine = main_module.EffectEngine(p._render, p._zones)
+        p._engine.start_battery(p._battery_state)
+        await asyncio.sleep(0)
+
+        await p.prepare_suspend()
+        p._controller.calls.clear()
+        p._render([(1, 2, 3), (4, 5, 6)])
+
+        assert p._controller.calls == []
+
+    asyncio.run(drive())
+
+
+def test_full_suspend_signal_cycle_stops_and_restores_battery(
+    main_module, monkeypatch
+):
+    monkeypatch.setattr(main_module, "RESUME_REAPPLY_DELAY", 0)
+
+    async def drive():
+        p = _plugin(main_module, "battery", power=True, per_zone=True)
+        p._engine = main_module.EffectEngine(p._render, p._zones)
+        connection = FakeSuspendConnection()
+        closed = []
+        monitor = main_module.SuspendMonitor(
+            p.prepare_suspend,
+            resume_suspend=p._resume_after_suspend_signal,
+            connect=connection.connect,
+            close_fd=closed.append,
+        )
+        p._engine.start_battery(p._battery_state)
+        render_task = p._engine._task
+        monitor.start()
+        await connection.ready.wait()
+
+        connection.emit(True)
+        for _ in range(20):
+            if render_task.done() and closed == [41]:
+                break
+            await asyncio.sleep(0)
+
+        assert render_task.cancelled()
+        assert p._suspend_prepared is True
+        assert closed == [41]
+
+        p._controller.calls.clear()
+        connection.emit(False)
+        for _ in range(20):
+            if p._engine.running and p._controller.reconnected:
+                break
+            await asyncio.sleep(0)
+
+        assert connection.acquire_count == 2
+        assert p._suspend_prepared is False
+        assert p._controller.reconnected is True
+        assert p._engine.running
+
+        await monitor.stop_and_wait()
+        await p._engine.stop_and_wait()
+
+    asyncio.run(drive())
+
+
+def test_apply_does_not_write_while_suspend_is_prepared(main_module):
+    p = _plugin(main_module, "solid", power=True)
+    p._suspend_prepared = True
+
+    p._apply()
+
+    assert p._controller.calls == []
+
+
+def test_restore_after_resume_restarts_requested_battery_mode(main_module):
+    async def drive():
+        p = _plugin(main_module, "battery", power=True, per_zone=True)
+        p._engine = main_module.EffectEngine(p._render, p._zones)
+        p._suspend_prepared = True
+
+        restored = await p._restore_after_resume()
+
+        assert restored is True
+        assert p._controller.reconnected is True
+        assert p._engine.running
+        await p._engine.stop_and_wait()
+
+    asyncio.run(drive())
+
+
 def test_resume_watch_reconnects_after_suspend_clock_jump(main_module, monkeypatch):
     monkeypatch.setattr(main_module, "RESUME_POLL_INTERVAL", 0)
     monkeypatch.setattr(main_module, "RESUME_REAPPLY_DELAY", 0)
@@ -590,6 +850,31 @@ def test_resume_restore_retries_until_controller_is_ready(main_module, monkeypat
     p.reconnect = reconnect
     assert asyncio.run(p._restore_after_resume()) is True
     assert reconnects == 3
+
+
+def test_overlapping_resume_signals_reconnect_only_once(main_module):
+    async def drive():
+        p = _plugin(main_module, "battery", power=True, per_zone=True)
+        p._suspend_prepared = True
+        reconnects = 0
+
+        async def reconnect():
+            nonlocal reconnects
+            reconnects += 1
+            await asyncio.sleep(0)
+            return True
+
+        p.reconnect = reconnect
+
+        restored = await asyncio.gather(
+            p._restore_after_resume(),
+            p._restore_after_resume(),
+        )
+
+        assert restored == [True, True]
+        assert reconnects == 1
+
+    asyncio.run(drive())
 
 
 def test_resume_restore_stops_after_bounded_failures(main_module, monkeypatch):
@@ -986,6 +1271,18 @@ def test_unload_restores_hhd_rgb_ownership(main_module):
 
     assert p._hhd_rgb.calls == [("set", True)]
     assert p._settings["hhd_rgb_restore"] is None
+
+
+def test_stopping_background_tasks_waits_for_suspend_monitor(main_module):
+    async def drive():
+        p = _plugin(main_module, "solid")
+        p._suspend_monitor = FakeSuspendMonitor()
+
+        await p._stop_background_tasks()
+
+        assert p._suspend_monitor.events == [("stop_and_wait",)]
+
+    asyncio.run(drive())
 
 
 def test_unload_waits_for_inflight_hhd_claim_before_restore(main_module, monkeypatch):
