@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.27.0...decky-colores-v0.28.0) (2026-09-20)
+
+
+### Features
+
+* refresh Decky interface ([38d25d2](https://github.com/Hooandee/decky-colores/commit/38d25d2e01f73afde08df0766387c43b677f1621))
+* refresh Decky interface ([1718570](https://github.com/Hooandee/decky-colores/commit/17185702e9a18ee70c031f83afa894434ea1a906))
+
 ## [0.27.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.1...decky-colores-v0.27.0) (2026-09-20)
 
 
