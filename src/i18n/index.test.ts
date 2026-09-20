@@ -201,10 +201,10 @@ describe("Brazilian Portuguese catalog", () => {
 
     expect(portuguese).toMatchObject({
       "settings.language": "Idioma",
-      "startup.remember.hint": "Ao definir uma cor, o Colores a salva para que a barra use essa cor ao iniciar. Desative esta opção para devolver o controle da barra ao SteamOS na próxima reinicialização.",
-      "forceControl.hint": "Retoma o controle das luzes sempre que você abre o Colores.",
+      "startup.remember.hint": "Ao definir uma cor, o Colores a salva e a aplica na inicialização. Desative esta opção para devolver o controle da barra ao SteamOS após reiniciar.",
+      "forceControl.hint": "O Colores retoma o controle das luzes sempre que você o abre.",
       "performance.hint": "As luzes se preenchem como uma barra de acordo com o uso da GPU, do verde ao vermelho.",
-      "experimental.description": "Estes recursos ainda não foram verificados neste dispositivo. Você pode testá-los, mas talvez ainda não funcionem corretamente. Estou trabalhando para adicionar compatibilidade.",
+      "experimental.description": "Estes recursos ainda não foram verificados neste dispositivo. Você pode testá-los, mas talvez ainda não funcionem corretamente. Estou trabalhando para oferecer suporte.",
     });
     expect(portuguese["forceControl.notice"]).toContain("RGB");
     expect(portuguese["startup.remember.hint"]).toContain("SteamOS");
