@@ -2,11 +2,29 @@
 
 ## [0.28.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.27.0...decky-colores-v0.28.0) (2026-09-20)
 
+### Español
 
-### Features
+* **Interfaz:** Renueva la cabecera del dispositivo y la navegación entre secciones con una vista más compacta, clara y cómoda con el mando.
+* **Perfiles por juego:** Simplifica el selector Global/Juego, lo coloca debajo de las pestañas y conserva ambas configuraciones al cambiar de ámbito o de juego.
+* **Reportes:** Estrena un flujo guiado para enviar problemas o ideas, muestra el modelo del dispositivo como título y mantiene el foco del mando en cada paso.
 
-* refresh Decky interface ([38d25d2](https://github.com/Hooandee/decky-colores/commit/38d25d2e01f73afde08df0766387c43b677f1621))
-* refresh Decky interface ([1718570](https://github.com/Hooandee/decky-colores/commit/17185702e9a18ee70c031f83afa894434ea1a906))
+### English
+
+* **Interface:** Refreshes the device header and section navigation with a more compact, clearer, and gamepad-friendly layout.
+* **Per-game profiles:** Simplifies the Global/Game selector, places it below the tabs, and preserves both configurations when switching scope or games.
+* **Reports:** Adds a guided flow for sending problems or ideas, shows the device model as the title, and keeps gamepad focus in the right place at every step.
+
+### Italiano
+
+* **Interfaccia:** Rinnova l'intestazione del dispositivo e la navigazione tra le sezioni con una vista più compatta, chiara e comoda da usare con il controller.
+* **Profili per gioco:** Semplifica il selettore Globale/Gioco, lo colloca sotto le schede e conserva entrambe le configurazioni quando si cambia ambito o gioco.
+* **Segnalazioni:** Introduce un flusso guidato per inviare problemi o idee, mostra il modello del dispositivo come titolo e mantiene il focus del controller in ogni fase.
+
+### Deutsch
+
+* **Oberfläche:** Überarbeitet die Geräte-Kopfzeile und die Bereichsnavigation mit einer kompakteren, übersichtlicheren und controllerfreundlichen Darstellung.
+* **Spielprofile:** Vereinfacht die Auswahl Global/Spiel, platziert sie unter den Tabs und behält beide Konfigurationen beim Wechsel des Bereichs oder Spiels bei.
+* **Berichte:** Führt einen geführten Ablauf zum Senden von Problemen oder Ideen ein, zeigt das Gerätemodell als Titel und hält den Controller-Fokus in jedem Schritt auf dem richtigen Element.
 
 ## [0.27.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.1...decky-colores-v0.27.0) (2026-09-20)
 
