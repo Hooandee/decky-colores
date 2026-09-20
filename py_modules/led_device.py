@@ -55,7 +55,7 @@ class LedDevice:
     def apply_solid(self, color, brightness, power):
         return False
 
-    def apply_hardware_effect(self, effect_id, color, speed, power):
+    def apply_hardware_effect(self, effect_id, color, speed, brightness, power):
         return False
 
 

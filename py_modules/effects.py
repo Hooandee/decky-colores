@@ -371,6 +371,12 @@ class EffectEngine:
             self._task.cancel()
             self._task = None
 
+    async def stop_and_wait(self):
+        task = self._task
+        self.stop()
+        if task is not None:
+            await asyncio.gather(task, return_exceptions=True)
+
     def _palette(self, params):
         if params.get("use_gradient") and params.get("stops"):
             return interpolate_gradient(params["stops"], self._zones)

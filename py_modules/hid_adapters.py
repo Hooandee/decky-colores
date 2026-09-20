@@ -264,7 +264,7 @@ class MsiHidDevice(_BaseHidDevice):
             lambda: bool(self._transport.send_rgb_config(self._solid_config(color, brightness)))
         )
 
-    def apply_hardware_effect(self, effect_id, color, speed, power):
+    def apply_hardware_effect(self, effect_id, color, speed, brightness, power):
         if not power:
             return self._heal(lambda: bool(self._transport.set_led_color(Color(0, 0, 0), RGBMode.Disabled)))
         return self._heal(
@@ -272,7 +272,7 @@ class MsiHidDevice(_BaseHidDevice):
                 self._transport.set_led_color(
                     Color(*[_clamp8(c) for c in color]),
                     _effect_mode(effect_id),
-                    brightness=100,
+                    brightness=_clamp_pct(brightness),
                     speed=_msi_speed(speed),
                 )
             )
@@ -315,7 +315,7 @@ class LegionTabletHidDevice(_LegionHidDevice):
                     [legion_rgb_enable("left", False), legion_rgb_enable("right", False)]
                 )
             )
-        level = _clamp_pct(brightness) / 100.0
+        level = self._brightness(brightness) / 100.0
         lr, lg, lb = (_clamp8(c) for c in left)
         rr, rg, rb = (_clamp8(c) for c in right)
         reps = [
@@ -336,12 +336,12 @@ class LegionTabletHidDevice(_LegionHidDevice):
                 self._transport.set_led_color(
                     RGBMode.Solid,
                     Color(*[_clamp8(c) for c in color]),
-                    brightness=_clamp_pct(brightness),
+                    brightness=self._brightness(brightness),
                 )
             )
         )
 
-    def apply_hardware_effect(self, effect_id, color, speed, power):
+    def apply_hardware_effect(self, effect_id, color, speed, brightness, power):
         if not power:
             return self._heal(lambda: bool(self._transport.set_led_color(RGBMode.Disabled, Color(0, 0, 0))))
         return self._heal(
@@ -349,18 +349,20 @@ class LegionTabletHidDevice(_LegionHidDevice):
                 self._transport.set_led_color(
                     _effect_mode(effect_id),
                     Color(*[_clamp8(c) for c in color]),
-                    brightness=100,
+                    brightness=self._brightness(brightness),
                     speed=_legion_speed(speed),
                 )
             )
         )
 
+    def _brightness(self, brightness):
+        return _clamp_pct(brightness)
+
 
 class LegionGoHidDevice(LegionTabletHidDevice):
-    def apply_solid(self, color, brightness, power):
-        if _clamp_pct(brightness) == 1:
-            brightness = 2
-        return super().apply_solid(color, brightness, power)
+    def _brightness(self, brightness):
+        brightness = super()._brightness(brightness)
+        return 2 if brightness == 1 else brightness
 
     def apply_zones(self, zone_colors, brightness, power):
         colors = list(zone_colors) or [(0, 0, 0)]
@@ -405,7 +407,7 @@ class LegionGoSHidDevice(_LegionHidDevice):
 
         return self._heal(_do)
 
-    def apply_hardware_effect(self, effect_id, color, speed, power):
+    def apply_hardware_effect(self, effect_id, color, speed, brightness, power):
         if not power:
             return self._heal(lambda: bool(self._transport.set_led_color(Color(0, 0, 0), RGBMode.Disabled)))
         return self._heal(
@@ -413,6 +415,7 @@ class LegionGoSHidDevice(_LegionHidDevice):
                 self._transport.set_led_color(
                     Color(*[_clamp8(c) for c in color]),
                     _effect_mode(effect_id),
+                    brightness=_clamp_pct(brightness),
                 )
             )
         )
@@ -441,11 +444,15 @@ class AsusAllyHidDevice(_BaseHidDevice):
     def supports_hardware_effects(self):
         return True
 
-    def _fit(self, zone_colors):
+    def _fit(self, zone_colors, brightness):
         colors = [tuple(c) for c in zone_colors] or [(0, 0, 0)]
         if len(colors) < 4:
             colors += [colors[-1]] * (4 - len(colors))
-        return [self._correct(c) for c in colors[:4]]
+        scale = _clamp_pct(brightness) / 100.0
+        return [
+            tuple(_clamp8(round(channel * scale)) for channel in self._correct(color))
+            for color in colors[:4]
+        ]
 
     def _off(self):
         def _do():
@@ -458,14 +465,14 @@ class AsusAllyHidDevice(_BaseHidDevice):
         return self._heal(_do)
 
     def apply_zones(self, zone_colors, brightness, power):
-        if not power:
+        if not power or _clamp_pct(brightness) == 0:
             return self._off()
 
         def _do():
             new_mode = self._transport.prev_mode != "solid"
             reps = list(init_cmds()) if new_mode else []
-            reps.append(brightness_cmd(pct_to_level(brightness)))
-            for code, (r, g, b) in zip(ZONE_CODES, self._fit(zone_colors)):
+            reps.append(brightness_cmd(3))
+            for code, (r, g, b) in zip(ZONE_CODES, self._fit(zone_colors, brightness)):
                 reps.append(zone_cmd(code, MODE_SOLID, r, g, b))
             if new_mode:
                 reps.extend(set_apply_cmds())
@@ -479,8 +486,8 @@ class AsusAllyHidDevice(_BaseHidDevice):
     def apply_solid(self, color, brightness, power):
         return self.apply_zones([tuple(color)] * 4, brightness, power)
 
-    def apply_hardware_effect(self, effect_id, color, speed, power):
-        if not power:
+    def apply_hardware_effect(self, effect_id, color, speed, brightness, power):
+        if not power or _clamp_pct(brightness) == 0:
             return self._off()
         code = mode_code(effect_id)
         speed_byte = speed_to_code(speed)
@@ -488,7 +495,7 @@ class AsusAllyHidDevice(_BaseHidDevice):
 
         def _do():
             reps = list(init_cmds())
-            reps.append(brightness_cmd(3))
+            reps.append(brightness_cmd(pct_to_level(brightness)))
             for zone in ZONE_CODES:
                 reps.append(zone_cmd(zone, code, r, g, b, speed=speed_byte))
             reps.extend(set_apply_cmds())

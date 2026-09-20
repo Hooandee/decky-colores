@@ -198,6 +198,22 @@ def test_effect_engine_uses_device_render_limit(monkeypatch):
     assert sleeps == pytest.approx([0.1])
 
 
+def test_effect_engine_stop_and_wait_reaps_render_task():
+    async def drive():
+        engine = EffectEngine(lambda colors: None, zones=1)
+        engine.start_effect("breathing", 50, {"color": (255, 0, 0)})
+        task = engine._task
+        await asyncio.sleep(0)
+
+        await engine.stop_and_wait()
+
+        assert task.done()
+        assert task.cancelled()
+        assert not engine.running
+
+    asyncio.run(drive())
+
+
 def test_frame_rainbow_valid():
     for t in range(20):
         frame = frame_rainbow(4, t / 5.0, 50)

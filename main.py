@@ -24,6 +24,7 @@ from thermal import apu_temperature
 from performance import gpu_busy_percent, CpuSampler
 from saved_gradients import upsert_gradient, remove_gradient
 from hhd_rgb_control import HhdRgbControl
+from suspend_monitor import SuspendMonitor
 import self_updater
 from colores_report import collector as report_collector
 from colores_report import client as report_client
@@ -89,6 +90,7 @@ RESUME_REAPPLY_DELAY = 2.0
 RESUME_SUSPEND_THRESHOLD = 1.0
 RESUME_RECONNECT_ATTEMPTS = 3
 RESUME_RECONNECT_INTERVAL = 1.0
+RESUME_DEDUP_INTERVAL = 5.0
 
 
 def _rgb(values):
@@ -198,6 +200,15 @@ class Plugin:
         if getattr(self, "_ready", False):
             return
         self._stopping = False
+        self._suspend_prepared = False
+        self._suspend_lock = asyncio.Lock()
+        self._resume_lock = asyncio.Lock()
+        self._resume_handled_at = None
+        self._suspend_monitor = SuspendMonitor(
+            self.prepare_suspend,
+            resume_suspend=self._resume_after_suspend_signal,
+            logger=decky.logger,
+        )
         self._hhd_rgb_lock = asyncio.Lock()
         self._hhd_rgb_status = None
         self._setup_device(self._build_context())
@@ -368,9 +379,13 @@ class Plugin:
             led_path=getattr(self._controller, "led_path", None),
             last_error=getattr(self._controller, "last_error", None),
         )
+        runtime = self._report_runtime_diagnostics()
 
         def _assemble() -> dict:
             logs = report_collector.tail_logs(
+                getattr(decky, "DECKY_PLUGIN_LOG_DIR", ""), home=home, hostname=hostname
+            )
+            errors = report_collector.tail_error_logs(
                 getattr(decky, "DECKY_PLUGIN_LOG_DIR", ""), home=home, hostname=hostname
             )
             snapshot = report_collector.sysfs_snapshot(home=home, hostname=hostname)
@@ -392,6 +407,8 @@ class Plugin:
                 state=state,
                 stores=self._report_stores(),
                 logs=logs,
+                errors=errors,
+                runtime=runtime,
                 kernel=kernel,
                 sysfs=snapshot,
                 home=home,
@@ -399,6 +416,38 @@ class Plugin:
             )
 
         return await loop.run_in_executor(None, _assemble)
+
+    def _report_runtime_diagnostics(self) -> dict:
+        def running(component):
+            probe = getattr(component, "running", None)
+            try:
+                return bool(probe() if callable(probe) else probe)
+            except Exception:  # noqa: BLE001
+                return None
+
+        monitor = getattr(self, "_suspend_monitor", None)
+        try:
+            suspend = monitor.diagnostics() if monitor else {}
+        except Exception:  # noqa: BLE001
+            suspend = {}
+        suspend["prepared"] = bool(getattr(self, "_suspend_prepared", False))
+        settings = getattr(self, "_settings", {})
+        capabilities = getattr(self, "_capabilities", {})
+        return {
+            "suspend": suspend,
+            "render": {
+                "engine_running": running(getattr(self, "_engine", None)),
+                "ambilight_running": running(getattr(self, "_ambilight", None)),
+                "ambilight_status": getattr(getattr(self, "_ambilight", None), "status", None),
+                "audio_status": getattr(getattr(self, "_audio", None), "status", None),
+            },
+            "hhd_rgb": {
+                "takeover_supported": bool(capabilities.get("hhdRgbTakeover")),
+                "force_control": bool(settings.get("force_control")),
+                "status": getattr(self, "_hhd_rgb_status", None),
+                "restore_pending": settings.get("hhd_rgb_restore") is True,
+            },
+        }
 
     def _run_capture(self, cmd) -> str | None:
         try:
@@ -724,7 +773,7 @@ class Plugin:
                 return "stopping"
             current = await self._run_hhd_call(self._hhd_rgb.read_rgb)
             if current is None:
-                self._set_hhd_status("unavailable", decky.logger.warning, "Colores: HHD RGB state unavailable; continuing Apex reclaim")
+                self._set_hhd_status("unavailable", decky.logger.warning, "Colores: HHD RGB state unavailable; continuing RGB reclaim")
                 return "failed"
             if current is False:
                 self._set_hhd_status("disabled", decky.logger.info, "Colores: HHD RGB already disabled")
@@ -735,7 +784,7 @@ class Plugin:
             confirmed = await self._run_hhd_call(lambda: self._hhd_rgb.set_rgb(False))
             if confirmed is True:
                 self._hhd_rgb_status = "disabled"
-                decky.logger.info("Colores: HHD RGB disabled and confirmed for Apex takeover")
+                decky.logger.info("Colores: HHD RGB disabled and confirmed for RGB takeover")
                 return "changed"
             self._set_hhd_status("disable_failed", decky.logger.warning, "Colores: HHD RGB disable was not confirmed; restore marker retained")
             return "failed"
@@ -858,10 +907,19 @@ class Plugin:
 
     async def prepare_suspend(self) -> None:
         self._init()
-        if self._settings["mode"] != "ambient":
-            return
-        await self._ambilight.stop_and_wait()
-        decky.logger.info("Colores: ambilight capture stopped for suspend")
+        async with self._suspend_lock:
+            if self._suspend_prepared:
+                return
+            self._suspend_prepared = True
+            self._resume_handled_at = None
+            mode = self._settings["mode"]
+            if mode == "ambient":
+                await self._ambilight.stop_and_wait()
+                decky.logger.info("Colores: ambilight capture stopped for suspend")
+                return
+            if mode != "vu" and self._wants_render_loop():
+                await self._engine.stop_and_wait()
+                decky.logger.info("Colores: lighting render loop stopped for suspend")
 
     async def get_audio_status(self) -> str:
         self._init()
@@ -970,6 +1028,8 @@ class Plugin:
             decky.logger.warning("Colores: startup persist failed: %s", error)
 
     def _render(self, zone_colors) -> None:
+        if getattr(self, "_suspend_prepared", False):
+            return
         self._controller.apply_zones(
             zone_colors, self._settings["brightness"], self._effective_power()
         )
@@ -998,6 +1058,8 @@ class Plugin:
         return False
 
     def _apply(self) -> None:
+        if getattr(self, "_suspend_prepared", False):
+            return
         if self._controller.supports_hardware_effects() and not self._wants_render_loop():
             self._apply_hardware()
             return
@@ -1016,7 +1078,11 @@ class Plugin:
         if s["mode"] == "effect":
             effect = s["effect"]
             self._controller.apply_hardware_effect(
-                effect["id"], tuple(s["color"]), effect["speed"], power
+                effect["id"],
+                tuple(s["color"]),
+                effect["speed"],
+                brightness,
+                power,
             )
         elif s["mode"] == "gradient":
             self._controller.apply_zones(
@@ -1114,6 +1180,7 @@ class Plugin:
             self._controller.led_path,
             self._controller.last_error,
         )
+        self._suspend_monitor.start()
         self._apply()
         self._reassert_task = asyncio.create_task(self._acquire_and_reassert())
         self._charger_task = asyncio.create_task(self._charger_watch())
@@ -1171,17 +1238,30 @@ class Plugin:
             decky.logger.warning("Colores: resume watch failed: %s", error)
 
     async def _restore_after_resume(self) -> bool:
-        for attempt in range(RESUME_RECONNECT_ATTEMPTS):
-            try:
-                if await self.reconnect():
-                    return True
-            except asyncio.CancelledError:
-                raise
-            except Exception as error:
-                decky.logger.warning("Colores: resume reconnect failed: %s", error)
-            if attempt + 1 < RESUME_RECONNECT_ATTEMPTS:
-                await asyncio.sleep(RESUME_RECONNECT_INTERVAL)
-        return False
+        async with self._resume_lock:
+            if (
+                self._resume_handled_at is not None
+                and time.monotonic() - self._resume_handled_at
+                < RESUME_DEDUP_INTERVAL
+            ):
+                return True
+            self._suspend_prepared = False
+            for attempt in range(RESUME_RECONNECT_ATTEMPTS):
+                try:
+                    if await self.reconnect():
+                        self._resume_handled_at = time.monotonic()
+                        return True
+                except asyncio.CancelledError:
+                    raise
+                except Exception as error:
+                    decky.logger.warning("Colores: resume reconnect failed: %s", error)
+                if attempt + 1 < RESUME_RECONNECT_ATTEMPTS:
+                    await asyncio.sleep(RESUME_RECONNECT_INTERVAL)
+            return False
+
+    async def _resume_after_suspend_signal(self) -> None:
+        await asyncio.sleep(RESUME_REAPPLY_DELAY)
+        await self._restore_after_resume()
 
     async def _force_control_watch(self) -> None:
         try:
@@ -1203,6 +1283,9 @@ class Plugin:
     async def _stop_background_tasks(self):
         async with self._hhd_rgb_lock:
             self._stopping = True
+        monitor = getattr(self, "_suspend_monitor", None)
+        if monitor:
+            await monitor.stop_and_wait()
         tasks = []
         for attr in (
             "_reassert_task",

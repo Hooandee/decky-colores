@@ -54,38 +54,6 @@ def detect_device(sysfs_root="/"):
     }
 
 
-def detect_capabilities(sysfs_root="/"):
-    leds_dir = os.path.join(sysfs_root, "sys/class/leds")
-    led_path = _find_rgb_led(leds_dir)
-
-    if led_path is None:
-        return {
-            "color": False,
-            "brightness": False,
-            "zones": 0,
-            "maxBrightness": 0,
-            "ledPath": None,
-            "layout": [],
-        }
-
-    zones = 1
-    multi_index = _read(os.path.join(led_path, "multi_index"))
-    if multi_index:
-        zones = len(multi_index.split())
-
-    max_brightness = _read(os.path.join(led_path, "max_brightness"))
-    has_color = os.path.exists(os.path.join(led_path, "multi_intensity"))
-
-    return {
-        "color": has_color,
-        "brightness": True,
-        "zones": zones,
-        "maxBrightness": _max_brightness(max_brightness),
-        "ledPath": led_path,
-        "layout": build_layout(zones),
-    }
-
-
 def _max_brightness(raw):
     return int(raw) if raw.isdigit() and int(raw) > 0 else 255
 
@@ -188,9 +156,13 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
     }
 
 
-def _find_rgb_led(leds_dir):
+def _find_rgb_led(leds_dir, required_name=None):
     if not os.path.isdir(leds_dir):
         return None
+
+    if required_name:
+        path = os.path.join(leds_dir, required_name)
+        return path if os.path.exists(os.path.join(path, "multi_intensity")) else None
 
     try:
         entries = os.listdir(leds_dir)
@@ -281,7 +253,11 @@ def build_device(sysfs_root="/", ambilight=False):
         profile["experimental"] = _all_experimental(profile)
 
     leds_dir = os.path.join(sysfs_root, "sys/class/leds")
-    led_path = _find_rgb_led(leds_dir) if profile.get("allow_sysfs_fallback", True) else None
+    led_path = (
+        _find_rgb_led(leds_dir, profile.get("led_name"))
+        if profile.get("allow_sysfs_fallback", True)
+        else None
+    )
 
     if led_path:
         zones, index_format = read_zone_format(led_path)

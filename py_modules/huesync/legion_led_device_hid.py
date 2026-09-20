@@ -30,9 +30,7 @@ class LegionGoLEDDeviceHID:
 
         hid_device_list = hid.enumerate()
 
-        # Check every HID device to find LED device
         for device in hid_device_list:
-            # logger.debug(f"device: {device}")
             if device["vendor_id"] not in self._vid:
                 continue
             if device["product_id"] not in self._pid:
@@ -59,6 +57,7 @@ class LegionGoLEDDeviceHID:
         mode: RGBMode,
         secondary_color: Color | None = None,
         close_device: bool = False,
+        brightness: int = 100,
     ) -> bool:
         if not self.is_ready():
             return False
@@ -67,7 +66,7 @@ class LegionGoLEDDeviceHID:
             f">>>> set_legion_go_color: mode={mode} color={main_color} secondary={secondary_color}"
         )
 
-        brightness = 1
+        brightness = max(0, min(100, int(brightness))) / 100.0
         speed = 1
         rgb_mode = None
 
