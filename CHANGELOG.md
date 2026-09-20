@@ -3,10 +3,33 @@
 ## [0.26.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.0...decky-colores-v0.26.1) (2026-09-20)
 
 
-### Bug Fixes
+### Español
 
-* harden RGB lifecycle and diagnostics ([d593d06](https://github.com/Hooandee/decky-colores/commit/d593d06d28d784ecd89efc4e0bb2fe6988166b40))
-* harden RGB lifecycle, brightness and diagnostics ([0019d47](https://github.com/Hooandee/decky-colores/commit/0019d4731be4f58004a0d593fa19ee198cf4b299))
+* **Suspensión y reanudación:** Colores detiene Ambilight y los efectos animados antes de suspender, libera correctamente el bloqueo de suspensión y restaura la iluminación al despertar sin dejar procesos huérfanos.
+* **Brillo:** Los efectos físicos ya respetan el nivel elegido en Legion Go, Legion Go 2, Legion Go S, MSI Claw y ASUS. También mejora la escala de los niveles bajos en Legion Go y ASUS.
+* **ASUS y HHD:** Colores usa únicamente el dispositivo de los aros RGB, ignora indicadores ajenos y puede tomar temporalmente el control de HHD cuando se activa Forzar control, restaurándolo al salir.
+* **Reportes:** Los reportes reparten mejor el espacio entre los registros recientes e incluyen un resumen anonimizado de errores y del estado interno. Validado físicamente en Legion Go y ROG Xbox Ally X. ([#156](https://github.com/Hooandee/decky-colores/pull/156))
+
+### English
+
+* **Suspend and resume:** Colores stops Ambilight and animated effects before sleep, releases the sleep lock correctly, and restores lighting after wake without leaving orphaned processes behind.
+* **Brightness:** Hardware effects now respect the selected level on Legion Go, Legion Go 2, Legion Go S, MSI Claw, and ASUS devices. Low brightness levels are also better scaled on Legion Go and ASUS.
+* **ASUS and HHD:** Colores now targets only the joystick-ring RGB device, ignores unrelated indicators, and can temporarily take control from HHD when Force Control is enabled, restoring it on exit.
+* **Reports:** Reports distribute space more fairly across recent logs and include a redacted summary of errors and internal runtime state. Physically validated on Legion Go and ROG Xbox Ally X. ([#156](https://github.com/Hooandee/decky-colores/pull/156))
+
+### Italiano
+
+* **Sospensione e ripresa:** Colores arresta Ambilight e gli effetti animati prima della sospensione, rilascia correttamente il blocco dello standby e ripristina l'illuminazione alla ripresa senza lasciare processi orfani.
+* **Luminosità:** Gli effetti hardware ora rispettano il livello scelto su Legion Go, Legion Go 2, Legion Go S, MSI Claw e dispositivi ASUS. Anche i livelli di luminosità più bassi sono calibrati meglio su Legion Go e ASUS.
+* **ASUS e HHD:** Colores ora usa soltanto il dispositivo RGB degli anelli dei joystick, ignora gli indicatori non correlati e può assumere temporaneamente il controllo da HHD quando Forza controllo è attivo, ripristinandolo all'uscita.
+* **Segnalazioni:** Le segnalazioni distribuiscono meglio lo spazio tra i registri recenti e includono un riepilogo anonimizzato degli errori e dello stato interno. Convalidato fisicamente su Legion Go e ROG Xbox Ally X. ([#156](https://github.com/Hooandee/decky-colores/pull/156))
+
+### Deutsch
+
+* **Energiesparmodus und Fortsetzen:** Colores beendet Ambilight und animierte Effekte vor dem Ruhezustand, gibt die Ruhezustandssperre zuverlässig frei und stellt die Beleuchtung beim Aufwachen wieder her, ohne verwaiste Prozesse zu hinterlassen.
+* **Helligkeit:** Hardwareeffekte berücksichtigen nun die gewählte Stufe auf Legion Go, Legion Go 2, Legion Go S, MSI Claw und ASUS-Geräten. Niedrige Helligkeitsstufen sind auf Legion Go und ASUS ebenfalls besser abgestimmt.
+* **ASUS und HHD:** Colores verwendet nur noch das RGB-Gerät der Joystick-Ringe, ignoriert fremde Anzeigen und kann bei aktivierter Option Steuerung erzwingen vorübergehend die Kontrolle von HHD übernehmen und sie beim Beenden wiederherstellen.
+* **Berichte:** Berichte verteilen den verfügbaren Platz fairer auf aktuelle Protokolle und enthalten eine anonymisierte Zusammenfassung von Fehlern und internem Laufzeitstatus. Physisch auf Legion Go und ROG Xbox Ally X validiert. ([#156](https://github.com/Hooandee/decky-colores/pull/156))
 
 ## [0.26.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.2...decky-colores-v0.26.0) (2026-09-10)
 
