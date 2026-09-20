@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.26.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.0...decky-colores-v0.26.1) (2026-09-20)
+
+
+### Español
+
+* **Suspensión:** La consola ya puede entrar en reposo correctamente mientras usas Ambilight u otros modos que actualizan las luces en tiempo real. Al volver, Colores recupera la conexión y restaura la iluminación automáticamente.
+* **Brillo:** El control de brillo ahora funciona también con los efectos propios de Legion Go, Legion Go 2, Legion Go S, MSI Claw y ASUS. En Legion Go y ASUS, los niveles bajos son más suaves y resultan más cómodos para jugar a oscuras.
+* **ASUS y HHD:** Colores identifica correctamente los aros de los joysticks y evita confundirlos con otros LED del sistema. Si HHD controla la iluminación, Forzar control permite que Colores tome el relevo y se lo devuelva a HHD al cerrarse.
+* **Reportes:** Los reportes destacan los errores más útiles y muestran qué estaba haciendo Colores cuando ocurrió el fallo. Además, aprovechan mejor el espacio para conservar registros recientes y ocultan los datos sensibles.
+* **Probado en hardware:** Confirmado en una Legion Go después de un reinicio completo y en una ROG Xbox Ally X con ambos aros encendidos. ([#156](https://github.com/Hooandee/decky-colores/pull/156))
+
+### English
+
+* **Suspend:** Your handheld can now enter sleep reliably while Ambilight or other modes that update the lights in real time are active. When it wakes, Colores reconnects and restores the lighting automatically.
+* **Brightness:** The brightness control now also works with built-in effects on Legion Go, Legion Go 2, Legion Go S, MSI Claw, and ASUS devices. On Legion Go and ASUS, the lower levels are gentler and more comfortable for playing in the dark.
+* **ASUS and HHD:** Colores now identifies the joystick rings correctly and avoids mistaking other system LEDs for them. If HHD controls the lighting, Force Control lets Colores take over and hands control back to HHD when Colores closes.
+* **Reports:** Reports highlight the most useful errors and show what Colores was doing when the problem occurred. They also make better use of the available space to keep recent logs and hide sensitive data.
+* **Hardware tested:** Confirmed on a Legion Go after a full reboot and on a ROG Xbox Ally X with both rings lit. ([#156](https://github.com/Hooandee/decky-colores/pull/156))
+
+### Italiano
+
+* **Sospensione:** La console ora entra correttamente in sospensione anche mentre sono attivi Ambilight o altri modi che aggiornano le luci in tempo reale. Alla ripresa, Colores ristabilisce la connessione e ripristina automaticamente l'illuminazione.
+* **Luminosità:** Il controllo della luminosità ora funziona anche con gli effetti integrati di Legion Go, Legion Go 2, Legion Go S, MSI Claw e dispositivi ASUS. Su Legion Go e ASUS, i livelli più bassi sono più delicati e comodi per giocare al buio.
+* **ASUS e HHD:** Colores riconosce correttamente gli anelli luminosi dei joystick ed evita di confonderli con altri LED del sistema. Se HHD gestisce l'illuminazione, Forza controllo consente a Colores di subentrare e restituisce il controllo a HHD quando Colores viene chiuso.
+* **Segnalazioni:** Le segnalazioni mettono in evidenza gli errori più utili e mostrano cosa stava facendo Colores quando si è verificato il problema. Inoltre, sfruttano meglio lo spazio disponibile per conservare i registri recenti e nascondono i dati sensibili.
+* **Test su hardware:** Confermato su una Legion Go dopo un riavvio completo e su una ROG Xbox Ally X con entrambi gli anelli accesi. ([#156](https://github.com/Hooandee/decky-colores/pull/156))
+
+### Deutsch
+
+* **Ruhezustand:** Das Gerät wechselt nun auch dann zuverlässig in den Ruhezustand, wenn Ambilight oder andere Modi aktiv sind, die die Beleuchtung in Echtzeit aktualisieren. Nach dem Aufwachen stellt Colores die Verbindung und die Beleuchtung automatisch wieder her.
+* **Helligkeit:** Die Helligkeitsregelung funktioniert nun auch mit den integrierten Effekten auf Legion Go, Legion Go 2, Legion Go S, MSI Claw und ASUS-Geräten. Auf Legion Go und ASUS sind die niedrigen Stufen sanfter und angenehmer beim Spielen im Dunkeln.
+* **ASUS und HHD:** Colores erkennt die Leuchtringe der Joysticks korrekt und verwechselt sie nicht mehr mit anderen System-LEDs. Wenn HHD die Beleuchtung steuert, kann Colores sie mit Steuerung erzwingen übernehmen und beim Beenden wieder an HHD zurückgeben.
+* **Berichte:** Berichte heben die wichtigsten Fehler hervor und zeigen, was Colores beim Auftreten des Problems gerade ausgeführt hat. Außerdem nutzen sie den verfügbaren Platz besser, um aktuelle Protokolle zu behalten, und blenden sensible Daten aus.
+* **Auf Hardware getestet:** Bestätigt auf einem Legion Go nach einem vollständigen Neustart und auf einer ROG Xbox Ally X mit beiden leuchtenden Ringen. ([#156](https://github.com/Hooandee/decky-colores/pull/156))
+
 ## [0.26.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.25.2...decky-colores-v0.26.0) (2026-09-10)
 
 
