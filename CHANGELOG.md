@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.29.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.28.0...decky-colores-v0.29.0) (2026-09-20)
+
+
+### Features
+
+* add Brazilian Portuguese localization ([78e9c15](https://github.com/Hooandee/decky-colores/commit/78e9c15e580fc721e2f3b22381c21fa272ccf6cc))
+
 ## [0.28.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.27.0...decky-colores-v0.28.0) (2026-09-20)
 
 ### Español
