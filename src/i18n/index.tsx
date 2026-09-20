@@ -14,6 +14,7 @@ const es: Record<string, string> = {
 
   "profiles.global": "Global",
   "profiles.game": "Juego: {name}",
+  "profiles.gameShort": "Juego",
   "profiles.followingGlobal": "Sigue el perfil global",
   "profiles.usingOwn": "Usa su propio perfil",
   "profiles.useOwn": "Usar perfil propio",
@@ -53,6 +54,7 @@ const es: Record<string, string> = {
 
   "nav.sensors": "Sensores",
   "nav.settings": "Ajustes",
+  "nav.changeSection": "Cambiar sección",
   "settings.language": "Idioma",
   "customize.title": "Personalización",
   "customize.accent": "Color de acento",
@@ -216,6 +218,7 @@ const es: Record<string, string> = {
   "report.section.kind": "¿Qué quieres enviar?",
   "report.kind.bug": "Un problema",
   "report.kind.feature": "Una petición o idea",
+  "report.kind.change": "Cambiar",
   "report.section.what": "¿Qué falla?",
   "report.section.what.feature": "¿Sobre qué parte?",
   "report.cat.color": "Color",
@@ -255,6 +258,7 @@ const en: Record<string, string> = {
 
   "profiles.global": "Global",
   "profiles.game": "Game: {name}",
+  "profiles.gameShort": "Game",
   "profiles.followingGlobal": "Following the global profile",
   "profiles.usingOwn": "Using its own profile",
   "profiles.useOwn": "Use own profile",
@@ -294,6 +298,7 @@ const en: Record<string, string> = {
 
   "nav.sensors": "Sensors",
   "nav.settings": "Settings",
+  "nav.changeSection": "Change section",
   "settings.language": "Language",
   "customize.title": "Customization",
   "customize.accent": "Accent color",
@@ -457,6 +462,7 @@ const en: Record<string, string> = {
   "report.section.kind": "What would you like to send?",
   "report.kind.bug": "A problem",
   "report.kind.feature": "A request or idea",
+  "report.kind.change": "Change",
   "report.section.what": "What's wrong?",
   "report.section.what.feature": "Which area is it about?",
   "report.cat.color": "Color",

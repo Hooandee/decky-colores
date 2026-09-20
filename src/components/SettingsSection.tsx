@@ -7,7 +7,7 @@ import { UpdatePanel } from "../updater/UpdatePanel";
 import { openCustomizeModal } from "./CustomizeModal";
 import { openReportModal } from "./ReportModal";
 import { Divider } from "./Divider";
-import { Capabilities } from "../types";
+import { Capabilities, DeviceInfo } from "../types";
 
 const AUTHOR = "Hooandee";
 const YOUTUBE_URL = "https://www.youtube.com/@Hooandee";
@@ -30,6 +30,7 @@ const hint = (text: string) => (
 
 interface SettingsSectionProps {
   caps: Capabilities;
+  device: DeviceInfo;
   availableTabIds: string[];
   lang: Lang;
   forceControl: boolean;
@@ -42,6 +43,7 @@ interface SettingsSectionProps {
 
 export const SettingsSection: FC<SettingsSectionProps> = ({
   caps,
+  device,
   availableTabIds,
   lang,
   forceControl,
@@ -154,7 +156,12 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
     <>
       {unvalidated ? hint(t("report.unvalidated.note")) : null}
       <PanelSectionRow>
-        <ButtonItem layout="below" bottomSeparator="none" description={t("report.button.desc")} onClick={() => openReportModal()}>
+        <ButtonItem
+          layout="below"
+          bottomSeparator="none"
+          description={t("report.button.desc")}
+          onClick={() => openReportModal(device)}
+        >
           {t("report.button")}
         </ButtonItem>
       </PanelSectionRow>
