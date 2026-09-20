@@ -163,7 +163,7 @@ class ApexRgbDevice(LedDevice):
 
 
 class SysfsRgbDevice(LedDevice):
-    def __init__(self, led_path, zones=1, max_brightness=255, color_order="rgb", index_format="hex", color_correction=(1.0, 1.0, 1.0), latch=None):
+    def __init__(self, led_path, zones=1, max_brightness=255, color_order="rgb", index_format="hex", color_correction=(1.0, 1.0, 1.0), latch=None, per_zone=True):
         self._led_path = led_path
         self._zones = max(1, zones)
         self._max_brightness = max_brightness or 255
@@ -179,6 +179,7 @@ class SysfsRgbDevice(LedDevice):
         self._packed_maxima_compatible = self._packed_maxima_are_compatible()
         self._latch = [(os.path.join(led_path, attr), value) for attr, value in (latch or [])] if led_path else []
         self._latched = False
+        self._per_zone = bool(per_zone)
 
     @property
     def available(self):
@@ -189,7 +190,7 @@ class SysfsRgbDevice(LedDevice):
         return self._led_path
 
     def supports_per_zone(self):
-        return True
+        return self._per_zone
 
     def invalidate(self):
         self._latched = False
@@ -210,9 +211,9 @@ class SysfsRgbDevice(LedDevice):
 
     def _order(self, color):
         r, g, b = apply_gain(color, self._color_correction)
-        if self._color_order == "bgr":
-            return b, g, r
-        return r, g, b
+        channels = {"r": r, "g": g, "b": b}
+        order = self._color_order if set(self._color_order) == set("rgb") else "rgb"
+        return tuple(channels[channel] for channel in order)
 
     def _read_channel_maxima(self):
         if not self._led_path or self._index_format != "decimal":
@@ -272,6 +273,138 @@ class SysfsRgbDevice(LedDevice):
             if self._has_brightness:
                 with open(self._brightness_path, "w") as handle:
                     handle.write(str(level))
+            return True
+        except OSError as error:
+            self.last_error = str(error)
+            return False
+
+    def apply_solid(self, color, brightness, power):
+        return self.apply_zones([tuple(color)], brightness, power)
+
+
+PORTAL_LED_NAMES = tuple(
+    [f"rgb:l{index}" for index in range(1, 5)]
+    + [f"rgb:r{index}" for index in range(1, 5)]
+)
+
+
+def discover_portal_leds(leds_dir):
+    nodes = []
+    for name in PORTAL_LED_NAMES:
+        path = os.path.join(leds_dir, name)
+        try:
+            with open(os.path.join(path, "multi_index")) as handle:
+                channels = handle.read().strip().lower().split()
+        except OSError:
+            return []
+        required = ("multi_intensity", "brightness", "max_brightness")
+        if channels != ["blue", "green", "red"] or not all(
+            os.path.exists(os.path.join(path, filename)) for filename in required
+        ):
+            return []
+        nodes.append(path)
+    return nodes
+
+
+class MultiSysfsRgbDevice(LedDevice):
+    def __init__(self, node_paths, color_order="rgb", color_correction=(1.0, 1.0, 1.0)):
+        self._nodes = list(node_paths)
+        self._zones = len(self._nodes)
+        self._max_brightness = 255
+        self._devices = [
+            SysfsRgbDevice(
+                path,
+                zones=1,
+                max_brightness=self._node_max(path),
+                color_order=color_order,
+                index_format="decimal",
+                color_correction=color_correction,
+            )
+            for path in self._nodes
+        ]
+        self.last_error = None
+
+    @staticmethod
+    def _node_max(path):
+        try:
+            with open(os.path.join(path, "max_brightness")) as handle:
+                value = int(handle.read().strip())
+        except (OSError, ValueError):
+            return 255
+        return value if value > 0 else 255
+
+    @property
+    def available(self):
+        return bool(self._devices) and all(device.available for device in self._devices)
+
+    @property
+    def led_path(self):
+        return self._nodes[0] if self._nodes else None
+
+    def supports_per_zone(self):
+        return False
+
+    def reconnect(self):
+        return self.available
+
+    def invalidate(self):
+        for device in self._devices:
+            device.invalidate()
+
+    def apply_zones(self, zone_colors, brightness, power):
+        colors = list(zone_colors) or [(0, 0, 0)]
+        return self.apply_solid(colors[0], brightness, power)
+
+    def apply_solid(self, color, brightness, power):
+        self.last_error = None
+        success = True
+        for device in self._devices:
+            if not device.apply_zones([tuple(color)], brightness, power):
+                success = False
+                self.last_error = device.last_error or "sysfs write failed"
+        return success
+
+
+class HpOmenRgbDevice(LedDevice):
+    def __init__(self, platform_path):
+        self._platform_path = platform_path
+        self._zone_paths = [os.path.join(platform_path, f"zone{index}") for index in range(8)]
+        self._brightness_path = os.path.join(platform_path, "brightness")
+        self._zones = 8
+        self._max_brightness = 1
+        self.last_error = None
+
+    @property
+    def available(self):
+        return bool(self._platform_path) and all(
+            os.path.isfile(path) for path in [*self._zone_paths, self._brightness_path]
+        )
+
+    @property
+    def led_path(self):
+        return self._platform_path
+
+    def supports_per_zone(self):
+        return False
+
+    def reconnect(self):
+        return self.available
+
+    def apply_zones(self, zone_colors, brightness, power):
+        colors = list(zone_colors) or [(0, 0, 0)]
+        return self.apply_solid(colors[0], brightness, power)
+
+    def apply_solid(self, color, brightness, power):
+        self.last_error = None
+        r, g, b = (_clamp8(channel) for channel in color)
+        value = f"{r:02X}{g:02X}{b:02X}"
+        enabled = "1" if power and _clamp_pct(brightness) > 0 else "0"
+        try:
+            for path in self._zone_paths:
+                with open(path, "w") as handle:
+                    handle.write(value)
+            with open(self._brightness_path, "w") as handle:
+                handle.write(enabled)
             return True
         except OSError as error:
             self.last_error = str(error)

@@ -4,6 +4,18 @@ import sys
 from time import monotonic, sleep
 
 from led_device import LedDevice, _clamp8, _clamp_pct, apply_gain
+from oxp_hid import (
+    OxpHidTransport,
+    STATE_CHANGE_DELAY as OXP_STATE_CHANGE_DELAY,
+    brightness_cmd as oxp_brightness_cmd,
+    solid_cmd as oxp_solid_cmd,
+    LEVEL_HIGH as OXP_LEVEL_HIGH,
+)
+from oxp_hid_v1 import (
+    INITIALIZE as OXP_V1_INITIALIZE,
+    brightness_cmd as oxp_v1_brightness_cmd,
+    solid_cmd as oxp_v1_solid_cmd,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +57,6 @@ try:
         ZONE_CODES,
         MODE_SOLID,
     )
-    from oxp_hid import (
-        OxpHidTransport,
-        STATE_CHANGE_DELAY as OXP_STATE_CHANGE_DELAY,
-        brightness_cmd as oxp_brightness_cmd,
-        solid_cmd as oxp_solid_cmd,
-        LEVEL_HIGH as OXP_LEVEL_HIGH,
-    )
-
     HID_AVAILABLE = True
 except Exception as error:  # pragma: no cover - exercised only without libhidapi
     _IMPORT_ERROR = error
@@ -97,12 +101,57 @@ OXP_IDS = {
     "usage": [0x0001],
 }
 
+OXP_V1_IDS = {
+    "vid": [0x1A86],
+    "pid": [0xFE00],
+    "usage_page": [0xFF00],
+    "usage": [0x0001],
+}
+
 OXP_APEX_IDS = {
     "vid": [0x1A2C],
     "pid": [0xB001],
     "usage_page": [0xFF01],
     "usage": [0x0001],
 }
+
+
+KNOWN_HID_SIGNATURES = (
+    ("hid_msi", MSI_IDS),
+    ("hid_oxp_v1", OXP_V1_IDS),
+    ("hid_oxp_apex_v2", OXP_APEX_IDS),
+    ("hid_oxp_v2", OXP_IDS),
+)
+
+
+def _matches_hid_signature(device, signature):
+    for field, key in (
+        ("vendor_id", "vid"),
+        ("product_id", "pid"),
+        ("usage_page", "usage_page"),
+        ("usage", "usage"),
+    ):
+        accepted = signature.get(key, [])
+        if accepted and device.get(field) not in accepted:
+            return False
+    interface = signature.get("interface")
+    return interface is None or device.get("interface_number") == interface
+
+
+def discover_hid_drivers():
+    if not HID_AVAILABLE:
+        return set()
+    try:
+        import lib_hid as hid
+
+        devices = hid.enumerate()
+    except Exception:
+        return set()
+    return {
+        driver
+        for driver, signature in KNOWN_HID_SIGNATURES
+        if any(_matches_hid_signature(device, signature) for device in devices)
+    }
 
 
 def _effect_mode(effect_id):
@@ -144,6 +193,8 @@ class _BaseHidDevice(LedDevice):
     def invalidate(self):
         if hasattr(self._transport, "prev_mode"):
             self._transport.prev_mode = None
+        if hasattr(self._transport, "initialized"):
+            self._transport.initialized = False
 
     def _correct(self, color):
         return apply_gain(color, self._color_correction)
@@ -198,8 +249,7 @@ class _BaseHidDevice(LedDevice):
             except Exception:
                 pass
         self._transport.hid_device = None
-        if hasattr(self._transport, "prev_mode"):
-            self._transport.prev_mode = None
+        self.invalidate()
         return self.available
 
     def _heal(self, action):
@@ -509,6 +559,11 @@ class AsusAllyHidDevice(_BaseHidDevice):
 
 class OxpHidDevice(_BaseHidDevice):
     route = "hid"
+    _brightness_command = staticmethod(oxp_brightness_cmd)
+    _solid_command = staticmethod(oxp_solid_cmd)
+    _initialization_commands = ()
+    _payload_offset = 2
+    _enabled_offset = 3
 
     @classmethod
     def create(cls):
@@ -526,7 +581,9 @@ class OxpHidDevice(_BaseHidDevice):
     def apply_solid(self, color, brightness, power):
         if not power:
             def _off():
-                ok = self._write([oxp_brightness_cmd(False, OXP_LEVEL_HIGH)])
+                if not self._initialize():
+                    return False
+                ok = self._write([self._brightness_command(False, OXP_LEVEL_HIGH)])
                 if ok:
                     self._transport.prev_mode = None
                 return ok
@@ -538,16 +595,26 @@ class OxpHidDevice(_BaseHidDevice):
         scaled = (_clamp8(r * scale), _clamp8(g * scale), _clamp8(b * scale))
 
         def _do():
+            if not self._initialize():
+                return False
             if self._transport.prev_mode != "solid":
-                if not self._write([oxp_brightness_cmd(True, OXP_LEVEL_HIGH)]):
+                if not self._write([self._brightness_command(True, OXP_LEVEL_HIGH)]):
                     return False
                 sleep(OXP_STATE_CHANGE_DELAY)
-            ok = self._write([oxp_solid_cmd(*scaled)])
+            ok = self._write([self._solid_command(*scaled)])
             if ok:
                 self._transport.prev_mode = "solid"
             return ok
 
         return self._heal(_do)
+
+    def _initialize(self):
+        if getattr(self._transport, "initialized", False):
+            return True
+        if self._initialization_commands and not self._write(self._initialization_commands):
+            return False
+        self._transport.initialized = True
+        return True
 
     def apply_zones(self, zone_colors, brightness, power):
         colors = list(zone_colors) or [(0, 0, 0)]
@@ -562,9 +629,13 @@ class OxpHidDevice(_BaseHidDevice):
         return ok
 
     def _after_write(self, report, written):
-        command = report[2] if len(report) > 2 else None
+        command = report[self._payload_offset] if len(report) > self._payload_offset else None
         if command == 0xFD:
-            kind = "enable" if len(report) > 3 and report[3] else "disable"
+            kind = (
+                "enable"
+                if len(report) > self._enabled_offset and report[self._enabled_offset]
+                else "disable"
+            )
         elif command == 0xFE:
             kind = "color"
         else:
@@ -593,6 +664,27 @@ class ApexOxpHidDevice(OxpHidDevice):
         )
 
 
+class OxpV1HidDevice(OxpHidDevice):
+    _brightness_command = staticmethod(oxp_v1_brightness_cmd)
+    _solid_command = staticmethod(oxp_v1_solid_cmd)
+    _initialization_commands = OXP_V1_INITIALIZE
+    _payload_offset = 3
+    _enabled_offset = 6
+
+    @classmethod
+    def create(cls):
+        if not HID_AVAILABLE:
+            return None
+        return cls(
+            OxpHidTransport(
+                OXP_V1_IDS["vid"],
+                OXP_V1_IDS["pid"],
+                OXP_V1_IDS["usage_page"],
+                OXP_V1_IDS["usage"],
+            )
+        )
+
+
 HID_DRIVERS = {
     "hid_msi": MsiHidDevice,
     "hid_legion_go": LegionGoHidDevice,
@@ -600,6 +692,7 @@ HID_DRIVERS = {
     "hid_asus_ally": AsusAllyHidDevice,
     "hid_oxp_v2": OxpHidDevice,
     "hid_oxp_apex_v2": ApexOxpHidDevice,
+    "hid_oxp_v1": OxpV1HidDevice,
 }
 
 

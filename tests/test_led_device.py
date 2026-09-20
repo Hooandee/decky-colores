@@ -1,6 +1,13 @@
 import os
 
-from py_modules.led_device import ApexRgbDevice, SysfsRgbDevice, ValveLedsDevice, discover_valve_leds
+from py_modules.led_device import (
+    ApexRgbDevice,
+    HpOmenRgbDevice,
+    MultiSysfsRgbDevice,
+    SysfsRgbDevice,
+    ValveLedsDevice,
+    discover_valve_leds,
+)
 
 _OXP_LATCH = [["enabled", "true"], ["effect", "monocolor"]]
 
@@ -119,6 +126,69 @@ def _make_led(tmp_path, multi_index="rgb rgb rgb rgb"):
 def _read(path):
     with open(path) as handle:
         return handle.read().strip()
+
+
+def _make_portal_nodes(tmp_path, count=8):
+    names = [f"rgb:l{i}" for i in range(1, 5)] + [f"rgb:r{i}" for i in range(1, 5)]
+    nodes = []
+    for name in names[:count]:
+        node = tmp_path / name
+        node.mkdir()
+        (node / "multi_index").write_text("blue green red")
+        (node / "multi_max_intensity").write_text("255 255 255")
+        (node / "multi_intensity").write_text("0 0 0")
+        (node / "brightness").write_text("0")
+        (node / "max_brightness").write_text("255")
+        nodes.append(str(node))
+    return nodes
+
+
+def test_multi_sysfs_uniform_color_uses_each_nodes_channel_order(tmp_path):
+    nodes = _make_portal_nodes(tmp_path)
+    device = MultiSysfsRgbDevice(nodes, color_order="bgr")
+
+    assert device.available is True
+    assert device.supports_per_zone() is False
+    assert device.apply_solid((255, 0, 0), 50, True) is True
+    assert all(_read(os.path.join(node, "multi_intensity")) == "0 0 255" for node in nodes)
+    assert all(_read(os.path.join(node, "brightness")) == "128" for node in nodes)
+
+
+def test_multi_sysfs_apply_zones_remains_uniform_without_calibration(tmp_path):
+    nodes = _make_portal_nodes(tmp_path)
+    device = MultiSysfsRgbDevice(nodes, color_order="bgr")
+
+    assert device.apply_zones([(10, 20, 30), (200, 210, 220)], 100, True) is True
+    assert all(_read(os.path.join(node, "multi_intensity")) == "30 20 10" for node in nodes)
+
+
+def _make_omen_platform(tmp_path, zones=8):
+    root = tmp_path / "hp-rgb-lighting"
+    root.mkdir()
+    for index in range(zones):
+        (root / f"zone{index}").write_text("000000")
+    (root / "brightness").write_text("0")
+    return root
+
+
+def test_hp_omen_device_writes_uniform_uppercase_hex_and_boolean_power(tmp_path):
+    root = _make_omen_platform(tmp_path)
+    device = HpOmenRgbDevice(str(root))
+
+    assert device.available is True
+    assert device.supports_per_zone() is False
+    assert device.apply_solid((10, 171, 255), 20, True) is True
+    assert all((root / f"zone{index}").read_text() == "0AABFF" for index in range(8))
+    assert (root / "brightness").read_text() == "1"
+
+    assert device.apply_solid((10, 171, 255), 100, False) is True
+    assert (root / "brightness").read_text() == "0"
+
+
+def test_hp_omen_device_requires_all_eight_zones(tmp_path):
+    root = _make_omen_platform(tmp_path, zones=7)
+
+    assert HpOmenRgbDevice(str(root)).available is False
 
 
 def test_unavailable_when_no_path():

@@ -1,5 +1,6 @@
 import importlib
 import logging
+import os
 import sys
 import types
 
@@ -80,6 +81,51 @@ def _msi_device_entry():
         "path": b"msi",
         "release_number": 0x0163,
     }
+
+
+def _oxp_v1_entry():
+    return {
+        "vendor_id": 0x1A86,
+        "product_id": 0xFE00,
+        "usage_page": 0xFF00,
+        "usage": 0x0001,
+        "interface_number": 0,
+        "path": b"oxp-v1",
+    }
+
+
+def test_known_hid_discovery_matches_exact_signatures_without_opening(hid_env):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [
+        _msi_device_entry(),
+        _oxp_v1_entry(),
+    ]
+    sys.modules["lib_hid"].Device = lambda *args, **kwargs: pytest.fail(
+        "read-only discovery must not open a HID interface"
+    )
+
+    assert adapters.discover_hid_drivers() == {"hid_msi", "hid_oxp_v1"}
+
+
+def test_known_hid_discovery_rejects_near_miss_signature(hid_env):
+    adapters, _ = hid_env
+    near_miss = dict(_oxp_v1_entry(), usage_page=0xFFA0)
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [near_miss]
+
+    assert "hid_oxp_v1" not in adapters.discover_hid_drivers()
+
+
+def test_oxp_v1_packets_keep_framing_and_payload():
+    from py_modules.oxp_hid_v1 import brightness_cmd, solid_cmd
+
+    brightness = brightness_cmd(True, 0x04)
+    solid = solid_cmd(1, 2, 3)
+
+    assert len(brightness) == len(solid) == 64
+    assert brightness[:9] == bytes.fromhex("b83f01fd0002010504")
+    assert brightness[-2:] == bytes.fromhex("3fb8")
+    assert solid[:12] == bytes.fromhex("b83f01fe0002010203010203")
+    assert solid[-4:] == bytes.fromhex("01023fb8")
 
 
 def _legion_tablet_entry():
@@ -395,6 +441,38 @@ def test_build_device_legion_hid_available(hid_env, tmp_path):
     sys.modules.pop("device", None)
 
 
+def test_unlisted_msi_family_uses_known_hid_signature(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_msi_device_entry()]
+    root = _make_dmi_root(tmp_path, "MSI Prototype Handheld")
+    dmi = os.path.join(root, "sys/class/dmi/id")
+    with open(os.path.join(dmi, "sys_vendor"), "w") as handle:
+        handle.write("Micro-Star International Co., Ltd.")
+
+    device = _reload_device()
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+
+    assert isinstance(ctx["device"], adapters.MsiHidDevice)
+    assert ctx["capabilities"]["zones"] == 9
+    assert ctx["capabilities"]["color"] is True
+    sys.modules.pop("device", None)
+
+
+def test_foreign_machine_does_not_claim_msi_hid_signature(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_msi_device_entry()]
+    device = _reload_device()
+    root = _make_dmi_root(tmp_path, "MysteryHandheld")
+
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+
+    from led_device import NullDevice
+
+    assert isinstance(ctx["device"], NullDevice)
+    assert ctx["capabilities"]["color"] is False
+    sys.modules.pop("device", None)
+
+
 def test_legion_ambilight_is_supported_when_capture_available(hid_env, tmp_path):
     adapters, _ = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_legion_go_s_entry()]
@@ -431,7 +509,7 @@ def test_legion_tablets_do_not_declare_per_controller_color(hid_env, tmp_path):
     sys.modules.pop("device", None)
 
 
-def test_build_device_hid_unavailable_falls_back(hid_env, tmp_path, monkeypatch):
+def test_build_device_hid_unavailable_reports_unsupported(hid_env, tmp_path, monkeypatch):
     adapters, _ = hid_env
     monkeypatch.setattr(adapters, "HID_AVAILABLE", False)
     device = _reload_device()
@@ -442,8 +520,8 @@ def test_build_device_hid_unavailable_falls_back(hid_env, tmp_path, monkeypatch)
 
     assert isinstance(ctx["device"], NullDevice)
     caps = ctx["capabilities"]
-    assert caps["states"]["color"] == "experimental"
-    assert caps["states"]["effects"] == "experimental"
+    assert caps["states"]["color"] == "unsupported"
+    assert caps["states"]["effects"] == "unsupported"
     sys.modules.pop("device", None)
 
 
@@ -711,6 +789,78 @@ def test_oxp_rejects_foreign_pid_with_matching_usage(hid_env):
 
     assert adapters.ApexOxpHidDevice.create().available is False
     assert adapters.OxpHidDevice.create().available is True
+
+
+def test_oxp_x2mini_selects_v1_from_enumerated_signature(hid_env, tmp_path):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_v1_entry()]
+    device = _reload_device()
+    root = _make_dmi_root(tmp_path, "ONEXPLAYER X2Mini PRO")
+
+    ctx = device.build_device(sysfs_root=root, ambilight=False)
+
+    assert isinstance(ctx["device"], adapters.OxpV1HidDevice)
+    assert ctx["capabilities"]["color"] is True
+    writes.clear()
+    assert ctx["device"].apply_solid((1, 2, 3), 100, True) is True
+    assert [packet[0] for packet in writes] == [0xB4, 0xB4, 0xB2, 0xB8, 0xB8]
+    assert writes[-1][:12] == bytes.fromhex("b83f01fe0002010203010203")
+    sys.modules.pop("device", None)
+
+
+def test_oxp_v1_power_off_logs_disable_packet(hid_env, caplog):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_v1_entry()]
+    device = adapters.OxpV1HidDevice.create()
+
+    with caplog.at_level(logging.INFO):
+        assert device.apply_solid((1, 2, 3), 100, False) is True
+
+    assert "packet kind=disable" in caplog.text
+
+
+def test_oxp_v1_reinitializes_after_reconnect(hid_env, monkeypatch):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_v1_entry()]
+    monkeypatch.setattr(adapters, "sleep", lambda _delay: None)
+    device = adapters.OxpV1HidDevice.create()
+    assert device.apply_solid((1, 2, 3), 100, True) is True
+
+    writes.clear()
+    stale_device = device._transport.hid_device
+
+    def short_write(data):
+        writes.append(bytes(data))
+        return 32
+
+    stale_device.write = short_write
+
+    assert device.apply_solid((4, 5, 6), 100, True) is True
+    assert [packet[0] for packet in writes] == [0xB8, 0xB4, 0xB4, 0xB2, 0xB8, 0xB8]
+
+
+def test_oxp_v1_reinitializes_after_invalidate(hid_env, monkeypatch):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_oxp_v1_entry()]
+    monkeypatch.setattr(adapters, "sleep", lambda _delay: None)
+    device = adapters.OxpV1HidDevice.create()
+    assert device.apply_solid((1, 2, 3), 100, True) is True
+
+    writes.clear()
+    device.invalidate()
+
+    assert device.apply_solid((4, 5, 6), 100, True) is True
+    assert [packet[0] for packet in writes] == [0xB4, 0xB4, 0xB2, 0xB8, 0xB8]
+
+
+def test_oxp_v1_missing_interface_logs_its_actual_signature(hid_env, caplog):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: []
+
+    with caplog.at_level(logging.WARNING):
+        assert adapters.OxpV1HidDevice.create().available is False
+
+    assert "vid=1a86 pid=fe00 usage_page=ff00 usage=0001" in caplog.text
 
 
 def _make_oxp_root(tmp_path, product):

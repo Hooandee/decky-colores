@@ -206,7 +206,46 @@ def test_sysfs_snapshot_captures_any_vendor_hid(tmp_path):
 
 def test_sysfs_snapshot_never_raises_on_missing_root():
     snap = sysfs_snapshot(root="/nope/nope")
-    assert snap == {"leds": [], "hid": [], "modules": [], "power_supply": {}}
+    assert snap == {
+        "identity": {"board": None, "product": None, "vendor": None, "model": None},
+        "leds": [],
+        "hid": [],
+        "modules": [],
+        "platform_rgb": {},
+        "power_supply": {},
+    }
+
+
+def test_sysfs_snapshot_captures_device_tree_identity(tmp_path):
+    model = tmp_path / "sys/firmware/devicetree/base/model"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"AYN Odin 2 Portal\x00")
+
+    snap = sysfs_snapshot(root=str(tmp_path))
+
+    assert snap["identity"] == {
+        "board": None,
+        "product": None,
+        "vendor": None,
+        "model": "AYN Odin 2 Portal",
+    }
+
+
+def test_sysfs_snapshot_captures_bounded_hp_rgb_platform_interface(tmp_path):
+    root = tmp_path / "sys/devices/platform/hp-rgb-lighting"
+    root.mkdir(parents=True)
+    for index in range(8):
+        (root / f"zone{index}").write_text(f"{index:06X}")
+    (root / "brightness").write_text("1")
+
+    snap = sysfs_snapshot(root=str(tmp_path))
+
+    assert snap["platform_rgb"] == {
+        "hp-rgb-lighting": {
+            "brightness": "1",
+            "zones": {f"zone{index}": f"{index:06X}" for index in range(8)},
+        }
+    }
 
 
 def test_build_bundle_shape():

@@ -103,6 +103,25 @@ OXP_APEX = {
     "hhd_rgb_takeover": True,
 }
 
+PORTAL_SYSFS = {
+    "driver": "multi_sysfs",
+    "color_order": "bgr",
+    "zones": 1,
+    "max_render_fps": 10,
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "experimental": [],
+}
+
+OMEN_PLATFORM = {
+    "driver": "hp_omen_platform",
+    "color_order": "rgb",
+    "zones": 1,
+    "brightness": False,
+    "max_render_fps": 2,
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "experimental": [],
+}
+
 GENERIC = {
     "driver": "sysfs",
     "color_order": "rgb",
@@ -152,6 +171,7 @@ PROFILES = [
     ("product", "83Q3", _profile(LEGION_GO_S_HID, "Legion Go S", POWER_LED_LPBL)),
     ("product_contains", "Claw 8 AI+", _profile(MSI_HID, "MSI Claw 8 AI+")),
     ("product_contains", "Claw A1M", _profile(MSI_HID, "MSI Claw")),
+    ("product", "Claw A8 BZ2EM", _profile({**MSI_HID, "allow_sysfs_fallback": False}, "MSI Claw A8 BZ2EM")),
     ("board", "Fremont", _profile(VALVE_LEDS, "Steam Machine")),
     ("product", "F7F", _profile(VALVE_LEDS, "Steam Machine")),
     ("product", "ONEXPLAYER APEX", _profile(OXP_APEX, "OneXPlayer OneXFly Apex")),
@@ -160,17 +180,46 @@ PROFILES = [
 ]
 
 
-def resolve_profile(board, product):
+def resolve_profile_match(board, product):
     for field, value, profile in PROFILES:
         if field == "board" and value == board:
-            return _copy_profile(profile)
+            return _copy_profile(profile), True
         if field == "product" and value == product:
-            return _copy_profile(profile)
+            return _copy_profile(profile), True
         if field == "product_contains" and value in (product or ""):
             resolved = _copy_profile(profile)
             if not resolved.get("name"):
                 resolved["name"] = product or board or "Unknown device"
-            return resolved
+            return resolved, True
     fallback = _copy_profile(GENERIC)
     fallback["name"] = product or board or "Unknown device"
-    return fallback
+    return fallback, False
+
+
+def resolve_profile(board, product):
+    profile, _ = resolve_profile_match(board, product)
+    return profile
+
+
+def profile_for_hid_signatures(info, drivers):
+    identity = " ".join(
+        str(info.get(field) or "") for field in ("vendor", "product", "board", "model")
+    ).lower()
+    name = info.get("product") or info.get("model") or info.get("board") or "Unknown device"
+    if "hid_msi" in drivers and any(token in identity for token in ("micro-star", "msi", "claw")):
+        return _profile({**MSI_HID, "allow_sysfs_fallback": False}, name)
+    if "onexplayer" not in identity:
+        return None
+    if "hid_oxp_v1" in drivers:
+        return _profile({**OXP_HID, "driver": "hid_oxp_v1"}, name)
+    if "hid_oxp_v2" in drivers:
+        return _profile(OXP_HID, name)
+    return None
+
+
+def profile_for_discovered_adapter(adapter, name):
+    if adapter == "portal_sysfs":
+        return _profile(PORTAL_SYSFS, name)
+    if adapter == "hp_omen_platform":
+        return _profile(OMEN_PLATFORM, name)
+    return None
