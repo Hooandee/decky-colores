@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Lang } from "../i18n";
 import { getUpdaterStrings } from "./strings";
 
-const LANGUAGES = ["es", "en", "it", "de"] as const satisfies readonly Lang[];
+const LANGUAGES = ["es", "en", "it", "de", "pt-BR"] as const satisfies readonly Lang[];
 
 function updaterValues(lang: Lang): string[] {
   const { panel, modal, availableTitle } = getUpdaterStrings(lang);
@@ -20,5 +20,6 @@ describe("Updater translation content", () => {
     expect(getUpdaterStrings("en").modal.restartNote).toBe("Restart Decky to apply it.");
     expect(getUpdaterStrings("it").panel.check).toBe("Cerca aggiornamenti");
     expect(getUpdaterStrings("de").panel.check).toBe("Nach Updates suchen");
+    expect(getUpdaterStrings("pt-BR").panel.check).toBe("Verificar atualizações");
   });
 });

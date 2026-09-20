@@ -194,11 +194,6 @@ export const it: Record<string, string> = {
   "about.version": "Versione {v}",
   "about.madeBy": "Realizzato da {name}",
 
-  "lang.spanish": "Spagnolo",
-  "lang.english": "Inglese",
-  "lang.italian": "Italiano",
-  "lang.german": "Tedesco",
-
   "experimental.title": "Funzioni sperimentali",
   "experimental.description":
     "Queste funzioni non sono state verificate su questo dispositivo. Puoi provarle, ma potrebbero non funzionare correttamente. Sto lavorando per aggiungere il supporto.",

@@ -108,6 +108,7 @@ describe("custom sensor bands", () => {
     expect(formatSensorValue(89.6, "en")).toBe("89.6");
     expect(formatSensorValue(89.6, "it")).toBe("89,6");
     expect(formatSensorValue(89.6, "de")).toBe("89,6");
+    expect(formatSensorValue(89.6, "pt-BR")).toBe("89,6");
   });
 
   it("formats battery percentages without floating point artifacts", () => {
@@ -145,5 +146,17 @@ describe("German gradient names", () => {
     vi.spyOn(Math, "random").mockReturnValue(0);
 
     expect(suggestGradientName("de")).toBe("Elektrischer Sonnenuntergang");
+  });
+});
+
+describe("Brazilian Portuguese gradient names", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("combines a Brazilian Portuguese noun and adjective in natural order", () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    expect(suggestGradientName("pt-BR")).toBe("Pôr do sol elétrico");
   });
 });

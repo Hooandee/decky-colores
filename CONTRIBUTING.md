@@ -25,7 +25,7 @@ El backend es Python (`main.py` + `py_modules/`). El frontend es React/TypeScrip
 
 ### Calidad de las traducciones
 
-El español, el inglés, el italiano y el alemán son textos de producto, no destinos
+El español, el inglés, el italiano, el alemán y el portugués de Brasil son textos de producto, no destinos
 de una traducción literal. Cada frase nueva o modificada debe sonar natural, usar
 la jerga habitual de juegos y hardware, y conservar la intención y el tono. Evita
 giros de traducción automática y tics editoriales como los guiones largos.
@@ -72,7 +72,7 @@ The backend is Python (`main.py` + `py_modules/`). The frontend is React/TypeScr
 
 ### Localization quality
 
-Spanish, English, Italian, and German are product copy, not literal translation
+Spanish, English, Italian, German, and Brazilian Portuguese are product copy, not literal translation
 targets. New or changed strings must read naturally to a native speaker, use the
 established gaming and hardware terminology, and preserve the original intent and
 tone. Avoid machine-translation phrasing and editorial tics such as em dashes.
