@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.29.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.28.0...decky-colores-v0.29.0) (2026-09-20)
+
+### Español
+
+* **Portugués de Brasil:** Ya puedes usar toda la interfaz Decky de Colores en portugués de Brasil, incluido el sistema de actualización y los nombres de los degradados. Además, el selector reúne los cinco idiomas en un menú compacto con banderas y recuerda tu elección.
+
+### English
+
+* **Brazilian Portuguese:** Colores' entire Decky interface is now available in Brazilian Portuguese, including the updater and gradient names. The language picker also brings all five languages together in a compact menu with flags and remembers your choice.
+
+### Italiano
+
+* **Portoghese brasiliano:** L'intera interfaccia Decky di Colores è ora disponibile in portoghese brasiliano, compresi il sistema di aggiornamento e i nomi dei gradienti. Inoltre, il selettore riunisce le cinque lingue in un menu compatto con bandiere e memorizza la tua scelta.
+
+### Deutsch
+
+* **Brasilianisches Portugiesisch:** Die gesamte Decky-Oberfläche von Colores ist jetzt auf brasilianischem Portugiesisch verfügbar, einschließlich der Update-Funktion und der Namen der Farbverläufe. Die Sprachauswahl bündelt außerdem alle fünf Sprachen in einem kompakten Menü mit Flaggen und merkt sich deine Auswahl.
+
+### Português (Brasil)
+
+* **Português do Brasil:** Toda a interface do Colores no Decky agora está disponível em português do Brasil, incluindo o atualizador e os nomes dos gradientes. O seletor de idiomas também reúne as cinco opções em um menu compacto com bandeiras e lembra a sua escolha.
+
 ## [0.28.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.27.0...decky-colores-v0.28.0) (2026-09-20)
 
 ### Español
