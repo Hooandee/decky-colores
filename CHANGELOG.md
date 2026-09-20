@@ -26,6 +26,12 @@
 * Während ein Spiel läuft, kannst du mit einer einfachen Auswahl zwischen den globalen Einstellungen und den Einstellungen für dieses Spiel wechseln. Colores behält beide, damit beim Umschalten nichts verloren geht.
 * Auch das Senden eines Berichts ist einfacher: Du wählst zuerst, ob du ein Problem melden oder eine Idee vorschlagen möchtest. Danach führt dich Colores Schritt für Schritt weiter, zeigt weiterhin dein Gerätemodell und setzt den Controller-Fokus an die richtige Stelle.
 
+### Português (Brasil)
+
+* Agora ficou muito mais fácil encontrar e mudar o tipo de iluminação: o nome do seu dispositivo continua visível na parte superior, e a navegação entre cores, gradientes, efeitos e as outras seções ficou mais clara e fácil de usar com o controle.
+* Durante o jogo, um seletor simples permite alternar entre as configurações globais e as específicas daquele jogo. O Colores mantém as duas, para que você possa trocar de uma para a outra sem perder o que já configurou.
+* Enviar um relatório também ficou mais fácil: primeiro você escolhe se quer relatar um problema ou sugerir uma ideia. Depois, o Colores orienta você passo a passo, mantém o modelo do dispositivo visível e deixa o foco no lugar certo para você continuar usando o controle.
+
 ## [0.27.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.26.1...decky-colores-v0.27.0) (2026-09-20)
 
 
