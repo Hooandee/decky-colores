@@ -433,9 +433,13 @@ private fun DashboardModeLayout(
             }
         }
         val sceneEnabled = state.canWrite && colorEnabled && !dynamic
+        val sceneShowsBoth = !gradientMode && !dynamic
 
         @Composable
-        fun Scene(sceneModifier: Modifier) {
+        fun Scene(
+            sceneModifier: Modifier,
+            wrapContent: Boolean = false,
+        ) {
             if (state.mode == AppMode.AUDIO) {
                 AudioDeviceScene(
                     frame = state.currentFrame,
@@ -459,7 +463,8 @@ private fun DashboardModeLayout(
                     perZone = perZone && !dynamic,
                     projection = state.ledColorProjection,
                     onTargetChange = sceneTargetChange,
-                    showBoth = !gradientMode && !dynamic,
+                    showBoth = sceneShowsBoth,
+                    wrapContent = wrapContent,
                     modifier = sceneModifier,
                 )
             }
@@ -493,7 +498,7 @@ private fun DashboardModeLayout(
                     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Scene(Modifier.fillMaxWidth().height(360.dp))
+                    if (state.mode == AppMode.AUDIO) Scene(Modifier.fillMaxWidth().height(360.dp)) else Scene(Modifier.fillMaxWidth(), wrapContent = true)
                     Panel(Modifier.fillMaxWidth().height(440.dp))
                 }
             }

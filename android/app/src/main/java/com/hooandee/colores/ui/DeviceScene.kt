@@ -1,5 +1,9 @@
 package com.hooandee.colores.ui
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.foundation.layout.width
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
@@ -51,6 +55,7 @@ fun DeviceScene(
     onTargetChange: (EditTarget) -> Unit,
     modifier: Modifier = Modifier,
     showBoth: Boolean = true,
+    wrapContent: Boolean = false,
 ) {
     val previewStyle = LocalLedPreviewStyle.current
     val lightPreview = previewStyle.sceneBackground.luminance() > 0.5f
@@ -61,12 +66,13 @@ fun DeviceScene(
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(32.dp),
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val compact = maxHeight < 320.dp
+        BoxWithConstraints(modifier = if (wrapContent) Modifier.fillMaxWidth() else Modifier.fillMaxSize()) {
+            val compact = !wrapContent && maxHeight < 320.dp
             val scenePadding = if (compact) 14.dp else 22.dp
             val capsuleHorizontalPadding = 18.dp
             val ringSpacing = 18.dp
-            val preferredRingSize = if (compact) (maxHeight - 150.dp).coerceIn(40.dp, 112.dp) else 112.dp
+            val compactChrome = if (showBoth) 172.dp else 118.dp
+            val preferredRingSize = if (compact) (maxHeight - compactChrome).coerceIn(40.dp, 112.dp) else 112.dp
             val ringSize =
                 previewRingDiameter(
                     availableWidth = maxWidth - scenePadding * 2 - capsuleHorizontalPadding * 2,
@@ -75,7 +81,7 @@ fun DeviceScene(
                     preferredDiameter = preferredRingSize,
                 )
             Column(
-                modifier = Modifier.fillMaxSize().padding(scenePadding),
+                modifier = (if (wrapContent) Modifier.fillMaxWidth() else Modifier.fillMaxSize()).padding(scenePadding),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
@@ -101,7 +107,7 @@ fun DeviceScene(
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
+                if (wrapContent) Spacer(Modifier.height(16.dp)) else Spacer(Modifier.weight(1f))
                 GlassPreviewCapsule {
                     Row(
                         modifier = Modifier.padding(horizontal = capsuleHorizontalPadding, vertical = if (compact) 12.dp else 16.dp),
@@ -119,6 +125,28 @@ fun DeviceScene(
                                 diameter = ringSize,
                                 projection = projection,
                                 onClick = { onTargetChange(target) },
+                            )
+                        }
+                    }
+                }
+                if (preview.groups.size > 1) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = capsuleHorizontalPadding),
+                        horizontalArrangement = Arrangement.spacedBy(ringSpacing),
+                    ) {
+                        preview.groups.indices.forEach { index ->
+                            val target = if (index == 0) EditTarget.LEFT else EditTarget.RIGHT
+                            val selected = selectedTarget == target
+                            Text(
+                                text = previewShortLabel(preview, index),
+                                modifier = Modifier.width(ringSize).clearAndSetSemantics {},
+                                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
@@ -177,7 +205,7 @@ fun DeviceScene(
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
+                if (!wrapContent) Spacer(Modifier.weight(1f))
             }
         }
     }
@@ -230,5 +258,16 @@ private fun StickTarget(
         )
     }
 }
+
+@Composable
+private fun previewShortLabel(
+    preview: DevicePreviewGroups,
+    index: Int,
+): String =
+    if (preview.representsSticks) {
+        stringResource(if (index == 0) R.string.target_left else R.string.target_right)
+    } else {
+        previewModuleLabel(preview, index)
+    }
 
 internal fun RgbColor.toComposeColor(): Color = Color(red, green, blue)
