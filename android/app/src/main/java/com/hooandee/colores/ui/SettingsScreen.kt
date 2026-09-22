@@ -88,6 +88,7 @@ fun SettingsScreen(
     onLedPreviewChange: (Boolean) -> Unit,
     onSubmitReport: (List<String>, String) -> Unit,
     onResetReport: () -> Unit,
+    onReportOpen: () -> Unit = {},
     onOpenHardwareLearning: () -> Unit,
     onForgetLearnedHardware: () -> Unit,
 ) {
@@ -225,6 +226,7 @@ fun SettingsScreen(
                 onResetReport()
             },
             onSubmit = onSubmitReport,
+            onOpen = onReportOpen,
         )
     }
     if (usageDisclosureOpen) {

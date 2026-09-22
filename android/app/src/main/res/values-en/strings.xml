@@ -76,7 +76,7 @@
     <string name="report_copy">Copy code</string>
     <string name="report_close">Close</string>
     <string name="report_error_title">The report could not be sent</string>
-    <string name="report_error_saved">A private copy was saved inside the app. You can retry when the connection is back.</string>
+    <string name="report_error_saved">A private copy was saved. It will be sent automatically the next time you open reports with a connection, for up to 7 days.</string>
     <string name="report_error_not_saved">A local copy could not be saved. Check the connection and try again.</string>
     <string name="report_retry">Retry</string>
     <string name="device_unknown">Unknown device</string>

@@ -76,7 +76,7 @@
     <string name="report_copy">Copiar código</string>
     <string name="report_close">Cerrar</string>
     <string name="report_error_title">No se pudo enviar el reporte</string>
-    <string name="report_error_saved">He guardado una copia privada en la app. Puedes reintentarlo cuando vuelva la conexión.</string>
+    <string name="report_error_saved">He guardado una copia privada. Se enviará sola la próxima vez que abras los reportes con conexión, durante 7 días.</string>
     <string name="report_error_not_saved">No se pudo guardar una copia local. Revisa la conexión e inténtalo de nuevo.</string>
     <string name="report_retry">Reintentar</string>
     <string name="device_unknown">Dispositivo no reconocido</string>

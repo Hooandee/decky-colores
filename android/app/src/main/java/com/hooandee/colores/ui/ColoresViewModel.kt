@@ -940,6 +940,10 @@ class ColoresViewModel(
         }
     }
 
+    fun resendPendingReport() {
+        viewModelScope.launch(Dispatchers.IO) { runCatching { reportSender.resendPending() } }
+    }
+
     fun resetReport() {
         mutableState.update { it.copy(reportSubmission = ReportSubmissionState()) }
     }

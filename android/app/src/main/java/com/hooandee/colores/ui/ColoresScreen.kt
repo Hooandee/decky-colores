@@ -45,6 +45,7 @@ fun ColoresScreen(
             onLedPreviewChange = viewModel::setLedPreviewEnabled,
             onSubmitReport = viewModel::submitReport,
             onResetReport = viewModel::resetReport,
+            onReportOpen = viewModel::resendPendingReport,
             onOpenHardwareLearning = {
                 settingsOpen = false
                 viewModel.openHardwareLearning()
@@ -128,6 +129,7 @@ fun ColoresScreen(
             initialCategories = setOf("learning"),
             initialText = stringResource(R.string.hardware_learning_report_description),
             lockedCategories = true,
+            onOpen = viewModel::resendPendingReport,
         )
     }
 }
