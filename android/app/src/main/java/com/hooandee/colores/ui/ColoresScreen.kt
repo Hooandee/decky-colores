@@ -29,6 +29,7 @@ fun ColoresScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var settingsOpen by rememberSaveable { mutableStateOf(false) }
+    var compatibilityReportOpen by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = settingsOpen) { settingsOpen = false }
     if (settingsOpen) {
         SettingsScreen(
@@ -65,6 +66,7 @@ fun ColoresScreen(
             onOpenSettings = { settingsOpen = true },
             onOpenHardwareLearning = viewModel::openHardwareLearning,
             onOpenHardwareLearningReport = viewModel::openHardwareLearningReport,
+            onOpenCompatibilityReport = { compatibilityReportOpen = true },
             gradientActions =
                 GradientActions(
                     onStopChange = viewModel::selectGradientStop,
@@ -128,6 +130,20 @@ fun ColoresScreen(
             onSubmit = viewModel::submitReport,
             initialCategories = setOf("learning"),
             initialText = stringResource(R.string.hardware_learning_report_description),
+            lockedCategories = true,
+            onOpen = viewModel::resendPendingReport,
+        )
+    }
+    if (compatibilityReportOpen) {
+        AndroidReportDialog(
+            state = state,
+            onDismiss = {
+                compatibilityReportOpen = false
+                viewModel.resetReport()
+            },
+            onSubmit = viewModel::submitReport,
+            initialCategories = setOf("learning"),
+            initialText = stringResource(R.string.compatibility_report_description),
             lockedCategories = true,
             onOpen = viewModel::resendPendingReport,
         )

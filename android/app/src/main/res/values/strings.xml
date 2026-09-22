@@ -81,9 +81,11 @@
     <string name="report_retry">Reintentar</string>
     <string name="device_unknown">Dispositivo no reconocido</string>
     <string name="no_leds_title">Sin LEDs controlables</string>
-    <string name="no_leds_description">Este dispositivo todavía no tiene una superficie de control verificada.</string>
+    <string name="no_leds_description">Aún no sabemos controlar sus luces. Envía un informe de compatibilidad y nos ayudarás a darle soporte.</string>
     <string name="lights_setup_title">Luces por configurar</string>
     <string name="lights_setup_description">Reconocemos tu %1$s. Ahora comprobaremos juntos qué ruta controla sus luces.</string>
+    <string name="lights_setup_description_unknown">Hemos encontrado posibles luces en tu %1$s. Comprobemos juntos cuál las controla.</string>
+    <string name="compatibility_report_description">Colores no ha encontrado luces que pueda controlar en mi dispositivo. Adjunto el diagnóstico privado para ayudar a darle soporte.</string>
     <string name="lights_setup_action">Configurar luces</string>
     <string name="lights_no_match_pill">Sin ruta compatible</string>
     <string name="lights_no_match_title">No encontramos una ruta compatible</string>
