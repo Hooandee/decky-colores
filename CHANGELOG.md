@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.29.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.29.0...decky-colores-v0.29.1) (2026-09-22)
+
+
+### Español
+
+* **ROG Ally:** La iluminación vuelve a funcionar aunque Aura se haya desactivado desde Windows u otro sistema.
+* **Carga durante la suspensión:** En los modelos ROG Ally compatibles puedes decidir si los anillos parpadean mientras la consola está suspendida y cargando. La opción viene desactivada por defecto.
+* **Legion Go:** En el modelo original puedes configurar por separado la luz del botón de encendido mientras usas la consola y durante la suspensión.
+* **Espiral GO:** En Legion Go 2 el efecto vuelve a animarse correctamente en lugar de quedarse blanco.
+* **Vista previa:** Los anillos de la interfaz siguen siendo visibles incluso con niveles de brillo muy bajos.
+
+### English
+
+* **ROG Ally:** Lighting works again even if Aura was disabled from Windows or another operating system.
+* **Charging during sleep:** On compatible ROG Ally models, you can choose whether the rings blink while the handheld is asleep and charging. The option is off by default.
+* **Legion Go:** On the original model, you can configure the power button light separately while using the handheld and during sleep.
+* **Spiral GO:** On Legion Go 2, the effect animates correctly again instead of staying white.
+* **Preview:** The rings remain visible in the interface even at very low brightness levels.
+
+### Italiano
+
+* **ROG Ally:** L'illuminazione torna a funzionare anche se Aura è stato disattivato da Windows o da un altro sistema operativo.
+* **Ricarica durante la sospensione:** Sui modelli ROG Ally compatibili puoi scegliere se far lampeggiare gli anelli mentre la console è sospesa e in carica. L'opzione è disattivata per impostazione predefinita.
+* **Legion Go:** Sul modello originale puoi configurare separatamente la spia del pulsante di accensione durante l'uso e durante la sospensione.
+* **Spirale GO:** Su Legion Go 2 l'effetto torna ad animarsi correttamente invece di rimanere bianco.
+* **Anteprima:** Gli anelli restano visibili nell'interfaccia anche con livelli di luminosità molto bassi.
+
+### Deutsch
+
+* **ROG Ally:** Die Beleuchtung funktioniert wieder, auch wenn Aura unter Windows oder einem anderen Betriebssystem deaktiviert wurde.
+* **Ladeanzeige im Ruhezustand:** Auf kompatiblen ROG-Ally-Modellen kannst du festlegen, ob die Ringe blinken, während das Gerät im Ruhezustand lädt. Die Option ist standardmäßig ausgeschaltet.
+* **Legion Go:** Beim ursprünglichen Modell lässt sich die Beleuchtung der Einschalttaste für den Betrieb und den Ruhezustand getrennt einstellen.
+* **Spirale GO:** Auf Legion Go 2 wird der Effekt wieder korrekt animiert, statt weiß zu bleiben.
+* **Vorschau:** Die Ringe bleiben in der Oberfläche auch bei sehr niedriger Helligkeit sichtbar.
+
+### Português (Brasil)
+
+* **ROG Ally:** A iluminação volta a funcionar mesmo que o Aura tenha sido desativado no Windows ou em outro sistema operacional.
+* **Carga durante a suspensão:** Nos modelos ROG Ally compatíveis, você pode escolher se os anéis piscam enquanto o dispositivo está suspenso e carregando. A opção vem desativada por padrão.
+* **Legion Go:** No modelo original, você pode configurar separadamente a luz do botão de energia durante o uso e durante a suspensão.
+* **Espiral GO:** No Legion Go 2, o efeito volta a ser animado corretamente em vez de ficar branco.
+* **Prévia:** Os anéis continuam visíveis na interface mesmo com níveis de brilho muito baixos.
+
 ## [0.29.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.28.0...decky-colores-v0.29.0) (2026-09-20)
 
 ### Español
