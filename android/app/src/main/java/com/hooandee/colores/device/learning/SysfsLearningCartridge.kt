@@ -1,10 +1,11 @@
 package com.hooandee.colores.device.learning
 
 import com.hooandee.colores.led.FileSysfsAccess
+import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.led.SysfsAccess
 import com.hooandee.colores.led.SysfsColorKind
 import com.hooandee.colores.led.SysfsRgbDescriptor
-import kotlin.math.roundToInt
+import com.hooandee.colores.led.SysfsRgbFrames
 
 class SysfsLearningCartridge(
     private val access: SysfsAccess = FileSysfsAccess,
@@ -15,23 +16,22 @@ class SysfsLearningCartridge(
 
     override fun accepts(candidate: ProbeCandidate): Boolean {
         val descriptor = candidate.descriptor as? SysfsRgbDescriptor ?: return false
-        val name = descriptor.nodePath.substringAfterLast('/')
         return candidate.cartridgeId == id &&
             candidate.cartridgeVersion == version &&
             candidate.surface == surface &&
-            descriptor.nodePath.startsWith(SYSFS_ROOT) &&
-            !descriptor.nodePath.contains("..") &&
-            !EXCLUDED_NAME.containsMatchIn(name) &&
-            descriptor.zones in 1..MAX_ZONES &&
-            descriptor.maxBrightness in 1..MAX_BRIGHTNESS
+            descriptor.isAcceptable(allowComposite = true)
     }
 
     override fun snapshot(candidate: ProbeCandidate): ProbeSnapshot? {
         val descriptor = candidate.descriptor as? SysfsRgbDescriptor ?: return null
         if (!accepts(candidate)) return null
-        val paths = colorPaths(descriptor) + brightnessPath(descriptor)
+        val paths = SysfsRgbFrames.statePaths(descriptor)
         if (paths.any { !access.exists(it) || !access.canWrite(it) }) return null
-        val values = paths.associateWith { access.read(it) ?: return null }
+        val values = linkedMapOf<String, String>()
+        paths.forEach { path -> values[path] = access.read(path) ?: return null }
+        SysfsRgbFrames.triggerPaths(descriptor).forEach { path ->
+            SysfsRgbFrames.activeTrigger(access.read(path))?.let { values[path] = it }
+        }
         return ProbeSnapshot(values)
     }
 
@@ -52,14 +52,16 @@ class SysfsLearningCartridge(
         zone: Int?,
     ): Boolean {
         val descriptor = candidate.descriptor as? SysfsRgbDescriptor ?: return false
-        if (snapshot(candidate) == null) return false
+        val snapshot = snapshot(candidate) ?: return false
+        if (!releaseTriggers(descriptor, snapshot)) return false
+        val all = List(descriptor.zones) { PROBE_RGB }
         return when (step) {
-            ProbeStep.COLOR -> writeFrame(descriptor, List(descriptor.zones) { PROBE_RGB }, LOW_PERCENT)
-            ProbeStep.BRIGHTNESS_LOW -> access.write(brightnessPath(descriptor), scaledBrightness(descriptor, LOW_PERCENT).toString())
-            ProbeStep.BRIGHTNESS_HIGH -> access.write(brightnessPath(descriptor), scaledBrightness(descriptor, HIGH_PERCENT).toString())
+            ProbeStep.COLOR -> writeFrame(descriptor, all, HIGH_PERCENT)
+            ProbeStep.BRIGHTNESS_LOW -> writeFrame(descriptor, all, LOW_PERCENT)
+            ProbeStep.BRIGHTNESS_HIGH -> writeFrame(descriptor, all, HIGH_PERCENT)
             ProbeStep.ZONE -> {
                 val index = zone?.takeIf { it in 0 until descriptor.zones } ?: return false
-                writeFrame(descriptor, List(descriptor.zones) { if (it == index) PROBE_RGB else OFF_RGB }, LOW_PERCENT)
+                writeFrame(descriptor, List(descriptor.zones) { if (it == index) PROBE_RGB else OFF_RGB }, HIGH_PERCENT)
             }
             ProbeStep.POWER_OFF, ProbeStep.POWER_ON -> false
         }
@@ -70,64 +72,79 @@ class SysfsLearningCartridge(
         snapshot: ProbeSnapshot,
     ): RollbackStatus {
         val descriptor = candidate.descriptor as? SysfsRgbDescriptor ?: return RollbackStatus.RESTORE_FAILED
-        val expectedPaths = (colorPaths(descriptor) + brightnessPath(descriptor)).toSet()
-        if (!accepts(candidate) || snapshot.values.keys != expectedPaths) return RollbackStatus.RESTORE_FAILED
-        if (!snapshot.values.attemptAll(access::write)) return RollbackStatus.RESTORE_FAILED
-        val restored = snapshot.values.all { (path, value) -> access.read(path)?.trim() == value.trim() }
-        return if (restored) RollbackStatus.RESTORED_AND_READ_BACK else RollbackStatus.RESTORE_FAILED
+        val statePaths = SysfsRgbFrames.statePaths(descriptor).toSet()
+        val triggerPaths = SysfsRgbFrames.triggerPaths(descriptor).toSet()
+        val keys = snapshot.values.keys
+        if (!accepts(candidate) || !keys.containsAll(statePaths) || !(statePaths + triggerPaths).containsAll(keys)) {
+            return RollbackStatus.RESTORE_FAILED
+        }
+        val state = snapshot.values.filterKeys { it in statePaths }
+        val triggers = snapshot.values.filterKeys { it in triggerPaths && it !in statePaths }.filterValues { it != NO_TRIGGER }
+        val stateWritten = state.attemptAll(access::write)
+        val triggersWritten = triggers.attemptAll(access::write)
+        if (!stateWritten || !triggersWritten) return RollbackStatus.RESTORE_FAILED
+        val triggeredNodes = triggers.keys.map { it.substringBeforeLast('/') }.toSet()
+        val stateRestored =
+            state.all { (path, value) -> path.substringBeforeLast('/') in triggeredNodes || access.read(path)?.trim() == value.trim() }
+        val triggersRestored = triggers.all { (path, value) -> SysfsRgbFrames.activeTrigger(access.read(path)) == value }
+        return if (stateRestored && triggersRestored) RollbackStatus.RESTORED_AND_READ_BACK else RollbackStatus.RESTORE_FAILED
     }
+
+    private fun releaseTriggers(
+        descriptor: SysfsRgbDescriptor,
+        snapshot: ProbeSnapshot,
+    ): Boolean =
+        SysfsRgbFrames.triggerPaths(descriptor)
+            .filter { path -> snapshot.values[path]?.let { it != NO_TRIGGER } == true }
+            .filter { path -> SysfsRgbFrames.activeTrigger(access.read(path)) != NO_TRIGGER }
+            .all { path -> access.write(path, NO_TRIGGER) }
 
     private fun writeFrame(
         descriptor: SysfsRgbDescriptor,
-        colors: List<Rgb>,
+        colors: List<RgbColor>,
         brightnessPercent: Int,
     ): Boolean {
-        val colorWritten =
-            when (descriptor.kind) {
-                SysfsColorKind.RGB_CHANNELS -> {
-                    val color = colors.first()
-                    colorPaths(descriptor).zip(listOf(color.red, color.green, color.blue)).all { (path, channel) ->
-                        val value = ((channel / 255.0) * descriptor.maxBrightness).roundToInt()
-                        access.write(path, value.toString())
-                    }
-                }
-                SysfsColorKind.MULTI_INTENSITY_DECIMAL ->
-                    access.write(
-                        colorPaths(descriptor).single(),
-                        colors.flatMap { listOf(it.red, it.green, it.blue) }.joinToString(" "),
-                    )
-                SysfsColorKind.MULTI_INTENSITY_HEX ->
-                    access.write(
-                        colorPaths(descriptor).single(),
-                        colors.joinToString(" ") { "0x%06X".format((it.red shl 16) or (it.green shl 8) or it.blue) },
-                    )
-            }
-        return colorWritten && access.write(brightnessPath(descriptor), scaledBrightness(descriptor, brightnessPercent).toString())
+        var succeeded = true
+        SysfsRgbFrames.writes(descriptor, colors, brightnessPercent, power = true).forEach { (path, value) ->
+            if (!access.write(path, value)) succeeded = false
+        }
+        return succeeded
     }
 
-    private fun colorPaths(descriptor: SysfsRgbDescriptor): List<String> =
-        when (descriptor.kind) {
-            SysfsColorKind.RGB_CHANNELS -> listOf("red", "green", "blue").map { "${descriptor.nodePath}/$it" }
-            else -> listOf("${descriptor.nodePath}/multi_intensity")
+    private fun SysfsRgbDescriptor.isAcceptable(allowComposite: Boolean): Boolean {
+        if (zones !in 1..MAX_ZONES || maxBrightness !in 1..MAX_BRIGHTNESS) return false
+        return when (kind) {
+            SysfsColorKind.COMPOSITE ->
+                allowComposite &&
+                    members.size in 2..MAX_MEMBERS &&
+                    members.sumOf(SysfsRgbDescriptor::zones) == zones &&
+                    members.all { it.isAcceptable(allowComposite = false) }
+            SysfsColorKind.CHANNEL_NODES -> zones == 1 && channelNodes.size == 3 && channelNodes.all(::isSafeNode)
+            SysfsColorKind.MULTI_INTENSITY_DECIMAL -> isSafeNode(nodePath) && hasCompleteLayout()
+            SysfsColorKind.MULTI_INTENSITY_HEX, SysfsColorKind.RGB_CHANNELS -> isSafeNode(nodePath)
         }
+    }
 
-    private fun brightnessPath(descriptor: SysfsRgbDescriptor): String = "${descriptor.nodePath}/brightness"
+    private fun SysfsRgbDescriptor.hasCompleteLayout(): Boolean {
+        if (multiIndex.isEmpty()) return true
+        return listOf("red", "green", "blue").all { channel -> multiIndex.count { it.equals(channel, ignoreCase = true) } == zones }
+    }
 
-    private fun scaledBrightness(
-        descriptor: SysfsRgbDescriptor,
-        percent: Int,
-    ): Int = ((percent / 100.0) * descriptor.maxBrightness).roundToInt()
-
-    private data class Rgb(val red: Int, val green: Int, val blue: Int)
+    private fun isSafeNode(path: String): Boolean =
+        path.startsWith(SYSFS_ROOT) &&
+            !path.contains("..") &&
+            !EXCLUDED_NAME.containsMatchIn(path.substringAfterLast('/'))
 
     private companion object {
         const val SYSFS_ROOT = "/sys/class/leds/"
+        const val NO_TRIGGER = "none"
         const val MAX_ZONES = 32
+        const val MAX_MEMBERS = 8
         const val MAX_BRIGHTNESS = 65535
         const val LOW_PERCENT = 25
         const val HIGH_PERCENT = 55
-        val PROBE_RGB = Rgb(255, 0, 255)
-        val OFF_RGB = Rgb(0, 0, 0)
+        val PROBE_RGB = RgbColor(255, 0, 255)
+        val OFF_RGB = RgbColor(0, 0, 0)
         val EXCLUDED_NAME = Regex("notif|status|charg|button|kbd|keyboard|backlight|lcd|flash|torch|indicator|mic|wlan|wifi|bt|lte|caps|numlock|mmc|power|batt", RegexOption.IGNORE_CASE)
     }
 }

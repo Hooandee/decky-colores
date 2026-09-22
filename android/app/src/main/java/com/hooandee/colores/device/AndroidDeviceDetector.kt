@@ -28,6 +28,7 @@ import com.hooandee.colores.device.learning.resolveDetectionOutcome
 import com.hooandee.colores.device.learning.usesTopologyGatedActivation
 import com.hooandee.colores.led.AndroidPServerCommandExecutor
 import com.hooandee.colores.led.LedDescriptor
+import com.hooandee.colores.led.SettingsProviderCodec
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsRgbDescriptor
@@ -55,7 +56,7 @@ class AndroidDeviceDetector(
     private val pserverAvailable: () -> Boolean = { AndroidPServerCommandExecutor().available },
     private val readSetting: (String) -> String? = { key -> Settings.System.getString(context.contentResolver, key) },
     private val scanJoypad: () -> SingleAdcJoypadDescriptor? = { SingleAdcJoypadDiscovery.scan() },
-    private val scanSysfs: () -> SysfsRgbDescriptor? = { SysfsRgbDiscovery.scan() },
+    private val scanSysfs: () -> List<SysfsRgbDescriptor> = { SysfsRgbDiscovery.scanAll() },
     private val informationCartridges: List<InformationCartridge> = listOf(Htr3212InformationCartridge()),
     private val topologyReader: I2cTopologyReader = SysfsI2cTopologyReader(),
 ) {
@@ -90,8 +91,7 @@ class AndroidDeviceDetector(
                         colorKeyValue = if (pserver) runCatching { readSetting(GenericVendorLed.COLOR_KEY) }.getOrNull() else null,
                     ),
                     GenericLedResolver.joypadCandidate(runCatching { scanJoypad() }.getOrNull()),
-                    GenericLedResolver.sysfsCandidate(runCatching { scanSysfs() }.getOrNull()),
-                )
+                ) + GenericLedResolver.sysfsCandidates(runCatching { scanSysfs() }.getOrDefault(emptyList()))
             },
             informationCartridges = informationCartridges,
         )
@@ -147,9 +147,10 @@ internal fun detectFromInputs(
     if (!shouldCollectVerificationCandidates(trustedExact, exactTransportAvailable)) {
         return DetectionOutcome.Resolved(identity, requireNotNull(trustedExact), facts = guard.facts)
     }
-    val route = resolveHardwareLearningRoute(identity, pserverAvailable, seedCandidates(), informationCartridges)
+    val (graphSeeds, deferredSeeds) = seedCandidates().partition { !it.usesNonDefaultSettingsFormat() }
+    val route = resolveHardwareLearningRoute(identity, pserverAvailable, graphSeeds, informationCartridges)
     val facts = route.facts + guard.facts
-    val candidates = verificationCandidates(route.candidates, trustedExact, exactTransportAvailable, facts)
+    val candidates = verificationCandidates(route.candidates + deferredSeeds, trustedExact, exactTransportAvailable, facts)
     val learned = resolveLearnedDevice(identity, binding, candidates)
     return resolveDetectionOutcome(
         identity = identity,
@@ -186,6 +187,9 @@ internal fun guardExactHtrTopology(
     val observed = "observed left=${left.describe()} right=${right.describe()}"
     return ExactTopologyGuard(true, listOf(topologyFact("contradicted; $expected; $observed")))
 }
+
+private fun ProbeCandidate.usesNonDefaultSettingsFormat(): Boolean =
+    (descriptor as? SettingsProviderDescriptor)?.colorFormat?.let { it != SettingsProviderCodec.ARGB_HEX_CSV } == true
 
 private fun List<I2cController>.describe(): String =
     if (isEmpty()) "none" else joinToString("|") { "${it.bus}-0x%02x".format(it.address) }

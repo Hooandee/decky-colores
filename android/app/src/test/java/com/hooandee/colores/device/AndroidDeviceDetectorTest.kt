@@ -414,6 +414,28 @@ class AndroidDeviceDetectorTest {
         assertTrue(guard.facts.isEmpty())
     }
 
+    @Test
+    fun `six digit settings candidate never becomes the HTR vendor base`() {
+        val topology = listOf(I2cController(3, 0x3c, "htr3212l"), I2cController(6, 0x3c, "htr3212r"))
+        val settings = requireNotNull(GenericLedResolver.settingsCandidate(true, "#010203,#040506"))
+
+        val result =
+            detectFromInputs(
+                identity = identity,
+                exact = null,
+                pserverAvailable = true,
+                binding = null,
+                readTopology = { topology },
+                seedCandidates = { listOf(settings) },
+                informationCartridges = listOf(Htr3212InformationCartridge { topology }),
+            )
+
+        val candidates = (result as DetectionOutcome.Candidates).candidates
+        val htr = candidates.single { it.surface == ProbeSurface.HTR3212 }
+        assertEquals("argb_hex_csv", (htr.descriptor as SettingsProviderDescriptor).colorFormat)
+        assertTrue(candidates.contains(settings))
+    }
+
     private fun detectThor(topology: List<I2cController>): DetectionOutcome {
         val shared = File("../../shared")
         val thorIdentity = AndroidDeviceIdentity("AYN Thor", "kalama", "AYN", emptyMap())

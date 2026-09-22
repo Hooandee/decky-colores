@@ -10,6 +10,8 @@ enum class SysfsColorKind {
     MULTI_INTENSITY_DECIMAL,
     MULTI_INTENSITY_HEX,
     RGB_CHANNELS,
+    CHANNEL_NODES,
+    COMPOSITE,
 }
 
 data class SysfsRgbDescriptor(
@@ -17,6 +19,9 @@ data class SysfsRgbDescriptor(
     val zones: Int,
     val maxBrightness: Int,
     val kind: SysfsColorKind,
+    val multiIndex: List<String> = emptyList(),
+    val channelNodes: List<String> = emptyList(),
+    val members: List<SysfsRgbDescriptor> = emptyList(),
 ) : LedDescriptor
 
 interface SysfsAccess {
@@ -55,13 +60,8 @@ class SysfsRgbDevice internal constructor(
         scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     ) : this(descriptor, FileSysfsAccess, scope)
 
-    private val brightnessPath = "${descriptor.nodePath}/brightness"
-    private val colorPaths =
-        when (descriptor.kind) {
-            SysfsColorKind.RGB_CHANNELS ->
-                listOf("red", "green", "blue").map { "${descriptor.nodePath}/$it" }
-            else -> listOf("${descriptor.nodePath}/multi_intensity")
-        }
+    private val colorPaths = SysfsRgbFrames.colorPaths(descriptor)
+    private val brightnessPath = SysfsRgbFrames.brightnessPaths(descriptor).firstOrNull()
 
     private val writer = ConflatedLedWriter(scope, WRITE_INTERVAL_MS, write = ::writeState)
 
@@ -95,38 +95,19 @@ class SysfsRgbDevice internal constructor(
     override fun invalidate() = Unit
 
     private fun writeState(state: LedState): Boolean {
-        val colors = if (state.power) state.zoneColors else List(descriptor.zones) { RgbColor(0, 0, 0) }
-        val colorWritten =
-            when (descriptor.kind) {
-                SysfsColorKind.RGB_CHANNELS -> writeChannels(colors.first())
-                SysfsColorKind.MULTI_INTENSITY_DECIMAL ->
-                    access.write(colorPaths.first(), colors.flatMap { listOf(it.red, it.green, it.blue) }.joinToString(" "))
-                SysfsColorKind.MULTI_INTENSITY_HEX ->
-                    access.write(colorPaths.first(), colors.joinToString(" ") { "0x%06X".format(packed(it)) })
-            }
-        val brightnessValue = if (state.power) scaleBrightness(state.brightness) else 0
-        val brightnessWritten = access.write(brightnessPath, brightnessValue.toString())
-        return colorWritten && brightnessWritten
+        var succeeded = true
+        SysfsRgbFrames.writes(descriptor, state.zoneColors, state.brightness, state.power).forEach { (path, value) ->
+            if (!access.write(path, value)) succeeded = false
+        }
+        return succeeded
     }
-
-    private fun writeChannels(color: RgbColor): Boolean {
-        val scaled = { channel: Int -> ((channel / 255.0) * descriptor.maxBrightness).roundToInt().coerceIn(0, descriptor.maxBrightness) }
-        return access.write(colorPaths[0], scaled(color.red).toString()) &&
-            access.write(colorPaths[1], scaled(color.green).toString()) &&
-            access.write(colorPaths[2], scaled(color.blue).toString())
-    }
-
-    private fun scaleBrightness(percent: Int): Int =
-        ((percent.coerceIn(0, 100) / 100.0) * descriptor.maxBrightness).roundToInt().coerceIn(0, descriptor.maxBrightness)
 
     private fun readBrightnessPercent(): Int {
-        val raw = access.read(brightnessPath)?.toIntOrNull() ?: return 100
+        val path = brightnessPath ?: return 100
+        val raw = access.read(path)?.toIntOrNull() ?: return 100
         if (descriptor.maxBrightness <= 0) return 100
         return ((raw.toDouble() / descriptor.maxBrightness) * 100).roundToInt().coerceIn(0, 100)
     }
-
-    private fun packed(color: RgbColor): Int =
-        (color.red.coerceIn(0, 255) shl 16) or (color.green.coerceIn(0, 255) shl 8) or color.blue.coerceIn(0, 255)
 
     private companion object {
         const val WRITE_INTERVAL_MS = 80L

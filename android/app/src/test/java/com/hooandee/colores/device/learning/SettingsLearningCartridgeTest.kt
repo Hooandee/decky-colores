@@ -43,6 +43,20 @@ class SettingsLearningCartridgeTest {
     }
 
     @Test
+    fun `six digit vendor colors are probed in the observed format`() {
+        val original = mutableMapOf("joystick_led_light_picker_color" to "#010203,#040506")
+        val store = FakeSettingsStore(original.toMutableMap())
+        val cartridge = SettingsLearningCartridge(store)
+        val candidate = requireNotNull(GenericLedResolver.settingsCandidate(true, original.getValue("joystick_led_light_picker_color")))
+        val snapshot = requireNotNull(cartridge.snapshot(candidate))
+
+        assertTrue(cartridge.execute(candidate, ProbeStep.ZONE, zone = 1))
+        assertEquals("#000000,#FF00FF", store.values["joystick_led_light_picker_color"])
+        assertEquals(RollbackStatus.RESTORED_AND_READ_BACK, cartridge.restore(candidate, snapshot))
+        assertEquals(original, store.values)
+    }
+
+    @Test
     fun `failed restore still attempts every snapshotted setting`() {
         val original =
             linkedMapOf(

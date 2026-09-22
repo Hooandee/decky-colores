@@ -1,6 +1,8 @@
 package com.hooandee.colores.device.learning
 
 import com.hooandee.colores.device.GenericVendorLed
+import com.hooandee.colores.led.RgbColor
+import com.hooandee.colores.led.SettingsProviderCodec
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SystemSettingsStore
 
@@ -19,7 +21,7 @@ class SettingsLearningCartridge(
             descriptor.driver == "settings_provider" &&
             descriptor.transport == "pserver" &&
             descriptor.colorKey == GenericVendorLed.COLOR_KEY &&
-            descriptor.colorFormat == "argb_hex_csv" &&
+            descriptor.colorFormat in SettingsProviderCodec.COLOR_FORMATS &&
             descriptor.brightnessKey == GenericVendorLed.BRIGHTNESS_KEY &&
             descriptor.brightnessRange == 0f..1f &&
             descriptor.enableKeys == GenericVendorLed.ENABLE_KEYS &&
@@ -61,7 +63,7 @@ class SettingsLearningCartridge(
         val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return false
         if (snapshot(candidate) == null) return false
         return when (step) {
-            ProbeStep.COLOR -> store.put(descriptor.colorKey, List(descriptor.zones) { PROBE_COLOR }.joinToString(","))
+            ProbeStep.COLOR -> store.put(descriptor.colorKey, encode(descriptor, List(descriptor.zones) { PROBE_COLOR }))
             ProbeStep.BRIGHTNESS_LOW -> putExisting(descriptor.brightnessKey, "0.25")
             ProbeStep.BRIGHTNESS_HIGH -> putExisting(descriptor.brightnessKey, "0.55")
             ProbeStep.POWER_OFF -> putPower(descriptor, false)
@@ -69,7 +71,7 @@ class SettingsLearningCartridge(
             ProbeStep.ZONE -> {
                 val index = zone?.takeIf { it in 0 until descriptor.zones } ?: return false
                 val colors = List(descriptor.zones) { if (it == index) PROBE_COLOR else OFF_COLOR }
-                store.put(descriptor.colorKey, colors.joinToString(","))
+                store.put(descriptor.colorKey, encode(descriptor, colors))
             }
         }
     }
@@ -88,6 +90,11 @@ class SettingsLearningCartridge(
         val restored = snapshot.values.all { (key, value) -> store.get(key) == value }
         return if (restored) RollbackStatus.RESTORED_AND_READ_BACK else RollbackStatus.RESTORE_FAILED
     }
+
+    private fun encode(
+        descriptor: SettingsProviderDescriptor,
+        colors: List<RgbColor>,
+    ): String = SettingsProviderCodec.encodeColors(colors, descriptor.zones, descriptor.colorFormat)
 
     private fun putExisting(
         key: String,
@@ -109,7 +116,7 @@ class SettingsLearningCartridge(
 
     private companion object {
         const val MAX_ZONES = 16
-        const val PROBE_COLOR = "#FFFF00FF"
-        const val OFF_COLOR = "#FF000000"
+        val PROBE_COLOR = RgbColor(255, 0, 255)
+        val OFF_COLOR = RgbColor(0, 0, 0)
     }
 }
