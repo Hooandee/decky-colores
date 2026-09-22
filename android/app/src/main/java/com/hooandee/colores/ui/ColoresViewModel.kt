@@ -29,6 +29,8 @@ import com.hooandee.colores.device.AndroidDeviceDetector
 import com.hooandee.colores.device.AndroidDeviceIdentityCatalog
 import com.hooandee.colores.device.DetectedAndroidDevice
 import com.hooandee.colores.device.DevicePresentation
+import com.hooandee.colores.device.diagnostics.AndroidHardwareInventorySource
+import com.hooandee.colores.device.diagnostics.HardwareInventoryCollector
 import com.hooandee.colores.device.learning.DetectionOutcome
 import com.hooandee.colores.device.learning.HardwareLearningAttempt
 import com.hooandee.colores.device.learning.HardwareLearningResult
@@ -81,6 +83,7 @@ import com.hooandee.colores.report.AndroidReportSnapshot
 import com.hooandee.colores.report.ReportSender
 import com.hooandee.colores.report.ReportSubmissionState
 import com.hooandee.colores.report.buildReportBundleForSubmission
+import com.hooandee.colores.report.reportDiagnostics
 import com.hooandee.colores.sensor.AndroidBatterySource
 import com.hooandee.colores.sensor.PerformanceMetric
 import com.hooandee.colores.sensor.PerformanceSources
@@ -1040,20 +1043,30 @@ class ColoresViewModel(
                 ambientSamplingMode = current.ambientSamplingMode.name.lowercase(),
             )
         mutableState.update { it.copy(reportSubmission = ReportSubmissionState(sending = true)) }
-        val bundle =
-            buildReportBundleForSubmission(
-                snapshot = snapshot,
-                categories = categories,
-                text = text,
-                learningResults = current.hardwareLearning.results,
-                restoreFailure = current.hardwareLearning.restoreFailure,
-                criticalSafetyFailure = current.hardwareLearning.criticalBlockReason == LearningBlockReason.JOURNAL_UNAVAILABLE,
-                learningFacts = current.detectionOutcome?.facts.orEmpty(),
-            )
+        val outcome = current.detectionOutcome
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { reportSender.submit(bundle) }
+            val result =
+                withContext(Dispatchers.IO) {
+                    val inventory = runCatching { HardwareInventoryCollector(AndroidHardwareInventorySource(application)).collect() }.getOrNull()
+                    val bundle =
+                        buildReportBundleForSubmission(
+                            snapshot = snapshot,
+                            categories = categories,
+                            text = text,
+                            learningResults = current.hardwareLearning.results,
+                            restoreFailure = current.hardwareLearning.restoreFailure,
+                            criticalSafetyFailure = current.hardwareLearning.criticalBlockReason == LearningBlockReason.JOURNAL_UNAVAILABLE,
+                            learningFacts = outcome?.facts.orEmpty(),
+                            diagnostics = reportDiagnostics(outcome, inventory),
+                        )
+                    reportSender.submit(bundle)
+                }
             mutableState.update { it.copy(reportSubmission = ReportSubmissionState(result = result)) }
         }
+    }
+
+    fun resendPendingReport() {
+        viewModelScope.launch(Dispatchers.IO) { runCatching { reportSender.resendPending() } }
     }
 
     fun resetReport() {

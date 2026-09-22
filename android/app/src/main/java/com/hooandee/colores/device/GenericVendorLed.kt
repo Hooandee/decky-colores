@@ -1,5 +1,6 @@
 package com.hooandee.colores.device
 
+import com.hooandee.colores.led.SettingsProviderCodec
 import com.hooandee.colores.led.SettingsProviderDescriptor
 
 internal object GenericVendorLed {
@@ -13,12 +14,15 @@ internal object GenericVendorLed {
             "left_handle_light_enabled",
             "right_handle_light_enabled",
         )
-    fun descriptor(zones: Int): SettingsProviderDescriptor =
+    fun descriptor(
+        zones: Int,
+        colorFormat: String = SettingsProviderCodec.ARGB_HEX_CSV,
+    ): SettingsProviderDescriptor =
         SettingsProviderDescriptor(
             driver = "settings_provider",
             transport = "pserver",
             colorKey = COLOR_KEY,
-            colorFormat = "argb_hex_csv",
+            colorFormat = colorFormat,
             brightnessKey = BRIGHTNESS_KEY,
             brightnessRange = 0f..1f,
             enableKeys = ENABLE_KEYS,

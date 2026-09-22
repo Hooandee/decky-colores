@@ -14,6 +14,8 @@
         tools:ignore="ProtectedPermissions" />
 
     <queries>
+        <package android:name="com.rp.gameassistant" />
+        <package android:name="com.odin.gameassistant" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

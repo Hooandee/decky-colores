@@ -24,6 +24,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,7 +52,9 @@ internal fun AndroidReportDialog(
     initialCategories: Set<String> = emptySet(),
     initialText: String = "",
     lockedCategories: Boolean = false,
+    onOpen: () -> Unit = {},
 ) {
+    LaunchedEffect(Unit) { onOpen() }
     var selected by remember(initialCategories) { mutableStateOf(initialCategories) }
     var text by remember(initialText) { mutableStateOf(initialText) }
     val submission = state.reportSubmission

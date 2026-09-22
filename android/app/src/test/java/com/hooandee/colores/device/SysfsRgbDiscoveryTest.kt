@@ -3,6 +3,8 @@ package com.hooandee.colores.device
 import com.hooandee.colores.led.FakeSysfsAccess
 import com.hooandee.colores.led.SysfsAccess
 import com.hooandee.colores.led.SysfsColorKind
+import com.hooandee.colores.led.SysfsRgbDescriptor
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -91,6 +93,115 @@ class SysfsRgbDiscoveryTest {
         val descriptor = SysfsRgbDiscovery.discover(listOf(node("rgb:rings", "/sys/leds/rings")), access)
 
         assertNull(descriptor)
+    }
+
+    @Test
+    fun `prefixed per channel nodes become one rgb surface`() {
+        val names = listOf("stick:red", "stick:green", "stick:blue")
+        val access =
+            fakeAccess(
+                files = names.associate { "/sys/class/leds/$it/max_brightness" to "31" },
+                writable = names.map { "/sys/class/leds/$it/brightness" }.toSet(),
+            )
+
+        val descriptor = requireNotNull(SysfsRgbDiscovery.discover(names.map { node(it, "/sys/class/leds/$it") }, access))
+
+        assertEquals(SysfsColorKind.CHANNEL_NODES, descriptor.kind)
+        assertEquals(names.map { "/sys/class/leds/$it" }, descriptor.channelNodes)
+        assertEquals(31, descriptor.maxBrightness)
+    }
+
+    @Test
+    fun `bare red green blue nodes are proposed after every other surface`() {
+        val bare = listOf("red", "green", "blue")
+        val access =
+            fakeAccess(
+                files = mapOf("/sys/class/leds/rgb:rings/multi_index" to "red green blue"),
+                writable = bare.map { "/sys/class/leds/$it/brightness" }.toSet() + "/sys/class/leds/rgb:rings/multi_intensity",
+            )
+
+        val all =
+            SysfsRgbDiscovery.discoverAll(
+                (bare + "rgb:rings").map { node(it, "/sys/class/leds/$it") },
+                access,
+            )
+
+        assertEquals(listOf(SysfsColorKind.MULTI_INTENSITY_DECIMAL, SysfsColorKind.CHANNEL_NODES), all.map { it.kind })
+        assertTrue(SysfsRgbDiscovery.isUnprefixedChannelGroup(all.last()))
+    }
+
+    @Test
+    fun `notification channel nodes are never proposed`() {
+        val names = listOf("notification:red", "notification:green", "notification:blue")
+        val access = fakeAccess(files = emptyMap(), writable = names.map { "/sys/class/leds/$it/brightness" }.toSet())
+
+        assertTrue(SysfsRgbDiscovery.discoverAll(names.map { node(it, "/sys/class/leds/$it") }, access).isEmpty())
+    }
+
+    @Test
+    fun `reordered and extra channels keep an explicit multi index`() {
+        val access =
+            fakeAccess(
+                files = mapOf("/sys/leds/rgb/multi_index" to "white green red blue green red blue white"),
+                writable = setOf("/sys/leds/rgb/multi_intensity"),
+            )
+
+        val descriptor = requireNotNull(SysfsRgbDiscovery.discover(listOf(node("rgb", "/sys/leds/rgb")), access))
+
+        assertEquals(2, descriptor.zones)
+        assertEquals(listOf("white", "green", "red", "blue", "green", "red", "blue", "white"), descriptor.multiIndex)
+    }
+
+    @Test
+    fun `standard multi index keeps the legacy descriptor shape`() {
+        val access =
+            fakeAccess(
+                files = mapOf("/sys/leds/rgb/multi_index" to "red green blue red green blue"),
+                writable = setOf("/sys/leds/rgb/multi_intensity"),
+            )
+
+        val descriptor = SysfsRgbDiscovery.discover(listOf(node("rgb", "/sys/leds/rgb")), access)
+
+        assertEquals(SysfsRgbDescriptor("/sys/leds/rgb", 2, 255, SysfsColorKind.MULTI_INTENSITY_DECIMAL), descriptor)
+    }
+
+    @Test
+    fun `uninterpretable multi index produces no candidate`() {
+        listOf("", "red green", "rgb red", "red green blue blue", "0x1 0x2").forEach { index ->
+            val access =
+                fakeAccess(
+                    files = mapOf("/sys/leds/rgb/multi_index" to index),
+                    writable = setOf("/sys/leds/rgb/multi_intensity"),
+                )
+
+            assertNull(index, SysfsRgbDiscovery.discover(listOf(node("rgb", "/sys/leds/rgb")), access))
+        }
+    }
+
+    @Test
+    fun `left and right nodes also offer one composite surface`() {
+        val access =
+            fakeAccess(
+                files =
+                    mapOf(
+                        "/sys/class/leds/left-stick/multi_index" to "red green blue",
+                        "/sys/class/leds/right-stick/multi_index" to "rgb rgb",
+                    ),
+                writable = setOf("/sys/class/leds/left-stick/multi_intensity", "/sys/class/leds/right-stick/multi_intensity"),
+            )
+
+        val all =
+            SysfsRgbDiscovery.discoverAll(
+                listOf(node("left-stick", "/sys/class/leds/left-stick"), node("right-stick", "/sys/class/leds/right-stick")),
+                access,
+            )
+
+        assertEquals(3, all.size)
+        val composite = all.last()
+        assertEquals(SysfsColorKind.COMPOSITE, composite.kind)
+        assertEquals(3, composite.zones)
+        assertEquals(all.take(2), composite.members)
+        assertEquals(SysfsColorKind.MULTI_INTENSITY_DECIMAL, SysfsRgbDiscovery.discover(listOf(node("left-stick", "/sys/class/leds/left-stick")), access)?.kind)
     }
 
     private fun node(

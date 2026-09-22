@@ -18,6 +18,18 @@ class SettingsProviderCodecTest {
         )
 
     @Test
+    fun `rgb hex format writes and reads six digit colors`() {
+        val colors = listOf(RgbColor(18, 52, 86), RgbColor(171, 205, 239))
+
+        assertEquals("#123456,#ABCDEF", SettingsProviderCodec.encodeColors(colors, 2, SettingsProviderCodec.RGB_HEX_CSV))
+        assertEquals("#FF123456,#FFABCDEF", SettingsProviderCodec.encodeColors(colors, 2, SettingsProviderCodec.ARGB_HEX_CSV))
+        assertEquals(
+            colors,
+            SettingsProviderCodec.decode("#123456,#ABCDEF", null, null, descriptor.copy(colorFormat = "rgb_hex_csv")).zoneColors,
+        )
+    }
+
+    @Test
     fun `encodes RP5 values exactly`() {
         val state =
             LedState(

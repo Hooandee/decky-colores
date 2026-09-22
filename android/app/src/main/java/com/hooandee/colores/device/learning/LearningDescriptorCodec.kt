@@ -42,14 +42,7 @@ internal fun encodeLearningDescriptor(descriptor: LedDescriptor): String =
         }
         is SingleAdcJoypadDescriptor ->
             JSONObject().put("type", "singleadc").put("base_path", descriptor.basePath).toString()
-        is SysfsRgbDescriptor ->
-            JSONObject()
-                .put("type", "sysfs")
-                .put("node_path", descriptor.nodePath)
-                .put("zones", descriptor.zones)
-                .put("max_brightness", descriptor.maxBrightness)
-                .put("kind", descriptor.kind.name)
-                .toString()
+        is SysfsRgbDescriptor -> descriptor.toJson().toString()
     }
 
 internal fun decodeLearningDescriptor(raw: String): LedDescriptor? =
@@ -87,16 +80,35 @@ internal fun decodeLearningDescriptor(raw: String): LedDescriptor? =
                 )
             }
             "singleadc" -> SingleAdcJoypadDescriptor(json.getString("base_path"))
-            "sysfs" ->
-                SysfsRgbDescriptor(
-                    nodePath = json.getString("node_path"),
-                    zones = json.getInt("zones"),
-                    maxBrightness = json.getInt("max_brightness"),
-                    kind = SysfsColorKind.valueOf(json.getString("kind")),
-                )
+            "sysfs" -> json.toSysfsDescriptor()
             else -> null
         }
     }.getOrNull()
+
+private fun SysfsRgbDescriptor.toJson(): JSONObject {
+    val value =
+        JSONObject()
+            .put("type", "sysfs")
+            .put("node_path", nodePath)
+            .put("zones", zones)
+            .put("max_brightness", maxBrightness)
+            .put("kind", kind.name)
+    if (multiIndex.isNotEmpty()) value.put("multi_index", JSONArray(multiIndex))
+    if (channelNodes.isNotEmpty()) value.put("channel_nodes", JSONArray(channelNodes))
+    if (members.isNotEmpty()) value.put("members", JSONArray(members.map { it.toJson() }))
+    return value
+}
+
+private fun JSONObject.toSysfsDescriptor(): SysfsRgbDescriptor =
+    SysfsRgbDescriptor(
+        nodePath = getString("node_path"),
+        zones = getInt("zones"),
+        maxBrightness = getInt("max_brightness"),
+        kind = SysfsColorKind.valueOf(getString("kind")),
+        multiIndex = optJSONArray("multi_index")?.strings().orEmpty(),
+        channelNodes = optJSONArray("channel_nodes")?.strings().orEmpty(),
+        members = optJSONArray("members")?.let { array -> (0 until array.length()).map { array.getJSONObject(it).toSysfsDescriptor() } }.orEmpty(),
+    )
 
 private fun JSONArray.strings(): List<String> = (0 until length()).map(::getString)
 
