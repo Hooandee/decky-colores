@@ -60,6 +60,12 @@ class ServiceOwnerLease(
     }
 
     @Synchronized
+    fun onForegroundRefused() {
+        owners.clear()
+        phase = Phase.IDLE
+    }
+
+    @Synchronized
     fun onServiceStopped() {
         phase = Phase.IDLE
         owners -= ServiceOwner.CAPTURE
@@ -103,6 +109,11 @@ class ContextServiceGate(
     }
 
     fun releaseIfUnowned(): Boolean = lease.releaseIfUnowned().also { if (it) Log.d(TAG, "released") }
+
+    fun onForegroundRefused() {
+        Log.w(TAG, "foreground refused")
+        lease.onForegroundRefused()
+    }
 
     fun onServiceStopped() {
         Log.d(TAG, "stopped")

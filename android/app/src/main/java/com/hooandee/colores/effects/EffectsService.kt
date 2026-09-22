@@ -42,7 +42,7 @@ class EffectsService : Service() {
     private var projectionOwner: CaptureOwner? = null
     private var captureLeaseHeld = false
     private var foreground = false
-    private var restoresInFlight = 0
+    private val settler by lazy { EffectsServiceSettler { application.effectsServiceGate.releaseIfUnowned() } }
 
     override fun onCreate() {
         super.onCreate()
@@ -69,34 +69,49 @@ class EffectsService : Service() {
         val command = resolveEffectsServiceCommand(intent != null, intent?.action)
         val policy = effectsServiceCommandPolicy(command)
         Log.i(TAG, "start command=$command action=${intent?.action}")
+        settler.onStartCommand(startId)
         when (command) {
             EffectsServiceCommand.START_AUDIO -> {
-                enterForeground(mediaProjection = true)
-                startAudioCapture(requireNotNull(intent))
+                val start = requireNotNull(intent)
+                val failure = enterForeground(mediaProjection = start.hasProjectionConsent())
+                if (failure == null) {
+                    startAudioCapture(start)
+                } else {
+                    stopAudioCapture(
+                        if (foregroundRefusalRequiresAuthorization(failure)) AudioCaptureStatus.AUTHORIZATION_REQUIRED else AudioCaptureStatus.ERROR,
+                    )
+                    recoverFromForegroundRefusal()
+                }
             }
             EffectsServiceCommand.STOP_AUDIO -> {
                 stopAudioCapture(requireNotNull(intent).audioStopStatus(), reconcile = policy.reconcileController)
-                settle(startId)
+                settle()
             }
             EffectsServiceCommand.START_AMBIENT -> {
-                enterForeground(mediaProjection = true)
-                startAmbientCapture(requireNotNull(intent))
+                val start = requireNotNull(intent)
+                val failure = enterForeground(mediaProjection = start.hasProjectionConsent())
+                if (failure == null) {
+                    startAmbientCapture(start)
+                } else {
+                    stopAmbientCapture(
+                        if (foregroundRefusalRequiresAuthorization(failure)) AmbientCaptureStatus.AUTHORIZATION_REQUIRED else AmbientCaptureStatus.ERROR,
+                    )
+                    recoverFromForegroundRefusal()
+                }
             }
             EffectsServiceCommand.STOP_AMBIENT -> {
                 stopAmbientCapture(requireNotNull(intent).ambientStopStatus(), reconcile = policy.reconcileController)
-                settle(startId)
+                settle()
             }
             EffectsServiceCommand.UPDATE_AMBIENT -> {
                 intent?.ambientConfig()?.let(application.ambientCaptureSession::updateConfig)
-                settle(startId)
+                settle()
             }
             EffectsServiceCommand.RESTORE -> {
-                enterForeground(mediaProjection = false)
-                restore(startId)
+                if (enterForeground(mediaProjection = false) == null) restore() else recoverFromForegroundRefusal()
             }
             EffectsServiceCommand.KEEP_ALIVE -> {
-                enterForeground(mediaProjection = projectionOwner != null)
-                settle(startId)
+                if (enterForeground(mediaProjection = projectionOwner != null) == null) settle() else recoverFromForegroundRefusal()
             }
         }
         return START_STICKY
@@ -128,14 +143,31 @@ class EffectsService : Service() {
         super.onDestroy()
     }
 
-    private fun enterForeground(mediaProjection: Boolean) {
-        startForegroundCompat(mediaProjection)
-        foreground = true
-        application.effectsServiceGate.onServiceStarted()
+    private fun enterForeground(mediaProjection: Boolean): Throwable? =
+        runCatching { startForegroundCompat(mediaProjection) }
+            .fold(
+                onSuccess = {
+                    foreground = true
+                    application.effectsServiceGate.onServiceStarted()
+                    null
+                },
+                onFailure = {
+                    Log.w(TAG, "foreground refused projection=$mediaProjection", it)
+                    it
+                },
+            )
+
+    private fun recoverFromForegroundRefusal() {
+        if (foreground) {
+            settle()
+            return
+        }
+        application.effectsServiceGate.onForegroundRefused()
+        stopSelf()
     }
 
-    private fun restore(startId: Int) {
-        restoresInFlight++
+    private fun restore() {
+        settler.beginRestore()
         val restoring =
             application.applicationScope.async {
                 runCatching {
@@ -145,17 +177,17 @@ class EffectsService : Service() {
             }
         serviceScope.launch {
             runCatching { restoring.await() }
-            restoresInFlight--
-            settle(startId)
+            settler.endRestore()?.let(::stopWhenUnowned)
         }
     }
 
-    private fun settle(startId: Int) {
-        if (restoresInFlight > 0) return
-        if (application.effectsServiceGate.releaseIfUnowned()) {
-            Log.i(TAG, "no consumers, stopping")
-            stopSelf(startId)
-        }
+    private fun settle() {
+        settler.settle()?.let(::stopWhenUnowned)
+    }
+
+    private fun stopWhenUnowned(latestStartId: Int) {
+        Log.i(TAG, "no consumers, stopping")
+        stopSelf(latestStartId)
     }
 
     private fun startForegroundCompat(mediaProjection: Boolean) {
@@ -472,6 +504,13 @@ class EffectsService : Service() {
         get() = getApplication() as ColoresApplication
 
     @Suppress("DEPRECATION")
+    private fun Intent.hasProjectionConsent(): Boolean =
+        hasProjectionConsent(
+            resultCode = getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED),
+            resultDataPresent = projectionData() != null,
+            okCode = Activity.RESULT_OK,
+        )
+
     private fun Intent.projectionData(): Intent? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             getParcelableExtra(EXTRA_PROJECTION_DATA, Intent::class.java)

@@ -146,4 +146,19 @@ class ContextServiceGateTest {
         lease.setRequired(ServiceOwner.EFFECTS, false)
         assertEquals(1, stops)
     }
+
+    @Test
+    fun `foreground refusal releases every owner so a later request starts again`() {
+        var starts = 0
+        val lease = ServiceOwnerLease(onStart = { starts++; true }, onStop = {})
+        lease.setRequired(ServiceOwner.EFFECTS, true)
+        lease.setRequired(ServiceOwner.CAPTURE, true)
+
+        lease.onForegroundRefused()
+
+        assertFalse(lease.hasOwners())
+        assertFalse(lease.active)
+        lease.setRequired(ServiceOwner.EFFECTS, true)
+        assertEquals(2, starts)
+    }
 }
