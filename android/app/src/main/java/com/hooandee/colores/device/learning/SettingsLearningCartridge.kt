@@ -72,6 +72,7 @@ class SettingsLearningCartridge(
             ProbeStep.BRIGHTNESS_HIGH -> putExisting(descriptor.brightnessKey, HIGH_BRIGHTNESS)
             ProbeStep.POWER_OFF -> putPower(descriptor, false)
             ProbeStep.POWER_ON -> putPower(descriptor, true)
+            ProbeStep.HARDWARE_EFFECT -> false
             ProbeStep.ZONE -> {
                 val index = zone?.takeIf { it in 0 until descriptor.zones } ?: return false
                 val colors = List(descriptor.zones) { if (it == index) PROBE_COLOR else OFF_COLOR }

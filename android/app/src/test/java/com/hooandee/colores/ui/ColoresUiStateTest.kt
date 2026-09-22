@@ -106,6 +106,24 @@ class ColoresUiStateTest {
     }
 
     @Test
+    fun `effects tab appears only when the device offers effects`() {
+        val withoutEffects = ColoresUiState(detected = thor, effects = emptyList())
+        val withEffects = ColoresUiState(detected = thor, effects = listOf(breathing))
+
+        assertFalse(AppMode.EFFECT in withoutEffects.availableModes())
+        assertTrue(AppMode.COLOR in withoutEffects.availableModes())
+        assertTrue(AppMode.EFFECT in withEffects.availableModes())
+    }
+
+    @Test
+    fun `saved effect profile falls back to color without available effects`() {
+        assertEquals(AppMode.COLOR, AppMode.EFFECT.coerceAvailable(gradientSupported = true, effectsAvailable = false))
+        assertEquals(AppMode.EFFECT, AppMode.EFFECT.coerceAvailable(gradientSupported = true, effectsAvailable = true))
+        assertEquals(AppMode.COLOR, AppMode.GRADIENT.coerceAvailable(gradientSupported = false, effectsAvailable = true))
+        assertEquals(AppMode.AUDIO, AppMode.AUDIO.coerceAvailable(gradientSupported = false, effectsAvailable = false))
+    }
+
+    @Test
     fun `known identity presentation does not enable LED controls`() {
         val state =
             ColoresUiState(

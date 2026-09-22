@@ -27,6 +27,7 @@ import com.hooandee.colores.gradient.GradientPresentation
 import com.hooandee.colores.led.HardwareEffect
 import com.hooandee.colores.led.LedDevice
 import com.hooandee.colores.led.RgbColor
+import com.hooandee.colores.led.effectModeAvailable
 import com.hooandee.colores.sensor.BatterySource
 import com.hooandee.colores.sensor.PerformanceMetric
 import com.hooandee.colores.sensor.PerformanceSource
@@ -110,6 +111,9 @@ data class ProfileApplication(
     val batteryBreathe: Boolean,
     val temperatureBreathe: Boolean,
 )
+
+internal fun LightingIntent.availableOn(device: LedDevice): LightingIntent =
+    if (mode == AppMode.EFFECT && !device.effectModeAvailable) copy(mode = AppMode.COLOR) else this
 
 internal fun LightingIntent.applying(profile: ProfileApplication): LightingIntent =
     copy(
@@ -348,7 +352,7 @@ class LightingController(
         frozenGradientFrame = emptyList()
         binding = command.binding
         sensorBands = command.binding.bands
-        intent = command.intent.copy(staticColors = command.intent.staticColors.fit(command.binding.zones))
+        intent = command.intent.copy(staticColors = command.intent.staticColors.fit(command.binding.zones)).availableOn(command.binding.device)
         temperatureCelsius = command.binding.temperature?.readCelsius()
         temperatureAvailable = temperatureCelsius != null || command.binding.temperature?.available == true
         rendererSignature = null
@@ -395,7 +399,8 @@ class LightingController(
     }
 
     private suspend fun mutateIntent(transform: (LightingIntent) -> LightingIntent) {
-        intent = transform(intent)
+        val transformed = transform(intent)
+        intent = binding?.let { transformed.availableOn(it.device) } ?: transformed
         reconcile()
     }
 

@@ -789,6 +789,7 @@ private fun probeTitle(step: ProbeStep, zone: Int?): String =
         ProbeStep.BRIGHTNESS_LOW, ProbeStep.BRIGHTNESS_HIGH -> stringResource(R.string.hardware_learning_probe_brightness)
         ProbeStep.POWER_OFF -> stringResource(R.string.hardware_learning_probe_power_off)
         ProbeStep.POWER_ON -> stringResource(R.string.hardware_learning_probe_power_on)
+        ProbeStep.HARDWARE_EFFECT -> stringResource(R.string.hardware_learning_probe_hardware_effect)
         ProbeStep.ZONE -> stringResource(R.string.hardware_learning_probe_zone, (zone ?: 0) + 1)
     }
 
@@ -801,6 +802,7 @@ private fun probeBody(step: ProbeStep, zone: Int?): String =
         ProbeStep.ZONE -> stringResource(R.string.hardware_learning_probe_zone_body, (zone ?: 0) + 1)
         ProbeStep.POWER_OFF -> stringResource(R.string.hardware_learning_probe_power_off_body)
         ProbeStep.POWER_ON -> stringResource(R.string.hardware_learning_probe_power_on_body)
+        ProbeStep.HARDWARE_EFFECT -> stringResource(R.string.hardware_learning_probe_hardware_effect_body)
     }
 
 @Composable
@@ -810,5 +812,6 @@ private fun observationTitle(step: ProbeStep, zone: Int?): String =
         ProbeStep.BRIGHTNESS_LOW, ProbeStep.BRIGHTNESS_HIGH -> stringResource(R.string.hardware_learning_saw_brightness)
         ProbeStep.POWER_OFF -> stringResource(R.string.hardware_learning_saw_power_off)
         ProbeStep.POWER_ON -> stringResource(R.string.hardware_learning_saw_power_on)
+        ProbeStep.HARDWARE_EFFECT -> stringResource(R.string.hardware_learning_saw_hardware_effect)
         ProbeStep.ZONE -> stringResource(R.string.hardware_learning_saw_zone, (zone ?: 0) + 1)
     }

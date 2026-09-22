@@ -41,6 +41,7 @@ class LightingControllerTest {
         override val recommendedFrameIntervalMs: Long = 80,
         override val supportsPerZone: Boolean = true,
         override val hardwareEffects: List<HardwareEffect> = emptyList(),
+        override val softwareEffects: Boolean = true,
     ) : LedDevice {
         data class Write(val colors: List<RgbColor>, val brightness: Int, val power: Boolean)
 
@@ -142,6 +143,44 @@ class LightingControllerTest {
         audio: AudioLevelSource = MutableAudioLevelSource(),
         ambient: AmbientFrameSource = MutableAmbientFrameSource(),
     ) = LightingBinding("dev", device, zones, catalog, bands, battery, temperature, performance, audio, ambient)
+
+    @Test
+    fun `effect mode falls back to color when the device offers no effects`() =
+        runTest {
+            val device = FakeDevice(softwareEffects = false)
+            val gate = RecordingGate()
+            val controller = LightingController(backgroundScope, gate, clockMs = { testScheduler.currentTime })
+
+            controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT))
+            advanceTimeBy(500)
+            runCurrent()
+            assertEquals(AppMode.COLOR, controller.snapshot.value.mode)
+            assertFalse(gate.running)
+
+            controller.setMode(AppMode.EFFECT)
+            advanceTimeBy(500)
+            runCurrent()
+            assertEquals(AppMode.COLOR, controller.snapshot.value.mode)
+            assertFalse(gate.running)
+            val writes = device.writes.size
+            advanceTimeBy(1_000)
+            runCurrent()
+            assertEquals(writes, device.writes.size)
+        }
+
+    @Test
+    fun `confirmed hardware effects keep effect mode without software effects`() =
+        runTest {
+            val device = FakeDevice(softwareEffects = false, hardwareEffects = listOf(HardwareEffect("breathing", 2, 50, emptyList())))
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+
+            controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT, effectId = "breathing"))
+            advanceTimeBy(100)
+            runCurrent()
+
+            assertEquals(AppMode.EFFECT, controller.snapshot.value.mode)
+            assertTrue(device.hardwareEffectWrites > 0)
+        }
 
     @Test
     fun `ambient capture and led writes run at independent cadences`() =

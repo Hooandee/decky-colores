@@ -109,6 +109,7 @@ data class HardwareLearningUiState(
                 ProbeStep.BRIGHTNESS_HIGH,
                 ProbeStep.POWER_OFF,
                 ProbeStep.POWER_ON,
+                ProbeStep.HARDWARE_EFFECT,
             ).firstOrNull { it in ready.supportedSteps && !ready.evidence.hasAnswer(it) }?.let {
                 return ProbeRequest(it, null)
             }

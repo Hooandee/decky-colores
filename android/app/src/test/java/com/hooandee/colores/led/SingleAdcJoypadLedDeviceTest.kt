@@ -174,4 +174,17 @@ class SingleAdcJoypadLedDeviceTest {
             )
         assertFalse(device.available)
     }
+
+    @Test
+    fun `unconfirmed joypad hides animated software effects and slows its cadence`() =
+        runTest {
+            val learned = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), FakeSysfsAccess(nodes), backgroundScope)
+            val confirmed = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base, vendorEffects = true), FakeSysfsAccess(allNodes), backgroundScope)
+
+            assertFalse(learned.effectModeAvailable)
+            assertEquals(200L, learned.recommendedFrameIntervalMs)
+            assertTrue(confirmed.effectModeAvailable)
+            assertTrue(confirmed.hardwareEffects.isNotEmpty())
+            assertEquals(80L, confirmed.recommendedFrameIntervalMs)
+        }
 }

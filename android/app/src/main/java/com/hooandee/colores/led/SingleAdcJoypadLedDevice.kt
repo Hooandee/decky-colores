@@ -24,12 +24,22 @@ class SingleAdcJoypadLedDevice internal constructor(
         scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     ) : this(descriptor, FileSysfsAccess, scope)
 
-    private val writer = ConflatedLedWriter(scope, WRITE_INTERVAL_MS, write = ::writeFrame)
+    private val writer =
+        ConflatedLedWriter(
+            scope,
+            if (descriptor.vendorEffects) WRITE_INTERVAL_MS else CONSERVATIVE_FRAME_INTERVAL_MS,
+            write = ::writeFrame,
+        )
 
     override val available: Boolean
         get() = access.canWrite(node("custum_rgb_r")) && access.canWrite(node("led_set"))
 
     override val supportsPerZone: Boolean = false
+
+    override val softwareEffects: Boolean = descriptor.vendorEffects
+
+    override val recommendedFrameIntervalMs: Long =
+        if (descriptor.vendorEffects) WRITE_INTERVAL_MS else CONSERVATIVE_FRAME_INTERVAL_MS
 
     override val hardwareEffects: List<HardwareEffect> =
         if (descriptor.vendorEffects) {
@@ -174,6 +184,7 @@ class SingleAdcJoypadLedDevice internal constructor(
 
     private companion object {
         const val WRITE_INTERVAL_MS = 80L
+        const val CONSERVATIVE_FRAME_INTERVAL_MS = 200L
         const val STATIC_MODE = 1
         const val MAX_SPEED = 8
 

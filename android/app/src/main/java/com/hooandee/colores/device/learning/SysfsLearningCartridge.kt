@@ -63,7 +63,7 @@ class SysfsLearningCartridge(
                 val index = zone?.takeIf { it in 0 until descriptor.zones } ?: return false
                 writeFrame(descriptor, List(descriptor.zones) { if (it == index) PROBE_RGB else OFF_RGB }, HIGH_PERCENT)
             }
-            ProbeStep.POWER_OFF, ProbeStep.POWER_ON -> false
+            ProbeStep.POWER_OFF, ProbeStep.POWER_ON, ProbeStep.HARDWARE_EFFECT -> false
         }
     }
 

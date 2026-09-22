@@ -405,6 +405,9 @@
     <string name="hardware_learning_saw_brightness">¿Ha cambiado claramente el brillo?</string>
     <string name="hardware_learning_saw_power_off">¿Se han apagado por completo?</string>
     <string name="hardware_learning_saw_power_on">¿Han vuelto a encenderse?</string>
+    <string name="hardware_learning_probe_hardware_effect">Comprobar respiración</string>
+    <string name="hardware_learning_probe_hardware_effect_body">Pulsa “Probar luz” y mira los joysticks. La luz debería subir y bajar suavemente.</string>
+    <string name="hardware_learning_saw_hardware_effect">¿Ves respirar la luz?</string>
     <string name="hardware_learning_saw_zone">¿Se ha iluminado una zona distinta para la posición %1$d?</string>
     <string name="hardware_learning_blocked">La prueba se ha detenido</string>
     <string name="hardware_learning_blocked_body">No se ha podido continuar de forma segura. No se ha activado ningún control experimental.</string>

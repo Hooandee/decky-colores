@@ -102,6 +102,7 @@ internal class Htr3212LearningCartridge(
             ProbeStep.BRIGHTNESS_HIGH -> prepareDevice(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, HIGH_LEVEL)
             ProbeStep.POWER_OFF -> putPower(descriptor, false)
             ProbeStep.POWER_ON -> prepareDevice(descriptor) && writeFrame(descriptor, List(TOTAL_ZONES) { PROBE_COLOR }, HIGH_LEVEL)
+            ProbeStep.HARDWARE_EFFECT -> false
             ProbeStep.ZONE -> {
                 val index = zone?.takeIf { it in 0 until TOTAL_ZONES } ?: return false
                 if (!prepareDevice(descriptor)) return false

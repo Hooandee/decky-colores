@@ -29,6 +29,9 @@ interface LedDevice {
     val hardwareEffects: List<HardwareEffect>
         get() = emptyList()
 
+    val softwareEffects: Boolean
+        get() = true
+
     val recommendedFrameIntervalMs: Long
         get() = 80L
 
@@ -63,3 +66,6 @@ internal fun List<RgbColor>.fitZones(zones: Int): List<RgbColor> {
     val fallback = firstOrNull() ?: RgbColor(255, 255, 255)
     return List(zones.coerceAtLeast(1)) { getOrNull(it) ?: fallback }
 }
+
+val LedDevice.effectModeAvailable: Boolean
+    get() = hardwareEffects.isNotEmpty() || softwareEffects

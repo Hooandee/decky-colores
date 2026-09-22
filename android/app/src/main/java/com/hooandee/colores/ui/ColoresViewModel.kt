@@ -246,7 +246,7 @@ data class ColoresUiState(
             if (colorEnabled) {
                 add(AppMode.COLOR)
                 if (gradientAvailable) add(AppMode.GRADIENT)
-                add(AppMode.EFFECT)
+                if (effects.isNotEmpty()) add(AppMode.EFFECT)
             }
             if (sensorsAvailable) add(AppMode.BATTERY)
             if (colorEnabled) add(AppMode.CLOCK)
@@ -474,8 +474,10 @@ class ColoresViewModel(
                                 colors = it.colors,
                             )
                         }
-                    } else {
+                    } else if (device.softwareEffects) {
                         catalog.presets
+                    } else {
+                        emptyList()
                     }
                 val bands = withContext(Dispatchers.IO) { BandSet.parse(context.readAsset("bands.json")) }
                 val zones = detected.capabilities.zones
@@ -561,7 +563,7 @@ class ColoresViewModel(
                                     ambient = coloresApplication.ambientFrameSource,
                                 ),
                                 LightingIntent(
-                                    mode = selectedProfile.mode.coerceAvailable(gradientSupported),
+                                    mode = selectedProfile.mode.coerceAvailable(gradientSupported, effectPresets.isNotEmpty()),
                                     staticColors = zoneColors,
                                     solidColor = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255),
                                     gradientStops = hydratedGradient.stops,
@@ -615,8 +617,8 @@ class ColoresViewModel(
                         controlAccess = controlAccess,
                         hardwareLearning = current.hardwareLearning.copy(results = emptyList()),
                         effects = effectPresets,
-                        softwareEffectIds = catalog.presets.mapTo(mutableSetOf()) { it.id },
-                        mode = selectedProfile.mode.coerceAvailable(gradientSupported),
+                        softwareEffectIds = if (device.softwareEffects) catalog.presets.mapTo(mutableSetOf()) { it.id } else emptySet(),
+                        mode = selectedProfile.mode.coerceAvailable(gradientSupported, effectPresets.isNotEmpty()),
                         profileStoredMode = selectedProfile.mode,
                         effectId = selectedProfile.effectId,
                         speed = selectedProfile.speed,
@@ -1121,7 +1123,7 @@ class ColoresViewModel(
                 profileScope = scope,
                 profilePickerOpen = false,
                 profileScopeState = scopeState,
-                mode = profile.mode.coerceAvailable(current.gradientAvailable),
+                mode = profile.mode.coerceAvailable(current.gradientAvailable, current.effects.isNotEmpty()),
                 profileStoredMode = profile.mode,
                 effectId = profile.effectId,
                 speed = profile.speed,
@@ -1610,8 +1612,15 @@ class ColoresViewModel(
 
 private const val COLOR_COMMIT_DEBOUNCE_MS = 120L
 
-private fun AppMode.coerceAvailable(gradientSupported: Boolean): AppMode =
-    if (this == AppMode.GRADIENT && !gradientSupported) AppMode.COLOR else this
+internal fun AppMode.coerceAvailable(
+    gradientSupported: Boolean,
+    effectsAvailable: Boolean,
+): AppMode =
+    when {
+        this == AppMode.GRADIENT && !gradientSupported -> AppMode.COLOR
+        this == AppMode.EFFECT && !effectsAvailable -> AppMode.COLOR
+        else -> this
+    }
 
 private fun ColoresUiState.gradientStopCount(): Int =
     gradientPresentation?.editorStopCount(detected?.capabilities?.zones ?: 2) ?: 2

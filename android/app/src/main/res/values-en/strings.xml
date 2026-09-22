@@ -405,6 +405,9 @@
     <string name="hardware_learning_saw_brightness">Did the brightness change clearly?</string>
     <string name="hardware_learning_saw_power_off">Did the lights turn off completely?</string>
     <string name="hardware_learning_saw_power_on">Did the lights turn back on?</string>
+    <string name="hardware_learning_probe_hardware_effect">Check breathing</string>
+    <string name="hardware_learning_probe_hardware_effect_body">Tap “Test the light” and watch the joysticks. The light should fade in and out smoothly.</string>
+    <string name="hardware_learning_saw_hardware_effect">Is the light breathing?</string>
     <string name="hardware_learning_saw_zone">Did a distinct zone light up for position %1$d?</string>
     <string name="hardware_learning_blocked">The test has stopped</string>
     <string name="hardware_learning_blocked_body">The test could not continue safely. No experimental control was enabled.</string>

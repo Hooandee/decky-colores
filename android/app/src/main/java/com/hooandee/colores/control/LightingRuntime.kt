@@ -102,16 +102,16 @@ class LightingRuntime(
             val zoneColors = GradientInterpolator.interpolate(gradientStops, zones)
             val liveState = runCatching { device.readState() }.getOrNull()
             val supportedEffectIds =
-                if (device.hardwareEffects.isNotEmpty()) {
-                    device.hardwareEffects.mapTo(mutableSetOf()) { it.id }
-                } else {
-                    catalog.presets.mapTo(mutableSetOf()) { it.id }
+                when {
+                    device.hardwareEffects.isNotEmpty() -> device.hardwareEffects.mapTo(mutableSetOf()) { it.id }
+                    device.softwareEffects -> catalog.presets.mapTo(mutableSetOf()) { it.id }
+                    else -> mutableSetOf()
                 }
             val mode =
-                if (stored.mode == AppMode.GRADIENT && supportedPresentation == null) {
-                    AppMode.COLOR
-                } else {
-                    stored.mode
+                when {
+                    stored.mode == AppMode.GRADIENT && supportedPresentation == null -> AppMode.COLOR
+                    stored.mode == AppMode.EFFECT && supportedEffectIds.isEmpty() -> AppMode.COLOR
+                    else -> stored.mode
                 }
             if (mode == AppMode.AUDIO) audio.reset(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
             if (mode == AppMode.AMBIENT) ambient.reset(AmbientCaptureStatus.AUTHORIZATION_REQUIRED)

@@ -111,6 +111,76 @@ class SingleAdcLearningCartridgeTest {
         assertEquals(statePaths + latch, access.writes.map { it.first })
     }
 
+    private val effectPaths =
+        listOf("Led_rgb_r2", "Led_rgb_g2", "Led_rgb_b2", "Led_rgb_r1", "Led_rgb_g1", "Led_rgb_b1", "led_speed").map { "$base/$it" }
+
+    @Test
+    fun `breathing probe is offered only when every effect node is writable`() {
+        val original = (statePaths + effectPaths).associateWith { "3" }
+        val candidate = candidate(SingleAdcJoypadDescriptor(base))
+        val complete = SingleAdcLearningCartridge(FakeSysfsAccess((statePaths + effectPaths + latch).toSet(), original.toMutableMap()))
+        val readOnlySpeed =
+            SingleAdcLearningCartridge(FakeSysfsAccess((statePaths + effectPaths + latch).toSet() - "$base/led_speed", original.toMutableMap()))
+        val missingSlot =
+            SingleAdcLearningCartridge(
+                FakeSysfsAccess((statePaths + effectPaths + latch).toSet(), original.filterKeys { it != "$base/Led_rgb_b1" }.toMutableMap()),
+            )
+
+        assertTrue(ProbeStep.HARDWARE_EFFECT in complete.supportedSteps(candidate))
+        assertFalse(ProbeStep.HARDWARE_EFFECT in readOnlySpeed.supportedSteps(candidate))
+        assertFalse(ProbeStep.HARDWARE_EFFECT in missingSlot.supportedSteps(candidate))
+        assertFalse(readOnlySpeed.execute(candidate, ProbeStep.HARDWARE_EFFECT))
+        assertEquals(statePaths.toSet(), requireNotNull(readOnlySpeed.snapshot(candidate)).values.keys)
+    }
+
+    @Test
+    fun `breathing probe writes the firmware effect and rollback restores every written node`() {
+        val original = (statePaths + effectPaths).withIndex().associate { (index, path) -> path to (index + 3).toString() }
+        val access = FakeSysfsAccess((statePaths + effectPaths + latch).toSet(), original.toMutableMap())
+        val cartridge = SingleAdcLearningCartridge(access)
+        val candidate = candidate(SingleAdcJoypadDescriptor(base))
+        val snapshot = requireNotNull(cartridge.snapshot(candidate))
+
+        assertEquals((statePaths + effectPaths).toSet(), snapshot.values.keys)
+        assertTrue(cartridge.execute(candidate, ProbeStep.HARDWARE_EFFECT))
+        assertEquals("2", access.values["$base/led_mode"])
+        assertEquals("4", access.values["$base/led_speed"])
+        assertEquals("255", access.values["$base/Led_rgb_r2"])
+        assertEquals("255", access.values["$base/Led_rgb_b1"])
+        assertEquals("$base/led_set" to "1", access.writes.last())
+        val written = access.writes.map { it.first }.toSet() - latch
+        assertTrue(snapshot.values.keys.containsAll(written))
+
+        assertEquals(RollbackStatus.RESTORED_AND_READ_BACK, cartridge.restore(candidate, snapshot))
+        assertEquals(original, access.values.filterKeys(original::containsKey))
+    }
+
+    @Test
+    fun `rollback rejects a snapshot with a partial effect node set`() {
+        val original = (statePaths + effectPaths).associateWith { "3" }
+        val access = FakeSysfsAccess((statePaths + effectPaths + latch).toSet(), original.toMutableMap())
+        val cartridge = SingleAdcLearningCartridge(access)
+        val candidate = candidate(SingleAdcJoypadDescriptor(base))
+        val partial = ProbeSnapshot(original.filterKeys { it != "$base/led_speed" })
+
+        assertEquals(RollbackStatus.RESTORE_FAILED, cartridge.restore(candidate, partial))
+    }
+
+    @Test
+    fun `only a confirmed breathing answer enables vendor effects in the binding`() {
+        val cartridge = SingleAdcLearningCartridge(FakeSysfsAccess(emptySet()))
+        val candidate = candidate(SingleAdcJoypadDescriptor(base))
+        fun evidence(level: EvidenceLevel) = listOf(ProbeEvidence(ProbeStep.HARDWARE_EFFECT, null, level, null))
+
+        val confirmed = cartridge.bindingCandidate(candidate, evidence(EvidenceLevel.USER_CONFIRMED))
+        val denied = cartridge.bindingCandidate(candidate, evidence(EvidenceLevel.NOT_OBSERVED))
+        val colorOnly = cartridge.bindingCandidate(candidate, listOf(ProbeEvidence(ProbeStep.COLOR, null, EvidenceLevel.USER_CONFIRMED, null)))
+
+        assertEquals(SingleAdcJoypadDescriptor(base, vendorEffects = true), confirmed.descriptor)
+        assertEquals(candidate, denied)
+        assertEquals(candidate, colorOnly)
+    }
+
     private fun candidate(descriptor: SingleAdcJoypadDescriptor) =
         ProbeCandidate("singleadc-joypad", 1, ProbeSurface.SINGLEADC_JOYPAD, descriptor, emptySet())
 

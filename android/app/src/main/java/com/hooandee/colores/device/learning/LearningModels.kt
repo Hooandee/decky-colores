@@ -28,6 +28,7 @@ enum class ProbeStep {
     POWER_OFF,
     POWER_ON,
     ZONE,
+    HARDWARE_EFFECT,
 }
 
 enum class UserObservation {

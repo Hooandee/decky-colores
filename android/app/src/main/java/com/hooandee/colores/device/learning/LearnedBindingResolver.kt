@@ -5,6 +5,7 @@ import com.hooandee.colores.device.DetectedAndroidDevice
 import com.hooandee.colores.device.LedGridCell
 import com.hooandee.colores.led.LedDescriptor
 import com.hooandee.colores.led.SettingsProviderDescriptor
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 
 internal fun resolveLearnedDevice(
     identity: AndroidDeviceIdentity,
@@ -110,6 +111,10 @@ private fun learnedDeviceId(binding: LearnedDeviceBinding): String =
     "learned-${binding.cartridgeId}-${binding.identityHash.take(12)}"
 
 private fun LedDescriptor.learningShape(): LedDescriptor =
-    if (this is SettingsProviderDescriptor) copy(requiresPermission = null, vendorService = "") else this
+    when (this) {
+        is SettingsProviderDescriptor -> copy(requiresPermission = null, vendorService = "")
+        is SingleAdcJoypadDescriptor -> copy(vendorEffects = false)
+        else -> this
+    }
 
 private fun List<Int>.isHtrOrder(): Boolean = size == 4 && sorted() == listOf(0, 1, 2, 3)

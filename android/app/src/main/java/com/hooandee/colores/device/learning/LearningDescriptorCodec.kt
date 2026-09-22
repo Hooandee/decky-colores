@@ -40,8 +40,11 @@ internal fun encodeLearningDescriptor(descriptor: LedDescriptor): String =
             }
             value.toString()
         }
-        is SingleAdcJoypadDescriptor ->
-            JSONObject().put("type", "singleadc").put("base_path", descriptor.basePath).toString()
+        is SingleAdcJoypadDescriptor -> {
+            val value = JSONObject().put("type", "singleadc").put("base_path", descriptor.basePath)
+            if (descriptor.vendorEffects) value.put("vendor_effects", true)
+            value.toString()
+        }
         is SysfsRgbDescriptor -> descriptor.toJson().toString()
     }
 
@@ -79,7 +82,7 @@ internal fun decodeLearningDescriptor(raw: String): LedDescriptor? =
                     htr3212 = hardware,
                 )
             }
-            "singleadc" -> SingleAdcJoypadDescriptor(json.getString("base_path"))
+            "singleadc" -> SingleAdcJoypadDescriptor(json.getString("base_path"), vendorEffects = json.optBoolean("vendor_effects", false))
             "sysfs" -> json.toSysfsDescriptor()
             else -> null
         }

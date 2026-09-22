@@ -16,10 +16,27 @@ import org.junit.Test
 
 class LearnedBindingTest {
     @Test
-    fun `learned singleadc descriptor never carries vendor effects`() {
-        val decoded = decodeLearningDescriptor(encodeLearningDescriptor(SingleAdcJoypadDescriptor(vendorEffects = true)))
+    fun `learned singleadc descriptor keeps confirmed vendor effects`() {
+        val confirmed = SingleAdcJoypadDescriptor(vendorEffects = true)
 
-        assertEquals(SingleAdcJoypadDescriptor(), decoded)
+        assertEquals(confirmed, decodeLearningDescriptor(encodeLearningDescriptor(confirmed)))
+        assertFalse(encodeLearningDescriptor(SingleAdcJoypadDescriptor()).contains("vendor_effects"))
+    }
+
+    @Test
+    fun `legacy singleadc bindings decode without vendor effects`() {
+        val legacy = """{"type":"singleadc","base_path":"${SingleAdcJoypadDescriptor.DEFAULT_BASE_PATH}"}"""
+
+        assertEquals(SingleAdcJoypadDescriptor(), decodeLearningDescriptor(legacy))
+    }
+
+    @Test
+    fun `binding with confirmed vendor effects still matches the observed joypad`() {
+        val confirmed = binding.copy(descriptorJson = encodeLearningDescriptor(SingleAdcJoypadDescriptor(vendorEffects = true)))
+
+        val device = requireNotNull(resolveLearnedDevice(identity, confirmed, listOf(candidate)))
+
+        assertEquals(SingleAdcJoypadDescriptor(vendorEffects = true), device.led)
     }
 
     private val identity = AndroidDeviceIdentity("Mystery", "mystery", "Maker", emptyMap())
