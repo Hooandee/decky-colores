@@ -50,12 +50,12 @@ class SingleAdcLearningCartridge(
                         node(descriptor, "custum_rgb_r") to "255",
                         node(descriptor, "custum_rgb_g") to "0",
                         node(descriptor, "custum_rgb_b") to "255",
-                        node(descriptor, "led_level") to "25",
+                        node(descriptor, "led_level") to HIGH_LEVEL,
                         node(descriptor, "led_mode") to "1",
                         node(descriptor, "led_switch") to "1",
                     )
-                ProbeStep.BRIGHTNESS_LOW -> linkedMapOf(node(descriptor, "led_level") to "25")
-                ProbeStep.BRIGHTNESS_HIGH -> linkedMapOf(node(descriptor, "led_level") to "55")
+                ProbeStep.BRIGHTNESS_LOW -> linkedMapOf(node(descriptor, "led_level") to LOW_LEVEL)
+                ProbeStep.BRIGHTNESS_HIGH -> linkedMapOf(node(descriptor, "led_level") to HIGH_LEVEL)
                 ProbeStep.POWER_OFF -> linkedMapOf(node(descriptor, "led_switch") to "0")
                 ProbeStep.POWER_ON -> linkedMapOf(node(descriptor, "led_switch") to "1")
                 ProbeStep.ZONE -> return false
@@ -97,6 +97,8 @@ class SingleAdcLearningCartridge(
     ): String = "${descriptor.basePath}/$name"
 
     private companion object {
+        const val LOW_LEVEL = "10"
+        const val HIGH_LEVEL = "55"
         val STATE_NODES = listOf("custum_rgb_r", "custum_rgb_g", "custum_rgb_b", "led_level", "led_mode", "led_switch")
     }
 }

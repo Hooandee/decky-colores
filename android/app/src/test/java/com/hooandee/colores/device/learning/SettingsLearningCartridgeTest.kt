@@ -22,6 +22,31 @@ class SettingsLearningCartridgeTest {
     }
 
     @Test
+    fun `brightness probe is observable even from a dim original`() {
+        val original =
+            mutableMapOf(
+                "joystick_led_light_picker_color" to "#FF010203,#FF040506",
+                "led_light_brightness_percent" to "0.2",
+                "joystick_light_enabled" to "1,1",
+            )
+        val store = FakeSettingsStore(original.toMutableMap())
+        val cartridge = SettingsLearningCartridge(store)
+        val candidate = requireNotNull(GenericLedResolver.settingsCandidate(true, original.getValue("joystick_led_light_picker_color")))
+        val level = { store.values.getValue("led_light_brightness_percent").toFloat() }
+
+        assertTrue(cartridge.execute(candidate, ProbeStep.COLOR))
+        val color = level()
+        assertTrue(cartridge.execute(candidate, ProbeStep.BRIGHTNESS_LOW))
+        val low = level()
+        assertTrue(cartridge.execute(candidate, ProbeStep.BRIGHTNESS_HIGH))
+        val high = level()
+
+        assertTrue(low < color)
+        assertTrue(high > low)
+        assertTrue(high <= 0.55f)
+    }
+
+    @Test
     fun `probe uses limited values and restores all touched settings`() {
         val original =
             mutableMapOf(
