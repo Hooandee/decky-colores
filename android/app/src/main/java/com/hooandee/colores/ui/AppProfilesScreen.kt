@@ -2,7 +2,29 @@ package com.hooandee.colores.ui
 
 import android.graphics.drawable.Drawable
 import android.widget.ImageView
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.window.DialogProperties
+import com.hooandee.colores.led.RgbColor
+import com.hooandee.colores.profiles.ConfiguredProfile
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +39,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -94,94 +116,301 @@ fun AppProfilesDialog(
     onForget: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
-    val selectedApp = state.profileScope as? ProfileScope.App
-    val selectedProfileApp = state.selectedProfileApp()
-    val selectedLabel = selectedProfileApp?.label ?: stringResource(R.string.profile_global)
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = RoundedCornerShape(28.dp),
-            color = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 680.dp)
-                    .prismaticPanel(RoundedCornerShape(28.dp), strong = true),
+    val configured = remember(state.configuredProfiles) { state.configuredProfiles.associateBy { it.packageName } }
+    val configuredApps = remember(state.profileApps, configured) { state.profileApps.filter { it.packageName in configured } }
+    val visibleApps = remember(state.profileApps, query) { filterApps(state.profileApps, query) }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            LazyColumn(
-                modifier = Modifier.padding(22.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
+            val landscape = isUsableLandscape(maxWidth, maxHeight)
+            val shape = RoundedCornerShape(32.dp)
+            Surface(
+                modifier =
+                    Modifier
+                        .widthIn(max = if (landscape) 1180.dp else 620.dp)
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .clip(shape)
+                        .background(MaterialTheme.colorScheme.surface)
+                        .prismaticPanel(shape, strong = true),
+                color = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                shape = shape,
             ) {
-                item {
-                    Text(stringResource(R.string.app_profiles_title), style = MaterialTheme.typography.headlineSmall)
-                }
-                item {
-                    SelectedProfileSummary(
-                        icon = selectedProfileApp?.icon,
-                        label = selectedLabel,
-                        subtitle =
-                            when {
-                                selectedApp == null -> stringResource(R.string.profile_global_description)
-                                state.profileScopeState.followsGlobal -> stringResource(R.string.profile_using_global)
-                                else -> stringResource(R.string.profile_own_active)
-                            },
-                    )
-                }
-                selectedApp?.let {
-                    item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { onFollowGlobal(!state.profileScopeState.followsGlobal) }) {
-                                Text(
-                                    if (state.profileScopeState.followsGlobal) {
-                                        stringResource(R.string.profile_use_own)
-                                    } else {
-                                        stringResource(R.string.profile_follow_global)
-                                    },
-                                )
-                            }
-                            if (state.profileScopeState.hasAppProfile) {
-                                OutlinedButton(onClick = onForget) { Text(stringResource(R.string.profile_forget)) }
-                            }
-                        }
+                Column(Modifier.padding(horizontal = 24.dp, vertical = 18.dp)) {
+                    ProfilesHeader(onDismiss)
+                    Spacer(Modifier.height(14.dp))
+                    val editing: @Composable (Modifier) -> Unit = { modifier ->
+                        EditingColumn(
+                            state = state,
+                            configured = configured,
+                            configuredApps = configuredApps,
+                            onGlobal = onGlobal,
+                            onApp = onApp,
+                            onFollowGlobal = onFollowGlobal,
+                            onForget = onForget,
+                            modifier = modifier,
+                        )
                     }
-                }
-                item {
-                    OutlinedTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        label = { Text(stringResource(R.string.profile_search)) },
-                    )
-                }
-                item {
-                    ProfileRow(
-                        title = stringResource(R.string.profile_global),
-                        subtitle = stringResource(R.string.profile_global_description),
-                        icon = null,
-                        selected = state.profileScope == ProfileScope.Global,
-                        onClick = onGlobal,
-                    )
-                }
-                items(filterApps(state.profileApps, query), key = { it.packageName }) { app ->
-                    ProfileRow(
-                        title = app.label,
-                        subtitle = app.packageName,
-                        icon = app.icon,
-                        selected = selectedApp?.packageName == app.packageName,
-                        onClick = { onApp(app.packageName) },
-                    )
-                }
-                item {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        OutlinedButton(onClick = onDismiss) {
-                            Text(stringResource(R.string.profile_done))
+                    val catalog: @Composable (Modifier) -> Unit = { modifier ->
+                        AppCatalog(
+                            apps = visibleApps,
+                            query = query,
+                            onQueryChange = { query = it },
+                            configured = configured,
+                            selectedPackage = (state.profileScope as? ProfileScope.App)?.packageName,
+                            onApp = onApp,
+                            modifier = modifier,
+                        )
+                    }
+                    if (landscape) {
+                        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                            editing(Modifier.width(300.dp).fillMaxHeight())
+                            catalog(Modifier.weight(1f).fillMaxHeight())
+                        }
+                    } else {
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                            editing(Modifier.fillMaxWidth().heightIn(max = 300.dp))
+                            catalog(Modifier.weight(1f).fillMaxWidth())
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun ProfilesHeader(onDismiss: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.app_profiles_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text(
+                stringResource(R.string.app_profiles_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Button(onClick = onDismiss) { Text(stringResource(R.string.profile_done)) }
+    }
+}
+
+@Composable
+private fun EditingColumn(
+    state: ColoresUiState,
+    configured: Map<String, ConfiguredProfile>,
+    configuredApps: List<LaunchableApp>,
+    onGlobal: () -> Unit,
+    onApp: (String) -> Unit,
+    onFollowGlobal: (Boolean) -> Unit,
+    onForget: () -> Unit,
+    modifier: Modifier,
+) {
+    val scope = state.profileScope as? ProfileScope.App
+    val selectedApp = state.selectedProfileApp()
+    val listedApps = if (selectedApp != null && selectedApp !in configuredApps) listOf(selectedApp) + configuredApps else configuredApps
+    LazyColumn(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        item { ProfileSectionLabel(stringResource(R.string.profile_section_saved)) }
+        item {
+            ProfileRow(
+                title = stringResource(R.string.profile_global),
+                subtitle = stringResource(R.string.profile_global_short),
+                icon = null,
+                selected = scope == null,
+                swatch = null,
+                onClick = onGlobal,
+            )
+        }
+        items(listedApps, key = { "listed:${it.packageName}" }) { app ->
+            val profile = configured[app.packageName]?.profile
+            val selected = scope?.packageName == app.packageName
+            val follows = selected && state.profileScopeState.followsGlobal
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ProfileRow(
+                    title = app.label,
+                    subtitle =
+                        if (follows || profile == null) {
+                            stringResource(R.string.profile_using_global)
+                        } else {
+                            navLabel(profile.mode)
+                        },
+                    icon = app.icon,
+                    selected = selected,
+                    swatch = profile?.solidColor?.takeUnless { follows },
+                    onClick = { onApp(app.packageName) },
+                )
+                if (selected) {
+                    OwnProfileChoice(
+                        appLabel = app.label,
+                        followsGlobal = state.profileScopeState.followsGlobal,
+                        onFollowGlobal = onFollowGlobal,
+                    )
+                    if (state.profileScopeState.hasAppProfile) {
+                        TextButton(onClick = onForget) { Text(stringResource(R.string.profile_forget)) }
+                    }
+                }
+            }
+        }
+        if (listedApps.isEmpty()) {
+            item {
+                Text(
+                    stringResource(R.string.profile_section_saved_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun OwnProfileChoice(
+    appLabel: String,
+    followsGlobal: Boolean,
+    onFollowGlobal: (Boolean) -> Unit,
+) {
+    val own = !followsGlobal
+    Surface(
+        onClick = { onFollowGlobal(own) },
+        modifier = Modifier.fillMaxWidth().semantics { selected = own },
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+        contentColor = MaterialTheme.colorScheme.onSurface,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.profile_own_lights), fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (own) stringResource(R.string.profile_own_lights_on, appLabel) else stringResource(R.string.profile_own_lights_off),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(checked = own, onCheckedChange = { onFollowGlobal(!it) })
+        }
+    }
+}
+
+@Composable
+private fun ProfileSectionLabel(text: String) {
+    Text(
+        text.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 8.dp, start = 4.dp),
+    )
+}
+
+@Composable
+private fun AppCatalog(
+    apps: List<LaunchableApp>,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    configured: Map<String, ConfiguredProfile>,
+    selectedPackage: String?,
+    onApp: (String) -> Unit,
+    modifier: Modifier,
+) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+            placeholder = { Text(stringResource(R.string.profile_search)) },
+            leadingIcon = { Text("⌕", style = MaterialTheme.typography.titleLarge) },
+        )
+        if (apps.isEmpty()) {
+            Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                Text(
+                    stringResource(R.string.profile_search_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 96.dp),
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                gridItems(apps, key = { it.packageName }) { app ->
+                    AppTile(
+                        app = app,
+                        swatch = configured[app.packageName]?.profile?.solidColor,
+                        selected = app.packageName == selectedPackage,
+                        onClick = { onApp(app.packageName) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppTile(
+    app: LaunchableApp,
+    swatch: RgbColor?,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+        border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+        modifier = Modifier.fillMaxWidth().semantics { this.selected = selected },
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Box {
+                ProfileIcon(app.icon, app.label, 44.dp)
+                swatch?.let {
+                    ProfileSwatch(it, Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 4.dp))
+                }
+            }
+            Text(
+                app.label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProfileSwatch(
+    color: RgbColor,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier
+            .size(16.dp)
+            .clip(CircleShape)
+            .background(Color(color.red, color.green, color.blue))
+            .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape),
+    )
 }
 
 @Composable
@@ -190,63 +419,35 @@ private fun ProfileRow(
     subtitle: String,
     icon: Drawable?,
     selected: Boolean,
+    swatch: RgbColor?,
     onClick: () -> Unit,
 ) {
     Surface(
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+        onClick = onClick,
+        color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().semantics { this.selected = selected },
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ProfileIcon(icon, title, 40.dp)
+            ProfileIcon(icon, title, 36.dp)
             Column(Modifier.weight(1f)) {
-                Text(title, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Text(title, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (subtitle.isNotEmpty()) {
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalContentColor.current.copy(alpha = 0.72f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
-        }
-    }
-}
-
-@Composable
-private fun SelectedProfileSummary(
-    icon: Drawable?,
-    label: String,
-    subtitle: String,
-) {
-    Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ProfileIcon(icon, label, 46.dp)
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.profile_editing_context),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.72f),
-                )
-                Text(label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
-                )
-            }
+            swatch?.let { ProfileSwatch(it) }
         }
     }
 }
