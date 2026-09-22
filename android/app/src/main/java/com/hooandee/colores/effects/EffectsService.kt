@@ -21,31 +21,39 @@ import com.hooandee.colores.R
 import com.hooandee.colores.ambient.AmbientCaptureConfig
 import com.hooandee.colores.ambient.AmbientCaptureStatus
 import com.hooandee.colores.ambient.AmbientSamplingMode
+import com.hooandee.colores.ambient.keepsCaptureActive
 import com.hooandee.colores.audio.AndroidPlaybackCapture
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.device.LedGridCell
-import com.hooandee.colores.control.AppMode
+import com.hooandee.colores.control.ServiceOwner
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class EffectsService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var projection: MediaProjection? = null
     private var projectionCallback: MediaProjection.Callback? = null
-    private var projectionOwner: ProjectionOwner? = null
+    private var projectionOwner: CaptureOwner? = null
+    private var captureLeaseHeld = false
+    private var foreground = false
+    private var restoresInFlight = 0
 
     override fun onCreate() {
         super.onCreate()
         serviceScope.launch {
             application.lightingController.snapshot.collect { snapshot ->
-                when {
-                    projectionOwner == ProjectionOwner.AUDIO && snapshot.mode != AppMode.AUDIO ->
-                        stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED, reconcile = false)
-                    projectionOwner == ProjectionOwner.AMBIENT && snapshot.mode != AppMode.AMBIENT ->
-                        stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED, reconcile = false)
+                val owner = projectionOwner ?: return@collect
+                if (snapshot.mode == owner.mode) return@collect
+                if (!shouldEndCapture(owner, snapshot.mode, application.profileCoordinator.globalMode())) return@collect
+                when (owner) {
+                    CaptureOwner.AUDIO -> stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED, reconcile = false)
+                    CaptureOwner.AMBIENT -> stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED, reconcile = false)
                 }
             }
         }
@@ -61,35 +69,42 @@ class EffectsService : Service() {
         val command = resolveEffectsServiceCommand(intent != null, intent?.action)
         val policy = effectsServiceCommandPolicy(command)
         Log.i(TAG, "start command=$command action=${intent?.action}")
-        application.effectsServiceGate.onServiceStarted()
         when (command) {
-            EffectsServiceCommand.START_AUDIO -> startAudioCapture(requireNotNull(intent))
+            EffectsServiceCommand.START_AUDIO -> {
+                enterForeground(mediaProjection = true)
+                startAudioCapture(requireNotNull(intent))
+            }
             EffectsServiceCommand.STOP_AUDIO -> {
-                requireNotNull(intent)
-                startForegroundCompat(mediaProjection = false)
-                stopAudioCapture(intent.audioStopStatus(), reconcile = policy.reconcileController)
+                stopAudioCapture(requireNotNull(intent).audioStopStatus(), reconcile = policy.reconcileController)
+                settle(startId)
             }
-            EffectsServiceCommand.START_AMBIENT -> startAmbientCapture(requireNotNull(intent))
+            EffectsServiceCommand.START_AMBIENT -> {
+                enterForeground(mediaProjection = true)
+                startAmbientCapture(requireNotNull(intent))
+            }
             EffectsServiceCommand.STOP_AMBIENT -> {
-                requireNotNull(intent)
-                startForegroundCompat(mediaProjection = false)
-                stopAmbientCapture(intent.ambientStopStatus(), reconcile = policy.reconcileController)
+                stopAmbientCapture(requireNotNull(intent).ambientStopStatus(), reconcile = policy.reconcileController)
+                settle(startId)
             }
-            EffectsServiceCommand.UPDATE_AMBIENT -> intent?.ambientConfig()?.let(application.ambientCaptureSession::updateConfig)
+            EffectsServiceCommand.UPDATE_AMBIENT -> {
+                intent?.ambientConfig()?.let(application.ambientCaptureSession::updateConfig)
+                settle(startId)
+            }
             EffectsServiceCommand.RESTORE -> {
-                startForegroundCompat(mediaProjection = false)
-                application.applicationScope.launch {
-                    if (!application.restoreRuntime()) stopSelf(startId)
-                }
+                enterForeground(mediaProjection = false)
+                restore(startId)
             }
-            EffectsServiceCommand.KEEP_ALIVE -> startForegroundCompat(mediaProjection = projectionOwner != null)
+            EffectsServiceCommand.KEEP_ALIVE -> {
+                enterForeground(mediaProjection = projectionOwner != null)
+                settle(startId)
+            }
         }
         return START_STICKY
     }
 
     override fun onTimeout(startId: Int) {
-        stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
-        stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
+        stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED, releaseLease = false)
+        stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED, releaseLease = false)
         stopSelf()
     }
 
@@ -99,15 +114,48 @@ class EffectsService : Service() {
             currentStatus.takeIf { it == AudioCaptureStatus.ERROR || it == AudioCaptureStatus.REVOKED }
                 ?: AudioCaptureStatus.AUTHORIZATION_REQUIRED
         Log.i(TAG, "destroy status=$terminalStatus")
-        stopAudioCapture(terminalStatus, reconcile = false)
+        stopAudioCapture(terminalStatus, reconcile = false, releaseLease = false)
         val ambientStatus = application.ambientFrameSource.state.value.status
         val ambientTerminal =
             ambientStatus.takeIf { it == AmbientCaptureStatus.ERROR || it == AmbientCaptureStatus.REVOKED }
                 ?: AmbientCaptureStatus.AUTHORIZATION_REQUIRED
-        stopAmbientCapture(ambientTerminal, reconcile = false)
+        stopAmbientCapture(ambientTerminal, reconcile = false, releaseLease = false)
+        mainHandler.removeCallbacksAndMessages(null)
         serviceScope.cancel()
+        captureLeaseHeld = false
+        foreground = false
         application.effectsServiceGate.onServiceStopped()
         super.onDestroy()
+    }
+
+    private fun enterForeground(mediaProjection: Boolean) {
+        startForegroundCompat(mediaProjection)
+        foreground = true
+        application.effectsServiceGate.onServiceStarted()
+    }
+
+    private fun restore(startId: Int) {
+        restoresInFlight++
+        val restoring =
+            application.applicationScope.async {
+                runCatching {
+                    application.restoreRuntime()
+                    application.lightingController.awaitIdle()
+                }.onFailure { if (it is CancellationException) throw it else Log.e(TAG, "restore failed", it) }
+            }
+        serviceScope.launch {
+            runCatching { restoring.await() }
+            restoresInFlight--
+            settle(startId)
+        }
+    }
+
+    private fun settle(startId: Int) {
+        if (restoresInFlight > 0) return
+        if (application.effectsServiceGate.releaseIfUnowned()) {
+            Log.i(TAG, "no consumers, stopping")
+            stopSelf(startId)
+        }
     }
 
     private fun startForegroundCompat(mediaProjection: Boolean) {
@@ -120,10 +168,31 @@ class EffectsService : Service() {
         }
     }
 
+    private fun acquireCaptureLease() {
+        if (captureLeaseHeld) return
+        captureLeaseHeld = true
+        application.effectsServiceGate.setRequired(ServiceOwner.CAPTURE, true)
+    }
+
+    private fun releaseCaptureLease() {
+        if (!captureLeaseHeld) return
+        captureLeaseHeld = false
+        val gate = application.effectsServiceGate
+        gate.setRequired(ServiceOwner.CAPTURE, false)
+        if (foreground && gate.hasOwners()) {
+            runCatching { startForegroundCompat(mediaProjection = false) }
+                .onFailure { Log.w(TAG, "foreground downgrade failed", it) }
+        }
+    }
+
+    private fun postOnMain(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) action() else mainHandler.post(action)
+    }
+
     private fun startAudioCapture(intent: Intent) {
-        stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
-        stopAudioCapture(AudioCaptureStatus.STARTING)
-        startForegroundCompat(mediaProjection = true)
+        acquireCaptureLease()
+        stopAmbientCapture(AmbientCaptureStatus.AUTHORIZATION_REQUIRED, releaseLease = false)
+        stopAudioCapture(AudioCaptureStatus.STARTING, releaseLease = false)
         val resultData = intent.projectionData()
         if (resultData == null || intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) != Activity.RESULT_OK) {
             stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
@@ -135,26 +204,29 @@ class EffectsService : Service() {
             val callback =
                 object : MediaProjection.Callback() {
                     override fun onStop() {
-                        if (projection === active && projectionOwner == ProjectionOwner.AUDIO) {
-                            stopAudioCapture(AudioCaptureStatus.REVOKED, stopProjection = false)
-                            stopSelf()
+                        postOnMain {
+                            if (projection === active && projectionOwner == CaptureOwner.AUDIO) {
+                                stopAudioCapture(AudioCaptureStatus.REVOKED, stopProjection = false)
+                            }
                         }
                     }
                 }
-            active.registerCallback(callback, Handler(Looper.getMainLooper()))
-            projectionOwner = ProjectionOwner.AUDIO
+            active.registerCallback(callback, mainHandler)
+            projectionOwner = CaptureOwner.AUDIO
             projection = active
             projectionCallback = callback
             application.audioCaptureSession.start(AndroidPlaybackCapture(this, active)) { error ->
                 Log.e(TAG, "audio capture failed", error)
-                stopAudioCapture(AudioCaptureStatus.ERROR)
-                stopSelf()
+                postOnMain {
+                    if (projection === active && projectionOwner == CaptureOwner.AUDIO) {
+                        stopAudioCapture(AudioCaptureStatus.ERROR)
+                    }
+                }
             }
             Log.i(TAG, "audio capture started")
         }.onFailure {
             Log.e(TAG, "audio capture setup failed", it)
             stopAudioCapture(AudioCaptureStatus.ERROR)
-            stopSelf()
         }
     }
 
@@ -162,10 +234,11 @@ class EffectsService : Service() {
         status: AudioCaptureStatus,
         stopProjection: Boolean = true,
         reconcile: Boolean = true,
+        releaseLease: Boolean = true,
     ) {
         Log.i(TAG, "stop audio status=$status projection=${projection != null}")
         application.audioCaptureSession.stop(status)
-        if (projectionOwner == ProjectionOwner.AUDIO) {
+        if (projectionOwner == CaptureOwner.AUDIO) {
             val active = projection
             val callback = projectionCallback
             projection = null
@@ -177,12 +250,13 @@ class EffectsService : Service() {
         if (shouldReconcileAudioController(reconcile, application.lightingController.snapshot.value.mode)) {
             application.lightingController.onAudioStateChanged()
         }
+        if (releaseLease && projectionOwner == null) releaseCaptureLease()
     }
 
     private fun startAmbientCapture(intent: Intent) {
-        stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
-        stopAmbientCapture(AmbientCaptureStatus.STARTING)
-        startForegroundCompat(mediaProjection = true)
+        acquireCaptureLease()
+        stopAudioCapture(AudioCaptureStatus.AUTHORIZATION_REQUIRED, releaseLease = false)
+        stopAmbientCapture(AmbientCaptureStatus.STARTING, releaseLease = false)
         val resultData = intent.projectionData()
         val config = intent.ambientConfig()
         if (resultData == null || config == null || intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED) != Activity.RESULT_OK) {
@@ -195,26 +269,29 @@ class EffectsService : Service() {
             val callback =
                 object : MediaProjection.Callback() {
                     override fun onStop() {
-                        if (projection === active && projectionOwner == ProjectionOwner.AMBIENT) {
-                            stopAmbientCapture(AmbientCaptureStatus.REVOKED, stopProjection = false)
-                            stopSelf()
+                        postOnMain {
+                            if (projection === active && projectionOwner == CaptureOwner.AMBIENT) {
+                                stopAmbientCapture(AmbientCaptureStatus.REVOKED, stopProjection = false)
+                            }
                         }
                     }
                 }
-            active.registerCallback(callback, Handler(Looper.getMainLooper()))
-            projectionOwner = ProjectionOwner.AMBIENT
+            active.registerCallback(callback, mainHandler)
+            projectionOwner = CaptureOwner.AMBIENT
             projection = active
             projectionCallback = callback
             application.ambientCaptureSession.start(active, config) { error ->
                 Log.e(TAG, "ambient capture failed", error)
-                stopAmbientCapture(AmbientCaptureStatus.ERROR)
-                stopSelf()
+                postOnMain {
+                    if (projection === active && projectionOwner == CaptureOwner.AMBIENT) {
+                        stopAmbientCapture(AmbientCaptureStatus.ERROR)
+                    }
+                }
             }
             Log.i(TAG, "ambient capture started fps=${config.captureFps} mode=${config.samplingMode}")
         }.onFailure {
             Log.e(TAG, "ambient capture setup failed", it)
             stopAmbientCapture(AmbientCaptureStatus.ERROR)
-            stopSelf()
         }
     }
 
@@ -222,9 +299,10 @@ class EffectsService : Service() {
         status: AmbientCaptureStatus,
         stopProjection: Boolean = true,
         reconcile: Boolean = true,
+        releaseLease: Boolean = true,
     ) {
         application.ambientCaptureSession.stop(status)
-        if (projectionOwner == ProjectionOwner.AMBIENT) {
+        if (projectionOwner == CaptureOwner.AMBIENT) {
             val active = projection
             val callback = projectionCallback
             projection = null
@@ -236,6 +314,7 @@ class EffectsService : Service() {
         if (shouldReconcileAmbientController(reconcile, application.lightingController.snapshot.value.mode)) {
             application.lightingController.onAmbientStateChanged()
         }
+        if (releaseLease && projectionOwner == null) releaseCaptureLease()
     }
 
     private fun buildNotification(): Notification {
@@ -306,6 +385,11 @@ class EffectsService : Service() {
             context: Context,
             status: AudioCaptureStatus = AudioCaptureStatus.AUTHORIZATION_REQUIRED,
         ) {
+            val application = context.applicationContext as ColoresApplication
+            val live = application.audioLevelSource.state.value.status.let {
+                it == AudioCaptureStatus.STARTING || it == AudioCaptureStatus.CAPTURING || it == AudioCaptureStatus.NO_AUDIO
+            }
+            if (!shouldDispatchCaptureStop(application.effectsServiceGate.active, live)) return
             startService(
                 context,
                 Intent(context, EffectsService::class.java)
@@ -339,6 +423,9 @@ class EffectsService : Service() {
             context: Context,
             status: AmbientCaptureStatus = AmbientCaptureStatus.AUTHORIZATION_REQUIRED,
         ) {
+            val application = context.applicationContext as ColoresApplication
+            val live = application.ambientFrameSource.state.value.status.keepsCaptureActive
+            if (!shouldDispatchCaptureStop(application.effectsServiceGate.active, live)) return
             startService(
                 context,
                 Intent(context, EffectsService::class.java)
@@ -354,11 +441,13 @@ class EffectsService : Service() {
         private fun startService(context: Context, intent: Intent) {
             val command = resolveEffectsServiceCommand(intentPresent = true, action = intent.action)
             val policy = effectsServiceCommandPolicy(command)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && policy.startMode == EffectsServiceStartMode.FOREGROUND) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
-            }
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && policy.startMode == EffectsServiceStartMode.FOREGROUND) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            }.onFailure { Log.w(TAG, "command ${intent.action} refused", it) }
         }
 
         private fun ambientIntent(
@@ -423,8 +512,4 @@ class EffectsService : Service() {
         )
     }
 
-    private enum class ProjectionOwner {
-        AUDIO,
-        AMBIENT,
-    }
 }

@@ -167,7 +167,7 @@ class LightingControllerTest {
         }
 
     @Test
-    fun `audio mode waits black without authorization and stops when leaving the mode`() =
+    fun `audio mode waits on the saved color without authorization and stops when leaving the mode`() =
         runTest {
             val device = FakeDevice(recommendedFrameIntervalMs = 80)
             val gate = RecordingGate()
@@ -178,7 +178,8 @@ class LightingControllerTest {
             runCurrent()
 
             assertFalse(gate.running)
-            assertTrue(device.writes.last().colors.all { it == RgbColor(0, 0, 0) })
+            assertTrue(device.writes.last().colors.all { it == LightingIntent().solidColor })
+            assertTrue(device.writes.last().power)
 
             audio.update(0.0, AudioCaptureStatus.STARTING)
             controller.setMode(AppMode.AUDIO)
@@ -719,5 +720,83 @@ class LightingControllerTest {
             assertEquals(settled, device.writes.size)
             assertFalse(controller.snapshot.value.bound)
             assertFalse(gate.running)
+        }
+
+    @Test
+    fun `a revoked ambient capture falls back to the saved solid color instead of black`() =
+        runTest {
+            val saved = RgbColor(12, 200, 40)
+            val device = FakeDevice()
+            val ambient = MutableAmbientFrameSource().apply { reset(AmbientCaptureStatus.REVOKED) }
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(
+                binding(device, zones = 4, ambient = ambient),
+                LightingIntent(mode = AppMode.AMBIENT, solidColor = saved, staticColors = List(4) { saved }),
+            )
+            advanceTimeBy(100)
+            runCurrent()
+
+            assertEquals(List(4) { saved }, device.writes.last().colors)
+            assertEquals(List(4) { saved }, controller.snapshot.value.currentFrame)
+        }
+
+    @Test
+    fun `applying a profile reconciles the service once`() =
+        runTest {
+            val blue = RgbColor(0, 0, 255)
+            val device = FakeDevice()
+            val gate = RecordingGate()
+            val controller = LightingController(backgroundScope, gate, clockMs = { testScheduler.currentTime })
+            controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT, effectId = "rainbow"))
+            advanceTimeBy(100)
+            runCurrent()
+            val before = gate.starts + gate.stops
+
+            controller.applyProfile(
+                ProfileApplication(
+                    mode = AppMode.COLOR,
+                    solidColor = RgbColor(1, 1, 1),
+                    gradientStops = listOf(blue, blue),
+                    staticColors = listOf(blue, blue),
+                    effectId = "breathing",
+                    speed = 40,
+                    gradientSpeed = 20,
+                    effectUsesGradient = false,
+                    brightness = 70,
+                    batteryBreathe = false,
+                    temperatureBreathe = false,
+                ),
+            )
+            controller.awaitIdle()
+            runCurrent()
+
+            assertEquals(1, gate.starts + gate.stops - before)
+            assertFalse(gate.running)
+            assertEquals(AppMode.COLOR, controller.snapshot.value.mode)
+            assertEquals(70, controller.snapshot.value.brightness)
+            assertEquals(listOf(blue, blue), device.writes.last().colors)
+        }
+
+    @Test
+    fun `temperature availability is cached instead of rescanning on every frame`() =
+        runTest {
+            var probes = 0
+            val temperature =
+                object : TemperatureSource {
+                    override val available: Boolean
+                        get() {
+                            probes++
+                            return true
+                        }
+
+                    override fun readCelsius(): Double = 45.0
+                }
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(FakeDevice(), temperature = temperature), LightingIntent(mode = AppMode.EFFECT, effectId = "rainbow"))
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            assertTrue(controller.snapshot.value.temperatureAvailable)
+            assertEquals(0, probes)
         }
 }

@@ -97,6 +97,35 @@ data class LightingBinding(
     val ambient: AmbientFrameSource = MutableAmbientFrameSource(),
 )
 
+data class ProfileApplication(
+    val mode: AppMode,
+    val solidColor: RgbColor,
+    val gradientStops: List<RgbColor>,
+    val staticColors: List<RgbColor>,
+    val effectId: String,
+    val speed: Int,
+    val gradientSpeed: Int,
+    val effectUsesGradient: Boolean,
+    val brightness: Int,
+    val batteryBreathe: Boolean,
+    val temperatureBreathe: Boolean,
+)
+
+internal fun LightingIntent.applying(profile: ProfileApplication): LightingIntent =
+    copy(
+        mode = profile.mode,
+        staticColors = profile.staticColors,
+        solidColor = profile.staticColors.firstOrNull() ?: profile.solidColor,
+        gradientStops = profile.gradientStops,
+        effectId = profile.effectId,
+        speed = profile.speed.coerceIn(0, 100),
+        gradientSpeed = profile.gradientSpeed.coerceIn(0, 100),
+        effectUsesGradient = profile.effectUsesGradient,
+        brightness = profile.brightness.coerceIn(0, 100),
+        batteryBreathe = profile.batteryBreathe,
+        temperatureBreathe = profile.temperatureBreathe,
+    )
+
 data class LightingSnapshot(
     val bound: Boolean = false,
     val deviceId: String? = null,
@@ -129,6 +158,7 @@ data class LightingSnapshot(
 enum class ServiceOwner {
     EFFECTS,
     APP_PROFILES,
+    CAPTURE,
 }
 
 interface ServiceGate {
@@ -181,6 +211,7 @@ class LightingController(
     @Volatile
     private var generation = 0L
     private var temperatureCelsius: Double? = null
+    private var temperatureAvailable = false
     private var lastFrame: List<RgbColor> = emptyList()
     private var gradientEditing = false
     private var frozenGradientFrame: List<RgbColor> = emptyList()
@@ -207,7 +238,15 @@ class LightingController(
         completion.await()
     }
 
+    suspend fun awaitIdle() {
+        val completion = CompletableDeferred<Unit>()
+        send(Command.Barrier(completion))
+        completion.await()
+    }
+
     fun reassert() = send(Command.Reassert)
+
+    fun applyProfile(profile: ProfileApplication) = send(Command.ApplyProfile(profile))
 
     fun boundDevice(deviceId: String): LedDevice? = binding?.takeIf { it.deviceId == deviceId }?.device
 
@@ -267,7 +306,9 @@ class LightingController(
                 onUnbind()
                 command.completion?.complete(Unit)
             }
+            is Command.Barrier -> command.completion.complete(Unit)
             Command.Reassert -> onReassert()
+            is Command.ApplyProfile -> mutateIntent { it.applying(command.profile) }
             is Command.SetMode -> mutateIntent { it.copy(mode = command.mode) }
             is Command.SetEffect -> mutateIntent { it.copy(effectId = command.effectId) }
             is Command.SetSpeed -> mutateIntent { it.copy(speed = command.speed.coerceIn(0, 100)) }
@@ -309,6 +350,7 @@ class LightingController(
         sensorBands = command.binding.bands
         intent = command.intent.copy(staticColors = command.intent.staticColors.fit(command.binding.zones))
         temperatureCelsius = command.binding.temperature?.readCelsius()
+        temperatureAvailable = temperatureCelsius != null || command.binding.temperature?.available == true
         rendererSignature = null
         val level = runCatching { command.binding.battery.read() }.getOrNull()
         if (level != null) {
@@ -345,6 +387,7 @@ class LightingController(
         batteryLevel = command.levelPercent
         batteryPresent = command.present
         temperatureCelsius = command.temperatureCelsius
+        temperatureAvailable = binding?.temperature != null && command.temperatureCelsius != null
         if (effectivePower() != previousEffective) {
             binding?.let { applyCurrent(it, manageRenderJob = false) }
         }
@@ -446,9 +489,10 @@ class LightingController(
     }
 
     private suspend fun applyCaptureUnavailable(binding: LightingBinding) {
-        val colors = binding.offFrame()
-        runCatching { binding.device.applyZones(colors, intent.brightness, effectivePower()) }.rethrowCancellation()
-        lastFrame = colors
+        val colors = List(binding.zones) { intent.solidColor }
+        val effective = effectivePower()
+        runCatching { binding.device.applyZones(colors, intent.brightness, effective) }.rethrowCancellation()
+        lastFrame = if (effective) colors else binding.offFrame()
         publishSnapshot()
     }
 
@@ -662,7 +706,7 @@ class LightingController(
                 batteryPresent = batteryPresent,
                 batteryLevelPercent = batteryLevel,
                 temperatureCelsius = temperatureCelsius,
-                temperatureAvailable = binding?.temperature?.available == true,
+                temperatureAvailable = binding != null && temperatureAvailable,
                 performanceMetric = binding?.performance?.metric,
                 audio = binding?.audio?.state?.value ?: AudioLevelState(),
                 audioScale = intent.audioScale,
@@ -689,6 +733,14 @@ class LightingController(
         ) : Command
 
         data object Reassert : Command
+
+        data class Barrier(
+            val completion: CompletableDeferred<Unit>,
+        ) : Command
+
+        data class ApplyProfile(
+            val profile: ProfileApplication,
+        ) : Command
 
         data class SetMode(val mode: AppMode) : Command
 
