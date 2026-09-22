@@ -16,6 +16,7 @@ import com.hooandee.colores.gradient.GradientPreferences
 import com.hooandee.colores.gradient.GradientPresentation
 import com.hooandee.colores.gradient.editorStopCount
 import com.hooandee.colores.gradient.gradientPresentation
+import com.hooandee.colores.led.LedDevice
 import com.hooandee.colores.led.LedDeviceFactory
 import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.permission.WriteSettingsPermission
@@ -23,6 +24,7 @@ import com.hooandee.colores.sensor.AndroidBatterySource
 import com.hooandee.colores.sensor.PerformanceSources
 import com.hooandee.colores.sensor.SysfsThermalSource
 import com.hooandee.colores.ui.ControlAccess
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,6 +41,15 @@ internal fun attachProfileRuntime(
 ): Boolean {
     restored ?: return false
     attach(restored)
+    return true
+}
+
+internal suspend fun closeIfNotBound(
+    candidate: LedDevice?,
+    bound: LedDevice?,
+): Boolean {
+    if (candidate == null || candidate === bound) return false
+    runCatching { candidate.close() }.onFailure { if (it is CancellationException) throw it }
     return true
 }
 
@@ -73,7 +84,10 @@ class LightingRuntime(
                     deviceAvailable = device.available,
                     userPermissionGranted = WriteSettingsPermission.canWrite(context),
                 )
-            if (access != ControlAccess.ENABLED) return@withContext null
+            if (access != ControlAccess.ENABLED) {
+                closeIfNotBound(device, bound = null)
+                return@withContext null
+            }
 
             val catalog = EffectCatalog.parse(context.readAsset("effects.json"))
             val bands = BandSet.parse(context.readAsset("bands.json"))
