@@ -226,6 +226,7 @@ internal class ConflatedLedWriter<T>(
     scope: CoroutineScope,
     private val intervalMs: Long,
     private val retryIntervalMs: Long = 500L,
+    private val maxRetryIntervalMs: Long = 30_000L,
     write: suspend (T) -> Boolean,
 ) {
     private val channel = Channel<T>(Channel.CONFLATED)
@@ -236,6 +237,7 @@ internal class ConflatedLedWriter<T>(
         scope.launch {
             for (value in channel) {
                 var pending = value
+                var failures = 0
                 while (true) {
                     val succeeded =
                         try {
@@ -245,12 +247,17 @@ internal class ConflatedLedWriter<T>(
                         } catch (_: Throwable) {
                             false
                         }
-                    delay(if (succeeded) intervalMs else retryIntervalMs)
-                    val newer = channel.tryReceive().getOrNull()
+                    if (succeeded) {
+                        delay(intervalMs)
+                        pending = channel.tryReceive().getOrNull() ?: break
+                        failures = 0
+                        continue
+                    }
+                    failures++
+                    val newer = awaitNewerDuring(ledRetryDelayMs(retryIntervalMs, failures, maxRetryIntervalMs))
                     if (newer != null) {
                         pending = newer
-                    } else if (succeeded) {
-                        break
+                        failures = 0
                     }
                 }
             }
@@ -263,4 +270,25 @@ internal class ConflatedLedWriter<T>(
         channel.close()
         worker.cancelAndJoin()
     }
+
+    private suspend fun awaitNewerDuring(totalMs: Long): T? {
+        var remaining = totalMs
+        while (remaining > 0) {
+            val step = minOf(retryIntervalMs.coerceAtLeast(1L), remaining)
+            delay(step)
+            remaining -= step
+            channel.tryReceive().getOrNull()?.let { return it }
+        }
+        return null
+    }
+}
+
+internal fun ledRetryDelayMs(
+    baseMs: Long,
+    failures: Int,
+    maxMs: Long,
+): Long {
+    val base = baseMs.coerceAtLeast(1L)
+    val exponent = (failures - 1).coerceIn(0, 20)
+    return (base shl exponent).coerceAtMost(maxMs.coerceAtLeast(base))
 }
