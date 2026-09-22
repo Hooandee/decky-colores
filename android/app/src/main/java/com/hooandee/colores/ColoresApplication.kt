@@ -21,6 +21,7 @@ import com.hooandee.colores.device.learning.RollbackRecovery
 import com.hooandee.colores.device.learning.RollbackStatus
 import com.hooandee.colores.device.learning.SettingsLearningCartridge
 import com.hooandee.colores.device.learning.SingleAdcLearningCartridge
+import com.hooandee.colores.device.learning.SysfsI2cTopologyReader
 import com.hooandee.colores.device.learning.SysfsLearningCartridge
 import com.hooandee.colores.device.learning.restoreAfterLearningRollback
 import com.hooandee.colores.led.PServerSystemSettingsStore
@@ -75,7 +76,7 @@ class ColoresApplication : Application() {
     }
 
     val hardwareRollbackRecovery: RollbackRecovery by lazy {
-        RollbackRecovery(hardwareLearningStore, hardwareLearningCatalog)
+        RollbackRecovery(hardwareLearningStore, hardwareLearningCatalog, SysfsI2cTopologyReader())
     }
 
     val usageAccess: UsageAccess by lazy { UsageAccess(this) }

@@ -153,6 +153,18 @@ internal class Htr3212LearningCartridge(
         }
     }
 
+    override fun restoreSettingsOnly(
+        candidate: ProbeCandidate,
+        snapshot: ProbeSnapshot,
+    ): RollbackStatus {
+        val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return RollbackStatus.RESTORE_FAILED
+        if (!accepts(candidate)) return RollbackStatus.RESTORE_FAILED
+        val allowedKeys = setOf(descriptor.colorKey, descriptor.brightnessKey) + descriptor.enableKeys
+        val settings = snapshot.values.filterKeys { it in allowedKeys }
+        if (settings.isEmpty()) return RollbackStatus.RESTORE_FAILED
+        return restoreSettings(settings)
+    }
+
     override fun bindingCandidate(
         candidate: ProbeCandidate,
         evidence: List<ProbeEvidence>,

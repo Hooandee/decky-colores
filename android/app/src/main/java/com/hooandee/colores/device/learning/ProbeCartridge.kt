@@ -27,6 +27,11 @@ interface ProbeCartridge {
         snapshot: ProbeSnapshot,
     ): RollbackStatus
 
+    fun restoreSettingsOnly(
+        candidate: ProbeCandidate,
+        snapshot: ProbeSnapshot,
+    ): RollbackStatus = RollbackStatus.RESTORE_FAILED
+
     fun verifiedRollback(
         candidate: ProbeCandidate,
         snapshot: ProbeSnapshot,
