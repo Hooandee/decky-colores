@@ -743,7 +743,7 @@ class ColoresViewModel(
         val session = hardwareLearningSession ?: return
         val current = mutableState.value
         val ui = current.hardwareLearning
-        if (!ui.hasNextCandidate || ui.busy) return
+        if (!ui.hasNextCandidate || ui.busy || ui.sessionState !is HardwareLearningState.Complete) return
         val nextIndex = ui.candidateIndex + 1
         val candidate = current.hardwareLearningCandidates.getOrNull(nextIndex) ?: return
         val sessionState = session.start(candidate)

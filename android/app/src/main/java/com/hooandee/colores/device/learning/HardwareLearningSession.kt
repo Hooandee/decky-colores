@@ -83,6 +83,11 @@ class HardwareLearningSession(
     private val evidence = mutableListOf<ProbeEvidence>()
 
     fun start(candidate: ProbeCandidate): HardwareLearningState {
+        if (snapshot != null) return state
+        if (store.hasRollback()) {
+            state = HardwareLearningState.Blocked(LearningBlockReason.RESTORE_FAILED)
+            return state
+        }
         val resolved = catalog.find(candidate.cartridgeId, candidate.cartridgeVersion)
         if (resolved == null || !runCatching { resolved.accepts(candidate) }.getOrDefault(false)) {
             state = HardwareLearningState.Blocked(LearningBlockReason.UNSUPPORTED_CANDIDATE)
@@ -165,6 +170,7 @@ class HardwareLearningSession(
         val currentCandidate = requireNotNull(candidate)
         val currentCartridge = requireNotNull(cartridge)
         val rollbackStatus = restoreOriginal()
+        snapshot = null
         val capabilities = confirmedCapabilities()
         if (rollbackStatus == RollbackStatus.RESTORE_FAILED) {
             val result = HardwareLearningResult(HardwareLearningStatus.RESTORE_FAILED, currentCandidate, evidence.toList(), capabilities, rollbackStatus)
@@ -209,6 +215,7 @@ class HardwareLearningSession(
             return null
         }
         val status = restoreOriginal()
+        snapshot = null
         state =
             when {
                 status == RollbackStatus.RESTORE_FAILED -> HardwareLearningState.Blocked(LearningBlockReason.RESTORE_FAILED)
@@ -253,6 +260,7 @@ class HardwareLearningSession(
 
     private fun restoreAndBlock(reason: LearningBlockReason) {
         val restored = restoreOriginal()
+        snapshot = null
         val blockReason =
             when {
                 restored == RollbackStatus.RESTORE_FAILED -> LearningBlockReason.RESTORE_FAILED
