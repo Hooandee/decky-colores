@@ -27,6 +27,7 @@ import com.hooandee.colores.ui.ControlAccess
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
 data class RestoredLightingBinding(
@@ -42,6 +43,26 @@ internal fun attachProfileRuntime(
     restored ?: return false
     attach(restored)
     return true
+}
+
+internal class UnboundDeviceHandoff(
+    private val candidate: LedDevice?,
+    private val bound: LedDevice?,
+    private val boundNow: (LedDevice) -> Boolean = { false },
+) {
+    private var settled = false
+
+    fun markBound() {
+        settled = true
+    }
+
+    suspend fun closeIfUnbound() {
+        if (settled) return
+        settled = true
+        val device = candidate ?: return
+        if (boundNow(device)) return
+        withContext(NonCancellable + Dispatchers.IO) { closeIfNotBound(device, bound) }
+    }
 }
 
 internal suspend fun closeIfNotBound(

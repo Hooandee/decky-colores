@@ -6,6 +6,9 @@ import org.junit.Assert.assertTrue
 import com.hooandee.colores.led.LedDevice
 import com.hooandee.colores.led.LedState
 import com.hooandee.colores.led.RgbColor
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -28,6 +31,45 @@ class LightingRuntimeRestoreTest {
     }
 
     @Test
+    fun `refresh cancelled before binding closes the new device once`() =
+        runTest {
+            val created = ClosingDevice()
+            val handoff = UnboundDeviceHandoff(created, bound = null)
+
+            val refresh =
+                launch {
+                    try {
+                        awaitCancellation()
+                    } finally {
+                        handoff.closeIfUnbound()
+                    }
+                }
+            runCurrent()
+            refresh.cancel()
+            refresh.join()
+            handoff.closeIfUnbound()
+
+            assertTrue(created.closed)
+            assertEquals(1, created.closes)
+        }
+
+    @Test
+    fun `handed off or controller bound devices are never closed`() =
+        runTest {
+            val handedOff = ClosingDevice()
+            val controllerBound = ClosingDevice()
+            val reused = ClosingDevice()
+
+            UnboundDeviceHandoff(handedOff, bound = null).apply { markBound() }.closeIfUnbound()
+            UnboundDeviceHandoff(controllerBound, bound = null) { it === controllerBound }.closeIfUnbound()
+            UnboundDeviceHandoff(reused, bound = reused).closeIfUnbound()
+
+            assertFalse(handedOff.closed)
+            assertFalse(controllerBound.closed)
+            assertFalse(reused.closed)
+        }
+
+    @Test
     fun `a device that is not bound is closed and the bound one is kept`() =
         runTest {
             val bound = ClosingDevice()
@@ -43,6 +85,7 @@ class LightingRuntimeRestoreTest {
 
     private class ClosingDevice : LedDevice {
         var closed = false
+        var closes = 0
         override val available = true
         override val supportsPerZone = true
 
@@ -63,6 +106,7 @@ class LightingRuntimeRestoreTest {
         ): Boolean = true
 
         override suspend fun close() {
+            closes++
             closed = true
         }
     }
