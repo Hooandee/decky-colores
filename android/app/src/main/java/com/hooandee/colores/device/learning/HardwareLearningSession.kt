@@ -188,6 +188,11 @@ class HardwareLearningSession(
             state = HardwareLearningState.Complete(result)
             return result
         }
+        if (!identity.complete) {
+            val result = HardwareLearningResult(HardwareLearningStatus.BLOCKED, bindingCandidate, evidence.toList(), capabilities, rollbackStatus)
+            state = HardwareLearningState.Blocked(LearningBlockReason.BINDING_UNAVAILABLE)
+            return result
+        }
         val binding =
             LearnedDeviceBinding(
                 identityHash = learningIdentityHash(identity),
@@ -197,6 +202,7 @@ class HardwareLearningSession(
                 capabilities = capabilities,
                 appVersion = appVersion,
                 learnedAtEpochMs = nowEpochMs(),
+                fingerprint = identity.fingerprint,
             )
         val status = if (store.saveBinding(binding)) HardwareLearningStatus.ADAPTED else HardwareLearningStatus.BLOCKED
         val result = HardwareLearningResult(status, bindingCandidate, evidence.toList(), capabilities, rollbackStatus)

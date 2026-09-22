@@ -187,6 +187,7 @@ private fun LearnedDeviceBinding.toJson(): JSONObject =
                 .put("power", capabilities.power),
         ).put("app_version", appVersion)
         .put("learned_at", learnedAtEpochMs)
+        .put("fingerprint", fingerprint)
 
 private fun JSONObject.toLearnedBinding(): LearnedDeviceBinding {
     require(getInt("schema") == 1)
@@ -208,6 +209,7 @@ private fun JSONObject.toLearnedBinding(): LearnedDeviceBinding {
             ),
         appVersion = getString("app_version"),
         learnedAtEpochMs = getLong("learned_at"),
+        fingerprint = optString("fingerprint", ""),
     )
 }
 

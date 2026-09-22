@@ -8,7 +8,10 @@ import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.device.GenericVendorLed
 import com.hooandee.colores.led.Htr3212Descriptor
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LearnedBindingTest {
@@ -59,6 +62,36 @@ class LearnedBindingTest {
                 listOf(candidate),
             ),
         )
+    }
+
+    @Test
+    fun `changed Android build keeps the binding but requires revalidation`() {
+        val current = identity.copy(fingerprint = "maker/device:14/new")
+        val stored = binding.copy(fingerprint = "maker/device:13/old")
+
+        assertNull(resolveLearnedDevice(current, stored, listOf(candidate)))
+        assertTrue(learnedBindingNeedsRevalidation(current, stored))
+        assertNotNull(resolveLearnedDevice(current, stored.copy(fingerprint = current.fingerprint), listOf(candidate)))
+        assertFalse(learnedBindingNeedsRevalidation(current, stored.copy(fingerprint = current.fingerprint)))
+    }
+
+    @Test
+    fun `legacy binding without fingerprint stays active and can be completed`() {
+        val current = identity.copy(fingerprint = "maker/device:14/new")
+
+        assertNotNull(resolveLearnedDevice(current, binding, listOf(candidate)))
+        assertFalse(learnedBindingNeedsRevalidation(current, binding))
+        assertTrue(learnedBindingNeedsFingerprint(current, binding))
+        assertFalse(learnedBindingNeedsFingerprint(current.copy(complete = false), binding))
+    }
+
+    @Test
+    fun `incomplete identity neither activates nor invalidates a binding`() {
+        val incomplete = identity.copy(fingerprint = "maker/device:14/new", complete = false)
+        val stored = binding.copy(fingerprint = "maker/device:13/old")
+
+        assertNull(resolveLearnedDevice(incomplete, binding, listOf(candidate)))
+        assertFalse(learnedBindingNeedsRevalidation(incomplete, stored))
     }
 
     @Test

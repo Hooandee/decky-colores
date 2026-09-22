@@ -271,8 +271,16 @@ private fun LearningBody(
             HardwareLearningState.Idle -> CircularProgressIndicator(Modifier.size(28.dp))
             is HardwareLearningState.ConsentRequired ->
                 LearningMessage(
-                    title = stringResource(R.string.hardware_learning_title),
-                    body = stringResource(R.string.hardware_learning_consent, surfaceLabel(state.candidate.surface)),
+                    title =
+                        stringResource(
+                            if (ui.revalidation) R.string.hardware_learning_revalidate_title else R.string.hardware_learning_title,
+                        ),
+                    body =
+                        if (ui.revalidation) {
+                            stringResource(R.string.hardware_learning_revalidate_body)
+                        } else {
+                            stringResource(R.string.hardware_learning_consent, surfaceLabel(state.candidate.surface))
+                        },
                     safety = stringResource(R.string.hardware_learning_safety),
                     textAlign = textAlign,
                 )

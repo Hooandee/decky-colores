@@ -38,6 +38,7 @@ data class HardwareLearningUiState(
     val candidateCount: Int = 0,
     val results: List<HardwareLearningResult> = emptyList(),
     val autoPromptDismissed: Boolean = false,
+    val revalidation: Boolean = false,
 ) {
     val actionLayout: HardwareLearningActionLayout
         get() =

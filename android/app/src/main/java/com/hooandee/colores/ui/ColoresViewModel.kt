@@ -41,6 +41,8 @@ import com.hooandee.colores.device.learning.UserObservation
 import com.hooandee.colores.device.learning.ZoneLocation
 import com.hooandee.colores.device.learning.learningIdentityHash
 import com.hooandee.colores.device.learning.learningDescriptorsCompatible
+import com.hooandee.colores.device.learning.learnedBindingNeedsFingerprint
+import com.hooandee.colores.device.learning.learnedBindingNeedsRevalidation
 import com.hooandee.colores.device.learning.learnedDeviceIdForPromotion
 import com.hooandee.colores.device.learning.resultsFor
 import com.hooandee.colores.engine.BandSet
@@ -101,6 +103,7 @@ data class ColoresUiState(
     val detectionOutcome: DetectionOutcome? = null,
     val devicePresentation: DevicePresentation = DevicePresentation.UNKNOWN,
     val learnedHardware: Boolean = false,
+    val learnedBindingNeedsRevalidation: Boolean = false,
     val hardwareLearning: HardwareLearningUiState = HardwareLearningUiState(),
     val controlAccess: ControlAccess = ControlAccess.SERVICE_UNAVAILABLE,
     val mode: AppMode = AppMode.COLOR,
@@ -156,7 +159,7 @@ data class ColoresUiState(
 
     val hardwareLearningCandidates: List<ProbeCandidate>
         get() =
-            when (val outcome = detectionOutcome) {
+            when (val outcome = detectionOutcome?.takeIf { it.identity.complete }) {
                 is DetectionOutcome.Candidates -> outcome.candidates
                 is DetectionOutcome.UnavailableKnownDevice -> outcome.candidates
                 is DetectionOutcome.Resolved ->
@@ -287,6 +290,7 @@ class ColoresViewModel(
     private val gradientPresets = GradientPresetRepository(application).load()
     private var hardwareLearningSession: HardwareLearningSession? = null
     private var hardwareLearningOperation: Job? = null
+    private var identityRetries = 0
 
     init {
         viewModelScope.launch {
@@ -375,6 +379,13 @@ class ColoresViewModel(
                     }
                 }
                 val learnedHardware = detected?.id?.startsWith("learned-") == true
+                if (learnedHardware && binding != null && learnedBindingNeedsFingerprint(outcome.identity, binding)) {
+                    withContext(Dispatchers.IO) {
+                        context.hardwareLearningStore.saveBinding(binding.copy(fingerprint = outcome.identity.fingerprint))
+                    }
+                }
+                val needsRevalidation = detected == null && learnedBindingNeedsRevalidation(outcome.identity, binding)
+                scheduleIdentityRetry(outcome.identity.complete)
                 val storedAttempt = withContext(Dispatchers.IO) { context.hardwareLearningStore.loadAttempt() }
                 val storedResults = storedAttempt?.resultsFor(outcome.identity).orEmpty()
                 if (detected != null && storedAttempt != null) {
@@ -410,6 +421,7 @@ class ColoresViewModel(
                             detectionOutcome = outcome,
                             devicePresentation = devicePresentation,
                             learnedHardware = learnedHardware,
+                            learnedBindingNeedsRevalidation = needsRevalidation,
                             controlAccess = controlAccess,
                             hardwareLearning =
                                 it.hardwareLearning.copy(
@@ -571,6 +583,7 @@ class ColoresViewModel(
                         detectionOutcome = outcome,
                         devicePresentation = devicePresentation,
                         learnedHardware = learnedHardware,
+                        learnedBindingNeedsRevalidation = false,
                         controlAccess = controlAccess,
                         hardwareLearning = current.hardwareLearning.copy(results = emptyList()),
                         effects = effectPresets,
@@ -605,6 +618,19 @@ class ColoresViewModel(
             }
     }
 
+    private fun scheduleIdentityRetry(identityComplete: Boolean) {
+        if (identityComplete) {
+            identityRetries = 0
+            return
+        }
+        if (identityRetries >= MAX_IDENTITY_RETRIES) return
+        identityRetries += 1
+        viewModelScope.launch {
+            delay(IDENTITY_RETRY_DELAY_MS)
+            refresh()
+        }
+    }
+
     fun onScreenOn() {
         if (mutableState.value.canWrite) controller.reassert()
     }
@@ -628,6 +654,7 @@ class ColoresViewModel(
                         busy = true,
                         candidateIndex = 0,
                         candidateCount = candidates.size,
+                        revalidation = current.learnedBindingNeedsRevalidation,
                     ),
             )
         }
@@ -1491,3 +1518,7 @@ private fun ColoresUiState.ambientCaptureConfig(): AmbientCaptureConfig? {
 
 private fun android.content.Context.readAsset(name: String): String =
     assets.open(name).bufferedReader().use { it.readText() }
+
+private const val MAX_IDENTITY_RETRIES = 2
+
+private const val IDENTITY_RETRY_DELAY_MS = 1_500L

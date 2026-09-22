@@ -337,6 +337,8 @@
     <string name="hardware_learning_progress">Route %1$d of %2$d</string>
     <string name="hardware_learning_title">Let’s find your lights</string>
     <string name="hardware_learning_consent">Colores found a possible route through %1$s. It will save the current state first. Then you will start each test, watch the device and confirm only what you can see.</string>
+    <string name="hardware_learning_revalidate_title">Confirm your lights again</string>
+    <string name="hardware_learning_revalidate_body">Android was updated. Your adaptation is kept, but it stays off until you repeat the test.</string>
     <string name="hardware_learning_safety">Nothing is tested before the current state is saved</string>
     <string name="hardware_learning_prepare">Save state and prepare</string>
     <string name="hardware_learning_state_saved">Original state saved</string>

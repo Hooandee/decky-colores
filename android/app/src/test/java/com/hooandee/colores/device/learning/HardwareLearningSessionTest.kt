@@ -190,6 +190,34 @@ class HardwareLearningSessionTest {
     }
 
     @Test
+    fun `binding stores the Android build fingerprint`() {
+        val fixture = fixture(identity.copy(fingerprint = "maker/device:14/build"))
+        fixture.session.start(candidate)
+        fixture.session.consent()
+        fixture.session.run(ProbeStep.COLOR)
+        fixture.session.answer(UserObservation.YES)
+
+        assertEquals(HardwareLearningStatus.ADAPTED, fixture.session.finish().status)
+        assertEquals("maker/device:14/build", fixture.store.loadBinding()?.fingerprint)
+    }
+
+    @Test
+    fun `incomplete identity never saves a binding`() {
+        val fixture = fixture(identity.copy(complete = false))
+        fixture.session.start(candidate)
+        fixture.session.consent()
+        fixture.session.run(ProbeStep.COLOR)
+        fixture.session.answer(UserObservation.YES)
+
+        val result = fixture.session.finish()
+
+        assertEquals(HardwareLearningStatus.BLOCKED, result.status)
+        assertNull(fixture.store.loadBinding())
+        assertEquals("original", fixture.cartridge.hardwareValue)
+        assertNull(fixture.store.loadRollback())
+    }
+
+    @Test
     fun `starting another candidate with a pending snapshot is rejected`() {
         val fixture = fixture()
         fixture.session.start(candidate)
@@ -231,19 +259,20 @@ class HardwareLearningSessionTest {
         assertEquals(restores, fixture.cartridge.restores)
     }
 
-    private fun fixture(): Fixture {
+    private fun fixture(sessionIdentity: AndroidDeviceIdentity = identity): Fixture {
         val values = mutableMapOf<String, String>()
         val store = HardwareLearningStore(values::get, { key, value -> values.set(key, value).let { true } }, { values.remove(it) != null })
         val cartridge = RecordingCartridge()
-        return Fixture(store, cartridge, session(cartridge, store))
+        return Fixture(store, cartridge, session(cartridge, store, sessionIdentity))
     }
 
     private fun session(
         cartridge: RecordingCartridge,
         store: HardwareLearningStore,
+        sessionIdentity: AndroidDeviceIdentity = identity,
     ) =
         HardwareLearningSession(
-            identity = identity,
+            identity = sessionIdentity,
             catalog = ProbeCartridgeCatalog(listOf(cartridge)),
             store = store,
             appVersion = "0.1.0",

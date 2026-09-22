@@ -337,6 +337,8 @@
     <string name="hardware_learning_progress">Ruta %1$d de %2$d</string>
     <string name="hardware_learning_title">Vamos a encontrar tus luces</string>
     <string name="hardware_learning_consent">Colores ha encontrado una posible ruta mediante %1$s. Primero guardará el estado actual. Después tú iniciarás cada prueba, mirarás el dispositivo y confirmarás únicamente lo que veas.</string>
+    <string name="hardware_learning_revalidate_title">Confirma de nuevo tus luces</string>
+    <string name="hardware_learning_revalidate_body">Android se ha actualizado. Tu adaptación sigue guardada, pero no se activará hasta que repitas la prueba.</string>
     <string name="hardware_learning_safety">Nada se prueba sin guardar antes el estado actual</string>
     <string name="hardware_learning_prepare">Guardar estado y preparar</string>
     <string name="hardware_learning_state_saved">Estado original guardado</string>

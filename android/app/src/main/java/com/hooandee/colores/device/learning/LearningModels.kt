@@ -86,6 +86,7 @@ data class LearnedDeviceBinding(
     val capabilities: DeviceCapabilities,
     val appVersion: String,
     val learnedAtEpochMs: Long,
+    val fingerprint: String = "",
 )
 
 data class HardwareLearningAttempt(
