@@ -41,7 +41,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -230,30 +229,31 @@ private fun EditingColumn(
             val profile = configured[app.packageName]?.profile
             val selected = scope?.packageName == app.packageName
             val follows = selected && state.profileScopeState.followsGlobal
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val subtitle =
+                if (follows || profile == null) {
+                    stringResource(R.string.profile_same_as_global)
+                } else {
+                    navLabel(profile.mode)
+                }
+            if (selected) {
+                SelectedAppProfileCard(
+                    app = app,
+                    subtitle = subtitle,
+                    swatch = profile?.solidColor?.takeUnless { follows },
+                    followsGlobal = state.profileScopeState.followsGlobal,
+                    canDelete = state.profileScopeState.hasAppProfile,
+                    onFollowGlobal = onFollowGlobal,
+                    onForget = onForget,
+                )
+            } else {
                 ProfileRow(
                     title = app.label,
-                    subtitle =
-                        if (follows || profile == null) {
-                            stringResource(R.string.profile_using_global)
-                        } else {
-                            navLabel(profile.mode)
-                        },
+                    subtitle = subtitle,
                     icon = app.icon,
-                    selected = selected,
-                    swatch = profile?.solidColor?.takeUnless { follows },
+                    selected = false,
+                    swatch = profile?.solidColor,
                     onClick = { onApp(app.packageName) },
                 )
-                if (selected) {
-                    OwnProfileChoice(
-                        appLabel = app.label,
-                        followsGlobal = state.profileScopeState.followsGlobal,
-                        onFollowGlobal = onFollowGlobal,
-                    )
-                    if (state.profileScopeState.hasAppProfile) {
-                        TextButton(onClick = onForget) { Text(stringResource(R.string.profile_forget)) }
-                    }
-                }
             }
         }
         if (listedApps.isEmpty()) {
@@ -270,33 +270,87 @@ private fun EditingColumn(
 }
 
 @Composable
-private fun OwnProfileChoice(
-    appLabel: String,
+private fun SelectedAppProfileCard(
+    app: LaunchableApp,
+    subtitle: String,
+    swatch: RgbColor?,
     followsGlobal: Boolean,
+    canDelete: Boolean,
     onFollowGlobal: (Boolean) -> Unit,
+    onForget: () -> Unit,
 ) {
-    val own = !followsGlobal
     Surface(
-        onClick = { onFollowGlobal(own) },
-        modifier = Modifier.fillMaxWidth().semantics { selected = own },
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
-        contentColor = MaterialTheme.colorScheme.onSurface,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth().semantics { selected = true },
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.profile_own_lights), fontWeight = FontWeight.SemiBold)
-                Text(
-                    if (own) stringResource(R.string.profile_own_lights_on, appLabel) else stringResource(R.string.profile_own_lights_off),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                ProfileIcon(app.icon, app.label, 36.dp)
+                Column(Modifier.weight(1f)) {
+                    Text(app.label, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = LocalContentColor.current.copy(alpha = 0.72f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                swatch?.let { ProfileSwatch(it) }
+            }
+            Text(
+                stringResource(R.string.profile_lights_question, app.label),
+                style = MaterialTheme.typography.labelMedium,
+                color = LocalContentColor.current.copy(alpha = 0.8f),
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ProfileChoiceButton(
+                    label = stringResource(R.string.profile_same_as_global),
+                    selected = followsGlobal,
+                    onClick = { if (!followsGlobal) onFollowGlobal(true) },
+                    modifier = Modifier.weight(1f),
+                )
+                ProfileChoiceButton(
+                    label = stringResource(R.string.profile_custom),
+                    selected = !followsGlobal,
+                    onClick = { if (followsGlobal) onFollowGlobal(false) },
+                    modifier = Modifier.weight(1f),
                 )
             }
-            Switch(checked = own, onCheckedChange = { onFollowGlobal(!it) })
+            if (canDelete) {
+                TextButton(onClick = onForget, modifier = Modifier.align(Alignment.End)) {
+                    Text(stringResource(R.string.profile_forget))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileChoiceButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    Surface(
+        onClick = onClick,
+        modifier = modifier.heightIn(min = 44.dp).semantics { this.selected = selected },
+        shape = shape,
+        color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else LocalContentColor.current,
+        border = if (selected) null else BorderStroke(1.dp, LocalContentColor.current.copy(alpha = 0.35f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (selected) Text("✓ ", style = MaterialTheme.typography.labelLarge)
+            Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
