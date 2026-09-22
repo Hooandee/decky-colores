@@ -118,6 +118,10 @@ fun ColoresScreen(
             onFinish = viewModel::finishHardwareLearningCandidate,
             onNextCandidate = viewModel::tryNextHardwareCandidate,
             onReport = viewModel::openHardwareLearningReport,
+            onRetryRestore = viewModel::retryHardwareRollback,
+            onRequestDiscard = viewModel::requestDiscardHardwareRollback,
+            onCancelDiscard = viewModel::cancelDiscardHardwareRollback,
+            onConfirmDiscard = viewModel::confirmDiscardHardwareRollback,
         )
     }
     if (state.hardwareLearning.reportOpen) {

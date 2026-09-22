@@ -39,6 +39,9 @@ data class HardwareLearningUiState(
     val results: List<HardwareLearningResult> = emptyList(),
     val autoPromptDismissed: Boolean = false,
     val revalidation: Boolean = false,
+    val journalPending: Boolean = false,
+    val recoveryAttempts: Int = 0,
+    val discardConfirmation: Boolean = false,
 ) {
     val actionLayout: HardwareLearningActionLayout
         get() =
@@ -133,6 +136,10 @@ data class HardwareLearningUiState(
                 ?.reason
                 ?.takeIf { it in setOf(LearningBlockReason.RESTORE_FAILED, LearningBlockReason.JOURNAL_UNAVAILABLE) }
 }
+
+internal fun HardwareLearningState.isCriticalLearningBlock(): Boolean =
+    this is HardwareLearningState.Blocked &&
+        reason in setOf(LearningBlockReason.RESTORE_FAILED, LearningBlockReason.JOURNAL_UNAVAILABLE)
 
 internal fun dismissedHardwareLearningUiState(current: HardwareLearningUiState): HardwareLearningUiState =
     HardwareLearningUiState(results = current.results, autoPromptDismissed = true)

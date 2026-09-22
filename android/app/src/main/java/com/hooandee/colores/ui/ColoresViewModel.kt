@@ -35,8 +35,8 @@ import com.hooandee.colores.device.learning.HardwareLearningSession
 import com.hooandee.colores.device.learning.HardwareLearningState
 import com.hooandee.colores.device.learning.HardwareLearningStatus
 import com.hooandee.colores.device.learning.LearningBlockReason
+import com.hooandee.colores.device.learning.LearningRecovery
 import com.hooandee.colores.device.learning.ProbeCandidate
-import com.hooandee.colores.device.learning.RollbackStatus
 import com.hooandee.colores.device.learning.UserObservation
 import com.hooandee.colores.device.learning.ZoneLocation
 import com.hooandee.colores.device.learning.learningIdentityHash
@@ -87,7 +87,6 @@ import com.hooandee.colores.sensor.SysfsThermalSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -288,7 +287,11 @@ class ColoresViewModel(
     private val deviceIdentityCatalog =
         AndroidDeviceIdentityCatalog.parse(runCatching { application.readAsset("android-device-identities.json") }.getOrDefault(""))
     private val gradientPresets = GradientPresetRepository(application).load()
-    private var hardwareLearningSession: HardwareLearningSession? = null
+    private var hardwareLearningSession: HardwareLearningSession?
+        get() = coloresApplication.hardwareLearningHandoff.session
+        set(value) {
+            coloresApplication.hardwareLearningHandoff.session = value
+        }
     private var hardwareLearningOperation: Job? = null
     private var identityRetries = 0
 
@@ -344,9 +347,14 @@ class ColoresViewModel(
         refreshJob =
             viewModelScope.launch {
                 val context = coloresApplication
-                val rollbackStatus = context.recoverHardwareLearningRollback()
-                if (rollbackStatus == RollbackStatus.RESTORE_FAILED) {
+                val recovery = context.recoverHardwareLearningRollback()
+                if (recovery == LearningRecovery.BUSY) {
+                    mutableState.update { it.copy(loading = false, controlAccess = ControlAccess.SERVICE_UNAVAILABLE) }
+                    return@launch
+                }
+                if (recovery == LearningRecovery.FAILED) {
                     controller.unbind()
+                    val rollback = context.hardwareRollbackState()
                     mutableState.update {
                         it.copy(
                             loading = false,
@@ -356,8 +364,12 @@ class ColoresViewModel(
                             hardwareLearning =
                                 it.hardwareLearning.copy(
                                     dialogOpen = true,
+                                    busy = false,
                                     restoreFailure = true,
                                     sessionState = HardwareLearningState.Blocked(LearningBlockReason.RESTORE_FAILED),
+                                    journalPending = rollback.pending,
+                                    recoveryAttempts = rollback.attempts,
+                                    discardConfirmation = false,
                                 ),
                         )
                     }
@@ -524,44 +536,51 @@ class ColoresViewModel(
                 val alreadyBound =
                     controller.snapshot.value.bound && controller.snapshot.value.deviceId == detected.id
 
-                if (!alreadyBound) {
-                    controller.bind(
-                        LightingBinding(
-                            deviceId = detected.id,
-                            device = device,
-                            zones = zones,
-                            catalog = catalog,
-                            bands = storedLighting.sensorBands,
-                            battery = AndroidBatterySource(context),
-                            temperature = SysfsThermalSource().takeIf { it.available },
-                            performance = PerformanceSources.detect(),
-                            audio = coloresApplication.audioLevelSource,
-                            ambient = coloresApplication.ambientFrameSource,
-                        ),
-                        LightingIntent(
-                            mode = selectedProfile.mode.coerceAvailable(gradientSupported),
-                            staticColors = zoneColors,
-                            solidColor = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255),
-                            gradientStops = hydratedGradient.stops,
-                            effectId =
-                                effectPresets.firstOrNull { it.id == selectedProfile.effectId }?.id
-                                    ?: effectPresets.firstOrNull()?.id
-                                    ?: catalog.defaultEffectId,
-                            speed = selectedProfile.speed,
-                            gradientSpeed = selectedProfile.gradientSpeed,
-                            gradientPresentation = gradientPresentation ?: GradientPresentation.SPATIAL,
-                            effectUsesGradient = selectedProfile.effectUsesGradient,
-                            brightness = selectedProfile.brightness,
-                            power = power,
-                            chargerOnly = storedLighting.chargerOnly,
-                            batteryBreathe = selectedProfile.batteryBreathe,
-                            temperatureBreathe = selectedProfile.temperatureBreathe,
-                            audioScale = storedLighting.audioScale,
-                            audioSensitivityDb = storedLighting.audioSensitivityDb,
-                            ambientVividness = storedLighting.ambientVividness,
-                            ambientSmoothing = storedLighting.ambientSmoothing,
-                        ),
-                    )
+                val boundWhileIdle =
+                    alreadyBound ||
+                        coloresApplication.hardwareLearningCoordinator.whenIdle {
+                            controller.bind(
+                                LightingBinding(
+                                    deviceId = detected.id,
+                                    device = device,
+                                    zones = zones,
+                                    catalog = catalog,
+                                    bands = storedLighting.sensorBands,
+                                    battery = AndroidBatterySource(context),
+                                    temperature = SysfsThermalSource().takeIf { it.available },
+                                    performance = PerformanceSources.detect(),
+                                    audio = coloresApplication.audioLevelSource,
+                                    ambient = coloresApplication.ambientFrameSource,
+                                ),
+                                LightingIntent(
+                                    mode = selectedProfile.mode.coerceAvailable(gradientSupported),
+                                    staticColors = zoneColors,
+                                    solidColor = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255),
+                                    gradientStops = hydratedGradient.stops,
+                                    effectId =
+                                        effectPresets.firstOrNull { it.id == selectedProfile.effectId }?.id
+                                            ?: effectPresets.firstOrNull()?.id
+                                            ?: catalog.defaultEffectId,
+                                    speed = selectedProfile.speed,
+                                    gradientSpeed = selectedProfile.gradientSpeed,
+                                    gradientPresentation = gradientPresentation ?: GradientPresentation.SPATIAL,
+                                    effectUsesGradient = selectedProfile.effectUsesGradient,
+                                    brightness = selectedProfile.brightness,
+                                    power = power,
+                                    chargerOnly = storedLighting.chargerOnly,
+                                    batteryBreathe = selectedProfile.batteryBreathe,
+                                    temperatureBreathe = selectedProfile.temperatureBreathe,
+                                    audioScale = storedLighting.audioScale,
+                                    audioSensitivityDb = storedLighting.audioSensitivityDb,
+                                    ambientVividness = storedLighting.ambientVividness,
+                                    ambientSmoothing = storedLighting.ambientSmoothing,
+                                ),
+                            )
+                            true
+                        } == true
+                if (!boundWhileIdle) {
+                    mutableState.update { it.copy(loading = false, controlAccess = ControlAccess.SERVICE_UNAVAILABLE) }
+                    return@launch
                 }
 
                 profileCoordinator.bindDevice(detected.id, zones, gradientSupported)
@@ -688,8 +707,23 @@ class ColoresViewModel(
                     )
                 withContext(Dispatchers.IO) { coloresApplication.hardwareLearningStore.clearAttempt() }
                 hardwareLearningSession = session
+                val started = session.start(candidates.first())
+                if (started.isCriticalLearningBlock()) {
+                    coloresApplication.hardwareLearningCoordinator.finish { Unit }
+                    hardwareLearningSession = null
+                }
+                val rollback = coloresApplication.hardwareRollbackState()
                 mutableState.update {
-                    it.copy(hardwareLearning = it.hardwareLearning.copy(busy = false, sessionState = session.start(candidates.first())))
+                    it.copy(
+                        hardwareLearning =
+                            it.hardwareLearning.copy(
+                                busy = false,
+                                sessionState = started,
+                                restoreFailure = it.hardwareLearning.restoreFailure || started.isCriticalLearningBlock(),
+                                journalPending = rollback.pending,
+                                recoveryAttempts = rollback.attempts,
+                            ),
+                    )
                 }
             }
     }
@@ -728,8 +762,10 @@ class ColoresViewModel(
                     coloresApplication.hardwareLearningCoordinator.run {
                         withContext(Dispatchers.IO) { session.finish() }
                     } ?: return@launch
+                val critical = session.state.isCriticalLearningBlock()
                 val terminal =
                     !ui.hasNextCandidate ||
+                        critical ||
                         result.status == HardwareLearningStatus.RESTORE_FAILED
                 val accumulatedResults = ui.results + result
                 withContext(Dispatchers.IO) {
@@ -750,6 +786,7 @@ class ColoresViewModel(
                     coloresApplication.hardwareLearningCoordinator.finish { Unit }
                     hardwareLearningSession = null
                 }
+                val rollback = coloresApplication.hardwareRollbackState()
                 mutableState.update {
                     it.copy(
                         hardwareLearning =
@@ -760,6 +797,8 @@ class ColoresViewModel(
                                 restoreFailure =
                                     it.hardwareLearning.restoreFailure ||
                                         result.status == HardwareLearningStatus.RESTORE_FAILED,
+                                journalPending = rollback.pending,
+                                recoveryAttempts = rollback.attempts,
                             ),
                     )
                 }
@@ -789,34 +828,24 @@ class ColoresViewModel(
             viewModelScope.launch {
                 pending?.join()
                 if (mutableState.value.hardwareLearning.restoreFailure) return@launch
-                val needsRestore = mutableState.value.hardwareLearning.sessionState !is HardwareLearningState.Complete
-                val session = hardwareLearningSession
-                val cancellationStatus =
-                    if (needsRestore) {
-                        withContext(NonCancellable + Dispatchers.IO) {
-                            coloresApplication.hardwareLearningCoordinator.finish { session?.cancel() }
-                        }
-                    } else {
-                        coloresApplication.hardwareLearningCoordinator.finish { Unit }
-                        null
-                    }
-                val cancellationState = session?.state ?: HardwareLearningState.Idle
-                if (hardwareLearningCancellationFailed(cancellationStatus, cancellationState)) {
-                    val restoreFailed = hardwareLearningRestoreFailed(cancellationStatus, cancellationState)
-                    hardwareLearningSession = null
+                val cancellation = coloresApplication.cancelHardwareLearning(pending = null).await()
+                if (hardwareLearningCancellationFailed(cancellation.status, cancellation.state)) {
+                    val restoreFailed = hardwareLearningRestoreFailed(cancellation.status, cancellation.state)
+                    val rollback = coloresApplication.hardwareRollbackState()
                     mutableState.update {
                         it.copy(
                             hardwareLearning =
                                 it.hardwareLearning.copy(
                                     busy = false,
                                     restoreFailure = it.hardwareLearning.restoreFailure || restoreFailed,
-                                    sessionState = cancellationState,
+                                    sessionState = cancellation.state,
+                                    journalPending = rollback.pending,
+                                    recoveryAttempts = rollback.attempts,
                                 ),
                         )
                     }
                     return@launch
                 }
-                hardwareLearningSession = null
                 mutableState.update {
                     it.copy(
                         hardwareLearning = dismissedHardwareLearningUiState(it.hardwareLearning),
@@ -825,6 +854,63 @@ class ColoresViewModel(
                 }
                 refresh()
             }
+    }
+
+    fun retryHardwareRollback() {
+        if (mutableState.value.hardwareLearning.busy) return
+        mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(busy = true, discardConfirmation = false)) }
+        hardwareLearningOperation =
+            viewModelScope.launch {
+                val recovery = coloresApplication.recoverHardwareLearningRollback()
+                if (recovery == LearningRecovery.FAILED || recovery == LearningRecovery.BUSY) {
+                    val rollback = coloresApplication.hardwareRollbackState()
+                    mutableState.update {
+                        it.copy(
+                            hardwareLearning =
+                                it.hardwareLearning.copy(
+                                    busy = false,
+                                    journalPending = rollback.pending,
+                                    recoveryAttempts = rollback.attempts,
+                                ),
+                        )
+                    }
+                    return@launch
+                }
+                closeRecoveredHardwareLearning()
+            }
+    }
+
+    fun requestDiscardHardwareRollback() {
+        mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(discardConfirmation = true)) }
+    }
+
+    fun cancelDiscardHardwareRollback() {
+        mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(discardConfirmation = false)) }
+    }
+
+    fun confirmDiscardHardwareRollback() {
+        if (mutableState.value.hardwareLearning.busy) return
+        mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(busy = true)) }
+        hardwareLearningOperation =
+            viewModelScope.launch {
+                if (!coloresApplication.discardHardwareLearningRollback()) {
+                    mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(busy = false, discardConfirmation = false)) }
+                    return@launch
+                }
+                closeRecoveredHardwareLearning()
+            }
+    }
+
+    private fun closeRecoveredHardwareLearning() {
+        mutableState.update { it.copy(hardwareLearning = dismissedHardwareLearningUiState(it.hardwareLearning)) }
+        refresh()
+    }
+
+    override fun onCleared() {
+        if (hardwareLearningSession != null || mutableState.value.hardwareLearning.dialogOpen) {
+            coloresApplication.cancelHardwareLearning(hardwareLearningOperation)
+        }
+        super.onCleared()
     }
 
     fun forgetLearnedHardware() {
@@ -857,10 +943,11 @@ class ColoresViewModel(
                     } ?: HardwareLearningState.Blocked(LearningBlockReason.UNSUPPORTED_CANDIDATE)
                 val restoreFailed =
                     state is HardwareLearningState.Blocked && state.reason == LearningBlockReason.RESTORE_FAILED
-                if (restoreFailed) {
+                if (state.isCriticalLearningBlock()) {
                     coloresApplication.hardwareLearningCoordinator.finish { Unit }
                     hardwareLearningSession = null
                 }
+                val rollback = coloresApplication.hardwareRollbackState()
                 mutableState.update {
                     it.copy(
                         hardwareLearning =
@@ -868,6 +955,8 @@ class ColoresViewModel(
                                 busy = false,
                                 sessionState = state,
                                 restoreFailure = it.hardwareLearning.restoreFailure || restoreFailed,
+                                journalPending = rollback.pending,
+                                recoveryAttempts = rollback.attempts,
                             ),
                     )
                 }

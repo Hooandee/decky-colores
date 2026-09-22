@@ -14,11 +14,13 @@ import com.hooandee.colores.control.attachProfileRuntime
 import com.hooandee.colores.effects.ContextServiceGate
 import com.hooandee.colores.device.learning.HardwareLearningStore
 import com.hooandee.colores.device.learning.HardwareLearningCoordinator
+import com.hooandee.colores.device.learning.HardwareLearningCancellation
+import com.hooandee.colores.device.learning.HardwareLearningHandoff
+import com.hooandee.colores.device.learning.LearningRecovery
 import com.hooandee.colores.device.learning.Htr3212LearningCartridge
 import com.hooandee.colores.device.learning.PServerHtr3212RegisterReader
 import com.hooandee.colores.device.learning.ProbeCartridgeCatalog
 import com.hooandee.colores.device.learning.RollbackRecovery
-import com.hooandee.colores.device.learning.RollbackStatus
 import com.hooandee.colores.device.learning.SettingsLearningCartridge
 import com.hooandee.colores.device.learning.SingleAdcLearningCartridge
 import com.hooandee.colores.device.learning.SysfsI2cTopologyReader
@@ -32,6 +34,8 @@ import com.hooandee.colores.profiles.LightingProfileStore
 import com.hooandee.colores.settings.AppPreferences
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
@@ -103,13 +107,30 @@ class ColoresApplication : Application() {
         )
     }
 
-    suspend fun recoverHardwareLearningRollback(): RollbackStatus? =
+    val hardwareLearningHandoff: HardwareLearningHandoff by lazy {
+        HardwareLearningHandoff(applicationScope, hardwareLearningCoordinator, hardwareRollbackRecovery::recover)
+    }
+
+    fun cancelHardwareLearning(pending: Job?): Deferred<HardwareLearningCancellation> = hardwareLearningHandoff.cancel(pending)
+
+    suspend fun recoverHardwareLearningRollback(): LearningRecovery = hardwareLearningHandoff.recover()
+
+    suspend fun discardHardwareLearningRollback(): Boolean =
         hardwareLearningCoordinator.whenIdle {
-            withContext(Dispatchers.IO) { hardwareRollbackRecovery.recover() }
+            withContext(Dispatchers.IO) { hardwareRollbackRecovery.discard() }
+        } ?: false
+
+    suspend fun hardwareRollbackState(): HardwareRollbackState =
+        withContext(Dispatchers.IO) {
+            HardwareRollbackState(
+                pending = hardwareRollbackRecovery.pending,
+                attempts = hardwareRollbackRecovery.failure?.attempts ?: 0,
+            )
         }
 
-    suspend fun restoreRuntime(): Boolean =
-        hardwareLearningCoordinator.whenIdle {
+    suspend fun restoreRuntime(): Boolean {
+        hardwareLearningHandoff.awaitCancellation()
+        return hardwareLearningCoordinator.whenIdle {
             restoreAfterLearningRollback(
                 recover = { withContext(Dispatchers.IO) { hardwareRollbackRecovery.recover() } },
                 restoreRuntime = {
@@ -120,4 +141,10 @@ class ColoresApplication : Application() {
                 },
             )
         } ?: false
+    }
 }
+
+data class HardwareRollbackState(
+    val pending: Boolean,
+    val attempts: Int,
+)
