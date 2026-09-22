@@ -373,6 +373,27 @@ class AndroidDeviceDetectorTest {
     }
 
     @Test
+    fun `observed Thor app context topology matches its exact profile`() {
+        val observed =
+            listOf(
+                I2cController(2, 0x34, "aw882xx_smartpa"),
+                I2cController(2, 0x35, "aw882xx_smartpa"),
+                I2cController(2, 0x42, "sc8547-charger"),
+                I2cController(2, 0x64, "bq27z561"),
+                I2cController(3, 0x3c, "htr3212l"),
+                I2cController(4, 0x38, "fts_ts"),
+                I2cController(5, 0x38, "fts_ts"),
+                I2cController(6, 0x3c, "htr3212r"),
+                I2cController(6, 0x77, "bmp280"),
+            )
+
+        val result = detectThor(observed)
+
+        assertEquals("ayn-thor", (result as DetectionOutcome.Resolved).device.id)
+        assertEquals("matched", result.facts.single { it.key == FACT_HTR3212_TOPOLOGY }.value)
+    }
+
+    @Test
     fun `readable Thor topology that contradicts the profile never activates compiled buses`() {
         val observed = listOf(I2cController(4, 0x3c, "htr3212l"), I2cController(7, 0x3c, "htr3212r"))
 
