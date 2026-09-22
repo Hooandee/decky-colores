@@ -364,6 +364,77 @@ class AndroidDeviceDetectorTest {
         assertEquals(listOf(ProbeSurface.SETTINGS_PSERVER, ProbeSurface.HTR3212, ProbeSurface.SINGLEADC_JOYPAD), candidates.map { it.surface })
     }
 
+    @Test
+    fun `readable Thor topology that matches keeps the exact profile`() {
+        val result = detectThor(listOf(I2cController(3, 0x3c, "htr3212l"), I2cController(6, 0x3c, "htr3212r")))
+
+        assertEquals("ayn-thor", (result as DetectionOutcome.Resolved).device.id)
+        assertEquals("matched", result.facts.single { it.key == FACT_HTR3212_TOPOLOGY }.value)
+    }
+
+    @Test
+    fun `readable Thor topology that contradicts the profile never activates compiled buses`() {
+        val observed = listOf(I2cController(4, 0x3c, "htr3212l"), I2cController(7, 0x3c, "htr3212r"))
+
+        val result = detectThor(observed)
+
+        assertTrue(result is DetectionOutcome.Candidates)
+        val htr = (result as DetectionOutcome.Candidates).candidates.single { it.surface == ProbeSurface.HTR3212 }
+        val hardware = requireNotNull((htr.descriptor as SettingsProviderDescriptor).htr3212)
+        assertEquals(4 to 7, hardware.leftBus to hardware.rightBus)
+        assertFalse(htr.signalKeys.contains("exact_profile"))
+        val fact = result.facts.single { it.key == FACT_HTR3212_TOPOLOGY }.value
+        assertTrue(fact.startsWith("contradicted"))
+        assertTrue(fact.contains("left=4-0x3c"))
+    }
+
+    @Test
+    fun `readable topology without the HTR drivers contradicts the exact profile`() {
+        val result = detectThor(listOf(I2cController(3, 0x3c, "other-chip")))
+
+        assertFalse(result is DetectionOutcome.Resolved)
+        assertTrue(result.facts.single { it.key == FACT_HTR3212_TOPOLOGY }.value.contains("left=none"))
+    }
+
+    @Test
+    fun `unreadable or empty topology keeps the exact profile and marks it unverified`() {
+        val result = detectThor(emptyList())
+
+        assertEquals("ayn-thor", (result as DetectionOutcome.Resolved).device.id)
+        assertEquals("unverified", result.facts.single { it.key == FACT_HTR3212_TOPOLOGY }.value)
+    }
+
+    @Test
+    fun `topology guard ignores automatically gated profiles`() {
+        val rp5 = htrProfile("retroid-pocket-5", automaticActivation = true)
+
+        val guard = guardExactHtrTopology(rp5) { error("topology must not be read") }
+
+        assertFalse(guard.contradicted)
+        assertTrue(guard.facts.isEmpty())
+    }
+
+    private fun detectThor(topology: List<I2cController>): DetectionOutcome {
+        val shared = File("../../shared")
+        val thorIdentity = AndroidDeviceIdentity("AYN Thor", "kalama", "AYN", emptyMap())
+        val thor =
+            requireNotNull(
+                DeviceRegistry.parse(
+                    devicesJson = shared.resolve("devices.json").readText(),
+                    previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+                ).match(thorIdentity),
+            )
+        return detectFromInputs(
+            identity = thorIdentity,
+            exact = thor,
+            pserverAvailable = true,
+            binding = null,
+            readTopology = { topology },
+            seedCandidates = { emptyList() },
+            informationCartridges = listOf(Htr3212InformationCartridge { topology }),
+        )
+    }
+
     private fun htrProfile(
         id: String,
         automaticActivation: Boolean,
