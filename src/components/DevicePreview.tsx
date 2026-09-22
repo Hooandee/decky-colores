@@ -141,7 +141,7 @@ const Uniform: FC<{ color: RGB; intensity: number }> = ({ color, intensity }) =>
 export const DevicePreview: FC<DevicePreviewProps> = ({ colors, brightness, power, label, layoutKind, segments }) => {
   const { t } = useI18n();
   const source = power && colors.length ? colors : [OFF];
-  const lit = source.map((c) => dim(softenForDisplay(c), power ? Math.max(brightness, 12) : 100));
+  const lit = source.map((c) => dim(softenForDisplay(c), power ? Math.max(brightness, 30) : 100));
   const intensity = power ? brightness / 100 : 0;
   const caption = (fallback: string) => (power ? label ?? t(fallback) : t("device.preview.off"));
 

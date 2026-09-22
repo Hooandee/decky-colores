@@ -145,6 +145,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
     }
     states = {f: _feature_state(profile, f, present[f]) for f in FEATURES}
     active = {f: states[f] != "unsupported" for f in FEATURES}
+    power_led_available = bool(power_led and power_led.available())
     return {
         "color": active["color"],
         "brightness": active["brightness"],
@@ -160,7 +161,11 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "supportedEffects": list(profile.get("supported_effects", [])),
         "states": states,
         "experimental": list(profile.get("experimental", [])),
-        "powerLed": bool(power_led and power_led.available()),
+        "powerLed": power_led_available,
+        "powerLedSeparateStates": bool(
+            power_led_available and power_led.supports_independent_states()
+        ),
+        "sleepChargingIndicator": False,
         "hasBattery": bool(battery),
         "batteryMode": bool(battery) and active["color"],
         "temperatureMode": bool(temperature) and active["color"],
@@ -261,6 +266,27 @@ def _build_valve_context(profile, sysfs_root, ambilight, power_led=None, battery
     return {"device": device, "capabilities": capabilities}
 
 
+def _with_sleep_charging(profile, context):
+    driver = profile.get("sleep_charging")
+    controller = context["device"]
+    supports = getattr(controller, "supports_sleep_charging_indicator", None)
+    if not driver:
+        context["capabilities"]["sleepChargingIndicator"] = False
+        return context
+    if not (callable(supports) and supports()):
+        controller = build_hid_device(driver) if HID_AVAILABLE else None
+        supports = getattr(controller, "supports_sleep_charging_indicator", None)
+    available = bool(
+        controller
+        and callable(supports)
+        and supports()
+        and controller.available
+    )
+    context["capabilities"]["sleepChargingIndicator"] = available
+    context["sleep_charging_controller"] = controller
+    return context
+
+
 def build_device(sysfs_root="/", ambilight=False):
     info = detect_device(sysfs_root)
     profile, matched = resolve_profile_match(info["board"], info["product"])
@@ -282,23 +308,23 @@ def build_device(sysfs_root="/", ambilight=False):
         if HID_AVAILABLE:
             hid_ctx = _build_hid_context(profile, ambilight, power_led, battery, temperature)
             if hid_ctx is not None:
-                return {
+                return _with_sleep_charging(profile, {
                     "info": info,
                     "capabilities": hid_ctx["capabilities"],
                     "device": hid_ctx["device"],
                     "power_led": power_led,
-                }
+                })
         profile["experimental"] = _all_experimental(profile)
 
     if profile["driver"] == "valve_leds":
         valve_ctx = _build_valve_context(profile, sysfs_root, ambilight, power_led, battery, temperature)
         if valve_ctx is not None:
-            return {
+            return _with_sleep_charging(profile, {
                 "info": info,
                 "capabilities": valve_ctx["capabilities"],
                 "device": valve_ctx["device"],
                 "power_led": power_led,
-            }
+            })
         profile["experimental"] = _all_experimental(profile)
 
     leds_dir = os.path.join(sysfs_root, "sys/class/leds")
@@ -313,12 +339,12 @@ def build_device(sysfs_root="/", ambilight=False):
             power_led, battery, temperature,
         )
         capabilities["perZone"] = device.supports_per_zone()
-        return {
+        return _with_sleep_charging(profile, {
             "info": info,
             "capabilities": capabilities,
             "device": device,
             "power_led": power_led,
-        }
+        })
 
     identity = " ".join(
         str(info.get(field) or "") for field in ("vendor", "product", "board", "model")
@@ -335,12 +361,12 @@ def build_device(sysfs_root="/", ambilight=False):
             power_led, battery, temperature,
         )
         capabilities["perZone"] = omen_device.supports_per_zone()
-        return {
+        return _with_sleep_charging(profile, {
             "info": info,
             "capabilities": capabilities,
             "device": omen_device,
             "power_led": power_led,
-        }
+        })
 
     led_path = (
         _find_rgb_led(
@@ -387,12 +413,12 @@ def build_device(sysfs_root="/", ambilight=False):
             fb_profile["name"] = profile["name"]
             hid_ctx = _build_hid_context(fb_profile, ambilight, power_led, battery, temperature)
             if hid_ctx is not None:
-                return {
+                return _with_sleep_charging(profile, {
                     "info": info,
                     "capabilities": hid_ctx["capabilities"],
                     "device": hid_ctx["device"],
                     "power_led": power_led,
-                }
+                })
         zones, max_brightness, device, has_led = 0, 255, NullDevice(), False
 
     if profile["driver"] not in _IMPLEMENTED_DRIVERS:
@@ -404,9 +430,9 @@ def build_device(sysfs_root="/", ambilight=False):
     )
     if isinstance(device, ApexRgbDevice):
         capabilities["reconnectable"] = True
-    return {
+    return _with_sleep_charging(profile, {
         "info": info,
         "capabilities": capabilities,
         "device": device,
         "power_led": power_led,
-    }
+    })

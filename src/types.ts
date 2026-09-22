@@ -47,6 +47,8 @@ export interface Capabilities {
   states: Record<string, "supported" | "experimental" | "unsupported">;
   enabledExperiments: string[];
   powerLed: boolean;
+  powerLedSeparateStates: boolean;
+  sleepChargingIndicator: boolean;
   hasBattery: boolean;
   batteryMode: boolean;
   temperatureMode: boolean;
@@ -129,6 +131,9 @@ export interface ColoresState {
   ambilight: AmbilightState;
   savedGradients: GradientPreset[];
   powerLedOff: boolean;
+  powerLedAwakeOff: boolean;
+  powerLedSuspendOff: boolean;
+  sleepChargingIndicator: boolean;
   chargerOnly: boolean;
   forceControl: boolean;
   batteryBreathe: boolean;
@@ -144,6 +149,8 @@ export interface GradientPreset {
   name: string;
   stops: RGB[];
 }
+
+export type PowerLedState = "awake" | "suspend";
 
 export type EffectColorNeed = "color" | "gradient" | "none";
 

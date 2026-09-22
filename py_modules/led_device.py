@@ -32,6 +32,12 @@ class LedDevice:
     def supports_hardware_effects(self):
         return False
 
+    def supports_sleep_charging_indicator(self):
+        return False
+
+    def set_sleep_charging_indicator(self, enabled):
+        return False
+
     def reconnect(self):
         return self.available
 

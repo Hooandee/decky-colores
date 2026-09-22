@@ -636,6 +636,8 @@ def test_build_device_ally_x_prefers_sysfs_when_node_present(hid_env, tmp_path):
 
     assert isinstance(ctx["device"], SysfsRgbDevice)
     assert ctx["capabilities"]["conflictsWithSystemRgb"] is False
+    assert ctx["capabilities"]["sleepChargingIndicator"] is True
+    assert isinstance(ctx["sleep_charging_controller"], adapters.AsusAllyHidDevice)
     sys.modules.pop("device", None)
 
 
@@ -649,6 +651,7 @@ def test_build_device_ally_x_null_when_no_sysfs_and_no_hid(hid_env, tmp_path):
 
     assert isinstance(ctx["device"], NullDevice)
     assert ctx["capabilities"]["color"] is False
+    assert ctx["capabilities"]["sleepChargingIndicator"] is False
     sys.modules.pop("device", None)
 
 
@@ -661,14 +664,48 @@ def test_ally_first_solid_sends_init_and_apply(hid_env):
     assert dev.supports_hardware_effects() is True
     writes.clear()
     assert dev.apply_solid((255, 0, 0), 100, True) is True
-    assert len(writes) == 8
-    assert writes[0][:15] == bytes([0x5D]) + b"ASUS Tech.Inc."
-    assert writes[1][:5] == bytes.fromhex("5abac5c403")
-    zone_packets = writes[2:6]
+    assert len(writes) == 9
+    assert writes[0][:5] == bytes.fromhex("5ad1090102")
+    assert writes[1][:15] == bytes([0x5D]) + b"ASUS Tech.Inc."
+    assert writes[2][:5] == bytes.fromhex("5abac5c403")
+    zone_packets = writes[3:7]
     assert [p[2] for p in zone_packets] == [0x01, 0x02, 0x03, 0x04]
     assert all(tuple(p[4:7]) == (255, 0, 0) for p in zone_packets)
-    assert writes[6][:2] == bytes([0x5D, 0xB5])
-    assert writes[7][:2] == bytes([0x5D, 0xB4])
+    assert writes[7][:2] == bytes([0x5D, 0xB5])
+    assert writes[8][:2] == bytes([0x5D, 0xB4])
+
+
+def test_ally_x_fallback_applies_default_sleep_charging_policy(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    writes.clear()
+
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+
+    assert writes[0][:5] == bytes.fromhex("5ad1090102")
+    assert writes[1][:15] == bytes([0x5D]) + b"ASUS Tech.Inc."
+
+
+def test_ally_sleep_charging_setting_is_reasserted_with_rgb_mode(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+
+    assert hasattr(dev, "supports_sleep_charging_indicator")
+    assert dev.supports_sleep_charging_indicator() is True
+    writes.clear()
+    assert dev.set_sleep_charging_indicator(True) is True
+    assert writes[-1][:5] == bytes.fromhex("5ad1090106")
+
+    dev.invalidate()
+    writes.clear()
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    assert writes[0][:5] == bytes.fromhex("5ad1090106")
+
+    writes.clear()
+    assert dev.set_sleep_charging_indicator(False) is True
+    assert writes[-1][:5] == bytes.fromhex("5ad1090102")
 
 
 def test_ally_second_solid_skips_init(hid_env):
@@ -751,10 +788,10 @@ def test_ally_color_correction_threads_through(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
     dev = adapters.AsusAllyHidDevice.create()
-    dev.set_color_correction((1.0, 0.85, 1.0))  # what _build_hid_context passes from the profile
+    dev.set_color_correction((1.0, 0.85, 1.0))
     writes.clear()
     dev.apply_solid((0, 255, 0), 100, True)
-    green_zone = writes[2]  # after init + brightness
+    green_zone = next(report for report in writes if report[:3] == bytes([0x5D, 0xB3, 0x01]))
     assert tuple(green_zone[4:7]) == (0, round(255 * 0.85), 0)
 
 
@@ -762,13 +799,14 @@ def test_ally_invalidate_forces_reinit(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
     dev = adapters.AsusAllyHidDevice.create()
-    dev.apply_solid((255, 0, 0), 100, True)  # prev_mode -> "solid"
-    dev.invalidate()  # drop the cached mode
+    dev.apply_solid((255, 0, 0), 100, True)
+    dev.invalidate()
     writes.clear()
-    dev.apply_solid((255, 0, 0), 100, True)  # must re-send the full init+apply
-    assert len(writes) == 8
-    assert writes[0][:15] == bytes([0x5D]) + b"ASUS Tech.Inc."
-    assert writes[-1][:2] == bytes([0x5D, 0xB4])  # APPLY
+    dev.apply_solid((255, 0, 0), 100, True)
+    assert len(writes) == 9
+    assert writes[0][:5] == bytes.fromhex("5ad1090102")
+    assert writes[1][:15] == bytes([0x5D]) + b"ASUS Tech.Inc."
+    assert writes[-1][:2] == bytes([0x5D, 0xB4])
 
 
 def _oxp_entry():

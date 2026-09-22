@@ -18,7 +18,13 @@ ASUS_ALLY_HID = {
     "color_correction": [1.0, 0.85, 1.0],
     "conflicts_with_system_rgb": True,
     "hhd_rgb_takeover": True,
+    "sleep_charging": "hid_asus_ally",
     "experimental": [],
+}
+
+ASUS_SYSFS_SLEEP = {
+    **ASUS_SYSFS,
+    "sleep_charging": "hid_asus_ally",
 }
 
 MSI_HID = {
@@ -37,8 +43,8 @@ MSI_HID = {
 # uses two separate fields (awake + suspend) while Go S / Go 2 use a single shared bit.
 POWER_LED_LPBL = [{"offset": 0x10, "mask": 0x40}]  # Go S, Go 2 (LPBL, awake+suspend)
 POWER_LED_LEDPM = [  # original Legion Go (LEDP awake + LEDM suspend)
-    {"offset": 0x52, "mask": 0x20},
-    {"offset": 0x58, "mask": 0x01},
+    {"offset": 0x52, "mask": 0x20, "state": "awake"},
+    {"offset": 0x58, "mask": 0x01, "state": "suspend"},
 ]
 
 LEGION_GO_HID = {
@@ -131,6 +137,7 @@ GENERIC = {
 }
 
 ASUS_SYSFS["fallback"] = ASUS_ALLY_HID
+ASUS_SYSFS_SLEEP["fallback"] = ASUS_ALLY_HID
 OXP_SYSFS["fallback"] = OXP_HID
 OXP_APEX["fallback"] = OXP_APEX_HID
 
@@ -159,9 +166,9 @@ def _profile(base, name, power_led=None):
 
 PROFILES = [
     ("board", "RC71L", _profile(ASUS_ALLY_HID, "ROG Ally")),
-    ("board", "RC72LA", _profile(ASUS_SYSFS, "ROG Ally X")),
+    ("board", "RC72LA", _profile(ASUS_SYSFS_SLEEP, "ROG Ally X")),
     ("board", "RC73YA", _profile(ASUS_SYSFS, "ROG Xbox Ally")),
-    ("board", "RC73XA", _profile(ASUS_SYSFS, "ROG Xbox Ally X")),
+    ("board", "RC73XA", _profile(ASUS_SYSFS_SLEEP, "ROG Xbox Ally X")),
     ("product", "83E1", _profile(LEGION_GO_HID, "Legion Go", POWER_LED_LEDPM)),
     ("product", "83N0", _profile(LEGION_GO_HID, "Legion Go 2", POWER_LED_LPBL)),
     ("product", "83N1", _profile(LEGION_GO_HID, "Legion Go 2", POWER_LED_LPBL)),

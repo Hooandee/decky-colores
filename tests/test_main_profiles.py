@@ -3,6 +3,9 @@ import json
 
 import pytest
 
+from device_profiles import POWER_LED_LEDPM
+from power_led import PowerLedController
+
 pytest_plugins = ("test_main_routing",)
 
 
@@ -140,3 +143,88 @@ def test_report_contains_only_profile_aggregate(profile_plugin):
 
     assert "private-app-key" not in serialized
     assert '"profiles_configured": 1' in serialized
+
+
+def test_separate_power_led_state_persists_and_preserves_other_state(
+    profile_plugin, tmp_path
+):
+    ec_path = tmp_path / "ec_io"
+    ec_path.write_bytes(bytes(0x60))
+    profile_plugin._power_led = PowerLedController(
+        POWER_LED_LEDPM, ec_io=str(ec_path)
+    )
+    profile_plugin._capabilities.update(
+        powerLed=True, powerLedSeparateStates=True
+    )
+
+    asyncio.run(profile_plugin.set_power_led_state("suspend", True))
+
+    state = asyncio.run(profile_plugin.get_state())
+    persisted = json.loads((tmp_path / "state.json").read_text())
+    assert state["powerLedAwakeOff"] is False
+    assert state["powerLedSuspendOff"] is True
+    assert persisted["power_led_awake_off"] is False
+    assert persisted["power_led_suspend_off"] is True
+    assert ec_path.read_bytes()[0x52] == 0x00
+    assert ec_path.read_bytes()[0x58] == 0x01
+
+
+def test_separate_power_led_state_materializes_legacy_all_off_setting(
+    profile_plugin, tmp_path
+):
+    ec_path = tmp_path / "ec_io"
+    ec_path.write_bytes(bytes([0] * 0x52 + [0x20] + [0] * 5 + [0x01] + [0] * 7))
+    profile_plugin._power_led = PowerLedController(
+        POWER_LED_LEDPM, ec_io=str(ec_path)
+    )
+    profile_plugin._capabilities.update(
+        powerLed=True, powerLedSeparateStates=True
+    )
+    profile_plugin._settings["power_led_off"] = True
+
+    asyncio.run(profile_plugin.set_power_led_state("suspend", False))
+
+    state = asyncio.run(profile_plugin.get_state())
+    persisted = json.loads((tmp_path / "state.json").read_text())
+    assert state["powerLedAwakeOff"] is True
+    assert state["powerLedSuspendOff"] is False
+    assert persisted["power_led_off"] is False
+    assert persisted["power_led_awake_off"] is True
+    assert persisted["power_led_suspend_off"] is False
+
+
+def test_sleep_charging_indicator_persists_global_intent(profile_plugin, tmp_path):
+    calls = []
+    controller = type(
+        "SleepChargingController",
+        (),
+        {"set_sleep_charging_indicator": lambda self, enabled: calls.append(enabled) or True},
+    )()
+    profile_plugin._sleep_charging_controller = controller
+    profile_plugin._capabilities["sleepChargingIndicator"] = True
+
+    asyncio.run(profile_plugin.set_sleep_charging_indicator(True))
+
+    state = asyncio.run(profile_plugin.get_state())
+    persisted = json.loads((tmp_path / "state.json").read_text())
+    assert state["sleepChargingIndicator"] is True
+    assert persisted["sleep_charging_indicator"] is True
+    assert calls == [True]
+
+
+def test_sleep_charging_indicator_keeps_intent_when_hardware_write_fails(
+    profile_plugin, tmp_path
+):
+    controller = type(
+        "SleepChargingController",
+        (),
+        {"set_sleep_charging_indicator": lambda self, enabled: False},
+    )()
+    profile_plugin._sleep_charging_controller = controller
+    profile_plugin._capabilities["sleepChargingIndicator"] = True
+
+    asyncio.run(profile_plugin.set_sleep_charging_indicator(True))
+
+    persisted = json.loads((tmp_path / "state.json").read_text())
+    assert profile_plugin._settings["sleep_charging_indicator"] is True
+    assert persisted["sleep_charging_indicator"] is True

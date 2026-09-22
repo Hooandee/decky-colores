@@ -62,6 +62,11 @@ def brightness_cmd(level):
     return buf([DRIVER_ID, 0xBA, 0xC5, 0xC4, max(0, min(3, int(level)))])
 
 
+def sleep_charging_power_cmd(enabled):
+    mask = 0x02 | (0x04 if enabled else 0x00)
+    return buf([DRIVER_ID, 0xD1, 0x09, 0x01, mask])
+
+
 def zone_cmd(zone, mode, r, g, b, speed=0x00, direction=0x00, r2=0, g2=0, b2=0):
     return buf(
         [
@@ -115,3 +120,8 @@ class AsusAllyTransport:
                 self.hid_device = hid.Device(path=device["path"])
                 return True
         return False
+
+    def awake_restore_cmds(self, sleep_charging=False):
+        if not self.is_ready():
+            return []
+        return [sleep_charging_power_cmd(sleep_charging)]
