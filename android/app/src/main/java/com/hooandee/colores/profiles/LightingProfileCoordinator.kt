@@ -5,6 +5,7 @@ import com.hooandee.colores.apps.ForegroundAppState
 import com.hooandee.colores.apps.UsageAccess
 import com.hooandee.colores.control.AppMode
 import com.hooandee.colores.control.LightingController
+import com.hooandee.colores.control.ProfileApplication
 import com.hooandee.colores.control.ServiceGate
 import com.hooandee.colores.control.ServiceOwner
 import com.hooandee.colores.gradient.GradientInterpolator
@@ -61,6 +62,7 @@ class LightingProfileCoordinator(
     private val mutableState = MutableStateFlow(ProfileRuntimeState())
     val state: StateFlow<ProfileRuntimeState> = mutableState.asStateFlow()
 
+    private val lock = Any()
     private var deviceId: String? = null
     private var zones = 1
     private var gradientSupported = true
@@ -68,6 +70,9 @@ class LightingProfileCoordinator(
     private var foregroundOverridesPreview = false
     private var previewScope: ProfileScope? = null
     private var observerJob: Job? = null
+
+    @Volatile
+    private var globalModeCache: AppMode? = null
 
     init {
         startObserver()
@@ -77,68 +82,79 @@ class LightingProfileCoordinator(
         deviceId: String,
         zones: Int,
         gradientSupported: Boolean = true,
-    ) {
+    ) = synchronized(lock) {
         this.deviceId = deviceId
         this.zones = zones.coerceAtLeast(1)
         this.gradientSupported = gradientSupported
         applyResolved()
     }
 
-    fun refreshAccess() {
-        updateAutomationState()
-        applyResolved()
-    }
-
-    fun setAutomationEnabled(enabled: Boolean) {
-        store.setAutomationEnabled(enabled)
-        if (!enabled) {
-            foregroundPackage = null
-            foregroundOverridesPreview = false
+    fun refreshAccess() =
+        synchronized(lock) {
+            updateAutomationState()
+            applyResolved()
         }
-        updateAutomationState()
-        applyResolved()
-    }
 
-    fun beginPreview(scope: ProfileScope) {
-        previewScope = scope
-        applyResolved()
-    }
+    fun setAutomationEnabled(enabled: Boolean) =
+        synchronized(lock) {
+            store.setAutomationEnabled(enabled)
+            if (!enabled) {
+                foregroundPackage = null
+                foregroundOverridesPreview = false
+            }
+            updateAutomationState()
+            applyResolved()
+        }
 
-    fun endPreview() {
-        previewScope = null
-        applyResolved()
-    }
+    fun beginPreview(scope: ProfileScope) =
+        synchronized(lock) {
+            previewScope = scope
+            applyResolved()
+        }
+
+    fun endPreview() =
+        synchronized(lock) {
+            previewScope = null
+            applyResolved()
+        }
 
     fun edit(
         scope: ProfileScope,
         patch: ProfilePatch,
-    ): LightingProfile? {
-        val id = deviceId ?: return null
-        val profile = store.patch(id, scope, patch)
-        if (previewScope == scope || previewScope == null && targetMatches(scope)) applyResolved()
-        return profile
-    }
+    ): LightingProfile? =
+        synchronized(lock) {
+            val id = deviceId ?: return null
+            val profile = store.patch(id, scope, patch)
+            if (scope == ProfileScope.Global) globalModeCache = profile.mode
+            if (previewScope == scope || previewScope == null && targetMatches(scope)) applyResolved()
+            profile
+        }
 
     fun setFollowGlobal(
         packageName: String,
         follow: Boolean,
-    ): ProfileScopeState? {
-        val id = deviceId ?: return null
-        val state = store.setFollowGlobal(id, packageName, follow)
-        applyResolved()
-        return state
-    }
+    ): ProfileScopeState? =
+        synchronized(lock) {
+            val id = deviceId ?: return null
+            val state = store.setFollowGlobal(id, packageName, follow)
+            applyResolved()
+            state
+        }
 
-    fun forget(packageName: String) {
-        val id = deviceId ?: return
-        store.forget(id, packageName)
-        applyResolved()
-    }
+    fun forget(packageName: String) =
+        synchronized(lock) {
+            val id = deviceId ?: return
+            store.forget(id, packageName)
+            applyResolved()
+        }
 
-    fun selectedProfile(scope: ProfileScope): LightingProfile? {
-        val id = deviceId ?: return null
-        return profile(id, scope)
-    }
+    fun selectedProfile(scope: ProfileScope): LightingProfile? =
+        synchronized(lock) {
+            val id = deviceId ?: return null
+            profile(id, scope)
+        }
+
+    fun globalMode(): AppMode? = globalModeCache
 
     private fun startObserver() {
         observerJob?.cancel()
@@ -149,28 +165,30 @@ class LightingProfileCoordinator(
                     ::configuredPackages,
                     ::authoritativeFocusEnabled,
                 ).collect { foreground ->
-                    when (foreground) {
-                        ForegroundAppState.Disabled,
-                        ForegroundAppState.PermissionRequired,
-                        -> {
-                            foregroundPackage = null
-                            foregroundOverridesPreview = false
+                    synchronized(lock) {
+                        when (foreground) {
+                            ForegroundAppState.Disabled,
+                            ForegroundAppState.PermissionRequired,
+                            -> {
+                                foregroundPackage = null
+                                foregroundOverridesPreview = false
+                            }
+                            is ForegroundAppState.Active -> {
+                                foregroundPackage = foreground.packageName
+                                foregroundOverridesPreview = foreground.authoritativeExternal
+                            }
                         }
-                        is ForegroundAppState.Active -> {
-                            foregroundPackage = foreground.packageName
-                            foregroundOverridesPreview = foreground.authoritativeExternal
-                        }
+                        updateAutomationState()
+                        applyResolved()
                     }
-                    updateAutomationState()
-                    applyResolved()
                 }
             }
     }
 
     private fun configuredPackages(): Set<String> =
-        deviceId?.let(store::configuredPackages).orEmpty()
+        synchronized(lock) { deviceId }?.let(store::configuredPackages).orEmpty()
 
-    private fun authoritativeFocusEnabled(): Boolean = deviceId == "ayn-thor"
+    private fun authoritativeFocusEnabled(): Boolean = synchronized(lock) { deviceId } == "ayn-thor"
 
     private fun updateAutomationState() {
         val enabled = store.isAutomationEnabled()
@@ -198,9 +216,11 @@ class LightingProfileCoordinator(
     private fun applyResolved() {
         val id = deviceId ?: return
         val target = resolveProfileTarget(previewScope, foregroundPackage, foregroundOverridesPreview)
+        val global = store.global(id)
+        globalModeCache = global.mode
         val profile =
             when (target) {
-                ProfileTarget.Global -> store.global(id)
+                ProfileTarget.Global -> global
                 is ProfileTarget.ForegroundApp -> store.effective(id, target.packageName)
                 is ProfileTarget.Preview -> profile(id, target.scope)
             }
@@ -217,23 +237,34 @@ class LightingProfileCoordinator(
         }
 
     private fun apply(profile: LightingProfile) {
-        val appliedMode =
-            if (profile.mode == AppMode.GRADIENT && !gradientSupported) AppMode.COLOR else profile.mode
-        val static =
-            if (appliedMode == AppMode.GRADIENT) {
-                GradientInterpolator.interpolate(profile.gradientStops, zones)
-            } else {
-                GradientInterpolator.interpolate(profile.staticColors, zones)
-            }
-        controller.setPaletteSources(profile.solidColor, profile.gradientStops)
-        controller.setStaticFrame(static)
-        controller.setEffect(profile.effectId)
-        controller.setSpeed(profile.speed)
-        controller.setGradientSpeed(profile.gradientSpeed)
-        controller.setEffectUsesGradient(profile.effectUsesGradient)
-        controller.setBrightness(profile.brightness)
-        controller.setBatteryBreathe(profile.batteryBreathe)
-        controller.setTemperatureBreathe(profile.temperatureBreathe)
-        controller.setMode(appliedMode)
+        controller.applyProfile(profileApplication(profile, zones, gradientSupported))
     }
+}
+
+internal fun profileApplication(
+    profile: LightingProfile,
+    zones: Int,
+    gradientSupported: Boolean,
+): ProfileApplication {
+    val appliedMode =
+        if (profile.mode == AppMode.GRADIENT && !gradientSupported) AppMode.COLOR else profile.mode
+    val static =
+        if (appliedMode == AppMode.GRADIENT) {
+            GradientInterpolator.interpolate(profile.gradientStops, zones)
+        } else {
+            GradientInterpolator.interpolate(profile.staticColors, zones)
+        }
+    return ProfileApplication(
+        mode = appliedMode,
+        solidColor = profile.solidColor,
+        gradientStops = profile.gradientStops,
+        staticColors = static,
+        effectId = profile.effectId,
+        speed = profile.speed,
+        gradientSpeed = profile.gradientSpeed,
+        effectUsesGradient = profile.effectUsesGradient,
+        brightness = profile.brightness,
+        batteryBreathe = profile.batteryBreathe,
+        temperatureBreathe = profile.temperatureBreathe,
+    )
 }

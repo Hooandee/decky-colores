@@ -53,6 +53,7 @@ import com.hooandee.colores.R
 import com.hooandee.colores.device.learning.HardwareLearningState
 import com.hooandee.colores.device.learning.HardwareLearningStatus
 import com.hooandee.colores.device.learning.LearningBlockReason
+import com.hooandee.colores.device.learning.MAX_ROLLBACK_RECOVERY_ATTEMPTS
 import com.hooandee.colores.device.learning.ProbeStep
 import com.hooandee.colores.device.learning.ProbeSurface
 import com.hooandee.colores.device.learning.RollbackStatus
@@ -69,7 +70,12 @@ internal fun HardwareLearningDialog(
     onFinish: () -> Unit,
     onNextCandidate: () -> Unit,
     onReport: () -> Unit,
+    onRetryRestore: () -> Unit,
+    onRequestDiscard: () -> Unit,
+    onCancelDiscard: () -> Unit,
+    onConfirmDiscard: () -> Unit,
 ) {
+    val recoveryActions = RecoveryActions(onRetryRestore, onRequestDiscard, onCancelDiscard, onConfirmDiscard)
     Dialog(
         onDismissRequest = { if (ui.canDismiss) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
@@ -128,7 +134,7 @@ internal fun HardwareLearningDialog(
                         Spacer(Modifier.height(16.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
                         Spacer(Modifier.height(14.dp))
-                        LearningActions(ui, onDismiss, onConsent, onRunProbe, onAnswer, onFinish, onNextCandidate, onReport)
+                        LearningActions(ui, onDismiss, onConsent, onRunProbe, onAnswer, onFinish, onNextCandidate, onReport, recoveryActions)
                     }
                 }
             }
@@ -267,12 +273,29 @@ private fun LearningBody(
         horizontalAlignment = horizontalAlignment,
         verticalArrangement = Arrangement.spacedBy(11.dp),
     ) {
+        if (ui.discardConfirmation) {
+            LearningMessage(
+                title = stringResource(R.string.hardware_learning_discard_title),
+                body = stringResource(R.string.hardware_learning_discard_body),
+                safety = null,
+                textAlign = textAlign,
+            )
+            return@Column
+        }
         when (val state = ui.sessionState) {
             HardwareLearningState.Idle -> CircularProgressIndicator(Modifier.size(28.dp))
             is HardwareLearningState.ConsentRequired ->
                 LearningMessage(
-                    title = stringResource(R.string.hardware_learning_title),
-                    body = stringResource(R.string.hardware_learning_consent, surfaceLabel(state.candidate.surface)),
+                    title =
+                        stringResource(
+                            if (ui.revalidation) R.string.hardware_learning_revalidate_title else R.string.hardware_learning_title,
+                        ),
+                    body =
+                        if (ui.revalidation) {
+                            stringResource(R.string.hardware_learning_revalidate_body)
+                        } else {
+                            stringResource(R.string.hardware_learning_consent, surfaceLabel(state.candidate.surface))
+                        },
                     safety = stringResource(R.string.hardware_learning_safety),
                     textAlign = textAlign,
                 )
@@ -315,7 +338,7 @@ private fun LearningBody(
                 if (state.result.status == HardwareLearningStatus.RESTORE_FAILED) {
                     LearningMessage(
                         title = stringResource(R.string.hardware_learning_restore_failed),
-                        body = stringResource(R.string.hardware_learning_restore_failed_body),
+                        body = recoveryBody(ui, stringResource(R.string.hardware_learning_restore_failed_body)),
                         safety = null,
                         textAlign = textAlign,
                     )
@@ -334,14 +357,14 @@ private fun LearningBody(
                     LearningBlockReason.RESTORE_FAILED ->
                         LearningMessage(
                             title = stringResource(R.string.hardware_learning_restore_failed),
-                            body = stringResource(R.string.hardware_learning_restore_failed_body),
+                            body = recoveryBody(ui, stringResource(R.string.hardware_learning_restore_failed_body)),
                             safety = null,
                             textAlign = textAlign,
                         )
                     LearningBlockReason.JOURNAL_UNAVAILABLE ->
                         LearningMessage(
                             title = stringResource(R.string.hardware_learning_journal_unavailable),
-                            body = stringResource(R.string.hardware_learning_journal_unavailable_body),
+                            body = recoveryBody(ui, stringResource(R.string.hardware_learning_journal_unavailable_body)),
                             safety = null,
                             textAlign = textAlign,
                         )
@@ -422,10 +445,10 @@ private fun LearningResultBody(
             },
         safety =
             stringResource(
-                if (rollbackStatus == RollbackStatus.RESTORED_AND_READ_BACK) {
-                    R.string.hardware_learning_restored
-                } else {
-                    R.string.hardware_learning_restored_without_readback
+                when (rollbackStatus) {
+                    RollbackStatus.RESTORED_AND_READ_BACK -> R.string.hardware_learning_restored
+                    RollbackStatus.RESTORED_UNVERIFIED -> R.string.hardware_learning_restored_unverified
+                    else -> R.string.hardware_learning_restored_without_readback
                 },
             ),
         textAlign = textAlign,
@@ -442,6 +465,7 @@ private fun LearningActions(
     onFinish: () -> Unit,
     onNextCandidate: () -> Unit,
     onReport: () -> Unit,
+    recoveryActions: RecoveryActions,
 ) {
     when (ui.actionLayout) {
         HardwareLearningActionLayout.NONE -> Unit
@@ -485,9 +509,60 @@ private fun LearningActions(
                     )
                 }
             }
-        HardwareLearningActionLayout.REPORT_ONLY ->
-            PrimaryLearningButton(stringResource(R.string.hardware_learning_report_critical), !ui.busy, onReport)
+        HardwareLearningActionLayout.REPORT_ONLY -> RecoveryLearningActions(ui, onReport, recoveryActions)
     }
+}
+
+internal class RecoveryActions(
+    val onRetry: () -> Unit,
+    val onRequestDiscard: () -> Unit,
+    val onCancelDiscard: () -> Unit,
+    val onConfirmDiscard: () -> Unit,
+)
+
+@Composable
+private fun RecoveryLearningActions(
+    ui: HardwareLearningUiState,
+    onReport: () -> Unit,
+    actions: RecoveryActions,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        if (ui.discardConfirmation) {
+            PrimaryLearningButton(stringResource(R.string.hardware_learning_discard_confirm), !ui.busy, actions.onConfirmDiscard)
+            OutlinedButton(onClick = actions.onCancelDiscard, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
+                Text(stringResource(R.string.hardware_learning_discard_cancel))
+            }
+            return@Column
+        }
+        if (ui.journalPending) {
+            PrimaryLearningButton(stringResource(R.string.hardware_learning_retry_restore), !ui.busy, actions.onRetry)
+        }
+        OutlinedButton(onClick = actions.onRequestDiscard, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
+            Text(stringResource(R.string.hardware_learning_discard_restore))
+        }
+        TextButton(onClick = onReport, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Text(stringResource(R.string.hardware_learning_report_critical))
+        }
+    }
+}
+
+@Composable
+private fun recoveryBody(
+    ui: HardwareLearningUiState,
+    base: String,
+): String {
+    val details =
+        if (ui.journalPending) {
+            listOfNotNull(
+                stringResource(R.string.hardware_learning_restore_options),
+                ui.recoveryAttempts.takeIf { it > 0 }?.let {
+                    stringResource(R.string.hardware_learning_restore_attempts, it, MAX_ROLLBACK_RECOVERY_ATTEMPTS)
+                },
+            )
+        } else {
+            listOf(stringResource(R.string.hardware_learning_restore_archived))
+        }
+    return (listOf(base) + details).joinToString(" ")
 }
 
 @Composable
@@ -714,6 +789,7 @@ private fun probeTitle(step: ProbeStep, zone: Int?): String =
         ProbeStep.BRIGHTNESS_LOW, ProbeStep.BRIGHTNESS_HIGH -> stringResource(R.string.hardware_learning_probe_brightness)
         ProbeStep.POWER_OFF -> stringResource(R.string.hardware_learning_probe_power_off)
         ProbeStep.POWER_ON -> stringResource(R.string.hardware_learning_probe_power_on)
+        ProbeStep.HARDWARE_EFFECT -> stringResource(R.string.hardware_learning_probe_hardware_effect)
         ProbeStep.ZONE -> stringResource(R.string.hardware_learning_probe_zone, (zone ?: 0) + 1)
     }
 
@@ -726,6 +802,7 @@ private fun probeBody(step: ProbeStep, zone: Int?): String =
         ProbeStep.ZONE -> stringResource(R.string.hardware_learning_probe_zone_body, (zone ?: 0) + 1)
         ProbeStep.POWER_OFF -> stringResource(R.string.hardware_learning_probe_power_off_body)
         ProbeStep.POWER_ON -> stringResource(R.string.hardware_learning_probe_power_on_body)
+        ProbeStep.HARDWARE_EFFECT -> stringResource(R.string.hardware_learning_probe_hardware_effect_body)
     }
 
 @Composable
@@ -735,5 +812,6 @@ private fun observationTitle(step: ProbeStep, zone: Int?): String =
         ProbeStep.BRIGHTNESS_LOW, ProbeStep.BRIGHTNESS_HIGH -> stringResource(R.string.hardware_learning_saw_brightness)
         ProbeStep.POWER_OFF -> stringResource(R.string.hardware_learning_saw_power_off)
         ProbeStep.POWER_ON -> stringResource(R.string.hardware_learning_saw_power_on)
+        ProbeStep.HARDWARE_EFFECT -> stringResource(R.string.hardware_learning_saw_hardware_effect)
         ProbeStep.ZONE -> stringResource(R.string.hardware_learning_saw_zone, (zone ?: 0) + 1)
     }

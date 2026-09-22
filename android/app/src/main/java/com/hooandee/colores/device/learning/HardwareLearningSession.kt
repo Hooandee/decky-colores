@@ -83,6 +83,11 @@ class HardwareLearningSession(
     private val evidence = mutableListOf<ProbeEvidence>()
 
     fun start(candidate: ProbeCandidate): HardwareLearningState {
+        if (snapshot != null) return state
+        if (store.hasRollback()) {
+            state = HardwareLearningState.Blocked(LearningBlockReason.RESTORE_FAILED)
+            return state
+        }
         val resolved = catalog.find(candidate.cartridgeId, candidate.cartridgeVersion)
         if (resolved == null || !runCatching { resolved.accepts(candidate) }.getOrDefault(false)) {
             state = HardwareLearningState.Blocked(LearningBlockReason.UNSUPPORTED_CANDIDATE)
@@ -164,7 +169,7 @@ class HardwareLearningSession(
     fun finish(): HardwareLearningResult {
         val currentCandidate = requireNotNull(candidate)
         val currentCartridge = requireNotNull(cartridge)
-        val rollbackStatus = restoreOriginal()
+        val rollbackStatus = restoreAndReleaseSnapshot()
         val capabilities = confirmedCapabilities()
         if (rollbackStatus == RollbackStatus.RESTORE_FAILED) {
             val result = HardwareLearningResult(HardwareLearningStatus.RESTORE_FAILED, currentCandidate, evidence.toList(), capabilities, rollbackStatus)
@@ -182,6 +187,11 @@ class HardwareLearningSession(
             state = HardwareLearningState.Complete(result)
             return result
         }
+        if (!identity.complete) {
+            val result = HardwareLearningResult(HardwareLearningStatus.BLOCKED, bindingCandidate, evidence.toList(), capabilities, rollbackStatus)
+            state = HardwareLearningState.Blocked(LearningBlockReason.BINDING_UNAVAILABLE)
+            return result
+        }
         val binding =
             LearnedDeviceBinding(
                 identityHash = learningIdentityHash(identity),
@@ -191,6 +201,7 @@ class HardwareLearningSession(
                 capabilities = capabilities,
                 appVersion = appVersion,
                 learnedAtEpochMs = nowEpochMs(),
+                fingerprint = identity.fingerprint,
             )
         val status = if (store.saveBinding(binding)) HardwareLearningStatus.ADAPTED else HardwareLearningStatus.BLOCKED
         val result = HardwareLearningResult(status, bindingCandidate, evidence.toList(), capabilities, rollbackStatus)
@@ -208,7 +219,7 @@ class HardwareLearningSession(
             state = HardwareLearningState.Idle
             return null
         }
-        val status = restoreOriginal()
+        val status = restoreAndReleaseSnapshot()
         state =
             when {
                 status == RollbackStatus.RESTORE_FAILED -> HardwareLearningState.Blocked(LearningBlockReason.RESTORE_FAILED)
@@ -240,16 +251,19 @@ class HardwareLearningSession(
 
     private fun confirmedZones(): List<Int> = confirmedZoneIndices(evidence, candidate?.surface)
 
-    private fun restoreOriginal(): RollbackStatus {
+    private fun restoreAndReleaseSnapshot(): RollbackStatus {
+        val captured = snapshot.also { snapshot = null } ?: return RollbackStatus.RESTORE_FAILED
         val currentCandidate = candidate ?: return RollbackStatus.RESTORE_FAILED
         val currentCartridge = cartridge ?: return RollbackStatus.RESTORE_FAILED
-        val captured = snapshot ?: return RollbackStatus.RESTORE_FAILED
-        return runCatching { currentCartridge.restore(currentCandidate, captured) }
-            .getOrDefault(RollbackStatus.RESTORE_FAILED)
+        val restored =
+            runCatching { currentCartridge.restore(currentCandidate, captured) }
+                .getOrDefault(RollbackStatus.RESTORE_FAILED)
+        return runCatching { currentCartridge.verifiedRollback(currentCandidate, captured, evidence.toList(), restored) }
+            .getOrDefault(restored)
     }
 
     private fun restoreAndBlock(reason: LearningBlockReason) {
-        val restored = restoreOriginal()
+        val restored = restoreAndReleaseSnapshot()
         val blockReason =
             when {
                 restored == RollbackStatus.RESTORE_FAILED -> LearningBlockReason.RESTORE_FAILED

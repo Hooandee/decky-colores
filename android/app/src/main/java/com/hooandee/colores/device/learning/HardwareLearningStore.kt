@@ -21,13 +21,39 @@ class HardwareLearningStore(
 
     constructor(context: Context) : this(context.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE))
 
-    fun saveRollback(record: RollbackRecord): Boolean = write(ROLLBACK_KEY, record.toJson().toString())
+    fun saveRollback(record: RollbackRecord): Boolean =
+        write(ROLLBACK_KEY, record.toJson().toString()).also { saved -> if (saved) remove(ROLLBACK_FAILURE_KEY) }
 
     fun loadRollback(): RollbackRecord? = read(ROLLBACK_KEY)?.let { runCatching { JSONObject(it).toRollbackRecord() }.getOrNull() }
 
     fun hasRollback(): Boolean = read(ROLLBACK_KEY) != null
 
-    fun clearRollback(): Boolean = remove(ROLLBACK_KEY)
+    fun clearRollback(): Boolean = remove(ROLLBACK_KEY).also { cleared -> if (cleared) remove(ROLLBACK_FAILURE_KEY) }
+
+    fun loadRollbackFailure(): RollbackFailure? =
+        read(ROLLBACK_FAILURE_KEY)?.let { runCatching { JSONObject(it).toRollbackFailure() }.getOrNull() }
+
+    fun recordRollbackFailure(reason: RollbackFailureReason): Int {
+        val attempts = (loadRollbackFailure()?.attempts ?: 0) + 1
+        write(ROLLBACK_FAILURE_KEY, RollbackFailure(attempts, reason).toJson().toString())
+        return attempts
+    }
+
+    fun archiveRollback(
+        reason: RollbackFailureReason,
+        archivedAtEpochMs: Long = System.currentTimeMillis(),
+    ): Boolean {
+        val journal = read(ROLLBACK_KEY) ?: return true
+        val attempts = loadRollbackFailure()?.attempts ?: 0
+        val archived = ArchivedRollback(journal, reason, attempts, archivedAtEpochMs)
+        if (!write(ROLLBACK_ARCHIVE_KEY, archived.toJson().toString())) return false
+        if (!remove(ROLLBACK_KEY)) return false
+        remove(ROLLBACK_FAILURE_KEY)
+        return true
+    }
+
+    fun loadArchivedRollback(): ArchivedRollback? =
+        read(ROLLBACK_ARCHIVE_KEY)?.let { runCatching { JSONObject(it).toArchivedRollback() }.getOrNull() }
 
     fun saveBinding(binding: LearnedDeviceBinding): Boolean = write(BINDING_KEY, binding.toJson().toString())
 
@@ -45,6 +71,8 @@ class HardwareLearningStore(
     private companion object {
         const val FILE_NAME = "hardware_learning"
         const val ROLLBACK_KEY = "rollback"
+        const val ROLLBACK_FAILURE_KEY = "rollback_failure"
+        const val ROLLBACK_ARCHIVE_KEY = "rollback_archive"
         const val BINDING_KEY = "binding"
         const val ATTEMPT_KEY = "attempt"
     }
@@ -65,6 +93,92 @@ internal fun learningIdentityHash(identity: AndroidDeviceIdentity): String {
 
 internal fun HardwareLearningAttempt.resultsFor(identity: AndroidDeviceIdentity): List<HardwareLearningResult> =
     results.takeIf { identityHash == learningIdentityHash(identity) }.orEmpty()
+
+enum class RollbackFailureReason {
+    CORRUPT_JOURNAL,
+    UNKNOWN_CARTRIDGE,
+    INVALID_DESCRIPTOR,
+    REJECTED_CANDIDATE,
+    TOPOLOGY_MISMATCH,
+    RESTORE_FAILED,
+    JOURNAL_NOT_CLEARED,
+    DISCARDED,
+}
+
+data class RollbackFailure(
+    val attempts: Int,
+    val reason: RollbackFailureReason,
+)
+
+data class ArchivedRollback(
+    val journal: String,
+    val reason: RollbackFailureReason,
+    val attempts: Int,
+    val archivedAtEpochMs: Long? = null,
+)
+
+data class ArchivedRollbackSummary(
+    val reason: RollbackFailureReason,
+    val attempts: Int,
+    val cartridgeId: String?,
+    val cartridgeVersion: Int?,
+    val archivedAtEpochMs: Long?,
+    val surface: ProbeSurface?,
+)
+
+fun ArchivedRollback.summary(): ArchivedRollbackSummary {
+    val record = runCatching { JSONObject(journal) }.getOrNull()
+    val cartridgeId = record?.optString("cartridge_id")?.takeIf { it.isNotBlank() }?.take(120)
+    return ArchivedRollbackSummary(
+        reason = reason,
+        attempts = attempts,
+        cartridgeId = cartridgeId,
+        cartridgeVersion = record?.optInt("cartridge_version", 0)?.takeIf { it > 0 },
+        archivedAtEpochMs = archivedAtEpochMs,
+        surface = cartridgeId?.let(::probeSurfaceFor),
+    )
+}
+
+private fun probeSurfaceFor(cartridgeId: String): ProbeSurface? =
+    when (cartridgeId) {
+        SETTINGS_PROBE_ID -> ProbeSurface.SETTINGS_PSERVER
+        SINGLEADC_PROBE_ID -> ProbeSurface.SINGLEADC_JOYPAD
+        SYSFS_PROBE_ID -> ProbeSurface.SYSFS_RGB
+        HTR3212_PROBE_ID -> ProbeSurface.HTR3212
+        else -> null
+    }
+
+private fun RollbackFailure.toJson(): JSONObject =
+    JSONObject()
+        .put("schema", 1)
+        .put("attempts", attempts)
+        .put("reason", reason.name)
+
+private fun JSONObject.toRollbackFailure(): RollbackFailure {
+    require(getInt("schema") == 1)
+    return RollbackFailure(
+        attempts = getInt("attempts").also { require(it > 0) },
+        reason = RollbackFailureReason.valueOf(getString("reason")),
+    )
+}
+
+private fun ArchivedRollback.toJson(): JSONObject =
+    JSONObject()
+        .put("schema", 1)
+        .put("journal", journal)
+        .put("reason", reason.name)
+        .put("attempts", attempts)
+        .put("archived_at", archivedAtEpochMs)
+
+private fun JSONObject.toArchivedRollback(): ArchivedRollback {
+    require(getInt("schema") == 1)
+    return ArchivedRollback(
+        journal = getString("journal"),
+        reason = RollbackFailureReason.valueOf(getString("reason")),
+        attempts = getInt("attempts"),
+        archivedAtEpochMs = optLong("archived_at", 0L).takeIf { it > 0L },
+    )
+}
 
 private fun RollbackRecord.toJson(): JSONObject =
     JSONObject()
@@ -111,6 +225,7 @@ private fun LearnedDeviceBinding.toJson(): JSONObject =
                 .put("power", capabilities.power),
         ).put("app_version", appVersion)
         .put("learned_at", learnedAtEpochMs)
+        .put("fingerprint", fingerprint)
 
 private fun JSONObject.toLearnedBinding(): LearnedDeviceBinding {
     require(getInt("schema") == 1)
@@ -132,6 +247,7 @@ private fun JSONObject.toLearnedBinding(): LearnedDeviceBinding {
             ),
         appVersion = getString("app_version"),
         learnedAtEpochMs = getLong("learned_at"),
+        fingerprint = optString("fingerprint", ""),
     )
 }
 

@@ -60,7 +60,7 @@ class SettingsProviderLedDevice internal constructor(
     override val available: Boolean
         get() =
             descriptor.driver == "settings_provider" &&
-                descriptor.colorFormat == "argb_hex_csv" &&
+                descriptor.colorFormat in SettingsProviderCodec.COLOR_FORMATS &&
                 descriptor.zones > 0 &&
                 store.available
 
@@ -100,7 +100,7 @@ class SettingsProviderLedDevice internal constructor(
         val previous = cachedState
         var succeeded = true
         if (previous?.zoneColors != state.zoneColors) {
-            if (!store.put(descriptor.colorKey, SettingsProviderCodec.encodeColors(state.zoneColors, descriptor.zones))) {
+            if (!store.put(descriptor.colorKey, SettingsProviderCodec.encodeColors(state.zoneColors, descriptor.zones, descriptor.colorFormat))) {
                 succeeded = false
             }
         }
@@ -153,15 +153,41 @@ private fun buildSystemSettingsStore(
         else -> AndroidSystemSettingsStore(context)
     }
 
+internal data class ObservedColorFormat(
+    val format: String,
+    val count: Int,
+)
+
 internal object SettingsProviderCodec {
-    fun encodeColors(colors: List<RgbColor>, zones: Int): String =
-        colors.fitZones(zones).joinToString(",") { color ->
-            "#FF%02X%02X%02X".format(
+    const val ARGB_HEX_CSV = "argb_hex_csv"
+    const val RGB_HEX_CSV = "rgb_hex_csv"
+    val COLOR_FORMATS = setOf(ARGB_HEX_CSV, RGB_HEX_CSV)
+    private val ARGB_TOKEN = Regex("#[0-9A-Fa-f]{8}")
+    private val RGB_TOKEN = Regex("#[0-9A-Fa-f]{6}")
+
+    fun encodeColors(
+        colors: List<RgbColor>,
+        zones: Int,
+        format: String = ARGB_HEX_CSV,
+    ): String {
+        val prefix = if (format == RGB_HEX_CSV) "#" else "#FF"
+        return colors.fitZones(zones).joinToString(",") { color ->
+            prefix + "%02X%02X%02X".format(
                 color.red.coerceIn(0, 255),
                 color.green.coerceIn(0, 255),
                 color.blue.coerceIn(0, 255),
             )
         }
+    }
+
+    fun observeColorFormat(value: String?): ObservedColorFormat? {
+        val tokens = value?.split(',')?.map(String::trim)?.takeIf { it.isNotEmpty() && it.none(String::isEmpty) } ?: return null
+        return when {
+            tokens.all(ARGB_TOKEN::matches) -> ObservedColorFormat(ARGB_HEX_CSV, tokens.size)
+            tokens.all(RGB_TOKEN::matches) -> ObservedColorFormat(RGB_HEX_CSV, tokens.size)
+            else -> null
+        }
+    }
 
     fun encodeBrightness(
         brightness: Int,
@@ -211,12 +237,17 @@ internal object SettingsProviderCodec {
 
     private fun parseColor(value: String): RgbColor? {
         val hex = value.trim().removePrefix("#")
-        if (hex.length != 8 || !hex.startsWith("FF", ignoreCase = true)) return null
+        val offset =
+            when {
+                hex.length == 8 && hex.startsWith("FF", ignoreCase = true) -> 2
+                hex.length == 6 -> 0
+                else -> return null
+            }
         return runCatching {
             RgbColor(
-                red = hex.substring(2, 4).toInt(16),
-                green = hex.substring(4, 6).toInt(16),
-                blue = hex.substring(6, 8).toInt(16),
+                red = hex.substring(offset, offset + 2).toInt(16),
+                green = hex.substring(offset + 2, offset + 4).toInt(16),
+                blue = hex.substring(offset + 4, offset + 6).toInt(16),
             )
         }.getOrNull()
     }
@@ -226,6 +257,7 @@ internal class ConflatedLedWriter<T>(
     scope: CoroutineScope,
     private val intervalMs: Long,
     private val retryIntervalMs: Long = 500L,
+    private val maxRetryIntervalMs: Long = 30_000L,
     write: suspend (T) -> Boolean,
 ) {
     private val channel = Channel<T>(Channel.CONFLATED)
@@ -236,6 +268,7 @@ internal class ConflatedLedWriter<T>(
         scope.launch {
             for (value in channel) {
                 var pending = value
+                var failures = 0
                 while (true) {
                     val succeeded =
                         try {
@@ -245,12 +278,17 @@ internal class ConflatedLedWriter<T>(
                         } catch (_: Throwable) {
                             false
                         }
-                    delay(if (succeeded) intervalMs else retryIntervalMs)
-                    val newer = channel.tryReceive().getOrNull()
+                    if (succeeded) {
+                        delay(intervalMs)
+                        pending = channel.tryReceive().getOrNull() ?: break
+                        failures = 0
+                        continue
+                    }
+                    failures++
+                    val newer = awaitNewerDuring(ledRetryDelayMs(retryIntervalMs, failures, maxRetryIntervalMs))
                     if (newer != null) {
                         pending = newer
-                    } else if (succeeded) {
-                        break
+                        failures = 0
                     }
                 }
             }
@@ -263,4 +301,25 @@ internal class ConflatedLedWriter<T>(
         channel.close()
         worker.cancelAndJoin()
     }
+
+    private suspend fun awaitNewerDuring(totalMs: Long): T? {
+        var remaining = totalMs
+        while (remaining > 0) {
+            val step = minOf(retryIntervalMs.coerceAtLeast(1L), remaining)
+            delay(step)
+            remaining -= step
+            channel.tryReceive().getOrNull()?.let { return it }
+        }
+        return null
+    }
+}
+
+internal fun ledRetryDelayMs(
+    baseMs: Long,
+    failures: Int,
+    maxMs: Long,
+): Long {
+    val base = baseMs.coerceAtLeast(1L)
+    val exponent = (failures - 1).coerceIn(0, 20)
+    return (base shl exponent).coerceAtMost(maxMs.coerceAtLeast(base))
 }

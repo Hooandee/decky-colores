@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -26,12 +27,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
@@ -51,6 +55,7 @@ fun DeviceScene(
     onTargetChange: (EditTarget) -> Unit,
     modifier: Modifier = Modifier,
     showBoth: Boolean = true,
+    wrapContent: Boolean = false,
 ) {
     val previewStyle = LocalLedPreviewStyle.current
     val lightPreview = previewStyle.sceneBackground.luminance() > 0.5f
@@ -61,12 +66,13 @@ fun DeviceScene(
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(32.dp),
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val compact = maxHeight < 320.dp
+        BoxWithConstraints(modifier = if (wrapContent) Modifier.fillMaxWidth() else Modifier.fillMaxSize()) {
+            val compact = !wrapContent && maxHeight < 320.dp
             val scenePadding = if (compact) 14.dp else 22.dp
             val capsuleHorizontalPadding = 18.dp
             val ringSpacing = 18.dp
-            val preferredRingSize = if (compact) (maxHeight - 150.dp).coerceIn(40.dp, 112.dp) else 112.dp
+            val compactChrome = if (showBoth) 172.dp else 118.dp
+            val preferredRingSize = if (compact) (maxHeight - compactChrome).coerceIn(40.dp, 112.dp) else 112.dp
             val ringSize =
                 previewRingDiameter(
                     availableWidth = maxWidth - scenePadding * 2 - capsuleHorizontalPadding * 2,
@@ -75,7 +81,7 @@ fun DeviceScene(
                     preferredDiameter = preferredRingSize,
                 )
             Column(
-                modifier = Modifier.fillMaxSize().padding(scenePadding),
+                modifier = (if (wrapContent) Modifier.fillMaxWidth() else Modifier.fillMaxSize()).padding(scenePadding),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Row(
@@ -101,7 +107,7 @@ fun DeviceScene(
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
+                if (wrapContent) Spacer(Modifier.height(16.dp)) else Spacer(Modifier.weight(1f))
                 GlassPreviewCapsule {
                     Row(
                         modifier = Modifier.padding(horizontal = capsuleHorizontalPadding, vertical = if (compact) 12.dp else 16.dp),
@@ -117,9 +123,30 @@ fun DeviceScene(
                                 power = power,
                                 enabled = enabled && perZone,
                                 diameter = ringSize,
-                                showLabel = !compact,
                                 projection = projection,
                                 onClick = { onTargetChange(target) },
+                            )
+                        }
+                    }
+                }
+                if (preview.groups.size > 1) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.padding(horizontal = capsuleHorizontalPadding),
+                        horizontalArrangement = Arrangement.spacedBy(ringSpacing),
+                    ) {
+                        preview.groups.indices.forEach { index ->
+                            val target = if (index == 0) EditTarget.LEFT else EditTarget.RIGHT
+                            val selected = selectedTarget == target
+                            Text(
+                                text = previewShortLabel(preview, index),
+                                modifier = Modifier.width(ringSize).clearAndSetSemantics {},
+                                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                     }
@@ -178,7 +205,7 @@ fun DeviceScene(
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
+                if (!wrapContent) Spacer(Modifier.weight(1f))
             }
         }
     }
@@ -192,7 +219,6 @@ private fun StickTarget(
     power: Boolean,
     enabled: Boolean,
     diameter: Dp,
-    showLabel: Boolean,
     projection: LedColorProjection,
     onClick: () -> Unit,
 ) {
@@ -202,48 +228,46 @@ private fun StickTarget(
             animationSpec = tween(durationMillis = 180),
             label = "LED preview glow",
         )
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(9.dp),
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier =
+            Modifier
+                .size(diameter)
+                .semantics {
+                    contentDescription = label
+                    this.selected = selected
+                    role = Role.RadioButton
+                },
+        color = Color.Transparent,
+        shape = CircleShape,
     ) {
-        Surface(
-            onClick = onClick,
-            enabled = enabled,
-            modifier =
-                Modifier
-                    .size(diameter)
-                    .semantics {
-                        contentDescription = label
-                        this.selected = selected
-                        role = Role.RadioButton
-                    },
-            color = Color.Transparent,
-            shape = CircleShape,
-        ) {
-            GlassLedRing(
-                segments =
-                    segments.map { segment ->
-                        LedPreviewRingSegment(
-                            color = projection.display(segment.color).toComposeColor(),
-                            startAngle = segment.startAngle,
-                            sweepAngle = segment.sweepAngle,
-                        )
-                    },
-                power = power,
-                glowAlpha = glowAlpha,
-                selected = selected,
-                selectedOutline = MaterialTheme.colorScheme.primary,
-            )
-        }
-        if (showLabel) {
-            Text(
-                text = label,
-                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-        }
+        GlassLedRing(
+            segments =
+                segments.map { segment ->
+                    LedPreviewRingSegment(
+                        color = projection.display(segment.color).toComposeColor(),
+                        startAngle = segment.startAngle,
+                        sweepAngle = segment.sweepAngle,
+                    )
+                },
+            power = power,
+            glowAlpha = glowAlpha,
+            selected = selected,
+            selectedOutline = MaterialTheme.colorScheme.primary,
+        )
     }
 }
+
+@Composable
+private fun previewShortLabel(
+    preview: DevicePreviewGroups,
+    index: Int,
+): String =
+    if (preview.representsSticks) {
+        stringResource(if (index == 0) R.string.target_left else R.string.target_right)
+    } else {
+        previewModuleLabel(preview, index)
+    }
 
 internal fun RgbColor.toComposeColor(): Color = Color(red, green, blue)

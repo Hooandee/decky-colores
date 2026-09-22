@@ -11,8 +11,13 @@ import com.hooandee.colores.device.learning.HardwareLearningGraph
 import com.hooandee.colores.device.learning.HardwareFact
 import com.hooandee.colores.device.learning.HardwareLearningRoute
 import com.hooandee.colores.device.learning.Htr3212InformationCartridge
+import com.hooandee.colores.device.learning.HTR3212_LEFT_DRIVER
 import com.hooandee.colores.device.learning.HTR3212_PROBE_ID
 import com.hooandee.colores.device.learning.HTR3212_PROBE_VERSION
+import com.hooandee.colores.device.learning.HTR3212_RIGHT_DRIVER
+import com.hooandee.colores.device.learning.I2cController
+import com.hooandee.colores.device.learning.I2cTopologyReader
+import com.hooandee.colores.device.learning.SysfsI2cTopologyReader
 import com.hooandee.colores.device.learning.InformationCartridge
 import com.hooandee.colores.device.learning.PROBE_VERSION
 import com.hooandee.colores.device.learning.ProbeCandidate
@@ -25,6 +30,7 @@ import com.hooandee.colores.device.learning.resolveDetectionOutcome
 import com.hooandee.colores.device.learning.usesTopologyGatedActivation
 import com.hooandee.colores.led.AndroidPServerCommandExecutor
 import com.hooandee.colores.led.LedDescriptor
+import com.hooandee.colores.led.SettingsProviderCodec
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsRgbDescriptor
@@ -35,6 +41,8 @@ data class AndroidDeviceIdentity(
     val device: String,
     val manufacturer: String,
     val productProperties: Map<String, String>,
+    val fingerprint: String = "",
+    val complete: Boolean = true,
 )
 
 data class DetectedAndroidDevice(
@@ -52,51 +60,42 @@ class AndroidDeviceDetector(
     private val pserverAvailable: () -> Boolean = { AndroidPServerCommandExecutor().available },
     private val readSetting: (String) -> String? = { key -> Settings.System.getString(context.contentResolver, key) },
     private val scanJoypad: () -> SingleAdcJoypadDescriptor? = { SingleAdcJoypadDiscovery.scan() },
-    private val scanSysfs: () -> SysfsRgbDescriptor? = { SysfsRgbDiscovery.scan() },
+    private val scanSysfs: () -> List<SysfsRgbDescriptor> = { SysfsRgbDiscovery.scanAll() },
     private val informationCartridges: List<InformationCartridge> = listOf(Htr3212InformationCartridge()),
+    private val topologyReader: I2cTopologyReader = SysfsI2cTopologyReader(),
 ) {
-    fun readIdentity(): AndroidDeviceIdentity {
-        val properties =
-            PRODUCT_PROPERTIES.associateWith(::readProperty).filterValues { it.isNotBlank() }
-        return AndroidDeviceIdentity(
-            model = Build.MODEL.orEmpty().ifBlank { properties["ro.product.model"].orEmpty() },
-            device = Build.DEVICE.orEmpty().ifBlank { properties["ro.product.device"].orEmpty() },
-            manufacturer =
-                Build.MANUFACTURER.orEmpty().ifBlank { properties["ro.product.manufacturer"].orEmpty() },
-            productProperties = properties,
+    fun readIdentity(): AndroidDeviceIdentity =
+        assembleAndroidDeviceIdentity(
+            model = Build.MODEL.orEmpty(),
+            device = Build.DEVICE.orEmpty(),
+            manufacturer = Build.MANUFACTURER.orEmpty(),
+            fingerprint = runCatching { Build.FINGERPRINT }.getOrNull().orEmpty(),
+            propertyNames = PRODUCT_PROPERTIES,
+            readProperty = ::readProperty,
         )
-    }
 
     fun detectOutcome(binding: LearnedDeviceBinding? = null): DetectionOutcome {
         val identity =
             runCatching { readIdentity() }.getOrElse {
-                AndroidDeviceIdentity(model = "", device = "", manufacturer = "", productProperties = emptyMap())
+                AndroidDeviceIdentity(model = "", device = "", manufacturer = "", productProperties = emptyMap(), complete = false)
             }
         val pserver = runCatching { pserverAvailable() }.getOrDefault(false)
-        val exact = modelMatch(identity)
-        val exactTransportAvailable = exact?.led?.isTransportAvailable(pserver) ?: false
-        if (!shouldCollectVerificationCandidates(exact, exactTransportAvailable)) {
-            return DetectionOutcome.Resolved(identity, requireNotNull(exact))
-        }
-        val seedCandidates =
-            listOfNotNull(
-                GenericLedResolver.settingsCandidate(
-                    pserverAvailable = pserver,
-                    colorKeyValue = if (pserver) runCatching { readSetting(GenericVendorLed.COLOR_KEY) }.getOrNull() else null,
-                ),
-                GenericLedResolver.joypadCandidate(runCatching { scanJoypad() }.getOrNull()),
-                GenericLedResolver.sysfsCandidate(runCatching { scanSysfs() }.getOrNull()),
-            )
-        val route = resolveHardwareLearningRoute(identity, pserver, seedCandidates, informationCartridges)
-        val candidates = verificationCandidates(route.candidates, exact, exactTransportAvailable, route.facts)
-        val learned = resolveLearnedDevice(identity, binding, candidates)
-        return resolveDetectionOutcome(
+        return detectFromInputs(
             identity = identity,
-            exact = exact,
-            exactTransportAvailable = exactTransportAvailable,
-            candidates = candidates,
-            learned = learned,
-            facts = route.facts,
+            exact = modelMatch(identity),
+            pserverAvailable = pserver,
+            binding = binding,
+            readTopology = { topologyReader.read() },
+            seedCandidates = {
+                listOfNotNull(
+                    GenericLedResolver.settingsCandidate(
+                        pserverAvailable = pserver,
+                        colorKeyValue = if (pserver) runCatching { readSetting(GenericVendorLed.COLOR_KEY) }.getOrNull() else null,
+                    ),
+                    GenericLedResolver.joypadCandidate(runCatching { scanJoypad() }.getOrNull()),
+                ) + GenericLedResolver.sysfsCandidates(runCatching { scanSysfs() }.getOrDefault(emptyList()))
+            },
+            informationCartridges = informationCartridges,
         )
     }
 
@@ -111,17 +110,28 @@ class AndroidDeviceDetector(
             ).match(identity)
         }.getOrNull()
 
-    private fun readProperty(name: String): String =
+    private fun readProperty(name: String): String? = readSystemProperty(name) ?: readGetprop(name)
+
+    private fun readSystemProperty(name: String): String? =
+        runCatching {
+            Class.forName("android.os.SystemProperties")
+                .getMethod("get", String::class.java)
+                .invoke(null, name) as? String
+        }.getOrNull()?.trim()
+
+    private fun readGetprop(name: String): String? =
         runCatching {
             val process = ProcessBuilder("/system/bin/getprop", name).redirectErrorStream(true).start()
-            if (!process.waitFor(300, TimeUnit.MILLISECONDS)) {
+            if (!process.waitFor(GETPROP_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
                 process.destroyForcibly()
-                return@runCatching ""
+                return@runCatching null
             }
+            if (process.exitValue() != 0) return@runCatching null
             process.inputStream.bufferedReader().use { it.readText().trim() }
-        }.getOrDefault("")
+        }.getOrNull()
 
     private companion object {
+        const val GETPROP_TIMEOUT_MS = 2_000L
         val PRODUCT_PROPERTIES =
             listOf(
                 "ro.product.model",
@@ -134,6 +144,101 @@ class AndroidDeviceDetector(
             )
     }
 }
+
+internal fun assembleAndroidDeviceIdentity(
+    model: String,
+    device: String,
+    manufacturer: String,
+    fingerprint: String,
+    propertyNames: List<String>,
+    readProperty: (String) -> String?,
+): AndroidDeviceIdentity {
+    val reads = propertyNames.associateWith { name -> runCatching { readProperty(name) }.getOrNull() }
+    val properties = reads.mapNotNull { (name, value) -> value?.takeIf(String::isNotBlank)?.let { name to it } }.toMap()
+    return AndroidDeviceIdentity(
+        model = model.ifBlank { properties["ro.product.model"].orEmpty() },
+        device = device.ifBlank { properties["ro.product.device"].orEmpty() },
+        manufacturer = manufacturer.ifBlank { properties["ro.product.manufacturer"].orEmpty() },
+        productProperties = properties,
+        fingerprint = fingerprint.trim(),
+        complete = reads.values.none { it == null },
+    )
+}
+
+internal fun detectFromInputs(
+    identity: AndroidDeviceIdentity,
+    exact: DetectedAndroidDevice?,
+    pserverAvailable: Boolean,
+    binding: LearnedDeviceBinding?,
+    readTopology: () -> List<I2cController>,
+    seedCandidates: () -> List<ProbeCandidate>,
+    informationCartridges: List<InformationCartridge>,
+): DetectionOutcome {
+    val guard = guardExactHtrTopology(exact) { runCatching(readTopology).getOrDefault(emptyList()) }
+    val trustedExact = exact.takeUnless { guard.contradicted }
+    val exactTransportAvailable = trustedExact?.led?.isTransportAvailable(pserverAvailable) ?: false
+    if (!shouldCollectVerificationCandidates(trustedExact, exactTransportAvailable)) {
+        return DetectionOutcome.Resolved(identity, requireNotNull(trustedExact), facts = guard.facts)
+    }
+    val (graphSeeds, deferredSeeds) = seedCandidates().partition { !it.usesNonDefaultSettingsFormat() }
+    val route = resolveHardwareLearningRoute(identity, pserverAvailable, graphSeeds, informationCartridges)
+    val facts = route.facts + guard.facts
+    val candidates = verificationCandidates(route.candidates + deferredSeeds, trustedExact, exactTransportAvailable, facts)
+    val learned = resolveLearnedDevice(identity, binding, candidates)
+    return resolveDetectionOutcome(
+        identity = identity,
+        exact = trustedExact,
+        exactTransportAvailable = exactTransportAvailable,
+        candidates = candidates,
+        learned = learned,
+        facts = facts,
+    )
+}
+
+internal const val FACT_HTR3212_TOPOLOGY = "controller.htr3212.topology"
+
+internal data class ExactTopologyGuard(
+    val contradicted: Boolean,
+    val facts: List<HardwareFact>,
+)
+
+internal fun guardExactHtrTopology(
+    exact: DetectedAndroidDevice?,
+    readTopology: () -> List<I2cController>,
+): ExactTopologyGuard {
+    val hardware = (exact?.led as? SettingsProviderDescriptor)?.takeIf { it.driver == "htr3212" }?.htr3212
+    if (hardware == null || hardware.automaticActivation) return ExactTopologyGuard(false, emptyList())
+    val controllers = readTopology()
+    if (controllers.isEmpty()) return ExactTopologyGuard(false, listOf(topologyFact("unverified")))
+    val left = controllers.filter { it.driver == HTR3212_LEFT_DRIVER }
+    val right = controllers.filter { it.driver == HTR3212_RIGHT_DRIVER }
+    val leftMatches = left.singleOrNull()?.let { it.bus == hardware.leftBus && it.address == hardware.address } == true
+    val rightMatches = right.singleOrNull()?.let { it.bus == hardware.rightBus && it.address == hardware.address } == true
+    if (leftMatches && rightMatches) return ExactTopologyGuard(false, listOf(topologyFact("matched")))
+    val contradicted =
+        (!leftMatches && (left.isNotEmpty() || controllers.hasForeignChipAt(hardware.leftBus, hardware.address))) ||
+            (!rightMatches && (right.isNotEmpty() || controllers.hasForeignChipAt(hardware.rightBus, hardware.address)))
+    if (!contradicted) return ExactTopologyGuard(false, listOf(topologyFact("unverified")))
+    val expected = "expected left=${hardware.leftBus}-0x%02x right=${hardware.rightBus}-0x%02x".format(hardware.address, hardware.address)
+    val observed = "observed left=${left.describe()} right=${right.describe()}"
+    return ExactTopologyGuard(true, listOf(topologyFact("contradicted; $expected; $observed")))
+}
+
+private fun ProbeCandidate.usesNonDefaultSettingsFormat(): Boolean =
+    (descriptor as? SettingsProviderDescriptor)?.colorFormat?.let { it != SettingsProviderCodec.ARGB_HEX_CSV } == true
+
+private fun List<I2cController>.hasForeignChipAt(
+    bus: Int,
+    address: Int,
+): Boolean = any { it.bus == bus && it.address == address && HTR_DRIVER_FAMILY !in it.driver }
+
+private fun List<I2cController>.describe(): String =
+    if (isEmpty()) "none" else joinToString("|") { "${it.bus}-0x%02x".format(it.address) }
+
+private fun topologyFact(value: String): HardwareFact =
+    HardwareFact(FACT_HTR3212_TOPOLOGY, value, FactEvidence.OBSERVED, "android-detector")
+
+private const val HTR_DRIVER_FAMILY = "htr"
 
 internal fun resolveHardwareLearningRoute(
     identity: AndroidDeviceIdentity,

@@ -117,4 +117,61 @@ class ConflatedLedWriterTest {
 
             assertEquals(1, attempts)
         }
+
+    @Test
+    fun `retry delay grows exponentially up to a cap`() {
+        assertEquals(500L, ledRetryDelayMs(500, 1, 30_000))
+        assertEquals(1_000L, ledRetryDelayMs(500, 2, 30_000))
+        assertEquals(16_000L, ledRetryDelayMs(500, 6, 30_000))
+        assertEquals(30_000L, ledRetryDelayMs(500, 7, 30_000))
+        assertEquals(30_000L, ledRetryDelayMs(500, 1_000, 30_000))
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a failing transport backs off but keeps the latest value`() =
+        runTest {
+            var available = false
+            val attempts = mutableListOf<Long>()
+            val written = mutableListOf<Int>()
+            val writer =
+                ConflatedLedWriter<Int>(backgroundScope, 80, retryIntervalMs = 500, maxRetryIntervalMs = 2_000) {
+                    attempts += testScheduler.currentTime
+                    if (available) written += it
+                    available
+                }
+
+            writer.submit(9)
+            advanceTimeBy(8_000)
+            runCurrent()
+            assertEquals(listOf(0L, 500L, 1_500L, 3_500L, 5_500L, 7_500L), attempts)
+
+            available = true
+            advanceTimeBy(2_000)
+            runCurrent()
+            assertEquals(listOf(9), written)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a new value restarts the backoff promptly`() =
+        runTest {
+            var available = false
+            val written = mutableListOf<Int>()
+            val writer =
+                ConflatedLedWriter<Int>(backgroundScope, 80, retryIntervalMs = 500, maxRetryIntervalMs = 30_000) {
+                    if (available) written += it
+                    available
+                }
+
+            writer.submit(1)
+            advanceTimeBy(20_000)
+            runCurrent()
+            available = true
+            writer.submit(2)
+            advanceTimeBy(500)
+            runCurrent()
+
+            assertEquals(listOf(2), written)
+        }
 }

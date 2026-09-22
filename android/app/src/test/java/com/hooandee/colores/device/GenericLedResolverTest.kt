@@ -1,6 +1,7 @@
 package com.hooandee.colores.device
 
 import com.hooandee.colores.device.learning.ProbeSurface
+import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsColorKind
 import com.hooandee.colores.led.SysfsRgbDescriptor
@@ -24,6 +25,31 @@ class GenericLedResolverTest {
         assertEquals("settings-pserver-joystick", candidate.cartridgeId)
         assertEquals(ProbeSurface.SETTINGS_PSERVER, candidate.surface)
         assertEquals(setOf("observed_color_count"), candidate.signalKeys)
+    }
+
+    @Test
+    fun `settings candidate records the observed color format`() {
+        val rgb = requireNotNull(GenericLedResolver.settingsCandidate(pserverAvailable = true, colorKeyValue = "#112233, #445566"))
+        val single = requireNotNull(GenericLedResolver.settingsCandidate(pserverAvailable = true, colorKeyValue = "#FF00FF00"))
+
+        assertEquals("rgb_hex_csv", (rgb.descriptor as SettingsProviderDescriptor).colorFormat)
+        assertEquals(2, (rgb.descriptor as SettingsProviderDescriptor).zones)
+        assertTrue(rgb.signalKeys.contains("observed_color_format_rgb_hex_csv"))
+        assertEquals("argb_hex_csv", (single.descriptor as SettingsProviderDescriptor).colorFormat)
+        assertEquals(1, (single.descriptor as SettingsProviderDescriptor).zones)
+        assertNull(GenericLedResolver.settingsCandidate(pserverAvailable = true, colorKeyValue = "#FF112233,#445566"))
+        assertNull(GenericLedResolver.settingsCandidate(pserverAvailable = true, colorKeyValue = "#112233,"))
+    }
+
+    @Test
+    fun `bare sysfs channel group is marked as a low confidence signal`() {
+        val nodes = listOf("red", "green", "blue").map { "/sys/class/leds/$it" }
+        val candidates =
+            GenericLedResolver.sysfsCandidates(
+                listOf(SysfsRgbDescriptor(nodes.first(), 1, 255, SysfsColorKind.CHANNEL_NODES, channelNodes = nodes)),
+            )
+
+        assertEquals(setOf("channel_nodes", "unprefixed_channel_nodes"), candidates.single().signalKeys)
     }
 
     @Test

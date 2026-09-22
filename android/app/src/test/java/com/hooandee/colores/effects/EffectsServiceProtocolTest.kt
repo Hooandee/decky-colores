@@ -61,4 +61,52 @@ class EffectsServiceProtocolTest {
         assertTrue(shouldReconcileAmbientController(requested = true, mode = AppMode.AMBIENT))
         assertFalse(shouldReconcileAmbientController(requested = true, mode = AppMode.COLOR))
     }
+
+    @Test
+    fun `capture survives a temporary app profile while the global profile uses it`() {
+        assertFalse(shouldEndCapture(CaptureOwner.AUDIO, AppMode.COLOR, globalMode = AppMode.AUDIO))
+        assertTrue(shouldEndCapture(CaptureOwner.AUDIO, AppMode.COLOR, globalMode = AppMode.COLOR))
+        assertTrue(shouldEndCapture(CaptureOwner.AMBIENT, AppMode.EFFECT, globalMode = null))
+        assertFalse(shouldEndCapture(CaptureOwner.AMBIENT, AppMode.AMBIENT, globalMode = AppMode.COLOR))
+    }
+
+    @Test
+    fun `stop commands are only dispatched to a live service or capture`() {
+        assertFalse(shouldDispatchCaptureStop(serviceActive = false, captureLive = false))
+        assertTrue(shouldDispatchCaptureStop(serviceActive = true, captureLive = false))
+        assertTrue(shouldDispatchCaptureStop(serviceActive = false, captureLive = true))
+    }
+
+    @Test
+    fun `a stop skipped during restore settles with the latest start id`() {
+        val settler = EffectsServiceSettler { true }
+
+        settler.onStartCommand(1)
+        settler.beginRestore()
+        settler.onStartCommand(2)
+
+        assertEquals(null, settler.settle())
+        assertEquals(2, settler.endRestore())
+    }
+
+    @Test
+    fun `settling keeps the service while owners remain`() {
+        val settler = EffectsServiceSettler { false }
+        settler.onStartCommand(3)
+
+        assertEquals(null, settler.settle())
+    }
+
+    @Test
+    fun `projection consent requires an ok result with data`() {
+        assertTrue(hasProjectionConsent(resultCode = -1, resultDataPresent = true))
+        assertFalse(hasProjectionConsent(resultCode = 0, resultDataPresent = true))
+        assertFalse(hasProjectionConsent(resultCode = -1, resultDataPresent = false))
+    }
+
+    @Test
+    fun `foreground refusal status separates consent errors from background limits`() {
+        assertTrue(foregroundRefusalRequiresAuthorization(SecurityException("projection")))
+        assertFalse(foregroundRefusalRequiresAuthorization(IllegalStateException("background")))
+    }
 }

@@ -77,3 +77,54 @@ internal fun resolveEffectsServiceCommand(
         action == ACTION_RESTORE -> EffectsServiceCommand.RESTORE
         else -> EffectsServiceCommand.KEEP_ALIVE
     }
+
+internal enum class CaptureOwner(
+    val mode: AppMode,
+) {
+    AUDIO(AppMode.AUDIO),
+    AMBIENT(AppMode.AMBIENT),
+}
+
+internal fun shouldEndCapture(
+    owner: CaptureOwner,
+    mode: AppMode,
+    globalMode: AppMode?,
+): Boolean = mode != owner.mode && globalMode != owner.mode
+
+internal fun shouldDispatchCaptureStop(
+    serviceActive: Boolean,
+    captureLive: Boolean,
+): Boolean = serviceActive || captureLive
+
+internal fun hasProjectionConsent(
+    resultCode: Int,
+    resultDataPresent: Boolean,
+    okCode: Int = -1,
+): Boolean = resultDataPresent && resultCode == okCode
+
+internal fun foregroundRefusalRequiresAuthorization(error: Throwable): Boolean = error is SecurityException
+
+internal class EffectsServiceSettler(
+    private val releaseIfUnowned: () -> Boolean,
+) {
+    private var latestStartId = 0
+    private var restoresInFlight = 0
+
+    fun onStartCommand(startId: Int) {
+        latestStartId = maxOf(latestStartId, startId)
+    }
+
+    fun beginRestore() {
+        restoresInFlight++
+    }
+
+    fun endRestore(): Int? {
+        restoresInFlight = maxOf(0, restoresInFlight - 1)
+        return settle()
+    }
+
+    fun settle(): Int? {
+        if (restoresInFlight > 0) return null
+        return if (releaseIfUnowned()) latestStartId else null
+    }
+}

@@ -3,10 +3,18 @@ package com.hooandee.colores.report
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
-import com.hooandee.colores.device.learning.HardwareLearningResult
+import com.hooandee.colores.device.diagnostics.HardwareInventory
+import com.hooandee.colores.device.learning.ArchivedRollbackSummary
+import com.hooandee.colores.device.learning.DetectionOutcome
 import com.hooandee.colores.device.learning.HardwareFact
+import com.hooandee.colores.device.learning.HardwareLearningResult
 import com.hooandee.colores.device.learning.HardwareLearningStatus
+import com.hooandee.colores.device.learning.ProbeCandidate
 import com.hooandee.colores.device.learning.RollbackStatus
+import com.hooandee.colores.led.LedDescriptor
+import com.hooandee.colores.led.SettingsProviderDescriptor
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
+import com.hooandee.colores.led.SysfsRgbDescriptor
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -47,6 +55,40 @@ sealed interface ReportResult {
     ) : ReportResult
 }
 
+data class ReportDiagnostics(
+    val detectionOutcome: String? = null,
+    val facts: List<HardwareFact> = emptyList(),
+    val candidates: List<ProbeCandidate> = emptyList(),
+    val inventory: HardwareInventory? = null,
+    val archivedRollback: ArchivedRollbackSummary? = null,
+)
+
+fun reportDiagnostics(
+    outcome: DetectionOutcome?,
+    inventory: HardwareInventory?,
+    archivedRollback: ArchivedRollbackSummary? = null,
+): ReportDiagnostics =
+    ReportDiagnostics(
+        detectionOutcome =
+            when (outcome) {
+                is DetectionOutcome.Resolved -> "resolved"
+                is DetectionOutcome.UnavailableKnownDevice -> "unavailable_known_device"
+                is DetectionOutcome.Candidates -> "candidates"
+                is DetectionOutcome.Unsupported -> "unsupported"
+                null -> null
+            },
+        facts = outcome?.facts.orEmpty(),
+        candidates =
+            when (outcome) {
+                is DetectionOutcome.Resolved -> outcome.candidates
+                is DetectionOutcome.UnavailableKnownDevice -> outcome.candidates
+                is DetectionOutcome.Candidates -> outcome.candidates
+                is DetectionOutcome.Unsupported, null -> emptyList()
+            },
+        inventory = inventory,
+        archivedRollback = archivedRollback,
+    )
+
 data class ReportSubmissionState(
     val sending: Boolean = false,
     val result: ReportResult? = null,
@@ -56,6 +98,7 @@ fun buildReportBundle(
     snapshot: AndroidReportSnapshot,
     categories: List<String>,
     text: String,
+    diagnostics: ReportDiagnostics = ReportDiagnostics(),
 ): JSONObject =
     JSONObject()
         .put("schema", 1)
@@ -102,8 +145,67 @@ fun buildReportBundle(
                 ),
         ).put("stores", JSONObject().put("profiles_configured", snapshot.configuredProfiles))
         .put("logs", JSONArray())
-        .put("kernel", JSONObject())
-        .put("sysfs", JSONObject())
+        .put("kernel", diagnostics.inventory?.kernel ?: JSONObject())
+        .put("sysfs", diagnostics.inventory?.sysfs ?: JSONObject())
+        .put("hardware", diagnostics.inventory?.hardware ?: JSONObject())
+        .put("discovery", discoveryJson(diagnostics))
+        .apply { diagnostics.archivedRollback?.let { put("rollback_archive", archivedRollbackJson(it)) } }
+
+private fun archivedRollbackJson(archive: ArchivedRollbackSummary): JSONObject =
+    JSONObject()
+        .put("reason", archive.reason.name.lowercase())
+        .put("attempts", archive.attempts)
+        .put("cartridge_id", archive.cartridgeId)
+        .put("cartridge_version", archive.cartridgeVersion)
+        .put("archived_at", archive.archivedAtEpochMs)
+        .put("surface", archive.surface?.name?.lowercase())
+
+private fun discoveryJson(diagnostics: ReportDiagnostics): JSONObject =
+    JSONObject()
+        .put("outcome", diagnostics.detectionOutcome)
+        .put("facts", factsJson(diagnostics.facts))
+        .put(
+            "candidates",
+            JSONArray(
+                diagnostics.candidates.take(MAX_REPORTED_CANDIDATES).map { candidate ->
+                    JSONObject()
+                        .put("cartridge_id", candidate.cartridgeId.take(120))
+                        .put("cartridge_version", candidate.cartridgeVersion)
+                        .put("surface", candidate.surface.name.lowercase())
+                        .put("driver", candidate.descriptor.reportDriver())
+                        .put("zones", candidate.descriptor.reportZones())
+                        .put("signal_keys", JSONArray(candidate.signalKeys.sorted().map { it.take(80) }))
+                },
+            ),
+        )
+
+private fun factsJson(facts: List<HardwareFact>): JSONArray =
+    JSONArray(
+        facts.take(MAX_REPORTED_FACTS).map { fact ->
+            JSONObject()
+                .put("key", fact.key.take(120))
+                .put("value", redactReportText(fact.value).take(200))
+                .put("evidence", fact.evidence.name.lowercase())
+                .put("cartridge_id", fact.cartridgeId.take(120))
+        },
+    )
+
+private fun LedDescriptor.reportDriver(): String =
+    when (this) {
+        is SettingsProviderDescriptor -> "${driver}:${colorFormat}"
+        is SysfsRgbDescriptor -> "sysfs:${kind.name.lowercase()}"
+        is SingleAdcJoypadDescriptor -> "singleadc"
+    }
+
+private fun LedDescriptor.reportZones(): Int =
+    when (this) {
+        is SettingsProviderDescriptor -> zones
+        is SysfsRgbDescriptor -> zones
+        is SingleAdcJoypadDescriptor -> 1
+    }
+
+private const val MAX_REPORTED_CANDIDATES = 24
+private const val MAX_REPORTED_FACTS = 64
 
 fun buildHardwareLearningBundle(
     snapshot: AndroidReportSnapshot,
@@ -112,6 +214,7 @@ fun buildHardwareLearningBundle(
     forcedRestoreFailure: Boolean = false,
     forcedSafetyFailure: Boolean = false,
     facts: List<HardwareFact> = emptyList(),
+    diagnostics: ReportDiagnostics = ReportDiagnostics(facts = facts),
 ): JSONObject {
     val restoreFailed = forcedRestoreFailure || results.any { it.rollbackStatus == RollbackStatus.RESTORE_FAILED }
     val safetyFailed = restoreFailed || forcedSafetyFailure
@@ -124,7 +227,7 @@ fun buildHardwareLearningBundle(
             if (restoreFailed) add("restore-failed")
             if (forcedSafetyFailure) add("safety-failed")
         }
-    return buildReportBundle(snapshot, listOf("learning"), text)
+    return buildReportBundle(snapshot, listOf("learning"), text, diagnostics)
         .put("report_kind", "hardware_learning")
         .put(
             "triage",
@@ -134,18 +237,7 @@ fun buildHardwareLearningBundle(
         ).put(
             "learning",
             JSONObject()
-                .put(
-                    "discovery_facts",
-                    JSONArray(
-                        facts.map { fact ->
-                            JSONObject()
-                                .put("key", fact.key.take(120))
-                                .put("value", redactReportText(fact.value).take(200))
-                                .put("evidence", fact.evidence.name.lowercase())
-                                .put("cartridge_id", fact.cartridgeId.take(120))
-                        },
-                    ),
-                )
+                .put("discovery_facts", factsJson(facts))
                 .put(
                     "attempts",
                     JSONArray(
@@ -194,8 +286,18 @@ fun buildReportBundleForSubmission(
     restoreFailure: Boolean = false,
     criticalSafetyFailure: Boolean = false,
     learningFacts: List<HardwareFact> = emptyList(),
+    diagnostics: ReportDiagnostics = ReportDiagnostics(facts = learningFacts),
 ): JSONObject =
-    if ("learning" in categories && (learningResults.isNotEmpty() || learningFacts.isNotEmpty() || restoreFailure || criticalSafetyFailure)) {
+    if (
+        "learning" in categories &&
+        (
+            learningResults.isNotEmpty() ||
+                learningFacts.isNotEmpty() ||
+                restoreFailure ||
+                criticalSafetyFailure ||
+                diagnostics.archivedRollback != null
+        )
+    ) {
         buildHardwareLearningBundle(
             snapshot,
             learningResults,
@@ -203,9 +305,10 @@ fun buildReportBundleForSubmission(
             forcedRestoreFailure = restoreFailure,
             forcedSafetyFailure = criticalSafetyFailure,
             facts = learningFacts,
+            diagnostics = diagnostics,
         )
     } else {
-        buildReportBundle(snapshot, categories, text)
+        buildReportBundle(snapshot, categories, text, diagnostics)
     }
 
 fun encodeReportPayload(bundle: JSONObject): JSONObject {
@@ -235,12 +338,28 @@ fun parseReportResponse(
     return ReportResult.Failure(response.optString("error").ifBlank { "HTTP $status" })
 }
 
+private val emailPattern = Regex("[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\\.[A-Za-z0-9-]+)*\\.[A-Za-z]{2,}")
+private const val PHONE_BEFORE = "(?<![\\w/:.#-])"
+private const val PHONE_AFTER = "(?![\\w/:#-]|\\.\\d)"
+private val phonePatterns =
+    listOf(
+        Regex("$PHONE_BEFORE\\+\\d{1,3}(?:[\\s.-]?\\(?\\d{1,4}\\)?){2,5}$PHONE_AFTER"),
+        Regex("$PHONE_BEFORE[6-9]\\d{2}(?:[\\s.-]?\\d{3}){2}$PHONE_AFTER"),
+        Regex("$PHONE_BEFORE[6-9]\\d{2}(?:[\\s.-]\\d{2}){3}$PHONE_AFTER"),
+        Regex("$PHONE_BEFORE\\(?\\d{3}\\)?[\\s.-]\\d{3}[\\s.-]\\d{4}$PHONE_AFTER"),
+    )
 private val macPattern = Regex("\\b(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\\b")
 private val uuidPattern = Regex("\\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\\b")
 private val serialPattern = Regex("(?i)((?:board|product|chassis|system|baseboard)?[ _-]?serial(?:\\s*number)?)(\\s*[:=]\\s*)(\\S+)")
 
-fun redactReportText(text: String): String =
-    text
-        .replace(macPattern, "[mac]")
-        .replace(uuidPattern, "[uuid]")
-        .replace(serialPattern) { "${it.groupValues[1]}${it.groupValues[2]}[serial]" }
+fun redactReportText(text: String): String {
+    val redacted =
+        text
+            .replace(emailPattern, "[email]")
+            .replace(macPattern, "[mac]")
+            .replace(uuidPattern, "[uuid]")
+            .replace(serialPattern) { "${it.groupValues[1]}${it.groupValues[2]}[serial]" }
+    return phonePatterns.fold(redacted) { current, pattern ->
+        current.replace(pattern) { if (it.value.count(Char::isDigit) >= 9) "[phone]" else it.value }
+    }
+}

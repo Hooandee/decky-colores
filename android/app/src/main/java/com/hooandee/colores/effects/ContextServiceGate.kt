@@ -6,13 +6,19 @@ import android.os.Build
 import android.util.Log
 import com.hooandee.colores.control.ServiceGate
 import com.hooandee.colores.control.ServiceOwner
-import java.util.concurrent.atomic.AtomicBoolean
 
 class ServiceOwnerLease(
     private val onStart: () -> Boolean,
     private val onStop: () -> Unit,
 ) {
+    private enum class Phase {
+        IDLE,
+        STARTING,
+        RUNNING,
+    }
+
     private val owners = mutableSetOf<ServiceOwner>()
+    private var phase = Phase.IDLE
 
     @Synchronized
     fun setRequired(
@@ -21,23 +27,70 @@ class ServiceOwnerLease(
     ) {
         if (required) {
             if (owner in owners) return
-            if (owners.isNotEmpty() || onStart()) owners += owner
+            if (ensureStarted()) owners += owner
         } else {
             if (!owners.remove(owner)) return
-            if (owners.isEmpty()) onStop()
+            if (owners.isEmpty() && phase == Phase.RUNNING) {
+                phase = Phase.IDLE
+                onStop()
+            }
         }
+    }
+
+    @get:Synchronized
+    val active: Boolean
+        get() = phase != Phase.IDLE
+
+    @Synchronized
+    fun hasOwners(): Boolean = owners.isNotEmpty()
+
+    @Synchronized
+    fun onServiceStarted() {
+        phase = Phase.RUNNING
+    }
+
+    @Synchronized
+    fun releaseIfUnowned(): Boolean {
+        if (owners.isNotEmpty()) {
+            phase = Phase.RUNNING
+            return false
+        }
+        phase = Phase.IDLE
+        return true
+    }
+
+    @Synchronized
+    fun onForegroundRefused() {
+        owners.clear()
+        phase = Phase.IDLE
+    }
+
+    @Synchronized
+    fun onServiceStopped() {
+        phase = Phase.IDLE
+        owners -= ServiceOwner.CAPTURE
+        if (owners.isNotEmpty() && !ensureStarted()) owners.clear()
+    }
+
+    private fun ensureStarted(): Boolean {
+        if (phase != Phase.IDLE) return true
+        if (!onStart()) return false
+        phase = Phase.STARTING
+        return true
     }
 }
 
 class ContextServiceGate(
     private val context: Context,
 ) : ServiceGate {
-    private val running = AtomicBoolean(false)
     private val lease =
         ServiceOwnerLease(
             onStart = ::startService,
             onStop = ::stopService,
         )
+
+    val active: Boolean
+        get() = lease.active
 
     override fun start() = setRequired(ServiceOwner.EFFECTS, true)
 
@@ -48,8 +101,26 @@ class ContextServiceGate(
         required: Boolean,
     ) = lease.setRequired(owner, required)
 
+    fun hasOwners(): Boolean = lease.hasOwners()
+
+    fun onServiceStarted() {
+        Log.d(TAG, "started")
+        lease.onServiceStarted()
+    }
+
+    fun releaseIfUnowned(): Boolean = lease.releaseIfUnowned().also { if (it) Log.d(TAG, "released") }
+
+    fun onForegroundRefused() {
+        Log.w(TAG, "foreground refused")
+        lease.onForegroundRefused()
+    }
+
+    fun onServiceStopped() {
+        Log.d(TAG, "stopped")
+        lease.onServiceStopped()
+    }
+
     private fun startService(): Boolean {
-        if (!running.compareAndSet(false, true)) return true
         Log.d(TAG, "start")
         val intent = Intent(context, EffectsService::class.java)
         return runCatching {
@@ -59,23 +130,12 @@ class ContextServiceGate(
                 context.startService(intent)
             }
             true
-        }.onFailure { running.set(false) }.getOrDefault(false)
+        }.onFailure { Log.w(TAG, "start refused", it) }.getOrDefault(false)
     }
 
     private fun stopService() {
-        if (!running.compareAndSet(true, false)) return
         Log.d(TAG, "stop")
         runCatching { context.stopService(Intent(context, EffectsService::class.java)) }
-    }
-
-    fun onServiceStarted() {
-        Log.d(TAG, "started")
-        running.set(true)
-    }
-
-    fun onServiceStopped() {
-        Log.d(TAG, "stopped")
-        running.set(false)
     }
 
     private companion object {

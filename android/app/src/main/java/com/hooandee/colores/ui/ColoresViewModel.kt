@@ -13,6 +13,7 @@ import com.hooandee.colores.ambient.normalizedAmbientCaptureFps
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hooandee.colores.ColoresApplication
+import com.hooandee.colores.HardwareRollbackState
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.audio.AudioLevelState
 import com.hooandee.colores.apps.LaunchableApp
@@ -24,10 +25,13 @@ import com.hooandee.colores.control.LightingIntent
 import com.hooandee.colores.control.DevicePreferenceMigration
 import com.hooandee.colores.control.LightingPreferences
 import com.hooandee.colores.control.StoredLighting
+import com.hooandee.colores.control.UnboundDeviceHandoff
 import com.hooandee.colores.device.AndroidDeviceDetector
 import com.hooandee.colores.device.AndroidDeviceIdentityCatalog
 import com.hooandee.colores.device.DetectedAndroidDevice
 import com.hooandee.colores.device.DevicePresentation
+import com.hooandee.colores.device.diagnostics.AndroidHardwareInventorySource
+import com.hooandee.colores.device.diagnostics.HardwareInventoryCollector
 import com.hooandee.colores.device.learning.DetectionOutcome
 import com.hooandee.colores.device.learning.HardwareLearningAttempt
 import com.hooandee.colores.device.learning.HardwareLearningResult
@@ -35,14 +39,17 @@ import com.hooandee.colores.device.learning.HardwareLearningSession
 import com.hooandee.colores.device.learning.HardwareLearningState
 import com.hooandee.colores.device.learning.HardwareLearningStatus
 import com.hooandee.colores.device.learning.LearningBlockReason
+import com.hooandee.colores.device.learning.LearningRecovery
 import com.hooandee.colores.device.learning.ProbeCandidate
-import com.hooandee.colores.device.learning.RollbackStatus
 import com.hooandee.colores.device.learning.UserObservation
 import com.hooandee.colores.device.learning.ZoneLocation
 import com.hooandee.colores.device.learning.learningIdentityHash
 import com.hooandee.colores.device.learning.learningDescriptorsCompatible
+import com.hooandee.colores.device.learning.learnedBindingNeedsFingerprint
+import com.hooandee.colores.device.learning.learnedBindingNeedsRevalidation
 import com.hooandee.colores.device.learning.learnedDeviceIdForPromotion
 import com.hooandee.colores.device.learning.resultsFor
+import com.hooandee.colores.device.learning.summary
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.AudioSensitivity
@@ -78,6 +85,7 @@ import com.hooandee.colores.report.AndroidReportSnapshot
 import com.hooandee.colores.report.ReportSender
 import com.hooandee.colores.report.ReportSubmissionState
 import com.hooandee.colores.report.buildReportBundleForSubmission
+import com.hooandee.colores.report.reportDiagnostics
 import com.hooandee.colores.sensor.AndroidBatterySource
 import com.hooandee.colores.sensor.PerformanceMetric
 import com.hooandee.colores.sensor.PerformanceSources
@@ -85,7 +93,6 @@ import com.hooandee.colores.sensor.SysfsThermalSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -101,6 +108,7 @@ data class ColoresUiState(
     val detectionOutcome: DetectionOutcome? = null,
     val devicePresentation: DevicePresentation = DevicePresentation.UNKNOWN,
     val learnedHardware: Boolean = false,
+    val learnedBindingNeedsRevalidation: Boolean = false,
     val hardwareLearning: HardwareLearningUiState = HardwareLearningUiState(),
     val controlAccess: ControlAccess = ControlAccess.SERVICE_UNAVAILABLE,
     val mode: AppMode = AppMode.COLOR,
@@ -156,7 +164,7 @@ data class ColoresUiState(
 
     val hardwareLearningCandidates: List<ProbeCandidate>
         get() =
-            when (val outcome = detectionOutcome) {
+            when (val outcome = detectionOutcome?.takeIf { it.identity.complete }) {
                 is DetectionOutcome.Candidates -> outcome.candidates
                 is DetectionOutcome.UnavailableKnownDevice -> outcome.candidates
                 is DetectionOutcome.Resolved ->
@@ -239,7 +247,7 @@ data class ColoresUiState(
             if (colorEnabled) {
                 add(AppMode.COLOR)
                 if (gradientAvailable) add(AppMode.GRADIENT)
-                add(AppMode.EFFECT)
+                if (effects.isNotEmpty()) add(AppMode.EFFECT)
             }
             if (sensorsAvailable) add(AppMode.BATTERY)
             if (colorEnabled) add(AppMode.CLOCK)
@@ -285,8 +293,14 @@ class ColoresViewModel(
     private val deviceIdentityCatalog =
         AndroidDeviceIdentityCatalog.parse(runCatching { application.readAsset("android-device-identities.json") }.getOrDefault(""))
     private val gradientPresets = GradientPresetRepository(application).load()
-    private var hardwareLearningSession: HardwareLearningSession? = null
+    private var hardwareLearningSession: HardwareLearningSession?
+        get() = coloresApplication.hardwareLearningHandoff.session
+        set(value) {
+            coloresApplication.hardwareLearningHandoff.session = value
+        }
     private var hardwareLearningOperation: Job? = null
+    private var identityRetries = 0
+    private var busyRetries = 0
 
     init {
         viewModelScope.launch {
@@ -340,9 +354,16 @@ class ColoresViewModel(
         refreshJob =
             viewModelScope.launch {
                 val context = coloresApplication
-                val rollbackStatus = context.recoverHardwareLearningRollback()
-                if (rollbackStatus == RollbackStatus.RESTORE_FAILED) {
+                val recovery = context.recoverHardwareLearningRollback()
+                if (recovery == LearningRecovery.BUSY) {
+                    mutableState.update { it.copy(loading = false, controlAccess = ControlAccess.SERVICE_UNAVAILABLE) }
+                    scheduleBusyRetry()
+                    return@launch
+                }
+                busyRetries = 0
+                if (recovery == LearningRecovery.FAILED) {
                     controller.unbind()
+                    val rollback = context.hardwareRollbackState()
                     mutableState.update {
                         it.copy(
                             loading = false,
@@ -352,9 +373,11 @@ class ColoresViewModel(
                             hardwareLearning =
                                 it.hardwareLearning.copy(
                                     dialogOpen = true,
+                                    busy = false,
                                     restoreFailure = true,
                                     sessionState = HardwareLearningState.Blocked(LearningBlockReason.RESTORE_FAILED),
-                                ),
+                                    discardConfirmation = false,
+                                ).withRollback(rollback),
                         )
                     }
                     return@launch
@@ -375,6 +398,13 @@ class ColoresViewModel(
                     }
                 }
                 val learnedHardware = detected?.id?.startsWith("learned-") == true
+                if (learnedHardware && binding != null && learnedBindingNeedsFingerprint(outcome.identity, binding)) {
+                    withContext(Dispatchers.IO) {
+                        context.hardwareLearningStore.saveBinding(binding.copy(fingerprint = outcome.identity.fingerprint))
+                    }
+                }
+                val needsRevalidation = detected == null && learnedBindingNeedsRevalidation(outcome.identity, binding)
+                scheduleIdentityRetry(outcome.identity.complete)
                 val storedAttempt = withContext(Dispatchers.IO) { context.hardwareLearningStore.loadAttempt() }
                 val storedResults = storedAttempt?.resultsFor(outcome.identity).orEmpty()
                 if (detected != null && storedAttempt != null) {
@@ -383,230 +413,250 @@ class ColoresViewModel(
                 val devicePresentation = deviceIdentityCatalog.resolve(outcome.identity, detected)
                 val userPermissionGranted = WriteSettingsPermission.canWrite(context)
                 val applicationScope = coloresApplication.applicationScope
+                val boundDevice = detected?.let { controller.boundDevice(it.id) }
                 val device =
                     detected?.let {
-                        controller.boundDevice(it.id)
+                        boundDevice
                             ?: LedDeviceFactory.create(
                                 context,
                                 it.led,
                                 scope = CoroutineScope(applicationScope.coroutineContext + Dispatchers.IO),
                             )
                     }
-                val controlAccess =
-                    detected?.let {
-                        ControlAccess.resolve(
-                            descriptor = it.led,
-                            deviceAvailable = device?.available == true,
-                            userPermissionGranted = userPermissionGranted,
-                        )
-                    } ?: ControlAccess.SERVICE_UNAVAILABLE
+                val handoff = UnboundDeviceHandoff(device, boundDevice) { candidate -> detected?.let { controller.boundDevice(it.id) } === candidate }
+                try {
+                    val controlAccess =
+                        detected?.let {
+                            ControlAccess.resolve(
+                                descriptor = it.led,
+                                deviceAvailable = device?.available == true,
+                                userPermissionGranted = userPermissionGranted,
+                            )
+                        } ?: ControlAccess.SERVICE_UNAVAILABLE
 
-                if (detected == null || device == null || controlAccess != ControlAccess.ENABLED) {
-                    controller.unbind()
-                    mutableState.update {
-                        it.copy(
+                    if (detected == null || device == null || controlAccess != ControlAccess.ENABLED) {
+                        handoff.closeIfUnbound()
+                        controller.unbind()
+                        mutableState.update {
+                            it.copy(
+                                loading = false,
+                                detected = detected,
+                                detectionOutcome = outcome,
+                                devicePresentation = devicePresentation,
+                                learnedHardware = learnedHardware,
+                                learnedBindingNeedsRevalidation = needsRevalidation,
+                                controlAccess = controlAccess,
+                                hardwareLearning =
+                                    it.hardwareLearning.copy(
+                                        results = if (it.hardwareLearning.results.isEmpty()) storedResults else it.hardwareLearning.results,
+                                    ),
+                            )
+                        }
+                        if (shouldAutomaticallyOpenHardwareLearning(mutableState.value)) {
+                            val completedRefresh = refreshJob
+                            viewModelScope.launch {
+                                completedRefresh?.join()
+                                if (shouldAutomaticallyOpenHardwareLearning(mutableState.value)) openHardwareLearning()
+                            }
+                        }
+                        return@launch
+                    }
+
+                    val catalog = withContext(Dispatchers.IO) { EffectCatalog.parse(context.readAsset("effects.json")) }
+                    val effectPresets = device.effectPresets(catalog)
+                    val bands = withContext(Dispatchers.IO) { BandSet.parse(context.readAsset("bands.json")) }
+                    val zones = detected.capabilities.zones
+                    val gradientPresentation = detected.capabilities.gradientPresentation(device.supportsPerZone)
+                    val gradientSupported = gradientPresentation != null
+                    val gradientStopCount = gradientPresentation?.editorStopCount(zones) ?: zones
+                    val storedGradient =
+                        withContext(Dispatchers.IO) { gradientPreferences.load(detected.id) }
+                    val storedLighting = withContext(Dispatchers.IO) { lightingPreferences.load(detected.id, bands) }
+                    val liveState = withContext(Dispatchers.IO) { runCatching { device.readState() }.getOrNull() }
+
+                    val legacyGradient =
+                        hydrateGradientUiState(
+                            liveColors = storedGradient.currentStops,
+                            preferences = storedGradient,
+                            presets = gradientPresets,
+                            zones = gradientStopCount,
+                            supported = gradientSupported,
+                        ).let { gradient ->
+                            val minStops = if (device.hardwareEffects.any { it.colorStops >= 2 }) 2 else 1
+                            if (gradient.stops.size < minStops) {
+                                val fallback = gradient.stops.firstOrNull() ?: RgbColor(93, 81, 255)
+                                val padded = List(maxOf(zones, minStops)) { gradient.stops.getOrNull(it) ?: fallback }
+                                gradient.copy(stops = padded)
+                            } else {
+                                gradient
+                            }
+                        }
+                    val brightness = storedLighting.brightness ?: liveState?.brightness ?: 100
+                    val power = storedLighting.power ?: liveState?.power ?: true
+                    profileStore.migrateIfMissing(
+                        detected.id,
+                        LightingProfile(
+                            mode = storedLighting.mode,
+                            effectId = storedLighting.effectId,
+                            speed = storedLighting.speed,
+                            gradientSpeed = storedLighting.gradientSpeed,
+                            effectUsesGradient = storedLighting.effectUsesGradient,
+                            solidColor = legacyGradient.stops.firstOrNull() ?: storedLighting.solidColor,
+                            staticColors = legacyGradient.stops.ifEmpty { List(zones) { storedLighting.solidColor } },
+                            gradientStops = legacyGradient.stops,
+                            brightness = brightness,
+                            batteryBreathe = storedLighting.batteryBreathe,
+                            temperatureBreathe = storedLighting.temperatureBreathe,
+                        ),
+                    )
+                    val selectedScope = mutableState.value.profileScope
+                    val selectedProfile =
+                        when (selectedScope) {
+                            ProfileScope.Global -> profileStore.global(detected.id)
+                            is ProfileScope.App -> profileStore.effective(detected.id, selectedScope.packageName)
+                        }
+                    val hydratedGradient =
+                        legacyGradient.copy(
+                            mode = if (selectedProfile.mode == AppMode.GRADIENT) LightingMode.GRADIENT else LightingMode.COLOR,
+                            stops = selectedProfile.gradientStops,
+                        )
+                    val zoneColors =
+                        if (selectedProfile.mode == AppMode.GRADIENT) {
+                            GradientInterpolator.interpolate(hydratedGradient.stops, zones)
+                        } else {
+                            GradientInterpolator.interpolate(selectedProfile.staticColors, zones)
+                        }
+
+                    val alreadyBound =
+                        controller.snapshot.value.bound && controller.snapshot.value.deviceId == detected.id
+
+                    if (alreadyBound) handoff.closeIfUnbound()
+                    val boundWhileIdle =
+                        alreadyBound ||
+                            coloresApplication.hardwareLearningCoordinator.whenIdle {
+                                controller.bind(
+                                    LightingBinding(
+                                        deviceId = detected.id,
+                                        device = device,
+                                        zones = zones,
+                                        catalog = catalog,
+                                        bands = storedLighting.sensorBands,
+                                        battery = AndroidBatterySource(context),
+                                        temperature = SysfsThermalSource().takeIf { it.available },
+                                        performance = PerformanceSources.detect(),
+                                        audio = coloresApplication.audioLevelSource,
+                                        ambient = coloresApplication.ambientFrameSource,
+                                    ),
+                                    LightingIntent(
+                                        mode = selectedProfile.mode.coerceAvailable(gradientSupported, effectPresets.isNotEmpty()),
+                                        staticColors = zoneColors,
+                                        solidColor = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255),
+                                        gradientStops = hydratedGradient.stops,
+                                        effectId =
+                                            effectPresets.firstOrNull { it.id == selectedProfile.effectId }?.id
+                                                ?: effectPresets.firstOrNull()?.id
+                                                ?: catalog.defaultEffectId,
+                                        speed = selectedProfile.speed,
+                                        gradientSpeed = selectedProfile.gradientSpeed,
+                                        gradientPresentation = gradientPresentation ?: GradientPresentation.SPATIAL,
+                                        effectUsesGradient = selectedProfile.effectUsesGradient,
+                                        brightness = selectedProfile.brightness,
+                                        power = power,
+                                        chargerOnly = storedLighting.chargerOnly,
+                                        batteryBreathe = selectedProfile.batteryBreathe,
+                                        temperatureBreathe = selectedProfile.temperatureBreathe,
+                                        audioScale = storedLighting.audioScale,
+                                        audioSensitivityDb = storedLighting.audioSensitivityDb,
+                                        ambientVividness = storedLighting.ambientVividness,
+                                        ambientSmoothing = storedLighting.ambientSmoothing,
+                                    ),
+                                )
+                                handoff.markBound()
+                                true
+                            } == true
+                    if (!boundWhileIdle) {
+                        handoff.closeIfUnbound()
+                        mutableState.update { it.copy(loading = false, controlAccess = ControlAccess.SERVICE_UNAVAILABLE) }
+                        return@launch
+                    }
+
+                    profileCoordinator.bindDevice(detected.id, zones, gradientSupported)
+                    profileCoordinator.refreshAccess()
+                    profileCoordinator.beginPreview(selectedScope)
+                    val configured = profileStore.configuredPackages(detected.id)
+                    val configuredProfiles = profileStore.configuredProfiles(detected.id)
+                    val apps = withContext(Dispatchers.IO) { appCatalog.load(configured) }
+                    val scopeState =
+                        when (selectedScope) {
+                            ProfileScope.Global -> ProfileScopeState(false, true)
+                            is ProfileScope.App -> profileStore.scopeState(detected.id, selectedScope.packageName)
+                        }
+
+                    mutableState.update { current ->
+                        current.copy(
                             loading = false,
                             detected = detected,
                             detectionOutcome = outcome,
                             devicePresentation = devicePresentation,
                             learnedHardware = learnedHardware,
+                            learnedBindingNeedsRevalidation = false,
                             controlAccess = controlAccess,
-                            hardwareLearning =
-                                it.hardwareLearning.copy(
-                                    results = if (it.hardwareLearning.results.isEmpty()) storedResults else it.hardwareLearning.results,
-                                ),
-                        )
-                    }
-                    if (shouldAutomaticallyOpenHardwareLearning(mutableState.value)) {
-                        val completedRefresh = refreshJob
-                        viewModelScope.launch {
-                            completedRefresh?.join()
-                            if (shouldAutomaticallyOpenHardwareLearning(mutableState.value)) openHardwareLearning()
-                        }
-                    }
-                    return@launch
-                }
-
-                val catalog = withContext(Dispatchers.IO) { EffectCatalog.parse(context.readAsset("effects.json")) }
-                val effectPresets =
-                    if (device.hardwareEffects.isNotEmpty()) {
-                        device.hardwareEffects.map {
-                            EffectPreset(
-                                id = it.id,
-                                need =
-                                    when {
-                                        it.colorStops >= 2 -> EffectNeed.GRADIENT
-                                        it.colorStops == 1 -> EffectNeed.COLOR
-                                        else -> EffectNeed.NONE
-                                    },
-                                defaultSpeed = it.defaultSpeed,
-                                colors = it.colors,
-                            )
-                        }
-                    } else {
-                        catalog.presets
-                    }
-                val bands = withContext(Dispatchers.IO) { BandSet.parse(context.readAsset("bands.json")) }
-                val zones = detected.capabilities.zones
-                val gradientPresentation = detected.capabilities.gradientPresentation(device.supportsPerZone)
-                val gradientSupported = gradientPresentation != null
-                val gradientStopCount = gradientPresentation?.editorStopCount(zones) ?: zones
-                val storedGradient =
-                    withContext(Dispatchers.IO) { gradientPreferences.load(detected.id) }
-                val storedLighting = withContext(Dispatchers.IO) { lightingPreferences.load(detected.id, bands) }
-                val liveState = withContext(Dispatchers.IO) { runCatching { device.readState() }.getOrNull() }
-
-                val legacyGradient =
-                    hydrateGradientUiState(
-                        liveColors = storedGradient.currentStops,
-                        preferences = storedGradient,
-                        presets = gradientPresets,
-                        zones = gradientStopCount,
-                        supported = gradientSupported,
-                    ).let { gradient ->
-                        val minStops = if (device.hardwareEffects.any { it.colorStops >= 2 }) 2 else 1
-                        if (gradient.stops.size < minStops) {
-                            val fallback = gradient.stops.firstOrNull() ?: RgbColor(93, 81, 255)
-                            val padded = List(maxOf(zones, minStops)) { gradient.stops.getOrNull(it) ?: fallback }
-                            gradient.copy(stops = padded)
-                        } else {
-                            gradient
-                        }
-                    }
-                val brightness = storedLighting.brightness ?: liveState?.brightness ?: 100
-                val power = storedLighting.power ?: liveState?.power ?: true
-                profileStore.migrateIfMissing(
-                    detected.id,
-                    LightingProfile(
-                        mode = storedLighting.mode,
-                        effectId = storedLighting.effectId,
-                        speed = storedLighting.speed,
-                        gradientSpeed = storedLighting.gradientSpeed,
-                        effectUsesGradient = storedLighting.effectUsesGradient,
-                        solidColor = legacyGradient.stops.firstOrNull() ?: storedLighting.solidColor,
-                        staticColors = legacyGradient.stops.ifEmpty { List(zones) { storedLighting.solidColor } },
-                        gradientStops = legacyGradient.stops,
-                        brightness = brightness,
-                        batteryBreathe = storedLighting.batteryBreathe,
-                        temperatureBreathe = storedLighting.temperatureBreathe,
-                    ),
-                )
-                val selectedScope = mutableState.value.profileScope
-                val selectedProfile =
-                    when (selectedScope) {
-                        ProfileScope.Global -> profileStore.global(detected.id)
-                        is ProfileScope.App -> profileStore.effective(detected.id, selectedScope.packageName)
-                    }
-                val hydratedGradient =
-                    legacyGradient.copy(
-                        mode = if (selectedProfile.mode == AppMode.GRADIENT) LightingMode.GRADIENT else LightingMode.COLOR,
-                        stops = selectedProfile.gradientStops,
-                    )
-                val zoneColors =
-                    if (selectedProfile.mode == AppMode.GRADIENT) {
-                        GradientInterpolator.interpolate(hydratedGradient.stops, zones)
-                    } else {
-                        GradientInterpolator.interpolate(selectedProfile.staticColors, zones)
-                    }
-
-                val alreadyBound =
-                    controller.snapshot.value.bound && controller.snapshot.value.deviceId == detected.id
-
-                if (!alreadyBound) {
-                    controller.bind(
-                        LightingBinding(
-                            deviceId = detected.id,
-                            device = device,
-                            zones = zones,
-                            catalog = catalog,
-                            bands = storedLighting.sensorBands,
-                            battery = AndroidBatterySource(context),
-                            temperature = SysfsThermalSource().takeIf { it.available },
-                            performance = PerformanceSources.detect(),
-                            audio = coloresApplication.audioLevelSource,
-                            ambient = coloresApplication.ambientFrameSource,
-                        ),
-                        LightingIntent(
-                            mode = selectedProfile.mode.coerceAvailable(gradientSupported),
-                            staticColors = zoneColors,
-                            solidColor = zoneColors.firstOrNull() ?: RgbColor(93, 81, 255),
-                            gradientStops = hydratedGradient.stops,
-                            effectId =
-                                effectPresets.firstOrNull { it.id == selectedProfile.effectId }?.id
-                                    ?: effectPresets.firstOrNull()?.id
-                                    ?: catalog.defaultEffectId,
+                            hardwareLearning = current.hardwareLearning.copy(results = emptyList()),
+                            effects = effectPresets,
+                            softwareEffectIds = if (device.softwareEffects) catalog.presets.mapTo(mutableSetOf()) { it.id } else emptySet(),
+                            mode = selectedProfile.mode.coerceAvailable(gradientSupported, effectPresets.isNotEmpty()),
+                            profileStoredMode = selectedProfile.mode,
+                            effectId = selectedProfile.effectId,
                             speed = selectedProfile.speed,
                             gradientSpeed = selectedProfile.gradientSpeed,
-                            gradientPresentation = gradientPresentation ?: GradientPresentation.SPATIAL,
                             effectUsesGradient = selectedProfile.effectUsesGradient,
-                            brightness = selectedProfile.brightness,
-                            power = power,
-                            chargerOnly = storedLighting.chargerOnly,
+                            ledState = LedState(zoneColors, selectedProfile.brightness, power),
+                            gradientPresentation = gradientPresentation,
+                            gradient = hydratedGradient,
                             batteryBreathe = selectedProfile.batteryBreathe,
                             temperatureBreathe = selectedProfile.temperatureBreathe,
+                            sensorBandDefaults = bands,
+                            sensorBands = storedLighting.sensorBands,
                             audioScale = storedLighting.audioScale,
                             audioSensitivityDb = storedLighting.audioSensitivityDb,
+                            ambientCaptureFps = storedLighting.ambientCaptureFps,
+                            ambientSamplingMode = storedLighting.ambientSamplingMode,
                             ambientVividness = storedLighting.ambientVividness,
                             ambientSmoothing = storedLighting.ambientSmoothing,
-                        ),
-                    )
-                }
-
-                profileCoordinator.bindDevice(detected.id, zones, gradientSupported)
-                profileCoordinator.refreshAccess()
-                profileCoordinator.beginPreview(selectedScope)
-                val configured = profileStore.configuredPackages(detected.id)
-                val configuredProfiles = profileStore.configuredProfiles(detected.id)
-                val apps = withContext(Dispatchers.IO) { appCatalog.load(configured) }
-                val scopeState =
-                    when (selectedScope) {
-                        ProfileScope.Global -> ProfileScopeState(false, true)
-                        is ProfileScope.App -> profileStore.scopeState(detected.id, selectedScope.packageName)
+                            profileApps = apps,
+                            configuredProfiles = configuredProfiles,
+                            profileScopeState = scopeState,
+                            ledPreviewEnabled =
+                                detected.takeIf { it.previewCalibration != null }
+                                    ?.let { ledPreviewPreferences.isEnabled(it.id) } ?: false,
+                        )
                     }
-
-                mutableState.update { current ->
-                    current.copy(
-                        loading = false,
-                        detected = detected,
-                        detectionOutcome = outcome,
-                        devicePresentation = devicePresentation,
-                        learnedHardware = learnedHardware,
-                        controlAccess = controlAccess,
-                        hardwareLearning = current.hardwareLearning.copy(results = emptyList()),
-                        effects = effectPresets,
-                        softwareEffectIds = catalog.presets.mapTo(mutableSetOf()) { it.id },
-                        mode = selectedProfile.mode.coerceAvailable(gradientSupported),
-                        profileStoredMode = selectedProfile.mode,
-                        effectId = selectedProfile.effectId,
-                        speed = selectedProfile.speed,
-                        gradientSpeed = selectedProfile.gradientSpeed,
-                        effectUsesGradient = selectedProfile.effectUsesGradient,
-                        ledState = LedState(zoneColors, selectedProfile.brightness, power),
-                        gradientPresentation = gradientPresentation,
-                        gradient = hydratedGradient,
-                        batteryBreathe = selectedProfile.batteryBreathe,
-                        temperatureBreathe = selectedProfile.temperatureBreathe,
-                        sensorBandDefaults = bands,
-                        sensorBands = storedLighting.sensorBands,
-                        audioScale = storedLighting.audioScale,
-                        audioSensitivityDb = storedLighting.audioSensitivityDb,
-                        ambientCaptureFps = storedLighting.ambientCaptureFps,
-                        ambientSamplingMode = storedLighting.ambientSamplingMode,
-                        ambientVividness = storedLighting.ambientVividness,
-                        ambientSmoothing = storedLighting.ambientSmoothing,
-                        profileApps = apps,
-                        configuredProfiles = configuredProfiles,
-                        profileScopeState = scopeState,
-                        ledPreviewEnabled =
-                            detected.takeIf { it.previewCalibration != null }
-                                ?.let { ledPreviewPreferences.isEnabled(it.id) } ?: false,
-                    )
+                } finally {
+                    handoff.closeIfUnbound()
                 }
             }
     }
 
-    fun onScreenOn() {
-        if (mutableState.value.canWrite) controller.reassert()
+    private fun scheduleBusyRetry() {
+        if (busyRetries >= MAX_BUSY_RETRIES || mutableState.value.hardwareLearning.dialogOpen) return
+        busyRetries += 1
+        viewModelScope.launch {
+            delay(IDENTITY_RETRY_DELAY_MS)
+            refresh()
+        }
+    }
+
+    private fun scheduleIdentityRetry(identityComplete: Boolean) {
+        if (identityComplete) {
+            identityRetries = 0
+            return
+        }
+        if (identityRetries >= MAX_IDENTITY_RETRIES) return
+        identityRetries += 1
+        viewModelScope.launch {
+            delay(IDENTITY_RETRY_DELAY_MS)
+            refresh()
+        }
     }
 
     fun onAppBackground() {
@@ -628,6 +678,7 @@ class ColoresViewModel(
                         busy = true,
                         candidateIndex = 0,
                         candidateCount = candidates.size,
+                        revalidation = current.learnedBindingNeedsRevalidation,
                     ),
             )
         }
@@ -661,8 +712,21 @@ class ColoresViewModel(
                     )
                 withContext(Dispatchers.IO) { coloresApplication.hardwareLearningStore.clearAttempt() }
                 hardwareLearningSession = session
+                val started = session.start(candidates.first())
+                if (started.isCriticalLearningBlock()) {
+                    coloresApplication.hardwareLearningCoordinator.finish { Unit }
+                    hardwareLearningSession = null
+                }
+                val rollback = coloresApplication.hardwareRollbackState()
                 mutableState.update {
-                    it.copy(hardwareLearning = it.hardwareLearning.copy(busy = false, sessionState = session.start(candidates.first())))
+                    it.copy(
+                        hardwareLearning =
+                            it.hardwareLearning.copy(
+                                busy = false,
+                                sessionState = started,
+                                restoreFailure = it.hardwareLearning.restoreFailure || started.isCriticalLearningBlock(),
+                            ).withRollback(rollback),
+                    )
                 }
             }
     }
@@ -701,8 +765,10 @@ class ColoresViewModel(
                     coloresApplication.hardwareLearningCoordinator.run {
                         withContext(Dispatchers.IO) { session.finish() }
                     } ?: return@launch
+                val critical = session.state.isCriticalLearningBlock()
                 val terminal =
                     !ui.hasNextCandidate ||
+                        critical ||
                         result.status == HardwareLearningStatus.RESTORE_FAILED
                 val accumulatedResults = ui.results + result
                 withContext(Dispatchers.IO) {
@@ -723,6 +789,7 @@ class ColoresViewModel(
                     coloresApplication.hardwareLearningCoordinator.finish { Unit }
                     hardwareLearningSession = null
                 }
+                val rollback = coloresApplication.hardwareRollbackState()
                 mutableState.update {
                     it.copy(
                         hardwareLearning =
@@ -733,7 +800,7 @@ class ColoresViewModel(
                                 restoreFailure =
                                     it.hardwareLearning.restoreFailure ||
                                         result.status == HardwareLearningStatus.RESTORE_FAILED,
-                            ),
+                            ).withRollback(rollback),
                     )
                 }
             }
@@ -743,7 +810,7 @@ class ColoresViewModel(
         val session = hardwareLearningSession ?: return
         val current = mutableState.value
         val ui = current.hardwareLearning
-        if (!ui.hasNextCandidate || ui.busy) return
+        if (!ui.hasNextCandidate || ui.busy || ui.sessionState !is HardwareLearningState.Complete) return
         val nextIndex = ui.candidateIndex + 1
         val candidate = current.hardwareLearningCandidates.getOrNull(nextIndex) ?: return
         val sessionState = session.start(candidate)
@@ -762,34 +829,22 @@ class ColoresViewModel(
             viewModelScope.launch {
                 pending?.join()
                 if (mutableState.value.hardwareLearning.restoreFailure) return@launch
-                val needsRestore = mutableState.value.hardwareLearning.sessionState !is HardwareLearningState.Complete
-                val session = hardwareLearningSession
-                val cancellationStatus =
-                    if (needsRestore) {
-                        withContext(NonCancellable + Dispatchers.IO) {
-                            coloresApplication.hardwareLearningCoordinator.finish { session?.cancel() }
-                        }
-                    } else {
-                        coloresApplication.hardwareLearningCoordinator.finish { Unit }
-                        null
-                    }
-                val cancellationState = session?.state ?: HardwareLearningState.Idle
-                if (hardwareLearningCancellationFailed(cancellationStatus, cancellationState)) {
-                    val restoreFailed = hardwareLearningRestoreFailed(cancellationStatus, cancellationState)
-                    hardwareLearningSession = null
+                val cancellation = coloresApplication.cancelHardwareLearning(pending = null).await()
+                if (hardwareLearningCancellationFailed(cancellation.status, cancellation.state)) {
+                    val restoreFailed = hardwareLearningRestoreFailed(cancellation.status, cancellation.state)
+                    val rollback = coloresApplication.hardwareRollbackState()
                     mutableState.update {
                         it.copy(
                             hardwareLearning =
                                 it.hardwareLearning.copy(
                                     busy = false,
                                     restoreFailure = it.hardwareLearning.restoreFailure || restoreFailed,
-                                    sessionState = cancellationState,
-                                ),
+                                    sessionState = cancellation.state,
+                                ).withRollback(rollback),
                         )
                     }
                     return@launch
                 }
-                hardwareLearningSession = null
                 mutableState.update {
                     it.copy(
                         hardwareLearning = dismissedHardwareLearningUiState(it.hardwareLearning),
@@ -798,6 +853,58 @@ class ColoresViewModel(
                 }
                 refresh()
             }
+    }
+
+    fun retryHardwareRollback() {
+        if (mutableState.value.hardwareLearning.busy) return
+        mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(busy = true, discardConfirmation = false)) }
+        hardwareLearningOperation =
+            viewModelScope.launch {
+                val recovery = coloresApplication.recoverHardwareLearningRollback()
+                if (recovery == LearningRecovery.FAILED || recovery == LearningRecovery.BUSY) {
+                    val rollback = coloresApplication.hardwareRollbackState()
+                    mutableState.update {
+                        it.copy(
+                            hardwareLearning = it.hardwareLearning.copy(busy = false).withRollback(rollback),
+                        )
+                    }
+                    return@launch
+                }
+                closeRecoveredHardwareLearning()
+            }
+    }
+
+    fun requestDiscardHardwareRollback() {
+        mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(discardConfirmation = true)) }
+    }
+
+    fun cancelDiscardHardwareRollback() {
+        mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(discardConfirmation = false)) }
+    }
+
+    fun confirmDiscardHardwareRollback() {
+        if (mutableState.value.hardwareLearning.busy) return
+        mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(busy = true)) }
+        hardwareLearningOperation =
+            viewModelScope.launch {
+                if (!coloresApplication.discardHardwareLearningRollback()) {
+                    mutableState.update { it.copy(hardwareLearning = it.hardwareLearning.copy(busy = false, discardConfirmation = false)) }
+                    return@launch
+                }
+                closeRecoveredHardwareLearning()
+            }
+    }
+
+    private fun closeRecoveredHardwareLearning() {
+        mutableState.update { it.copy(hardwareLearning = dismissedHardwareLearningUiState(it.hardwareLearning)) }
+        refresh()
+    }
+
+    override fun onCleared() {
+        if (hardwareLearningSession != null || mutableState.value.hardwareLearning.dialogOpen) {
+            coloresApplication.cancelHardwareLearning(hardwareLearningOperation)
+        }
+        super.onCleared()
     }
 
     fun forgetLearnedHardware() {
@@ -830,10 +937,11 @@ class ColoresViewModel(
                     } ?: HardwareLearningState.Blocked(LearningBlockReason.UNSUPPORTED_CANDIDATE)
                 val restoreFailed =
                     state is HardwareLearningState.Blocked && state.reason == LearningBlockReason.RESTORE_FAILED
-                if (restoreFailed) {
+                if (state.isCriticalLearningBlock()) {
                     coloresApplication.hardwareLearningCoordinator.finish { Unit }
                     hardwareLearningSession = null
                 }
+                val rollback = coloresApplication.hardwareRollbackState()
                 mutableState.update {
                     it.copy(
                         hardwareLearning =
@@ -841,7 +949,7 @@ class ColoresViewModel(
                                 busy = false,
                                 sessionState = state,
                                 restoreFailure = it.hardwareLearning.restoreFailure || restoreFailed,
-                            ),
+                            ).withRollback(rollback),
                     )
                 }
             }
@@ -915,20 +1023,35 @@ class ColoresViewModel(
                 ambientSamplingMode = current.ambientSamplingMode.name.lowercase(),
             )
         mutableState.update { it.copy(reportSubmission = ReportSubmissionState(sending = true)) }
-        val bundle =
-            buildReportBundleForSubmission(
-                snapshot = snapshot,
-                categories = categories,
-                text = text,
-                learningResults = current.hardwareLearning.results,
-                restoreFailure = current.hardwareLearning.restoreFailure,
-                criticalSafetyFailure = current.hardwareLearning.criticalBlockReason == LearningBlockReason.JOURNAL_UNAVAILABLE,
-                learningFacts = current.detectionOutcome?.facts.orEmpty(),
-            )
+        val outcome = current.detectionOutcome
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { reportSender.submit(bundle) }
+            val result =
+                withContext(Dispatchers.IO) {
+                    val inventory = runCatching { HardwareInventoryCollector(AndroidHardwareInventorySource(application)).collect() }.getOrNull()
+                    val bundle =
+                        buildReportBundleForSubmission(
+                            snapshot = snapshot,
+                            categories = categories,
+                            text = text,
+                            learningResults = current.hardwareLearning.results,
+                            restoreFailure = current.hardwareLearning.restoreFailure,
+                            criticalSafetyFailure = current.hardwareLearning.criticalBlockReason == LearningBlockReason.JOURNAL_UNAVAILABLE,
+                            learningFacts = outcome?.facts.orEmpty(),
+                            diagnostics =
+                                reportDiagnostics(
+                                    outcome,
+                                    inventory,
+                                    runCatching { coloresApplication.hardwareLearningStore.loadArchivedRollback()?.summary() }.getOrNull(),
+                                ),
+                        )
+                    reportSender.submit(bundle)
+                }
             mutableState.update { it.copy(reportSubmission = ReportSubmissionState(result = result)) }
         }
+    }
+
+    fun resendPendingReport() {
+        viewModelScope.launch(Dispatchers.IO) { runCatching { reportSender.resendPending() } }
     }
 
     fun resetReport() {
@@ -983,7 +1106,7 @@ class ColoresViewModel(
                 profileScope = scope,
                 profilePickerOpen = false,
                 profileScopeState = scopeState,
-                mode = profile.mode.coerceAvailable(current.gradientAvailable),
+                mode = profile.mode.coerceAvailable(current.gradientAvailable, current.effects.isNotEmpty()),
                 profileStoredMode = profile.mode,
                 effectId = profile.effectId,
                 speed = profile.speed,
@@ -1472,8 +1595,15 @@ class ColoresViewModel(
 
 private const val COLOR_COMMIT_DEBOUNCE_MS = 120L
 
-private fun AppMode.coerceAvailable(gradientSupported: Boolean): AppMode =
-    if (this == AppMode.GRADIENT && !gradientSupported) AppMode.COLOR else this
+internal fun AppMode.coerceAvailable(
+    gradientSupported: Boolean,
+    effectsAvailable: Boolean,
+): AppMode =
+    when {
+        this == AppMode.GRADIENT && !gradientSupported -> AppMode.COLOR
+        this == AppMode.EFFECT && !effectsAvailable -> AppMode.COLOR
+        else -> this
+    }
 
 private fun ColoresUiState.gradientStopCount(): Int =
     gradientPresentation?.editorStopCount(detected?.capabilities?.zones ?: 2) ?: 2
@@ -1491,3 +1621,32 @@ private fun ColoresUiState.ambientCaptureConfig(): AmbientCaptureConfig? {
 
 private fun android.content.Context.readAsset(name: String): String =
     assets.open(name).bufferedReader().use { it.readText() }
+
+private const val MAX_IDENTITY_RETRIES = 2
+
+private const val MAX_BUSY_RETRIES = 3
+
+private const val IDENTITY_RETRY_DELAY_MS = 1_500L
+
+private fun LedDevice.effectPresets(catalog: EffectCatalog): List<EffectPreset> =
+    when {
+        hardwareEffects.isNotEmpty() ->
+            hardwareEffects.map {
+                EffectPreset(
+                    id = it.id,
+                    need =
+                        when {
+                            it.colorStops >= 2 -> EffectNeed.GRADIENT
+                            it.colorStops == 1 -> EffectNeed.COLOR
+                            else -> EffectNeed.NONE
+                        },
+                    defaultSpeed = it.defaultSpeed,
+                    colors = it.colors,
+                )
+            }
+        softwareEffects -> catalog.presets
+        else -> emptyList()
+    }
+
+private fun HardwareLearningUiState.withRollback(rollback: HardwareRollbackState): HardwareLearningUiState =
+    copy(journalPending = rollback.pending, recoveryAttempts = rollback.attempts)

@@ -257,7 +257,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSparkles(
 }
 
 @Composable
-private fun navLabel(mode: AppMode): String =
+internal fun navLabel(mode: AppMode): String =
     when (mode) {
         AppMode.COLOR -> stringResource(R.string.nav_color)
         AppMode.GRADIENT -> stringResource(R.string.nav_gradient)

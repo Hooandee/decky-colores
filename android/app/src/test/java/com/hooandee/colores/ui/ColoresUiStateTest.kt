@@ -9,6 +9,10 @@ import com.hooandee.colores.device.AndroidDeviceIdentity
 import com.hooandee.colores.device.DevicePresentation
 import com.hooandee.colores.device.DevicePresentationSource
 import com.hooandee.colores.device.DeviceRegistry
+import com.hooandee.colores.device.learning.DetectionOutcome
+import com.hooandee.colores.device.learning.ProbeCandidate
+import com.hooandee.colores.device.learning.ProbeSurface
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.engine.EffectNeed
 import com.hooandee.colores.engine.EffectPreset
 import com.hooandee.colores.gradient.GradientPresentation
@@ -25,6 +29,25 @@ class ColoresUiStateTest {
             File("../../shared/devices.json").readText(),
             File("../../shared/led-preview-profiles.json").readText(),
         ).match(AndroidDeviceIdentity("AYN Thor", "kalama", "AYN", emptyMap()))!!
+
+    @Test
+    fun `incomplete identity offers no learning candidates`() {
+        val identity = AndroidDeviceIdentity("Mystery", "mystery", "Maker", emptyMap())
+        val candidate =
+            ProbeCandidate(
+                cartridgeId = "singleadc-joypad",
+                cartridgeVersion = 1,
+                surface = ProbeSurface.SINGLEADC_JOYPAD,
+                descriptor = SingleAdcJoypadDescriptor(),
+                signalKeys = emptySet(),
+            )
+
+        assertTrue(ColoresUiState(detectionOutcome = DetectionOutcome.Candidates(identity, listOf(candidate))).hasHardwareLearningCandidates)
+        assertFalse(
+            ColoresUiState(detectionOutcome = DetectionOutcome.Candidates(identity.copy(complete = false), listOf(candidate)))
+                .hasHardwareLearningCandidates,
+        )
+    }
 
     @Test
     fun `gradient presentation derives a consistent availability state`() {
@@ -80,6 +103,24 @@ class ColoresUiStateTest {
         assertFalse(AppMode.AUDIO in unavailable.availableModes())
         assertTrue(AppMode.AMBIENT in connected.availableModes())
         assertFalse(AppMode.AMBIENT in unavailable.availableModes())
+    }
+
+    @Test
+    fun `effects tab appears only when the device offers effects`() {
+        val withoutEffects = ColoresUiState(detected = thor, effects = emptyList())
+        val withEffects = ColoresUiState(detected = thor, effects = listOf(breathing))
+
+        assertFalse(AppMode.EFFECT in withoutEffects.availableModes())
+        assertTrue(AppMode.COLOR in withoutEffects.availableModes())
+        assertTrue(AppMode.EFFECT in withEffects.availableModes())
+    }
+
+    @Test
+    fun `saved effect profile falls back to color without available effects`() {
+        assertEquals(AppMode.COLOR, AppMode.EFFECT.coerceAvailable(gradientSupported = true, effectsAvailable = false))
+        assertEquals(AppMode.EFFECT, AppMode.EFFECT.coerceAvailable(gradientSupported = true, effectsAvailable = true))
+        assertEquals(AppMode.COLOR, AppMode.GRADIENT.coerceAvailable(gradientSupported = false, effectsAvailable = true))
+        assertEquals(AppMode.AUDIO, AppMode.AUDIO.coerceAvailable(gradientSupported = false, effectsAvailable = false))
     }
 
     @Test

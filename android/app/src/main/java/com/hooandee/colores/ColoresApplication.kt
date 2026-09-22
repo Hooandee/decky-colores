@@ -14,13 +14,16 @@ import com.hooandee.colores.control.attachProfileRuntime
 import com.hooandee.colores.effects.ContextServiceGate
 import com.hooandee.colores.device.learning.HardwareLearningStore
 import com.hooandee.colores.device.learning.HardwareLearningCoordinator
+import com.hooandee.colores.device.learning.HardwareLearningCancellation
+import com.hooandee.colores.device.learning.HardwareLearningHandoff
+import com.hooandee.colores.device.learning.LearningRecovery
 import com.hooandee.colores.device.learning.Htr3212LearningCartridge
 import com.hooandee.colores.device.learning.PServerHtr3212RegisterReader
 import com.hooandee.colores.device.learning.ProbeCartridgeCatalog
 import com.hooandee.colores.device.learning.RollbackRecovery
-import com.hooandee.colores.device.learning.RollbackStatus
 import com.hooandee.colores.device.learning.SettingsLearningCartridge
 import com.hooandee.colores.device.learning.SingleAdcLearningCartridge
+import com.hooandee.colores.device.learning.SysfsI2cTopologyReader
 import com.hooandee.colores.device.learning.SysfsLearningCartridge
 import com.hooandee.colores.device.learning.restoreAfterLearningRollback
 import com.hooandee.colores.led.PServerSystemSettingsStore
@@ -31,6 +34,8 @@ import com.hooandee.colores.profiles.LightingProfileStore
 import com.hooandee.colores.settings.AppPreferences
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
@@ -49,6 +54,8 @@ class ColoresApplication : Application() {
     val ambientCaptureSession by lazy { AmbientCaptureSession(this, ambientFrameSource) }
 
     val effectsServiceGate by lazy { ContextServiceGate(this) }
+
+    val screenState: ScreenStateMonitor by lazy { ScreenStateMonitor(this) { lightingController.reassert() } }
 
     val profileStore: LightingProfileStore by lazy { LightingProfileStore(this) }
 
@@ -75,7 +82,7 @@ class ColoresApplication : Application() {
     }
 
     val hardwareRollbackRecovery: RollbackRecovery by lazy {
-        RollbackRecovery(hardwareLearningStore, hardwareLearningCatalog)
+        RollbackRecovery(hardwareLearningStore, hardwareLearningCatalog, SysfsI2cTopologyReader())
     }
 
     val usageAccess: UsageAccess by lazy { UsageAccess(this) }
@@ -96,19 +103,47 @@ class ColoresApplication : Application() {
             scope = applicationScope,
             store = profileStore,
             usageAccess = usageAccess,
-            observer = ForegroundAppObserver(this, usageAccess, focusedAppResolver = PServerFocusedAppResolver(this)),
+            observer =
+                ForegroundAppObserver(
+                    this,
+                    usageAccess,
+                    focusedAppResolver = PServerFocusedAppResolver(this),
+                    interactive = screenState.interactive,
+                ),
             controller = lightingController,
             serviceGate = effectsServiceGate,
         )
     }
 
-    suspend fun recoverHardwareLearningRollback(): RollbackStatus? =
+    override fun onCreate() {
+        super.onCreate()
+        screenState.register()
+    }
+
+    val hardwareLearningHandoff: HardwareLearningHandoff by lazy {
+        HardwareLearningHandoff(applicationScope, hardwareLearningCoordinator, hardwareRollbackRecovery::recover)
+    }
+
+    fun cancelHardwareLearning(pending: Job?): Deferred<HardwareLearningCancellation> = hardwareLearningHandoff.cancel(pending)
+
+    suspend fun recoverHardwareLearningRollback(): LearningRecovery = hardwareLearningHandoff.recover()
+
+    suspend fun discardHardwareLearningRollback(): Boolean =
         hardwareLearningCoordinator.whenIdle {
-            withContext(Dispatchers.IO) { hardwareRollbackRecovery.recover() }
+            withContext(Dispatchers.IO) { hardwareRollbackRecovery.discard() }
+        } ?: false
+
+    suspend fun hardwareRollbackState(): HardwareRollbackState =
+        withContext(Dispatchers.IO) {
+            HardwareRollbackState(
+                pending = hardwareRollbackRecovery.pending,
+                attempts = hardwareRollbackRecovery.failure?.attempts ?: 0,
+            )
         }
 
-    suspend fun restoreRuntime(): Boolean =
-        hardwareLearningCoordinator.whenIdle {
+    suspend fun restoreRuntime(): Boolean {
+        hardwareLearningHandoff.awaitCancellation()
+        return hardwareLearningCoordinator.whenIdle {
             restoreAfterLearningRollback(
                 recover = { withContext(Dispatchers.IO) { hardwareRollbackRecovery.recover() } },
                 restoreRuntime = {
@@ -119,4 +154,10 @@ class ColoresApplication : Application() {
                 },
             )
         } ?: false
+    }
 }
+
+data class HardwareRollbackState(
+    val pending: Boolean,
+    val attempts: Int,
+)

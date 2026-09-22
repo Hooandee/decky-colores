@@ -8,6 +8,9 @@ import java.io.File
 internal const val HTR3212_INFORMATION_ID = "android-i2c-htr3212"
 internal const val HTR3212_PROBE_ID = "htr3212-multipoint"
 internal const val HTR3212_PROBE_VERSION = 3
+internal const val HTR3212_LEFT_DRIVER = "htr3212l"
+internal const val HTR3212_RIGHT_DRIVER = "htr3212r"
+internal const val HTR3212_I2C_ADDRESS = 0x3c
 
 data class I2cController(
     val bus: Int,
@@ -50,8 +53,8 @@ class Htr3212InformationCartridge(
 
     override fun inspect(context: HardwareLearningContext): InformationCartridgeResult {
         val controllers = topologyReader.read()
-        val left = controllers.singleOrNull { it.driver == LEFT_DRIVER && it.address == ADDRESS }
-        val right = controllers.singleOrNull { it.driver == RIGHT_DRIVER && it.address == ADDRESS }
+        val left = controllers.singleOrNull { it.driver == HTR3212_LEFT_DRIVER && it.address == HTR3212_I2C_ADDRESS }
+        val right = controllers.singleOrNull { it.driver == HTR3212_RIGHT_DRIVER && it.address == HTR3212_I2C_ADDRESS }
         val facts =
             buildList {
                 left?.let { add(it.toFact(FACT_HTR3212_LEFT)) }
@@ -79,7 +82,7 @@ class Htr3212InformationCartridge(
                                 Htr3212Descriptor(
                                     leftBus = left.bus,
                                     rightBus = right.bus,
-                                    address = ADDRESS,
+                                    address = HTR3212_I2C_ADDRESS,
                                     leftOrder = DEFAULT_ORDER,
                                     rightOrder = DEFAULT_ORDER,
                                     rgbStartRegister = AYN_RGB_START_REGISTER,
@@ -101,9 +104,6 @@ class Htr3212InformationCartridge(
         model.equals("Retroid Pocket 5", ignoreCase = true)
 
     private companion object {
-        const val LEFT_DRIVER = "htr3212l"
-        const val RIGHT_DRIVER = "htr3212r"
-        const val ADDRESS = 0x3c
         const val STICKS = 2
         const val TOTAL_ZONES = 8
         const val AYN_RGB_START_REGISTER = 0x0d

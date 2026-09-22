@@ -22,6 +22,31 @@ class SettingsLearningCartridgeTest {
     }
 
     @Test
+    fun `brightness probe is observable even from a dim original`() {
+        val original =
+            mutableMapOf(
+                "joystick_led_light_picker_color" to "#FF010203,#FF040506",
+                "led_light_brightness_percent" to "0.2",
+                "joystick_light_enabled" to "1,1",
+            )
+        val store = FakeSettingsStore(original.toMutableMap())
+        val cartridge = SettingsLearningCartridge(store)
+        val candidate = requireNotNull(GenericLedResolver.settingsCandidate(true, original.getValue("joystick_led_light_picker_color")))
+        val level = { store.values.getValue("led_light_brightness_percent").toFloat() }
+
+        assertTrue(cartridge.execute(candidate, ProbeStep.COLOR))
+        val color = level()
+        assertTrue(cartridge.execute(candidate, ProbeStep.BRIGHTNESS_LOW))
+        val low = level()
+        assertTrue(cartridge.execute(candidate, ProbeStep.BRIGHTNESS_HIGH))
+        val high = level()
+
+        assertTrue(low < color)
+        assertTrue(high > low)
+        assertTrue(high <= 0.55f)
+    }
+
+    @Test
     fun `probe uses limited values and restores all touched settings`() {
         val original =
             mutableMapOf(
@@ -38,6 +63,20 @@ class SettingsLearningCartridgeTest {
         assertEquals("#FFFF00FF,#FFFF00FF", store.values["joystick_led_light_picker_color"])
         assertTrue(cartridge.execute(candidate, ProbeStep.BRIGHTNESS_HIGH))
         assertEquals("0.55", store.values["led_light_brightness_percent"])
+        assertEquals(RollbackStatus.RESTORED_AND_READ_BACK, cartridge.restore(candidate, snapshot))
+        assertEquals(original, store.values)
+    }
+
+    @Test
+    fun `six digit vendor colors are probed in the observed format`() {
+        val original = mutableMapOf("joystick_led_light_picker_color" to "#010203,#040506")
+        val store = FakeSettingsStore(original.toMutableMap())
+        val cartridge = SettingsLearningCartridge(store)
+        val candidate = requireNotNull(GenericLedResolver.settingsCandidate(true, original.getValue("joystick_led_light_picker_color")))
+        val snapshot = requireNotNull(cartridge.snapshot(candidate))
+
+        assertTrue(cartridge.execute(candidate, ProbeStep.ZONE, zone = 1))
+        assertEquals("#000000,#FF00FF", store.values["joystick_led_light_picker_color"])
         assertEquals(RollbackStatus.RESTORED_AND_READ_BACK, cartridge.restore(candidate, snapshot))
         assertEquals(original, store.values)
     }

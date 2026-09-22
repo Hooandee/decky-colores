@@ -41,6 +41,7 @@ class LightingControllerTest {
         override val recommendedFrameIntervalMs: Long = 80,
         override val supportsPerZone: Boolean = true,
         override val hardwareEffects: List<HardwareEffect> = emptyList(),
+        override val softwareEffects: Boolean = true,
     ) : LedDevice {
         data class Write(val colors: List<RgbColor>, val brightness: Int, val power: Boolean)
 
@@ -144,6 +145,44 @@ class LightingControllerTest {
     ) = LightingBinding("dev", device, zones, catalog, bands, battery, temperature, performance, audio, ambient)
 
     @Test
+    fun `effect mode falls back to color when the device offers no effects`() =
+        runTest {
+            val device = FakeDevice(softwareEffects = false)
+            val gate = RecordingGate()
+            val controller = LightingController(backgroundScope, gate, clockMs = { testScheduler.currentTime })
+
+            controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT))
+            advanceTimeBy(500)
+            runCurrent()
+            assertEquals(AppMode.COLOR, controller.snapshot.value.mode)
+            assertFalse(gate.running)
+
+            controller.setMode(AppMode.EFFECT)
+            advanceTimeBy(500)
+            runCurrent()
+            assertEquals(AppMode.COLOR, controller.snapshot.value.mode)
+            assertFalse(gate.running)
+            val writes = device.writes.size
+            advanceTimeBy(1_000)
+            runCurrent()
+            assertEquals(writes, device.writes.size)
+        }
+
+    @Test
+    fun `confirmed hardware effects keep effect mode without software effects`() =
+        runTest {
+            val device = FakeDevice(softwareEffects = false, hardwareEffects = listOf(HardwareEffect("breathing", 2, 50, emptyList())))
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+
+            controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT, effectId = "breathing"))
+            advanceTimeBy(100)
+            runCurrent()
+
+            assertEquals(AppMode.EFFECT, controller.snapshot.value.mode)
+            assertTrue(device.hardwareEffectWrites > 0)
+        }
+
+    @Test
     fun `ambient capture and led writes run at independent cadences`() =
         runTest {
             val device = FakeDevice(recommendedFrameIntervalMs = 80)
@@ -167,7 +206,7 @@ class LightingControllerTest {
         }
 
     @Test
-    fun `audio mode waits black without authorization and stops when leaving the mode`() =
+    fun `audio mode waits on the saved color without authorization and stops when leaving the mode`() =
         runTest {
             val device = FakeDevice(recommendedFrameIntervalMs = 80)
             val gate = RecordingGate()
@@ -178,7 +217,8 @@ class LightingControllerTest {
             runCurrent()
 
             assertFalse(gate.running)
-            assertTrue(device.writes.last().colors.all { it == RgbColor(0, 0, 0) })
+            assertTrue(device.writes.last().colors.all { it == LightingIntent().solidColor })
+            assertTrue(device.writes.last().power)
 
             audio.update(0.0, AudioCaptureStatus.STARTING)
             controller.setMode(AppMode.AUDIO)
@@ -646,6 +686,52 @@ class LightingControllerTest {
         }
 
     @Test
+    fun `a transient missing temperature reading keeps the sensor available`() =
+        runTest {
+            val temperature = FakeTemperature(50.0)
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(FakeDevice(), temperature = temperature), LightingIntent(mode = AppMode.COLOR))
+            advanceTimeBy(100)
+            runCurrent()
+            assertTrue(controller.snapshot.value.temperatureAvailable)
+
+            temperature.celsius = null
+            advanceTimeBy(3_000)
+            runCurrent()
+            assertTrue(controller.snapshot.value.temperatureAvailable)
+
+            temperature.celsius = 51.0
+            advanceTimeBy(3_000)
+            runCurrent()
+            temperature.celsius = null
+            advanceTimeBy(9_000)
+            runCurrent()
+            assertFalse(controller.snapshot.value.temperatureAvailable)
+
+            temperature.celsius = 49.0
+            advanceTimeBy(3_000)
+            runCurrent()
+            assertTrue(controller.snapshot.value.temperatureAvailable)
+        }
+
+    @Test
+    fun `temperature availability withdraws after consecutive misses or a missing source`() {
+        val availability = TemperatureAvailability(missesBeforeWithdrawal = 3)
+
+        assertTrue(availability.onBind(true))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = null))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = null))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = 40.0))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = null))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = null))
+        assertFalse(availability.onReading(sourcePresent = true, celsius = null))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = 41.0))
+        assertFalse(availability.onReading(sourcePresent = false, celsius = null))
+        assertFalse(availability.onBind(false))
+        assertFalse(availability.onReading(sourcePresent = true, celsius = null))
+    }
+
+    @Test
     fun `performance mode reports its metric label`() =
         runTest {
             val device = FakeDevice()
@@ -719,5 +805,83 @@ class LightingControllerTest {
             assertEquals(settled, device.writes.size)
             assertFalse(controller.snapshot.value.bound)
             assertFalse(gate.running)
+        }
+
+    @Test
+    fun `a revoked ambient capture falls back to the saved solid color instead of black`() =
+        runTest {
+            val saved = RgbColor(12, 200, 40)
+            val device = FakeDevice()
+            val ambient = MutableAmbientFrameSource().apply { reset(AmbientCaptureStatus.REVOKED) }
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(
+                binding(device, zones = 4, ambient = ambient),
+                LightingIntent(mode = AppMode.AMBIENT, solidColor = saved, staticColors = List(4) { saved }),
+            )
+            advanceTimeBy(100)
+            runCurrent()
+
+            assertEquals(List(4) { saved }, device.writes.last().colors)
+            assertEquals(List(4) { saved }, controller.snapshot.value.currentFrame)
+        }
+
+    @Test
+    fun `applying a profile reconciles the service once`() =
+        runTest {
+            val blue = RgbColor(0, 0, 255)
+            val device = FakeDevice()
+            val gate = RecordingGate()
+            val controller = LightingController(backgroundScope, gate, clockMs = { testScheduler.currentTime })
+            controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT, effectId = "rainbow"))
+            advanceTimeBy(100)
+            runCurrent()
+            val before = gate.starts + gate.stops
+
+            controller.applyProfile(
+                ProfileApplication(
+                    mode = AppMode.COLOR,
+                    solidColor = RgbColor(1, 1, 1),
+                    gradientStops = listOf(blue, blue),
+                    staticColors = listOf(blue, blue),
+                    effectId = "breathing",
+                    speed = 40,
+                    gradientSpeed = 20,
+                    effectUsesGradient = false,
+                    brightness = 70,
+                    batteryBreathe = false,
+                    temperatureBreathe = false,
+                ),
+            )
+            controller.awaitIdle()
+            runCurrent()
+
+            assertEquals(1, gate.starts + gate.stops - before)
+            assertFalse(gate.running)
+            assertEquals(AppMode.COLOR, controller.snapshot.value.mode)
+            assertEquals(70, controller.snapshot.value.brightness)
+            assertEquals(listOf(blue, blue), device.writes.last().colors)
+        }
+
+    @Test
+    fun `temperature availability is cached instead of rescanning on every frame`() =
+        runTest {
+            var probes = 0
+            val temperature =
+                object : TemperatureSource {
+                    override val available: Boolean
+                        get() {
+                            probes++
+                            return true
+                        }
+
+                    override fun readCelsius(): Double = 45.0
+                }
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(FakeDevice(), temperature = temperature), LightingIntent(mode = AppMode.EFFECT, effectId = "rainbow"))
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            assertTrue(controller.snapshot.value.temperatureAvailable)
+            assertEquals(0, probes)
         }
 }

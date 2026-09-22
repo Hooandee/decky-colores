@@ -38,6 +38,10 @@ data class HardwareLearningUiState(
     val candidateCount: Int = 0,
     val results: List<HardwareLearningResult> = emptyList(),
     val autoPromptDismissed: Boolean = false,
+    val revalidation: Boolean = false,
+    val journalPending: Boolean = false,
+    val recoveryAttempts: Int = 0,
+    val discardConfirmation: Boolean = false,
 ) {
     val actionLayout: HardwareLearningActionLayout
         get() =
@@ -105,6 +109,7 @@ data class HardwareLearningUiState(
                 ProbeStep.BRIGHTNESS_HIGH,
                 ProbeStep.POWER_OFF,
                 ProbeStep.POWER_ON,
+                ProbeStep.HARDWARE_EFFECT,
             ).firstOrNull { it in ready.supportedSteps && !ready.evidence.hasAnswer(it) }?.let {
                 return ProbeRequest(it, null)
             }
@@ -130,8 +135,13 @@ data class HardwareLearningUiState(
         get() =
             (sessionState as? HardwareLearningState.Blocked)
                 ?.reason
-                ?.takeIf { it in setOf(LearningBlockReason.RESTORE_FAILED, LearningBlockReason.JOURNAL_UNAVAILABLE) }
+                ?.takeIf { it in CRITICAL_BLOCK_REASONS }
 }
+
+private val CRITICAL_BLOCK_REASONS = setOf(LearningBlockReason.RESTORE_FAILED, LearningBlockReason.JOURNAL_UNAVAILABLE)
+
+internal fun HardwareLearningState.isCriticalLearningBlock(): Boolean =
+    this is HardwareLearningState.Blocked && reason in CRITICAL_BLOCK_REASONS
 
 internal fun dismissedHardwareLearningUiState(current: HardwareLearningUiState): HardwareLearningUiState =
     HardwareLearningUiState(results = current.results, autoPromptDismissed = true)

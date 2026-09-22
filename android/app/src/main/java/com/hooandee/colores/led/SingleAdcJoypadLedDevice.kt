@@ -7,6 +7,7 @@ import kotlin.math.roundToInt
 
 data class SingleAdcJoypadDescriptor(
     val basePath: String = DEFAULT_BASE_PATH,
+    val vendorEffects: Boolean = false,
 ) : LedDescriptor {
     companion object {
         const val DEFAULT_BASE_PATH = "/sys/bus/platform/devices/singleadc-joypad"
@@ -23,15 +24,24 @@ class SingleAdcJoypadLedDevice internal constructor(
         scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     ) : this(descriptor, FileSysfsAccess, scope)
 
-    private val writer = ConflatedLedWriter(scope, WRITE_INTERVAL_MS, write = ::writeFrame)
+    override val recommendedFrameIntervalMs: Long =
+        if (descriptor.vendorEffects) WRITE_INTERVAL_MS else CONSERVATIVE_FRAME_INTERVAL_MS
+
+    private val writer = ConflatedLedWriter(scope, recommendedFrameIntervalMs, write = ::writeFrame)
 
     override val available: Boolean
         get() = access.canWrite(node("custum_rgb_r")) && access.canWrite(node("led_set"))
 
     override val supportsPerZone: Boolean = false
 
+    override val softwareEffects: Boolean = descriptor.vendorEffects
+
     override val hardwareEffects: List<HardwareEffect> =
-        EFFECTS.map { HardwareEffect(it.id, it.colorStops, it.defaultSpeed, it.previewColors) }
+        if (descriptor.vendorEffects) {
+            EFFECTS.map { HardwareEffect(it.id, it.colorStops, it.defaultSpeed, it.previewColors) }
+        } else {
+            emptyList()
+        }
 
     override suspend fun readState(): LedState {
         val color =
@@ -79,6 +89,7 @@ class SingleAdcJoypadLedDevice internal constructor(
         speed: Int,
         power: Boolean,
     ): Boolean {
+        if (!descriptor.vendorEffects) return false
         val spec = EFFECTS.firstOrNull { it.id == effectId } ?: return false
         val first = colors.firstOrNull() ?: RgbColor(255, 255, 255)
         val second = colors.getOrNull(1) ?: first
@@ -116,6 +127,13 @@ class SingleAdcJoypadLedDevice internal constructor(
         put("custum_rgb_r", main.red.coerceIn(0, 255))
         put("custum_rgb_g", main.green.coerceIn(0, 255))
         put("custum_rgb_b", main.blue.coerceIn(0, 255))
+        if (!descriptor.vendorEffects) {
+            put("led_level", frame.brightness)
+            put("led_mode", STATIC_MODE)
+            put("led_switch", 1)
+            put("led_set", 1)
+            return succeeded
+        }
         val slotMain = if (frame.colored) main else RgbColor(0, 0, 0)
         val slotFollow = if (frame.colored) frame.secondColor else RgbColor(0, 0, 0)
         put("Led_rgb_r2", slotMain.red.coerceIn(0, 255))
@@ -161,6 +179,7 @@ class SingleAdcJoypadLedDevice internal constructor(
 
     private companion object {
         const val WRITE_INTERVAL_MS = 80L
+        const val CONSERVATIVE_FRAME_INTERVAL_MS = 200L
         const val STATIC_MODE = 1
         const val MAX_SPEED = 8
 

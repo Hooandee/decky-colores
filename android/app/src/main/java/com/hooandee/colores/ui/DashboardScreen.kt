@@ -58,6 +58,7 @@ fun DashboardScreen(
     onOpenSettings: () -> Unit,
     onOpenHardwareLearning: () -> Unit,
     onOpenHardwareLearningReport: () -> Unit,
+    onOpenCompatibilityReport: () -> Unit,
     gradientActions: GradientActions,
     modeActions: ModeActions,
 ) {
@@ -100,24 +101,28 @@ fun DashboardScreen(
                             state.hardwareLearningNeedsReport -> stringResource(R.string.lights_no_match_description)
                             canConfigure ->
                                 stringResource(
-                                    R.string.lights_setup_description,
+                                    if (state.devicePresentation.isKnown) {
+                                        R.string.lights_setup_description
+                                    } else {
+                                        R.string.lights_setup_description_unknown
+                                    },
                                     state.devicePresentation.friendlyName.ifBlank { stringResource(R.string.device_unknown) },
                                 )
                             else -> stringResource(R.string.no_leds_description)
                         },
                     action =
                         stringResource(
-                            if (state.hardwareLearningNeedsReport) {
-                                R.string.lights_no_match_report
-                            } else {
+                            if (canConfigure && !state.hardwareLearningNeedsReport) {
                                 R.string.lights_setup_action
+                            } else {
+                                R.string.lights_no_match_report
                             },
-                        ).takeIf { state.hardwareLearningNeedsReport || canConfigure },
+                        ),
                     onAction =
-                        if (state.hardwareLearningNeedsReport) {
-                            onOpenHardwareLearningReport
-                        } else {
-                            onOpenHardwareLearning.takeIf { canConfigure }
+                        when {
+                            state.hardwareLearningNeedsReport -> onOpenHardwareLearningReport
+                            canConfigure -> onOpenHardwareLearning
+                            else -> onOpenCompatibilityReport
                         },
                     secondaryAction = stringResource(R.string.lights_no_match_retry).takeIf { state.hardwareLearningNeedsReport },
                     onSecondaryAction = onOpenHardwareLearning.takeIf { state.hardwareLearningNeedsReport && canConfigure },
@@ -430,7 +435,10 @@ private fun DashboardModeLayout(
         val sceneEnabled = state.canWrite && colorEnabled && !dynamic
 
         @Composable
-        fun Scene(sceneModifier: Modifier) {
+        fun Scene(
+            sceneModifier: Modifier,
+            wrapContent: Boolean = false,
+        ) {
             if (state.mode == AppMode.AUDIO) {
                 AudioDeviceScene(
                     frame = state.currentFrame,
@@ -455,6 +463,7 @@ private fun DashboardModeLayout(
                     projection = state.ledColorProjection,
                     onTargetChange = sceneTargetChange,
                     showBoth = !gradientMode && !dynamic,
+                    wrapContent = wrapContent,
                     modifier = sceneModifier,
                 )
             }
@@ -488,7 +497,7 @@ private fun DashboardModeLayout(
                     modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
-                    Scene(Modifier.fillMaxWidth().height(360.dp))
+                    if (state.mode == AppMode.AUDIO) Scene(Modifier.fillMaxWidth().height(360.dp)) else Scene(Modifier.fillMaxWidth(), wrapContent = true)
                     Panel(Modifier.fillMaxWidth().height(440.dp))
                 }
             }

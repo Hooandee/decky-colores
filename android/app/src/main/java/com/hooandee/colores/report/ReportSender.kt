@@ -13,31 +13,79 @@ data class HttpResponse(
     val body: String,
 )
 
+data class PendingReport(
+    val bundle: JSONObject,
+    val savedAtEpochMs: Long,
+)
+
 class ReportSender(
     private val post: (JSONObject) -> HttpResponse,
     private val save: (JSONObject) -> String?,
     private val clear: () -> Unit,
+    private val load: () -> PendingReport? = { null },
+    private val nowEpochMs: () -> Long = System::currentTimeMillis,
 ) {
     constructor(context: Context) : this(
         post = { payload -> postReport(REPORT_SERVICE_URL, payload) },
-        save = { bundle -> saveReport(context, bundle) },
+        save = { bundle -> saveReport(context, bundle, System.currentTimeMillis()) },
         clear = { clearSavedReport(context) },
+        load = { loadSavedReport(context) },
     )
 
-    fun submit(bundle: JSONObject): ReportResult {
-        val result =
-            runCatching {
-                val response = post(encodeReportPayload(bundle))
-                parseReportResponse(response.status, response.body)
-            }.getOrElse { ReportResult.Failure(it.message ?: "network") }
-        if (result is ReportResult.Success) {
-            clear()
-            return result
+    private val lock = Any()
+
+    fun submit(bundle: JSONObject): ReportResult =
+        synchronized(lock) {
+            val result = send(bundle)
+            if (result is ReportResult.Success) {
+                resendPendingLocked(except = bundle)
+                return result
+            }
+            val failure = result as ReportResult.Failure
+            failure.copy(savedPath = save(bundle))
         }
-        val failure = result as ReportResult.Failure
-        return failure.copy(savedPath = save(bundle))
+
+    fun resendPending(): ReportResult? = synchronized(lock) { resendPendingLocked(except = null) }
+
+    private fun resendPendingLocked(except: JSONObject?): ReportResult? {
+        val pending = runCatching(load).getOrNull() ?: return null
+        val age = nowEpochMs() - pending.savedAtEpochMs
+        if (age !in 0..PENDING_MAX_AGE_MS || (except != null && pending.bundle.toString() == except.toString())) {
+            clear()
+            return null
+        }
+        val result = send(pending.bundle)
+        if (result is ReportResult.Success) clear()
+        return result
     }
+
+    private fun send(bundle: JSONObject): ReportResult =
+        runCatching {
+            val response = post(encodeReportPayload(bundle))
+            parseReportResponse(response.status, response.body)
+        }.getOrElse { ReportResult.Failure(it.message ?: "network") }
 }
+
+internal const val PENDING_MAX_AGE_MS = 7L * 24 * 60 * 60 * 1000
+
+internal fun decodePendingReport(
+    raw: String,
+    fallbackSavedAtEpochMs: Long,
+): PendingReport? =
+    runCatching {
+        val json = JSONObject(raw)
+        val bundle = json.optJSONObject("bundle")
+        if (bundle != null && json.has("saved_at")) {
+            PendingReport(bundle, json.getLong("saved_at"))
+        } else {
+            PendingReport(json, fallbackSavedAtEpochMs)
+        }
+    }.getOrNull()
+
+internal fun encodePendingReport(
+    bundle: JSONObject,
+    savedAtEpochMs: Long,
+): String = JSONObject().put("saved_at", savedAtEpochMs).put("bundle", bundle).toString()
 
 private fun postReport(
     serviceUrl: String,
@@ -63,12 +111,13 @@ private fun postReport(
 private fun saveReport(
     context: Context,
     bundle: JSONObject,
+    savedAtEpochMs: Long,
 ): String? =
     runCatching {
-        val directory = File(context.filesDir, "reports").apply { mkdirs() }
-        val target = File(directory, "report-offline.json")
-        val temporary = File(directory, "report-offline.json.tmp")
-        temporary.writeText(bundle.toString(2))
+        val target = savedReportFile(context)
+        val directory = target.parentFile.apply { mkdirs() }
+        val temporary = File(directory, "${target.name}.tmp")
+        temporary.writeText(encodePendingReport(bundle, savedAtEpochMs))
         runCatching {
             Files.move(
                 temporary.toPath(),
@@ -82,8 +131,16 @@ private fun saveReport(
         target.absolutePath
     }.getOrNull()
 
+private fun savedReportFile(context: Context): File = File(File(context.filesDir, "reports"), "report-offline.json")
+
 private fun clearSavedReport(context: Context) {
-    File(File(context.filesDir, "reports"), "report-offline.json").delete()
+    savedReportFile(context).delete()
+}
+
+private fun loadSavedReport(context: Context): PendingReport? {
+    val file = savedReportFile(context)
+    if (!file.isFile) return null
+    return decodePendingReport(file.readText(), file.lastModified())
 }
 
 private const val REPORT_SERVICE_URL = "https://bug-collector-khaki.vercel.app/api/report"

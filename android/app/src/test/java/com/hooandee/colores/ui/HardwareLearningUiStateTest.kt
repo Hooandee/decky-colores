@@ -27,6 +27,33 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HardwareLearningUiStateTest {
+    @Test
+    fun `failed restore keeps recovery actions until retry or discard closes it`() {
+        val failed =
+            HardwareLearningUiState(
+                dialogOpen = true,
+                restoreFailure = true,
+                sessionState = HardwareLearningState.Blocked(LearningBlockReason.RESTORE_FAILED),
+                journalPending = true,
+                recoveryAttempts = 2,
+                discardConfirmation = true,
+            )
+
+        assertEquals(HardwareLearningActionLayout.REPORT_ONLY, failed.actionLayout)
+        assertFalse(failed.canDismiss)
+        assertTrue(failed.sessionState.isCriticalLearningBlock())
+        assertTrue(HardwareLearningState.Blocked(LearningBlockReason.JOURNAL_UNAVAILABLE).isCriticalLearningBlock())
+        assertFalse(HardwareLearningState.Blocked(LearningBlockReason.WRITE_FAILED).isCriticalLearningBlock())
+
+        val closed = dismissedHardwareLearningUiState(failed)
+
+        assertFalse(closed.dialogOpen)
+        assertFalse(closed.restoreFailure)
+        assertFalse(closed.journalPending)
+        assertFalse(closed.discardConfirmation)
+        assertEquals(0, closed.recoveryAttempts)
+    }
+
     private val candidate =
         ProbeCandidate(
             "android-sysfs-multicolor",

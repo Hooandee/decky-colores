@@ -54,6 +54,26 @@ class PServerHtr3212RegisterReaderTest {
     }
 
     @Test
+    fun `reads the explicit control bank but no arbitrary register list`() {
+        val output = temporaryFolder.newFile("htr-registers")
+        val control = listOf(0x4a, 0x4b) + (0x32..0x3d) + 0x00
+        val executor =
+            object : PServerCommandExecutor {
+                override val available = true
+
+                override fun execute(command: String): Boolean {
+                    output.writeText(List(control.size) { "0x01" }.joinToString("\n"))
+                    return true
+                }
+            }
+        val reader = PServerHtr3212RegisterReader(executor, output)
+
+        assertEquals(List(control.size) { 1 }, reader.read(3, 0x3c, control))
+        assertNull(reader.read(3, 0x3c, control.reversed()))
+        assertNull(reader.read(3, 0x3c, listOf(0x4a)))
+    }
+
+    @Test
     fun `rejects malformed output instead of shifting register values`() {
         val output = temporaryFolder.newFile("htr-registers")
         val executor =

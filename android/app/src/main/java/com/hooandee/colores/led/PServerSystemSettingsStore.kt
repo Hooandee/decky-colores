@@ -122,18 +122,18 @@ internal class VerifiedPServerCommandExecutor(
         }.isSuccess
 }
 
-private fun File.shareWithPServer(writable: Boolean) {
+internal fun File.shareWithPServer(writable: Boolean) {
     setReadable(false, false)
     setReadable(true, false)
     setWritable(false, false)
     setWritable(true, !writable)
 }
 
-private fun File.restoreOwnerAccess() {
+internal fun File.restoreOwnerAccess() {
     setReadable(false, false)
     setReadable(true, true)
     setWritable(false, false)
     setWritable(true, true)
 }
 
-private fun String.shellQuoted(): String = "'${replace("'", "'\"'\"'")}'"
+internal fun String.shellQuoted(): String = "'${replace("'", "'\"'\"'")}'"
