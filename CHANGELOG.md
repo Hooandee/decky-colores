@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.29.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.29.0...decky-colores-v0.29.1) (2026-09-22)
+
+
+### Bug Fixes
+
+* resolve validated hardware control issues ([a6865eb](https://github.com/Hooandee/decky-colores/commit/a6865eb17ada1e8ccf2c48a1ba6355500d894c4a))
+* resolve validated hardware control issues ([f7c8282](https://github.com/Hooandee/decky-colores/commit/f7c828226fb65dc543a1a7622599fcec53e63e48))
+
 ## [0.29.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.28.0...decky-colores-v0.29.0) (2026-09-20)
 
 ### Español
