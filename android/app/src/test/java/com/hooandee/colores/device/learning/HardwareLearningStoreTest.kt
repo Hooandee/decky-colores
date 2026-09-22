@@ -70,6 +70,32 @@ class HardwareLearningStoreTest {
     }
 
     @Test
+    fun `binding fingerprint persists and legacy bindings load without one`() {
+        val values = mutableMapOf<String, String>()
+        val store = HardwareLearningStore(values::get, { key, value -> values.set(key, value).let { true } }, { values.remove(it) != null })
+        val binding =
+            LearnedDeviceBinding(
+                identityHash = "a".repeat(64),
+                cartridgeId = "singleadc-joypad",
+                cartridgeVersion = 1,
+                descriptorJson = "{}",
+                capabilities = DeviceCapabilities(true, false, false, 1),
+                appVersion = "1.0",
+                learnedAtEpochMs = 1L,
+                fingerprint = "maker/device:14/build",
+            )
+
+        assertTrue(store.saveBinding(binding))
+        assertEquals(binding, store.loadBinding())
+
+        values["binding"] =
+            "{\"schema\":1,\"identity_hash\":\"${"a".repeat(64)}\",\"cartridge_id\":\"singleadc-joypad\"," +
+            "\"cartridge_version\":1,\"descriptor\":\"{}\",\"capabilities\":{\"color\":true,\"brightness\":false," +
+            "\"per_zone\":false,\"zones\":1},\"app_version\":\"0.9\",\"learned_at\":1}"
+        assertEquals("", store.loadBinding()?.fingerprint)
+    }
+
+    @Test
     fun `clear removes rollback and learned binding independently`() {
         val values = mutableMapOf("rollback" to "r", "binding" to "b")
         val store = HardwareLearningStore(values::get, { key, value -> values.set(key, value).let { true } }, { values.remove(it) != null })

@@ -56,7 +56,7 @@ class SingleAdcJoypadLedDeviceTest {
     fun `two color hardware effect writes a distinct colour per zone slot`() =
         runTest {
             val access = FakeSysfsAccess(allNodes)
-            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
+            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base, vendorEffects = true), access, backgroundScope)
 
             assertTrue(
                 device.applyHardwareEffect(
@@ -83,7 +83,7 @@ class SingleAdcJoypadLedDeviceTest {
     fun `single colour list mirrors the colour to both zone slots`() =
         runTest {
             val access = FakeSysfsAccess(allNodes)
-            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
+            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base, vendorEffects = true), access, backgroundScope)
 
             device.applyHardwareEffect("chasing", listOf(RgbColor(9, 8, 7)), brightness = 100, speed = 0, power = true)
             runCurrent()
@@ -96,7 +96,7 @@ class SingleAdcJoypadLedDeviceTest {
     fun `fixed hardware effect zeroes the zone colors`() =
         runTest {
             val access = FakeSysfsAccess(allNodes)
-            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
+            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base, vendorEffects = true), access, backgroundScope)
 
             device.applyHardwareEffect("marquee", listOf(RgbColor(255, 0, 0)), brightness = 100, speed = 50, power = true)
             runCurrent()
@@ -109,15 +109,15 @@ class SingleAdcJoypadLedDeviceTest {
     fun `unknown hardware effect is rejected`() =
         runTest {
             val access = FakeSysfsAccess(nodes)
-            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
+            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base, vendorEffects = true), access, backgroundScope)
             assertFalse(device.applyHardwareEffect("nope", listOf(RgbColor(1, 2, 3)), 100, 50, true))
         }
 
     @Test
-    fun `exposes anbernic hardware effects with two colour stops for the coloured ones`() {
+    fun `profile with vendor effects exposes anbernic hardware effects with two colour stops for the coloured ones`() {
         val device =
             SingleAdcJoypadLedDevice(
-                SingleAdcJoypadDescriptor(base),
+                SingleAdcJoypadDescriptor(base, vendorEffects = true),
                 FakeSysfsAccess(nodes),
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined),
             )
@@ -126,6 +126,31 @@ class SingleAdcJoypadLedDeviceTest {
         assertEquals(2, device.hardwareEffects.first { it.id == "chasing" }.colorStops)
         assertEquals(0, device.hardwareEffects.first { it.id == "marquee" }.colorStops)
     }
+
+    @Test
+    fun `learned descriptor exposes no unobserved hardware effects`() =
+        runTest {
+            val access = FakeSysfsAccess(allNodes)
+            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
+
+            assertTrue(device.hardwareEffects.isEmpty())
+            assertFalse(device.applyHardwareEffect("breathing", listOf(RgbColor(1, 2, 3)), 100, 50, true))
+        }
+
+    @Test
+    fun `learned descriptor writes only the probed nodes`() =
+        runTest {
+            val access = FakeSysfsAccess(allNodes)
+            val device = SingleAdcJoypadLedDevice(SingleAdcJoypadDescriptor(base), access, backgroundScope)
+
+            device.applySolid(RgbColor(255, 0, 255), brightness = 60, power = true)
+            runCurrent()
+
+            assertEquals(nodes, access.values.keys)
+            assertEquals("60", access.values["$base/led_level"])
+            assertEquals("1", access.values["$base/led_mode"])
+            assertEquals("1", access.values["$base/led_set"])
+        }
 
     @Test
     fun `reports a single zone and no per zone`() {

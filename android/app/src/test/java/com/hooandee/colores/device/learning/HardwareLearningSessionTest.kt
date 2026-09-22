@@ -189,19 +189,90 @@ class HardwareLearningSessionTest {
         assertTrue(store.hasRollback())
     }
 
-    private fun fixture(): Fixture {
+    @Test
+    fun `binding stores the Android build fingerprint`() {
+        val fixture = fixture(identity.copy(fingerprint = "maker/device:14/build"))
+        fixture.session.start(candidate)
+        fixture.session.consent()
+        fixture.session.run(ProbeStep.COLOR)
+        fixture.session.answer(UserObservation.YES)
+
+        assertEquals(HardwareLearningStatus.ADAPTED, fixture.session.finish().status)
+        assertEquals("maker/device:14/build", fixture.store.loadBinding()?.fingerprint)
+    }
+
+    @Test
+    fun `incomplete identity never saves a binding`() {
+        val fixture = fixture(identity.copy(complete = false))
+        fixture.session.start(candidate)
+        fixture.session.consent()
+        fixture.session.run(ProbeStep.COLOR)
+        fixture.session.answer(UserObservation.YES)
+
+        val result = fixture.session.finish()
+
+        assertEquals(HardwareLearningStatus.BLOCKED, result.status)
+        assertNull(fixture.store.loadBinding())
+        assertEquals("original", fixture.cartridge.hardwareValue)
+        assertNull(fixture.store.loadRollback())
+    }
+
+    @Test
+    fun `starting another candidate with a pending snapshot is rejected`() {
+        val fixture = fixture()
+        fixture.session.start(candidate)
+        fixture.session.consent()
+        fixture.session.run(ProbeStep.COLOR)
+        val pending = fixture.session.state
+
+        assertEquals(pending, fixture.session.start(candidate.copy(signalKeys = setOf("other"))))
+        assertEquals("color", fixture.cartridge.hardwareValue)
+        assertEquals(RollbackStatus.RESTORED_AND_READ_BACK, fixture.session.cancel())
+        assertEquals("original", fixture.cartridge.hardwareValue)
+        assertNull(fixture.store.loadRollback())
+    }
+
+    @Test
+    fun `a stale durable journal blocks a new session instead of being overwritten`() {
+        val fixture = fixture()
+        val stale = RollbackRecord("old", candidate.cartridgeId, 1, encodeLearningDescriptor(candidate.descriptor), ProbeSnapshot(mapOf("hardware" to "vendor")))
+        fixture.store.saveRollback(stale)
+
+        val state = fixture.session.start(candidate)
+
+        assertEquals(LearningBlockReason.RESTORE_FAILED, (state as HardwareLearningState.Blocked).reason)
+        assertEquals("old", fixture.store.loadRollback()?.sessionId)
+    }
+
+    @Test
+    fun `finished candidate releases its snapshot before the next route`() {
+        val fixture = fixture()
+        fixture.session.start(candidate)
+        fixture.session.consent()
+        fixture.session.run(ProbeStep.COLOR)
+        fixture.session.answer(UserObservation.YES)
+        fixture.session.finish()
+        val restores = fixture.cartridge.restores
+
+        assertTrue(fixture.session.start(candidate) is HardwareLearningState.ConsentRequired)
+        assertNull(fixture.session.cancel())
+        assertEquals(restores, fixture.cartridge.restores)
+    }
+
+    private fun fixture(sessionIdentity: AndroidDeviceIdentity = identity): Fixture {
         val values = mutableMapOf<String, String>()
         val store = HardwareLearningStore(values::get, { key, value -> values.set(key, value).let { true } }, { values.remove(it) != null })
         val cartridge = RecordingCartridge()
-        return Fixture(store, cartridge, session(cartridge, store))
+        return Fixture(store, cartridge, session(cartridge, store, sessionIdentity))
     }
 
     private fun session(
         cartridge: RecordingCartridge,
         store: HardwareLearningStore,
+        sessionIdentity: AndroidDeviceIdentity = identity,
     ) =
         HardwareLearningSession(
-            identity = identity,
+            identity = sessionIdentity,
             catalog = ProbeCartridgeCatalog(listOf(cartridge)),
             store = store,
             appVersion = "0.1.0",
@@ -223,6 +294,7 @@ class HardwareLearningSessionTest {
         override val version = 1
         override val surface = ProbeSurface.SYSFS_RGB
         var hardwareValue = "original"
+        var restores = 0
 
         override fun accepts(candidate: ProbeCandidate) = candidate.cartridgeId == id
         override fun snapshot(candidate: ProbeCandidate): ProbeSnapshot {
@@ -239,6 +311,7 @@ class HardwareLearningSessionTest {
 
         override fun restore(candidate: ProbeCandidate, snapshot: ProbeSnapshot): RollbackStatus {
             hardwareValue = snapshot.values.getValue("hardware")
+            restores += 1
             return RollbackStatus.RESTORED_AND_READ_BACK
         }
     }

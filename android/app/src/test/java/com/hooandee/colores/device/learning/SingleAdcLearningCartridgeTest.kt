@@ -30,6 +30,26 @@ class SingleAdcLearningCartridgeTest {
     }
 
     @Test
+    fun `brightness probe starts high then drops and rises observably`() {
+        val original = statePaths.associateWith { "25" }.toMutableMap()
+        val access = FakeSysfsAccess((statePaths + latch).toSet(), original)
+        val cartridge = SingleAdcLearningCartridge(access)
+        val candidate = candidate(SingleAdcJoypadDescriptor(base))
+        val level = { access.values.getValue("$base/led_level").toInt() }
+
+        assertTrue(cartridge.execute(candidate, ProbeStep.COLOR))
+        val color = level()
+        assertTrue(cartridge.execute(candidate, ProbeStep.BRIGHTNESS_LOW))
+        val low = level()
+        assertTrue(cartridge.execute(candidate, ProbeStep.BRIGHTNESS_HIGH))
+        val high = level()
+
+        assertTrue(low < color)
+        assertTrue(high > low)
+        assertTrue(high <= 55)
+    }
+
+    @Test
     fun `probe restores every state node and latches the restored frame`() {
         val original = statePaths.withIndex().associate { (index, path) -> path to (index + 10).toString() }.toMutableMap()
         val access = FakeSysfsAccess((statePaths + latch).toSet(), original.toMutableMap())

@@ -61,9 +61,13 @@ class SettingsLearningCartridge(
         val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return false
         if (snapshot(candidate) == null) return false
         return when (step) {
-            ProbeStep.COLOR -> store.put(descriptor.colorKey, List(descriptor.zones) { PROBE_COLOR }.joinToString(","))
-            ProbeStep.BRIGHTNESS_LOW -> putExisting(descriptor.brightnessKey, "0.25")
-            ProbeStep.BRIGHTNESS_HIGH -> putExisting(descriptor.brightnessKey, "0.55")
+            ProbeStep.COLOR -> {
+                val colored = store.put(descriptor.colorKey, List(descriptor.zones) { PROBE_COLOR }.joinToString(","))
+                val leveled = store.get(descriptor.brightnessKey) == null || putExisting(descriptor.brightnessKey, HIGH_BRIGHTNESS)
+                colored && leveled
+            }
+            ProbeStep.BRIGHTNESS_LOW -> putExisting(descriptor.brightnessKey, LOW_BRIGHTNESS)
+            ProbeStep.BRIGHTNESS_HIGH -> putExisting(descriptor.brightnessKey, HIGH_BRIGHTNESS)
             ProbeStep.POWER_OFF -> putPower(descriptor, false)
             ProbeStep.POWER_ON -> putPower(descriptor, true)
             ProbeStep.ZONE -> {
@@ -111,5 +115,7 @@ class SettingsLearningCartridge(
         const val MAX_ZONES = 16
         const val PROBE_COLOR = "#FFFF00FF"
         const val OFF_COLOR = "#FF000000"
+        const val LOW_BRIGHTNESS = "0.1"
+        const val HIGH_BRIGHTNESS = "0.55"
     }
 }

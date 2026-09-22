@@ -62,6 +62,7 @@ enum class EvidenceLevel {
 enum class RollbackStatus {
     RESTORED_AND_READ_BACK,
     RESTORED_WITHOUT_HARDWARE_READBACK,
+    RESTORED_UNVERIFIED,
     RESTORE_FAILED,
 }
 
@@ -85,6 +86,7 @@ data class LearnedDeviceBinding(
     val capabilities: DeviceCapabilities,
     val appVersion: String,
     val learnedAtEpochMs: Long,
+    val fingerprint: String = "",
 )
 
 data class HardwareLearningAttempt(

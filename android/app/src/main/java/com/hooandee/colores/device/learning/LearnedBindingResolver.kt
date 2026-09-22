@@ -12,7 +12,8 @@ internal fun resolveLearnedDevice(
     candidates: List<ProbeCandidate>,
 ): DetectedAndroidDevice? {
     binding ?: return null
-    if (binding.identityHash != learningIdentityHash(identity)) return null
+    if (!identity.complete || binding.identityHash != learningIdentityHash(identity)) return null
+    if (learnedBindingNeedsRevalidation(identity, binding)) return null
     val boundDescriptor = decodeLearningDescriptor(binding.descriptorJson) ?: return null
     val candidate =
         candidates.firstOrNull {
@@ -50,6 +51,27 @@ private fun ProbeCandidate.learnedGridLayout(
     } else {
         null
     }
+
+internal fun learnedBindingNeedsRevalidation(
+    identity: AndroidDeviceIdentity,
+    binding: LearnedDeviceBinding?,
+): Boolean =
+    binding != null &&
+        identity.complete &&
+        binding.identityHash == learningIdentityHash(identity) &&
+        binding.fingerprint.isNotBlank() &&
+        identity.fingerprint.isNotBlank() &&
+        binding.fingerprint != identity.fingerprint
+
+internal fun learnedBindingNeedsFingerprint(
+    identity: AndroidDeviceIdentity,
+    binding: LearnedDeviceBinding?,
+): Boolean =
+    binding != null &&
+        identity.complete &&
+        binding.identityHash == learningIdentityHash(identity) &&
+        binding.fingerprint.isBlank() &&
+        identity.fingerprint.isNotBlank()
 
 internal fun learnedDeviceIdForPromotion(
     identity: AndroidDeviceIdentity,

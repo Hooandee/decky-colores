@@ -337,6 +337,8 @@
     <string name="hardware_learning_progress">Route %1$d of %2$d</string>
     <string name="hardware_learning_title">Let’s find your lights</string>
     <string name="hardware_learning_consent">Colores found a possible route through %1$s. It will save the current state first. Then you will start each test, watch the device and confirm only what you can see.</string>
+    <string name="hardware_learning_revalidate_title">Confirm your lights again</string>
+    <string name="hardware_learning_revalidate_body">Android was updated. Your adaptation is kept, but it stays off until you repeat the test.</string>
     <string name="hardware_learning_safety">Nothing is tested before the current state is saved</string>
     <string name="hardware_learning_prepare">Save state and prepare</string>
     <string name="hardware_learning_state_saved">Original state saved</string>
@@ -355,6 +357,7 @@
     <string name="hardware_learning_no_match_body">We will not show controls that have not been confirmed.</string>
     <string name="hardware_learning_restored">Original state restored and verified</string>
     <string name="hardware_learning_restored_without_readback">Original settings restored, without hardware readback</string>
+    <string name="hardware_learning_restored_unverified">Restored without confirming lights off</string>
     <string name="hardware_learning_try_next">Try the next route</string>
     <string name="hardware_learning_continue_discovery">Look for more zones</string>
     <string name="hardware_learning_more_routes_body">This route works and remains saved as a fallback. We found another safe test that may discover more zones.</string>
@@ -404,9 +407,18 @@
     <string name="hardware_learning_blocked">The test has stopped</string>
     <string name="hardware_learning_blocked_body">The test could not continue safely. No experimental control was enabled.</string>
     <string name="hardware_learning_restore_failed">We need your help before continuing</string>
-    <string name="hardware_learning_restore_failed_body">Colores could not confirm restoration. It will run no more tests and will retain the journal to retry at startup.</string>
+    <string name="hardware_learning_restore_failed_body">Colores couldn’t confirm the restore and won’t run more tests.</string>
     <string name="hardware_learning_journal_unavailable">The safety record is still open</string>
     <string name="hardware_learning_journal_unavailable_body">Colores has blocked new tests because it could not safely close the restoration record. You can send us the diagnostics so we can investigate.</string>
+    <string name="hardware_learning_retry_restore">Retry restore</string>
+    <string name="hardware_learning_discard_restore">Discard restore</string>
+    <string name="hardware_learning_discard_title">Discard the restore?</string>
+    <string name="hardware_learning_discard_body">Colores will stop trying and the lights may stay as they are. The journal is kept for the report.</string>
+    <string name="hardware_learning_discard_confirm">Discard anyway</string>
+    <string name="hardware_learning_discard_cancel">Go back</string>
+    <string name="hardware_learning_restore_options">You can retry or discard it.</string>
+    <string name="hardware_learning_restore_attempts">Attempts: %1$d of %2$d.</string>
+    <string name="hardware_learning_restore_archived">Colores stopped retrying and kept the journal for the report.</string>
     <string name="hardware_learning_lens_accessibility">Optical test status indicator</string>
     <string name="hardware_learning_look_device">WATCH THE DEVICE</string>
     <string name="hardware_learning_look_areas">Joysticks, sides and shell</string>

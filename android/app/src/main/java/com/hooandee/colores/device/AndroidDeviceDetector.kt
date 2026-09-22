@@ -35,6 +35,8 @@ data class AndroidDeviceIdentity(
     val device: String,
     val manufacturer: String,
     val productProperties: Map<String, String>,
+    val fingerprint: String = "",
+    val complete: Boolean = true,
 )
 
 data class DetectedAndroidDevice(
@@ -55,17 +57,15 @@ class AndroidDeviceDetector(
     private val scanSysfs: () -> SysfsRgbDescriptor? = { SysfsRgbDiscovery.scan() },
     private val informationCartridges: List<InformationCartridge> = listOf(Htr3212InformationCartridge()),
 ) {
-    fun readIdentity(): AndroidDeviceIdentity {
-        val properties =
-            PRODUCT_PROPERTIES.associateWith(::readProperty).filterValues { it.isNotBlank() }
-        return AndroidDeviceIdentity(
-            model = Build.MODEL.orEmpty().ifBlank { properties["ro.product.model"].orEmpty() },
-            device = Build.DEVICE.orEmpty().ifBlank { properties["ro.product.device"].orEmpty() },
-            manufacturer =
-                Build.MANUFACTURER.orEmpty().ifBlank { properties["ro.product.manufacturer"].orEmpty() },
-            productProperties = properties,
+    fun readIdentity(): AndroidDeviceIdentity =
+        assembleAndroidDeviceIdentity(
+            model = Build.MODEL.orEmpty(),
+            device = Build.DEVICE.orEmpty(),
+            manufacturer = Build.MANUFACTURER.orEmpty(),
+            fingerprint = runCatching { Build.FINGERPRINT }.getOrNull().orEmpty(),
+            propertyNames = PRODUCT_PROPERTIES,
+            readProperty = ::readProperty,
         )
-    }
 
     fun detectOutcome(binding: LearnedDeviceBinding? = null): DetectionOutcome {
         val identity =
@@ -111,17 +111,28 @@ class AndroidDeviceDetector(
             ).match(identity)
         }.getOrNull()
 
-    private fun readProperty(name: String): String =
+    private fun readProperty(name: String): String? = readSystemProperty(name) ?: readGetprop(name)
+
+    private fun readSystemProperty(name: String): String? =
+        runCatching {
+            Class.forName("android.os.SystemProperties")
+                .getMethod("get", String::class.java)
+                .invoke(null, name) as? String
+        }.getOrNull()?.trim()
+
+    private fun readGetprop(name: String): String? =
         runCatching {
             val process = ProcessBuilder("/system/bin/getprop", name).redirectErrorStream(true).start()
-            if (!process.waitFor(300, TimeUnit.MILLISECONDS)) {
+            if (!process.waitFor(GETPROP_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
                 process.destroyForcibly()
-                return@runCatching ""
+                return@runCatching null
             }
+            if (process.exitValue() != 0) return@runCatching null
             process.inputStream.bufferedReader().use { it.readText().trim() }
-        }.getOrDefault("")
+        }.getOrNull()
 
     private companion object {
+        const val GETPROP_TIMEOUT_MS = 2_000L
         val PRODUCT_PROPERTIES =
             listOf(
                 "ro.product.model",
@@ -133,6 +144,26 @@ class AndroidDeviceDetector(
                 "ro.board.platform",
             )
     }
+}
+
+internal fun assembleAndroidDeviceIdentity(
+    model: String,
+    device: String,
+    manufacturer: String,
+    fingerprint: String,
+    propertyNames: List<String>,
+    readProperty: (String) -> String?,
+): AndroidDeviceIdentity {
+    val reads = propertyNames.associateWith { name -> runCatching { readProperty(name) }.getOrNull() }
+    val properties = reads.mapNotNull { (name, value) -> value?.takeIf(String::isNotBlank)?.let { name to it } }.toMap()
+    return AndroidDeviceIdentity(
+        model = model.ifBlank { properties["ro.product.model"].orEmpty() },
+        device = device.ifBlank { properties["ro.product.device"].orEmpty() },
+        manufacturer = manufacturer.ifBlank { properties["ro.product.manufacturer"].orEmpty() },
+        productProperties = properties,
+        fingerprint = fingerprint.trim(),
+        complete = reads.values.none { it == null },
+    )
 }
 
 internal fun resolveHardwareLearningRoute(
