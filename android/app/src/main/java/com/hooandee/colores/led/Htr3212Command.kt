@@ -10,6 +10,7 @@ internal object Htr3212Command {
         rgbStartRegister: Int = RGB_START_REGISTER,
         blockWrite: Boolean = false,
         explicitInitialization: Boolean = false,
+        initialize: Boolean = true,
     ): String? {
         val mappedColors =
             colors.mapIndexedNotNull { logicalIndex, color ->
@@ -24,7 +25,8 @@ internal object Htr3212Command {
 
         val driverColors = mappedColors.sortedBy { it.first }
         val commands = mutableListOf<String>()
-        if (previous == null && explicitInitialization) {
+        val initializes = previous == null && explicitInitialization && initialize
+        if (initializes) {
             commands += initializationCommands(bus, address)
         }
         commands +=
@@ -48,10 +50,26 @@ internal object Htr3212Command {
                 }
             }
         commands += registerCommand(bus, address, APPLY_REGISTER, 0, explicitInitialization)
-        if (previous == null && explicitInitialization) {
+        if (initializes) {
             commands += registerCommand(bus, address, SHUTDOWN_REGISTER, SHUTDOWN_ON, byteWrite = true)
         }
         return commands.joinToString(" && ")
+    }
+
+    val CONTROL_REGISTERS: List<Int> =
+        listOf(GLOBAL_CONTROL_REGISTER, OUTPUT_FREQUENCY_REGISTER) +
+            (CONTROL_START_REGISTER until CONTROL_START_REGISTER + CHANNEL_COUNT) +
+            SHUTDOWN_REGISTER
+
+    fun controlRestore(
+        bus: Int,
+        address: Int,
+        values: Map<Int, Int>,
+    ): String? {
+        if (values.keys != CONTROL_REGISTERS.toSet() || values.values.any { it !in 0..255 }) return null
+        return CONTROL_REGISTERS.joinToString(" && ") { register ->
+            registerCommand(bus, address, register, values.getValue(register), byteWrite = true)
+        }
     }
 
     private fun initializationCommands(

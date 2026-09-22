@@ -355,6 +355,7 @@
     <string name="hardware_learning_no_match_body">We will not show controls that have not been confirmed.</string>
     <string name="hardware_learning_restored">Original state restored and verified</string>
     <string name="hardware_learning_restored_without_readback">Original settings restored, without hardware readback</string>
+    <string name="hardware_learning_restored_unverified">Restored without confirming lights off</string>
     <string name="hardware_learning_try_next">Try the next route</string>
     <string name="hardware_learning_continue_discovery">Look for more zones</string>
     <string name="hardware_learning_more_routes_body">This route works and remains saved as a fallback. We found another safe test that may discover more zones.</string>

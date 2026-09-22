@@ -170,4 +170,36 @@ class Htr3212CommandTest {
 
         assertNull(Htr3212Command.build(1, 0x3c, colors, listOf(0, 1, 3, 2), colors))
     }
+
+    @Test
+    fun `restore frames keep byte writes without reinitializing the controller`() {
+        val command =
+            requireNotNull(
+                Htr3212Command.build(
+                    bus = 1,
+                    address = 0x3c,
+                    colors = List(4) { RgbColor(0, 0, 0) },
+                    logicalToDriverOrder = listOf(0, 1, 2, 3),
+                    previous = null,
+                    explicitInitialization = true,
+                    initialize = false,
+                ),
+            )
+
+        assertTrue(command.startsWith("i2cset -f -y 1 0x3c 0x0d 0x00 b"))
+        assertTrue(command.endsWith("i2cset -f -y 1 0x3c 0x25 0x00 b"))
+        assertTrue("0x4a" !in command && "0x00 0x01 b" !in command)
+    }
+
+    @Test
+    fun `control restore writes the audited registers with shutdown last`() {
+        val values = Htr3212Command.CONTROL_REGISTERS.associateWith { 1 }
+        val command = requireNotNull(Htr3212Command.controlRestore(6, 0x3c, values))
+
+        assertEquals(Htr3212Command.CONTROL_REGISTERS.size, command.split(" && ").size)
+        assertTrue(command.startsWith("i2cset -f -y 6 0x3c 0x4a 0x01 b"))
+        assertTrue(command.endsWith("i2cset -f -y 6 0x3c 0x00 0x01 b"))
+        assertNull(Htr3212Command.controlRestore(6, 0x3c, values - 0x4b))
+        assertNull(Htr3212Command.controlRestore(6, 0x3c, values + (0x00 to 300)))
+    }
 }

@@ -62,6 +62,7 @@ enum class EvidenceLevel {
 enum class RollbackStatus {
     RESTORED_AND_READ_BACK,
     RESTORED_WITHOUT_HARDWARE_READBACK,
+    RESTORED_UNVERIFIED,
     RESTORE_FAILED,
 }
 

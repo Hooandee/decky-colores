@@ -1,5 +1,6 @@
 package com.hooandee.colores.device.learning
 
+import com.hooandee.colores.led.Htr3212Command
 import com.hooandee.colores.led.PServerCommandExecutor
 import java.io.File
 
@@ -12,7 +13,7 @@ internal class PServerHtr3212RegisterReader(
         address: Int,
         registers: List<Int>,
     ): List<Int>? {
-        if (!executor.available || bus !in BUS_RANGE || address != ADDRESS || registers != PWM_REGISTERS) return null
+        if (!executor.available || bus !in BUS_RANGE || address != ADDRESS || registers !in AUDITED_BANKS) return null
         return try {
             outputFile.writeText("")
             outputFile.shareWithPServer()
@@ -51,5 +52,6 @@ internal class PServerHtr3212RegisterReader(
         val BUS_RANGE = 0..31
         const val ADDRESS = 0x3c
         val PWM_REGISTERS = (0x0d..0x18).toList()
+        val AUDITED_BANKS = listOf(PWM_REGISTERS, Htr3212Command.CONTROL_REGISTERS)
     }
 }

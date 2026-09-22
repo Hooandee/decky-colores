@@ -27,6 +27,13 @@ interface ProbeCartridge {
         snapshot: ProbeSnapshot,
     ): RollbackStatus
 
+    fun verifiedRollback(
+        candidate: ProbeCandidate,
+        snapshot: ProbeSnapshot,
+        evidence: List<ProbeEvidence>,
+        status: RollbackStatus,
+    ): RollbackStatus = status
+
     fun bindingCandidate(
         candidate: ProbeCandidate,
         evidence: List<ProbeEvidence>,

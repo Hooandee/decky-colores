@@ -244,8 +244,11 @@ class HardwareLearningSession(
         val currentCandidate = candidate ?: return RollbackStatus.RESTORE_FAILED
         val currentCartridge = cartridge ?: return RollbackStatus.RESTORE_FAILED
         val captured = snapshot ?: return RollbackStatus.RESTORE_FAILED
-        return runCatching { currentCartridge.restore(currentCandidate, captured) }
-            .getOrDefault(RollbackStatus.RESTORE_FAILED)
+        val restored =
+            runCatching { currentCartridge.restore(currentCandidate, captured) }
+                .getOrDefault(RollbackStatus.RESTORE_FAILED)
+        return runCatching { currentCartridge.verifiedRollback(currentCandidate, captured, evidence.toList(), restored) }
+            .getOrDefault(restored)
     }
 
     private fun restoreAndBlock(reason: LearningBlockReason) {

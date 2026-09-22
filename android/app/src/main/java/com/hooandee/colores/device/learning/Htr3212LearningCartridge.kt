@@ -135,13 +135,16 @@ internal class Htr3212LearningCartridge(
                 descriptor = vendorDescriptor,
             )
         val directRestored =
-            !original.power ||
+            if (original.power) {
                 writeFrame(
                     descriptor,
                     List(ZONES_PER_STICK) { original.zoneColors[0] } +
                         List(ZONES_PER_STICK) { original.zoneColors.getOrElse(1) { original.zoneColors[0] } },
                     original.brightness,
                 )
+            } else {
+                writeDarkFrame(descriptor)
+            }
         val settingsRestored = snapshot.values.all { (key, value) -> store.get(key) == value }
         return if (directRestored && settingsRestored) {
             RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK
@@ -190,10 +193,64 @@ internal class Htr3212LearningCartridge(
         val registers = (hardware.rgbStartRegister until hardware.rgbStartRegister + CHANNEL_COUNT).toList()
         val left = registerReader.read(hardware.leftBus, hardware.address, registers)?.validRegisterValues() ?: return null
         val right = registerReader.read(hardware.rightBus, hardware.address, registers)?.validRegisterValues() ?: return null
+        val controls =
+            if (hardware.explicitInitialization) {
+                val leftControls = readControls(hardware.leftBus, hardware.address) ?: return null
+                val rightControls = readControls(hardware.rightBus, hardware.address) ?: return null
+                leftControls to rightControls
+            } else {
+                null
+            }
         return linkedMapOf<String, String>().apply {
             left.forEachIndexed { index, value -> put("$RAW_LEFT_PREFIX$index", value.toString()) }
             right.forEachIndexed { index, value -> put("$RAW_RIGHT_PREFIX$index", value.toString()) }
+            controls?.first?.forEach { (register, value) -> put(controlKey(RAW_LEFT_CONTROL_PREFIX, register), value.toString()) }
+            controls?.second?.forEach { (register, value) -> put(controlKey(RAW_RIGHT_CONTROL_PREFIX, register), value.toString()) }
         }
+    }
+
+    private fun readControls(
+        bus: Int,
+        address: Int,
+    ): Map<Int, Int>? {
+        val registers = Htr3212Command.CONTROL_REGISTERS
+        val values = registerReader.read(bus, address, registers) ?: return null
+        if (values.size != registers.size || values.any { it !in 0..255 }) return null
+        return registers.zip(values).toMap(linkedMapOf())
+    }
+
+    private fun ProbeSnapshot.controlValues(prefix: String): Map<Int, Int>? =
+        Htr3212Command.CONTROL_REGISTERS.associateWith { register ->
+            values[controlKey(prefix, register)]?.toIntOrNull()?.takeIf { it in 0..255 } ?: return null
+        }
+
+    private fun controlKey(
+        prefix: String,
+        register: Int,
+    ): String = prefix + "%02x".format(register)
+
+    private fun writeDarkFrame(descriptor: SettingsProviderDescriptor): Boolean =
+        writeFrame(descriptor, List(TOTAL_ZONES) { OFF_COLOR }, FULL_LEVEL, initialize = false)
+
+    private fun originallyPowered(
+        descriptor: SettingsProviderDescriptor,
+        snapshot: ProbeSnapshot,
+    ): Boolean {
+        val power = descriptor.enableKeys.mapNotNull(snapshot.values::get)
+        if (descriptor.colorKey in snapshot.values) return power.isEmpty() || power.joinToString(",").split(',').any { it.trim() == "1" }
+        return power.isEmpty() || !power.all(::isPowerOffValue)
+    }
+
+    override fun verifiedRollback(
+        candidate: ProbeCandidate,
+        snapshot: ProbeSnapshot,
+        evidence: List<ProbeEvidence>,
+        status: RollbackStatus,
+    ): RollbackStatus {
+        val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return status
+        if (status == RollbackStatus.RESTORE_FAILED || originallyPowered(descriptor, snapshot)) return status
+        val powerOffUnseen = evidence.any { it.step == ProbeStep.POWER_OFF && it.level == EvidenceLevel.NOT_OBSERVED }
+        return if (powerOffUnseen) RollbackStatus.RESTORED_UNVERIFIED else status
     }
 
     private fun restoreRaw(
@@ -207,13 +264,34 @@ internal class Htr3212LearningCartridge(
             if (settings.isEmpty() || settings.size != snapshot.values.size || !settings.values.all(::isPowerOffValue)) {
                 return RollbackStatus.RESTORE_FAILED
             }
-            return restoreSettings(settings)
+            val settingsStatus = restoreSettings(settings)
+            val darkened = writeDarkFrame(descriptor)
+            return if (darkened) settingsStatus else RollbackStatus.RESTORE_FAILED
         }
         val left = snapshot.rawValues(RAW_LEFT_PREFIX) ?: return RollbackStatus.RESTORE_FAILED
         val right = snapshot.rawValues(RAW_RIGHT_PREFIX) ?: return RollbackStatus.RESTORE_FAILED
-        val allowedKeys = settings.keys + (0 until CHANNEL_COUNT).flatMap { listOf("$RAW_LEFT_PREFIX$it", "$RAW_RIGHT_PREFIX$it") }
+        val hardware = descriptor.htr3212 ?: return RollbackStatus.RESTORE_FAILED
+        val controlKeys = Htr3212Command.CONTROL_REGISTERS.flatMap { listOf(controlKey(RAW_LEFT_CONTROL_PREFIX, it), controlKey(RAW_RIGHT_CONTROL_PREFIX, it)) }
+        val hasControlValues = snapshot.values.keys.any { it in controlKeys }
+        val allowedKeys =
+            settings.keys + controlKeys + (0 until CHANNEL_COUNT).flatMap { listOf("$RAW_LEFT_PREFIX$it", "$RAW_RIGHT_PREFIX$it") }
         if (!allowedKeys.containsAll(snapshot.values.keys)) return RollbackStatus.RESTORE_FAILED
-        val directRestored = writeRawFrame(descriptor, left, right)
+        val controls =
+            if (hasControlValues) {
+                val leftControls = snapshot.controlValues(RAW_LEFT_CONTROL_PREFIX) ?: return RollbackStatus.RESTORE_FAILED
+                val rightControls = snapshot.controlValues(RAW_RIGHT_CONTROL_PREFIX) ?: return RollbackStatus.RESTORE_FAILED
+                leftControls to rightControls
+            } else {
+                null
+            }
+        val pwmRestored = writeRawFrame(descriptor, left, right)
+        val controlsRestored =
+            controls == null ||
+                listOfNotNull(
+                    Htr3212Command.controlRestore(hardware.leftBus, hardware.address, controls.first),
+                    Htr3212Command.controlRestore(hardware.rightBus, hardware.address, controls.second),
+                ).let { commands -> commands.size == STICKS && commands.map(executor::execute).all { it } }
+        val directRestored = pwmRestored && controlsRestored
         return if (directRestored && restoreSettings(settings) == RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK) {
             RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK
         } else {
@@ -249,6 +327,8 @@ internal class Htr3212LearningCartridge(
                 previous = null,
                 rgbStartRegister = hardware.rgbStartRegister,
                 blockWrite = hardware.blockWrite,
+                explicitInitialization = hardware.explicitInitialization,
+                initialize = false,
             ) ?: return false
         val rightCommand =
             Htr3212Command.build(
@@ -259,6 +339,8 @@ internal class Htr3212LearningCartridge(
                 previous = null,
                 rgbStartRegister = hardware.rgbStartRegister,
                 blockWrite = hardware.blockWrite,
+                explicitInitialization = hardware.explicitInitialization,
+                initialize = false,
             ) ?: return false
         return listOf(leftCommand, rightCommand).all(executor::execute)
     }
@@ -284,6 +366,7 @@ internal class Htr3212LearningCartridge(
         descriptor: SettingsProviderDescriptor,
         colors: List<RgbColor>,
         brightness: Int,
+        initialize: Boolean = true,
     ): Boolean {
         val hardware = descriptor.htr3212 ?: return false
         val scaled = colors.map { it.scale(brightness) }
@@ -299,6 +382,7 @@ internal class Htr3212LearningCartridge(
                 rgbStartRegister = hardware.rgbStartRegister,
                 blockWrite = hardware.blockWrite,
                 explicitInitialization = hardware.explicitInitialization,
+                initialize = initialize,
             ) ?: return false
         val rightCommand =
             Htr3212Command.build(
@@ -310,6 +394,7 @@ internal class Htr3212LearningCartridge(
                 rgbStartRegister = hardware.rgbStartRegister,
                 blockWrite = hardware.blockWrite,
                 explicitInitialization = hardware.explicitInitialization,
+                initialize = initialize,
             ) ?: return false
         val commands = if (hardware.pairedWrite) listOf("$leftCommand && $rightCommand") else listOf(leftCommand, rightCommand)
         return commands.all(executor::execute)
@@ -354,6 +439,7 @@ internal class Htr3212LearningCartridge(
         const val CHANNEL_COUNT = ZONES_PER_STICK * CHANNELS_PER_ZONE
         const val LOW_LEVEL = 25
         const val HIGH_LEVEL = 55
+        const val FULL_LEVEL = 100
         const val HIGH_BRIGHTNESS_SETTING = "0.55"
         const val VENDOR_SETTLE_MS = 300L
         const val VENDOR_REPAINT_MS = 1_200L
@@ -363,5 +449,7 @@ internal class Htr3212LearningCartridge(
         const val PROBE_COLOR_ARGB = "#FFFF00FF"
         const val RAW_LEFT_PREFIX = "htr.left."
         const val RAW_RIGHT_PREFIX = "htr.right."
+        const val RAW_LEFT_CONTROL_PREFIX = "htr.control.left."
+        const val RAW_RIGHT_CONTROL_PREFIX = "htr.control.right."
     }
 }

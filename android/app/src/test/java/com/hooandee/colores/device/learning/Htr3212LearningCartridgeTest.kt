@@ -147,8 +147,113 @@ class Htr3212LearningCartridgeTest {
         snapshot ?: return
         assertTrue(cartridge.execute(candidate, ProbeStep.COLOR))
         assertEquals("1,1", store.values[key])
+        executor.commands.clear()
         assertEquals(RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK, cartridge.restore(candidate, snapshot))
         assertEquals("0,0", store.values[key])
+        assertDarkFrames(executor.commands, buses = listOf(3, 6))
+    }
+
+    @Test
+    fun `vendor snapshot that was powered off restores dark PWM on both sticks`() {
+        val settings =
+            linkedMapOf(
+                "joystick_led_light_picker_color" to "#FF010203,#FF040506",
+                "led_light_brightness_percent" to "0.72",
+                "joystick_light_enabled" to "0,0",
+                "left_joystick_light_enabled" to "0",
+                "right_joystick_light_enabled" to "0",
+            )
+        val store = FakeSettingsStore(settings.toMutableMap())
+        val executor = FakeExecutor()
+        val cartridge = Htr3212LearningCartridge(store, executor, settleVendor = {})
+        val candidate = candidate()
+        val snapshot = requireNotNull(cartridge.snapshot(candidate))
+
+        assertTrue(cartridge.execute(candidate, ProbeStep.COLOR))
+        executor.commands.clear()
+
+        assertEquals(RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK, cartridge.restore(candidate, snapshot))
+        assertEquals(settings, store.values)
+        assertDarkFrames(executor.commands, buses = listOf(3, 5))
+        assertTrue(executor.commands.none { "0x00 0x01 b" in it })
+    }
+
+    @Test
+    fun `dark restore stays unverified when power off was not observed`() {
+        val key = "joystick_light_enabled"
+        val cartridge = Htr3212LearningCartridge(FakeSettingsStore(linkedMapOf(key to "0,0")), FakeExecutor(), settleVendor = {})
+        val candidate = candidate(enableKeys = listOf(key))
+        val offSnapshot = ProbeSnapshot(mapOf(key to "0,0"))
+        val onSnapshot = ProbeSnapshot(mapOf(key to "1,1"))
+        val unseen = listOf(ProbeEvidence(ProbeStep.POWER_OFF, null, EvidenceLevel.NOT_OBSERVED, UserObservation.NO))
+        val seen = listOf(ProbeEvidence(ProbeStep.POWER_OFF, null, EvidenceLevel.USER_CONFIRMED, UserObservation.YES))
+        val restored = RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK
+
+        assertEquals(RollbackStatus.RESTORED_UNVERIFIED, cartridge.verifiedRollback(candidate, offSnapshot, unseen, restored))
+        assertEquals(restored, cartridge.verifiedRollback(candidate, offSnapshot, seen, restored))
+        assertEquals(restored, cartridge.verifiedRollback(candidate, onSnapshot, unseen, restored))
+        assertEquals(
+            RollbackStatus.RESTORE_FAILED,
+            cartridge.verifiedRollback(candidate, offSnapshot, unseen, RollbackStatus.RESTORE_FAILED),
+        )
+    }
+
+    @Test
+    fun `explicit initialization snapshots and restores the control registers`() {
+        val key = "joystick_light_enabled"
+        val store = FakeSettingsStore(linkedMapOf(key to "1,1"))
+        val executor = FakeExecutor()
+        val controlRegisters = listOf(0x4a, 0x4b) + (0x32..0x3d) + 0x00
+        val requested = mutableListOf<List<Int>>()
+        val reader =
+            Htr3212RegisterReader { bus, _, registers ->
+                requested += registers
+                when (registers) {
+                    (0x0d..0x18).toList() -> List(12) { bus }
+                    controlRegisters -> List(controlRegisters.size) { index -> if (index == controlRegisters.lastIndex) 0 else 0x10 + bus }
+                    else -> null
+                }
+            }
+        val cartridge = Htr3212LearningCartridge(store, executor, reader, settleVendor = {})
+        val candidate = candidate(enableKeys = listOf(key), explicitInitialization = true)
+
+        val snapshot = requireNotNull(cartridge.snapshot(candidate))
+        assertTrue(controlRegisters in requested)
+        assertEquals("0", snapshot.values["htr.control.left.00"])
+        assertEquals((0x10 + 5).toString(), snapshot.values["htr.control.right.4a"])
+
+        assertTrue(cartridge.execute(candidate, ProbeStep.COLOR))
+        executor.commands.clear()
+        assertEquals(RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK, cartridge.restore(candidate, snapshot))
+
+        val leftControl = executor.commands.single { it.startsWith("i2cset -f -y 3 0x3c 0x4a") }
+        assertTrue(leftControl.startsWith("i2cset -f -y 3 0x3c 0x4a 0x13 b"))
+        assertTrue(leftControl.endsWith("i2cset -f -y 3 0x3c 0x00 0x00 b"))
+        assertTrue("i2cset -f -y 3 0x3c 0x3d 0x13 b" in leftControl)
+        assertTrue(executor.commands.any { it.startsWith("i2cset -f -y 5 0x3c 0x4a 0x15 b") })
+        val pwmIndex = executor.commands.indexOfFirst { "0x0d 0x03" in it }
+        assertTrue(pwmIndex in 0 until executor.commands.indexOf(leftControl))
+    }
+
+    @Test
+    fun `explicit initialization blocks learning when control registers cannot be read`() {
+        val key = "joystick_light_enabled"
+        val reader =
+            Htr3212RegisterReader { _, _, registers -> if (registers == (0x0d..0x18).toList()) List(12) { 1 } else null }
+        val cartridge = Htr3212LearningCartridge(FakeSettingsStore(linkedMapOf(key to "1,1")), FakeExecutor(), reader, settleVendor = {})
+
+        assertEquals(null, cartridge.snapshot(candidate(enableKeys = listOf(key), explicitInitialization = true)))
+    }
+
+    private fun assertDarkFrames(
+        commands: List<String>,
+        buses: List<Int>,
+    ) {
+        buses.forEach { bus ->
+            val frame = commands.firstOrNull { "-y $bus 0x3c 0x0d" in it } ?: error("missing frame for bus $bus")
+            (0x0d..0x18).forEach { register -> assertTrue(frame, "-y $bus 0x3c 0x%02x 0x00".format(register) in frame) }
+            assertTrue(frame, "-y $bus 0x3c 0x25 0x00" in frame)
+        }
     }
 
     @Test

@@ -355,6 +355,7 @@
     <string name="hardware_learning_no_match_body">No vamos a mostrar controles que no hayamos podido confirmar.</string>
     <string name="hardware_learning_restored">Estado original restaurado y comprobado</string>
     <string name="hardware_learning_restored_without_readback">Ajustes originales repuestos, sin lectura física</string>
+    <string name="hardware_learning_restored_unverified">Restaurado sin confirmar el apagado</string>
     <string name="hardware_learning_try_next">Probar la siguiente ruta</string>
     <string name="hardware_learning_continue_discovery">Buscar más zonas</string>
     <string name="hardware_learning_more_routes_body">Esta ruta funciona y queda guardada como respaldo. Hemos encontrado otra prueba segura que podría descubrir más zonas.</string>

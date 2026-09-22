@@ -422,10 +422,10 @@ private fun LearningResultBody(
             },
         safety =
             stringResource(
-                if (rollbackStatus == RollbackStatus.RESTORED_AND_READ_BACK) {
-                    R.string.hardware_learning_restored
-                } else {
-                    R.string.hardware_learning_restored_without_readback
+                when (rollbackStatus) {
+                    RollbackStatus.RESTORED_AND_READ_BACK -> R.string.hardware_learning_restored
+                    RollbackStatus.RESTORED_UNVERIFIED -> R.string.hardware_learning_restored_unverified
+                    else -> R.string.hardware_learning_restored_without_readback
                 },
             ),
         textAlign = textAlign,
