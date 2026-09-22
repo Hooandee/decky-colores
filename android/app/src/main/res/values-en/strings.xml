@@ -102,7 +102,6 @@
     <string name="app_profiles_title">App profiles</string>
     <string name="profile_editing">Editing: %1$s</string>
     <string name="profile_global">Global</string>
-    <string name="profile_global_description">Used when an app does not have its own profile.</string>
     <string name="profile_auto_title">Apply automatically</string>
     <string name="profile_auto_disabled">Disabled</string>
     <string name="profile_auto_permission_required">Usage access required</string>

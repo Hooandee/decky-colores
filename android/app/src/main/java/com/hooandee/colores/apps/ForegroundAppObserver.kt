@@ -141,7 +141,6 @@ class ForegroundAppObserver(
     private val focusedAppResolver: FocusedAppResolver = NoFocusedAppResolver,
     private val interactive: StateFlow<Boolean> = MutableStateFlow(true),
 ) {
-    private var currentPackage: String? = null
     private var activePackages = emptyMap<String, Long>()
     private var lastQueryEnd: Long? = null
 
@@ -155,24 +154,24 @@ class ForegroundAppObserver(
                 interactive.first { it }
                 val state =
                     if (!enabled()) {
-                        currentPackage = null
-                        activePackages = emptyMap()
-                        lastQueryEnd = null
+                        resetTracking()
                         ForegroundAppState.Disabled
                     } else if (!usageAccess.isGranted()) {
-                        currentPackage = null
-                        activePackages = emptyMap()
-                        lastQueryEnd = null
+                        resetTracking()
                         ForegroundAppState.PermissionRequired
                     } else {
                         val selection = readLatest(preferredPackages(), authoritativeFocusEnabled())
-                        currentPackage = selection.packageName
-                        ForegroundAppState.Active(currentPackage, selection.authoritativeExternal)
+                        ForegroundAppState.Active(selection.packageName, selection.authoritativeExternal)
                     }
                 emit(state)
                 delay(foregroundPollDelayMs(state))
             }
         }.distinctUntilChanged()
+
+    private fun resetTracking() {
+        activePackages = emptyMap()
+        lastQueryEnd = null
+    }
 
     private fun readLatest(
         preferredPackages: Set<String>,
@@ -206,7 +205,6 @@ class ForegroundAppObserver(
         val authoritativePackage = if (authoritativeFocusEnabled) focusedAppResolver.resolve() else null
         return resolveForegroundSelection(authoritativePackage, activePackages, context.packageName, preferredPackages)
     }
-
 }
 
 private const val ACTIVE_POLL_MS = 1_000L

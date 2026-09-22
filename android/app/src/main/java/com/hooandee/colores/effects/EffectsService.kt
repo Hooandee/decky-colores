@@ -26,6 +26,7 @@ import com.hooandee.colores.audio.AndroidPlaybackCapture
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.device.LedGridCell
 import com.hooandee.colores.control.ServiceOwner
+import com.hooandee.colores.control.keepsAudioCaptureActive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -71,34 +72,18 @@ class EffectsService : Service() {
         Log.i(TAG, "start command=$command action=${intent?.action}")
         settler.onStartCommand(startId)
         when (command) {
-            EffectsServiceCommand.START_AUDIO -> {
-                val start = requireNotNull(intent)
-                val failure = enterForeground(mediaProjection = start.hasProjectionConsent())
-                if (failure == null) {
-                    startAudioCapture(start)
-                } else {
-                    stopAudioCapture(
-                        if (foregroundRefusalRequiresAuthorization(failure)) AudioCaptureStatus.AUTHORIZATION_REQUIRED else AudioCaptureStatus.ERROR,
-                    )
-                    recoverFromForegroundRefusal()
+            EffectsServiceCommand.START_AUDIO ->
+                startCaptureInForeground(requireNotNull(intent), ::startAudioCapture) { requiresAuthorization ->
+                    stopAudioCapture(if (requiresAuthorization) AudioCaptureStatus.AUTHORIZATION_REQUIRED else AudioCaptureStatus.ERROR)
                 }
-            }
             EffectsServiceCommand.STOP_AUDIO -> {
                 stopAudioCapture(requireNotNull(intent).audioStopStatus(), reconcile = policy.reconcileController)
                 settle()
             }
-            EffectsServiceCommand.START_AMBIENT -> {
-                val start = requireNotNull(intent)
-                val failure = enterForeground(mediaProjection = start.hasProjectionConsent())
-                if (failure == null) {
-                    startAmbientCapture(start)
-                } else {
-                    stopAmbientCapture(
-                        if (foregroundRefusalRequiresAuthorization(failure)) AmbientCaptureStatus.AUTHORIZATION_REQUIRED else AmbientCaptureStatus.ERROR,
-                    )
-                    recoverFromForegroundRefusal()
+            EffectsServiceCommand.START_AMBIENT ->
+                startCaptureInForeground(requireNotNull(intent), ::startAmbientCapture) { requiresAuthorization ->
+                    stopAmbientCapture(if (requiresAuthorization) AmbientCaptureStatus.AUTHORIZATION_REQUIRED else AmbientCaptureStatus.ERROR)
                 }
-            }
             EffectsServiceCommand.STOP_AMBIENT -> {
                 stopAmbientCapture(requireNotNull(intent).ambientStopStatus(), reconcile = policy.reconcileController)
                 settle()
@@ -156,6 +141,20 @@ class EffectsService : Service() {
                     it
                 },
             )
+
+    private fun startCaptureInForeground(
+        intent: Intent,
+        startCapture: (Intent) -> Unit,
+        stopRefusedCapture: (requiresAuthorization: Boolean) -> Unit,
+    ) {
+        val failure = enterForeground(mediaProjection = intent.hasProjectionConsent())
+        if (failure == null) {
+            startCapture(intent)
+        } else {
+            stopRefusedCapture(foregroundRefusalRequiresAuthorization(failure))
+            recoverFromForegroundRefusal()
+        }
+    }
 
     private fun recoverFromForegroundRefusal() {
         if (foreground) {
@@ -418,9 +417,7 @@ class EffectsService : Service() {
             status: AudioCaptureStatus = AudioCaptureStatus.AUTHORIZATION_REQUIRED,
         ) {
             val application = context.applicationContext as ColoresApplication
-            val live = application.audioLevelSource.state.value.status.let {
-                it == AudioCaptureStatus.STARTING || it == AudioCaptureStatus.CAPTURING || it == AudioCaptureStatus.NO_AUDIO
-            }
+            val live = application.audioLevelSource.state.value.status.keepsAudioCaptureActive
             if (!shouldDispatchCaptureStop(application.effectsServiceGate.active, live)) return
             startService(
                 context,
@@ -503,7 +500,6 @@ class EffectsService : Service() {
     private val application: ColoresApplication
         get() = getApplication() as ColoresApplication
 
-    @Suppress("DEPRECATION")
     private fun Intent.hasProjectionConsent(): Boolean =
         hasProjectionConsent(
             resultCode = getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED),
@@ -511,6 +507,7 @@ class EffectsService : Service() {
             okCode = Activity.RESULT_OK,
         )
 
+    @Suppress("DEPRECATION")
     private fun Intent.projectionData(): Intent? =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             getParcelableExtra(EXTRA_PROJECTION_DATA, Intent::class.java)
@@ -550,5 +547,4 @@ class EffectsService : Service() {
                     .getOrDefault(AmbientSamplingMode.FULL_SCENE),
         )
     }
-
 }

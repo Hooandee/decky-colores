@@ -135,12 +135,13 @@ data class HardwareLearningUiState(
         get() =
             (sessionState as? HardwareLearningState.Blocked)
                 ?.reason
-                ?.takeIf { it in setOf(LearningBlockReason.RESTORE_FAILED, LearningBlockReason.JOURNAL_UNAVAILABLE) }
+                ?.takeIf { it in CRITICAL_BLOCK_REASONS }
 }
 
+private val CRITICAL_BLOCK_REASONS = setOf(LearningBlockReason.RESTORE_FAILED, LearningBlockReason.JOURNAL_UNAVAILABLE)
+
 internal fun HardwareLearningState.isCriticalLearningBlock(): Boolean =
-    this is HardwareLearningState.Blocked &&
-        reason in setOf(LearningBlockReason.RESTORE_FAILED, LearningBlockReason.JOURNAL_UNAVAILABLE)
+    this is HardwareLearningState.Blocked && reason in CRITICAL_BLOCK_REASONS
 
 internal fun dismissedHardwareLearningUiState(current: HardwareLearningUiState): HardwareLearningUiState =
     HardwareLearningUiState(results = current.results, autoPromptDismissed = true)

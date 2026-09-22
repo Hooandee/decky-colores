@@ -13,6 +13,7 @@ import com.hooandee.colores.ambient.normalizedAmbientCaptureFps
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.hooandee.colores.ColoresApplication
+import com.hooandee.colores.HardwareRollbackState
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.audio.AudioLevelState
 import com.hooandee.colores.apps.LaunchableApp
@@ -372,10 +373,8 @@ class ColoresViewModel(
                                     busy = false,
                                     restoreFailure = true,
                                     sessionState = HardwareLearningState.Blocked(LearningBlockReason.RESTORE_FAILED),
-                                    journalPending = rollback.pending,
-                                    recoveryAttempts = rollback.attempts,
                                     discardConfirmation = false,
-                                ),
+                                ).withRollback(rollback),
                         )
                     }
                     return@launch
@@ -461,26 +460,7 @@ class ColoresViewModel(
                     }
 
                     val catalog = withContext(Dispatchers.IO) { EffectCatalog.parse(context.readAsset("effects.json")) }
-                    val effectPresets =
-                        if (device.hardwareEffects.isNotEmpty()) {
-                            device.hardwareEffects.map {
-                                EffectPreset(
-                                    id = it.id,
-                                    need =
-                                        when {
-                                            it.colorStops >= 2 -> EffectNeed.GRADIENT
-                                            it.colorStops == 1 -> EffectNeed.COLOR
-                                            else -> EffectNeed.NONE
-                                        },
-                                    defaultSpeed = it.defaultSpeed,
-                                    colors = it.colors,
-                                )
-                            }
-                        } else if (device.softwareEffects) {
-                            catalog.presets
-                        } else {
-                            emptyList()
-                        }
+                    val effectPresets = device.effectPresets(catalog)
                     val bands = withContext(Dispatchers.IO) { BandSet.parse(context.readAsset("bands.json")) }
                     val zones = detected.capabilities.zones
                     val gradientPresentation = detected.capabilities.gradientPresentation(device.supportsPerZone)
@@ -733,9 +713,7 @@ class ColoresViewModel(
                                 busy = false,
                                 sessionState = started,
                                 restoreFailure = it.hardwareLearning.restoreFailure || started.isCriticalLearningBlock(),
-                                journalPending = rollback.pending,
-                                recoveryAttempts = rollback.attempts,
-                            ),
+                            ).withRollback(rollback),
                     )
                 }
             }
@@ -810,9 +788,7 @@ class ColoresViewModel(
                                 restoreFailure =
                                     it.hardwareLearning.restoreFailure ||
                                         result.status == HardwareLearningStatus.RESTORE_FAILED,
-                                journalPending = rollback.pending,
-                                recoveryAttempts = rollback.attempts,
-                            ),
+                            ).withRollback(rollback),
                     )
                 }
             }
@@ -852,9 +828,7 @@ class ColoresViewModel(
                                     busy = false,
                                     restoreFailure = it.hardwareLearning.restoreFailure || restoreFailed,
                                     sessionState = cancellation.state,
-                                    journalPending = rollback.pending,
-                                    recoveryAttempts = rollback.attempts,
-                                ),
+                                ).withRollback(rollback),
                         )
                     }
                     return@launch
@@ -879,12 +853,7 @@ class ColoresViewModel(
                     val rollback = coloresApplication.hardwareRollbackState()
                     mutableState.update {
                         it.copy(
-                            hardwareLearning =
-                                it.hardwareLearning.copy(
-                                    busy = false,
-                                    journalPending = rollback.pending,
-                                    recoveryAttempts = rollback.attempts,
-                                ),
+                            hardwareLearning = it.hardwareLearning.copy(busy = false).withRollback(rollback),
                         )
                     }
                     return@launch
@@ -968,9 +937,7 @@ class ColoresViewModel(
                                 busy = false,
                                 sessionState = state,
                                 restoreFailure = it.hardwareLearning.restoreFailure || restoreFailed,
-                                journalPending = rollback.pending,
-                                recoveryAttempts = rollback.attempts,
-                            ),
+                            ).withRollback(rollback),
                     )
                 }
             }
@@ -1646,3 +1613,26 @@ private fun android.content.Context.readAsset(name: String): String =
 private const val MAX_IDENTITY_RETRIES = 2
 
 private const val IDENTITY_RETRY_DELAY_MS = 1_500L
+
+private fun LedDevice.effectPresets(catalog: EffectCatalog): List<EffectPreset> =
+    when {
+        hardwareEffects.isNotEmpty() ->
+            hardwareEffects.map {
+                EffectPreset(
+                    id = it.id,
+                    need =
+                        when {
+                            it.colorStops >= 2 -> EffectNeed.GRADIENT
+                            it.colorStops == 1 -> EffectNeed.COLOR
+                            else -> EffectNeed.NONE
+                        },
+                    defaultSpeed = it.defaultSpeed,
+                    colors = it.colors,
+                )
+            }
+        softwareEffects -> catalog.presets
+        else -> emptyList()
+    }
+
+private fun HardwareLearningUiState.withRollback(rollback: HardwareRollbackState): HardwareLearningUiState =
+    copy(journalPending = rollback.pending, recoveryAttempts = rollback.attempts)

@@ -853,7 +853,7 @@ class LightingController(
 
 private fun <T> Result<T>.rethrowCancellation(): Result<T> = onFailure { if (it is CancellationException) throw it }
 
-private val com.hooandee.colores.audio.AudioCaptureStatus.keepsAudioCaptureActive: Boolean
+internal val com.hooandee.colores.audio.AudioCaptureStatus.keepsAudioCaptureActive: Boolean
     get() =
         this == com.hooandee.colores.audio.AudioCaptureStatus.STARTING ||
             this == com.hooandee.colores.audio.AudioCaptureStatus.CAPTURING ||

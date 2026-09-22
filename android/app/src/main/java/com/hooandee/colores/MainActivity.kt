@@ -55,11 +55,7 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
             val pending = afterNotificationPermission
             afterNotificationPermission = ProjectionRequest.NONE
-            when (pending) {
-                ProjectionRequest.AUDIO -> requestAudioPermission()
-                ProjectionRequest.AMBIENT -> launchProjectionConsent(ProjectionRequest.AMBIENT)
-                ProjectionRequest.NONE -> Unit
-            }
+            continueCaptureRequest(pending)
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -146,11 +142,15 @@ class MainActivity : AppCompatActivity() {
             afterNotificationPermission = request
             notificationPermissionLauncher.launch(NOTIFICATION_PERMISSION)
         } else {
-            when (request) {
-                ProjectionRequest.AUDIO -> requestAudioPermission()
-                ProjectionRequest.AMBIENT -> launchProjectionConsent(ProjectionRequest.AMBIENT)
-                ProjectionRequest.NONE -> Unit
-            }
+            continueCaptureRequest(request)
+        }
+    }
+
+    private fun continueCaptureRequest(request: ProjectionRequest) {
+        when (request) {
+            ProjectionRequest.AUDIO -> requestAudioPermission()
+            ProjectionRequest.AMBIENT -> launchProjectionConsent(ProjectionRequest.AMBIENT)
+            ProjectionRequest.NONE -> Unit
         }
     }
 

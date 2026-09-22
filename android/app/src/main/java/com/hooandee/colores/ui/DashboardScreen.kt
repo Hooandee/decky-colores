@@ -433,7 +433,6 @@ private fun DashboardModeLayout(
             }
         }
         val sceneEnabled = state.canWrite && colorEnabled && !dynamic
-        val sceneShowsBoth = !gradientMode && !dynamic
 
         @Composable
         fun Scene(
@@ -463,7 +462,7 @@ private fun DashboardModeLayout(
                     perZone = perZone && !dynamic,
                     projection = state.ledColorProjection,
                     onTargetChange = sceneTargetChange,
-                    showBoth = sceneShowsBoth,
+                    showBoth = !gradientMode && !dynamic,
                     wrapContent = wrapContent,
                     modifier = sceneModifier,
                 )
