@@ -5,7 +5,10 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 
 data class ForegroundUsageEvent(
@@ -70,8 +73,21 @@ fun resolveForegroundSelection(
 
 fun foregroundQueryStart(
     end: Long,
-    initialized: Boolean,
-): Long = end - if (initialized) POLL_LOOKBACK_MS else INITIAL_LOOKBACK_MS
+    lastQueryEnd: Long?,
+): Long =
+    if (lastQueryEnd == null) {
+        end - INITIAL_LOOKBACK_MS
+    } else {
+        (minOf(lastQueryEnd, end) - POLL_LOOKBACK_MS).coerceAtLeast(end - INITIAL_LOOKBACK_MS)
+    }
+
+fun foregroundPollDelayMs(state: ForegroundAppState): Long =
+    when (state) {
+        is ForegroundAppState.Active -> ACTIVE_POLL_MS
+        ForegroundAppState.Disabled,
+        ForegroundAppState.PermissionRequired,
+        -> IDLE_POLL_MS
+    }
 
 sealed interface ForegroundAppState {
     data object Disabled : ForegroundAppState
@@ -123,10 +139,11 @@ class ForegroundAppObserver(
     private val usageAccess: UsageAccess = UsageAccess(context),
     private val clock: () -> Long = System::currentTimeMillis,
     private val focusedAppResolver: FocusedAppResolver = NoFocusedAppResolver,
+    private val interactive: StateFlow<Boolean> = MutableStateFlow(true),
 ) {
     private var currentPackage: String? = null
     private var activePackages = emptyMap<String, Long>()
-    private var initialized = false
+    private var lastQueryEnd: Long? = null
 
     fun observe(
         enabled: () -> Boolean,
@@ -135,22 +152,25 @@ class ForegroundAppObserver(
     ): Flow<ForegroundAppState> =
         flow {
             while (true) {
-                if (!enabled()) {
-                    currentPackage = null
-                    activePackages = emptyMap()
-                    initialized = false
-                    emit(ForegroundAppState.Disabled)
-                } else if (!usageAccess.isGranted()) {
-                    currentPackage = null
-                    activePackages = emptyMap()
-                    initialized = false
-                    emit(ForegroundAppState.PermissionRequired)
-                } else {
-                    val selection = readLatest(preferredPackages(), authoritativeFocusEnabled())
-                    currentPackage = selection.packageName
-                    emit(ForegroundAppState.Active(currentPackage, selection.authoritativeExternal))
-                }
-                delay(POLL_MS)
+                interactive.first { it }
+                val state =
+                    if (!enabled()) {
+                        currentPackage = null
+                        activePackages = emptyMap()
+                        lastQueryEnd = null
+                        ForegroundAppState.Disabled
+                    } else if (!usageAccess.isGranted()) {
+                        currentPackage = null
+                        activePackages = emptyMap()
+                        lastQueryEnd = null
+                        ForegroundAppState.PermissionRequired
+                    } else {
+                        val selection = readLatest(preferredPackages(), authoritativeFocusEnabled())
+                        currentPackage = selection.packageName
+                        ForegroundAppState.Active(currentPackage, selection.authoritativeExternal)
+                    }
+                emit(state)
+                delay(foregroundPollDelayMs(state))
             }
         }.distinctUntilChanged()
 
@@ -160,7 +180,7 @@ class ForegroundAppObserver(
     ): ForegroundSelection {
         val end = clock()
         val manager = context.getSystemService(UsageStatsManager::class.java)
-        val events = manager.queryEvents(foregroundQueryStart(end, initialized), end)
+        val events = manager.queryEvents(foregroundQueryStart(end, lastQueryEnd), end)
         val event = UsageEvents.Event()
         val collected = mutableListOf<ForegroundUsageEvent>()
         while (events.hasNextEvent()) {
@@ -182,15 +202,14 @@ class ForegroundAppObserver(
                 )
         }
         activePackages = updateActivePackages(activePackages, collected)
-        initialized = true
+        lastQueryEnd = end
         val authoritativePackage = if (authoritativeFocusEnabled) focusedAppResolver.resolve() else null
         return resolveForegroundSelection(authoritativePackage, activePackages, context.packageName, preferredPackages)
     }
 
-    private companion object {
-        const val POLL_MS = 1_000L
-    }
 }
 
+private const val ACTIVE_POLL_MS = 1_000L
+private const val IDLE_POLL_MS = 5_000L
 private const val POLL_LOOKBACK_MS = 5_000L
 private const val INITIAL_LOOKBACK_MS = 86_400_000L

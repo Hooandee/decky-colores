@@ -1,11 +1,23 @@
 package com.hooandee.colores.apps
 
+import android.Manifest
 import android.app.AppOpsManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Process
 import android.provider.Settings
+
+internal fun usageAccessGranted(
+    appOpMode: Int,
+    permissionGranted: Boolean,
+): Boolean =
+    when (appOpMode) {
+        AppOpsManager.MODE_ALLOWED -> true
+        AppOpsManager.MODE_DEFAULT -> permissionGranted
+        else -> false
+    }
 
 class UsageAccess(
     private val context: Context,
@@ -18,7 +30,10 @@ class UsageAccess(
                 Process.myUid(),
                 context.packageName,
             )
-        return mode == AppOpsManager.MODE_ALLOWED
+        val permissionGranted =
+            mode == AppOpsManager.MODE_DEFAULT &&
+                context.checkCallingOrSelfPermission(Manifest.permission.PACKAGE_USAGE_STATS) == PackageManager.PERMISSION_GRANTED
+        return usageAccessGranted(mode, permissionGranted)
     }
 
     fun settingsIntent(): Intent =

@@ -61,4 +61,19 @@ class EffectsServiceProtocolTest {
         assertTrue(shouldReconcileAmbientController(requested = true, mode = AppMode.AMBIENT))
         assertFalse(shouldReconcileAmbientController(requested = true, mode = AppMode.COLOR))
     }
+
+    @Test
+    fun `capture survives a temporary app profile while the global profile uses it`() {
+        assertFalse(shouldEndCapture(CaptureOwner.AUDIO, AppMode.COLOR, globalMode = AppMode.AUDIO))
+        assertTrue(shouldEndCapture(CaptureOwner.AUDIO, AppMode.COLOR, globalMode = AppMode.COLOR))
+        assertTrue(shouldEndCapture(CaptureOwner.AMBIENT, AppMode.EFFECT, globalMode = null))
+        assertFalse(shouldEndCapture(CaptureOwner.AMBIENT, AppMode.AMBIENT, globalMode = AppMode.COLOR))
+    }
+
+    @Test
+    fun `stop commands are only dispatched to a live service or capture`() {
+        assertFalse(shouldDispatchCaptureStop(serviceActive = false, captureLive = false))
+        assertTrue(shouldDispatchCaptureStop(serviceActive = true, captureLive = false))
+        assertTrue(shouldDispatchCaptureStop(serviceActive = false, captureLive = true))
+    }
 }

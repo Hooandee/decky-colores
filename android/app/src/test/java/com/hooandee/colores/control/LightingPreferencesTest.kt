@@ -107,9 +107,18 @@ class LightingPreferencesTest {
     }
 
     @Test
-    fun `audio and charger monitoring request a background restore`() {
+    fun `capture modes wait for consent while charger monitoring restores in background`() {
         val (prefs, _) = preferences()
         prefs.save("thor", StoredLighting(mode = AppMode.AUDIO, power = true))
+        assertEquals(false, prefs.shouldRestoreInBackground())
+
+        prefs.save("thor", StoredLighting(mode = AppMode.AMBIENT, power = true))
+        assertEquals(false, prefs.shouldRestoreInBackground())
+
+        prefs.save("thor", StoredLighting(mode = AppMode.AMBIENT, power = true, chargerOnly = true))
+        assertEquals(true, prefs.shouldRestoreInBackground())
+
+        prefs.save("thor", StoredLighting(mode = AppMode.EFFECT, power = true))
         assertEquals(true, prefs.shouldRestoreInBackground())
 
         prefs.save("thor", StoredLighting(mode = AppMode.COLOR, power = true, chargerOnly = true))

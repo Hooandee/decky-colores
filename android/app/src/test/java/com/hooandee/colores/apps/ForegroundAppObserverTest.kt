@@ -71,11 +71,30 @@ class ForegroundAppObserverTest {
         val now = 86_400_100L
         val earlierResume = 1_000L
 
-        val initialStart = foregroundQueryStart(now, initialized = false)
-        val pollingStart = foregroundQueryStart(now, initialized = true)
+        val initialStart = foregroundQueryStart(now, lastQueryEnd = null)
+        val pollingStart = foregroundQueryStart(now, lastQueryEnd = now - 1_000L)
 
         assertTrue(initialStart <= earlierResume)
         assertTrue(pollingStart > earlierResume)
+    }
+
+    @Test
+    fun `resuming after the screen was off queries from the last observation`() {
+        val lastQueryEnd = 1_000_000L
+        val resumedAt = lastQueryEnd + 600_000L
+
+        val start = foregroundQueryStart(resumedAt, lastQueryEnd)
+
+        assertTrue(start <= lastQueryEnd)
+        assertTrue(start >= resumedAt - 86_400_000L)
+    }
+
+    @Test
+    fun `automation without an active target polls less often`() {
+        val active = foregroundPollDelayMs(ForegroundAppState.Active("org.game"))
+
+        assertTrue(foregroundPollDelayMs(ForegroundAppState.Disabled) > active)
+        assertTrue(foregroundPollDelayMs(ForegroundAppState.PermissionRequired) > active)
     }
 
     @Test

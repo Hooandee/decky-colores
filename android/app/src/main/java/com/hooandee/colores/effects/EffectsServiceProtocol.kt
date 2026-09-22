@@ -77,3 +77,21 @@ internal fun resolveEffectsServiceCommand(
         action == ACTION_RESTORE -> EffectsServiceCommand.RESTORE
         else -> EffectsServiceCommand.KEEP_ALIVE
     }
+
+internal enum class CaptureOwner(
+    val mode: AppMode,
+) {
+    AUDIO(AppMode.AUDIO),
+    AMBIENT(AppMode.AMBIENT),
+}
+
+internal fun shouldEndCapture(
+    owner: CaptureOwner,
+    mode: AppMode,
+    globalMode: AppMode?,
+): Boolean = mode != owner.mode && globalMode != owner.mode
+
+internal fun shouldDispatchCaptureStop(
+    serviceActive: Boolean,
+    captureLive: Boolean,
+): Boolean = serviceActive || captureLive

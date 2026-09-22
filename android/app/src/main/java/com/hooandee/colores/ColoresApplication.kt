@@ -50,6 +50,8 @@ class ColoresApplication : Application() {
 
     val effectsServiceGate by lazy { ContextServiceGate(this) }
 
+    val screenState: ScreenStateMonitor by lazy { ScreenStateMonitor(this) { lightingController.reassert() } }
+
     val profileStore: LightingProfileStore by lazy { LightingProfileStore(this) }
 
     val hardwareLearningStore: HardwareLearningStore by lazy { HardwareLearningStore(this) }
@@ -96,10 +98,21 @@ class ColoresApplication : Application() {
             scope = applicationScope,
             store = profileStore,
             usageAccess = usageAccess,
-            observer = ForegroundAppObserver(this, usageAccess, focusedAppResolver = PServerFocusedAppResolver(this)),
+            observer =
+                ForegroundAppObserver(
+                    this,
+                    usageAccess,
+                    focusedAppResolver = PServerFocusedAppResolver(this),
+                    interactive = screenState.interactive,
+                ),
             controller = lightingController,
             serviceGate = effectsServiceGate,
         )
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        screenState.register()
     }
 
     suspend fun recoverHardwareLearningRollback(): RollbackStatus? =

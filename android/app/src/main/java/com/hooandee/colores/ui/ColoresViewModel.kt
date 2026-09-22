@@ -24,6 +24,7 @@ import com.hooandee.colores.control.LightingIntent
 import com.hooandee.colores.control.DevicePreferenceMigration
 import com.hooandee.colores.control.LightingPreferences
 import com.hooandee.colores.control.StoredLighting
+import com.hooandee.colores.control.closeIfNotBound
 import com.hooandee.colores.device.AndroidDeviceDetector
 import com.hooandee.colores.device.AndroidDeviceIdentityCatalog
 import com.hooandee.colores.device.DetectedAndroidDevice
@@ -383,9 +384,10 @@ class ColoresViewModel(
                 val devicePresentation = deviceIdentityCatalog.resolve(outcome.identity, detected)
                 val userPermissionGranted = WriteSettingsPermission.canWrite(context)
                 val applicationScope = coloresApplication.applicationScope
+                val boundDevice = detected?.let { controller.boundDevice(it.id) }
                 val device =
                     detected?.let {
-                        controller.boundDevice(it.id)
+                        boundDevice
                             ?: LedDeviceFactory.create(
                                 context,
                                 it.led,
@@ -402,6 +404,7 @@ class ColoresViewModel(
                     } ?: ControlAccess.SERVICE_UNAVAILABLE
 
                 if (detected == null || device == null || controlAccess != ControlAccess.ENABLED) {
+                    closeUnboundDevice(device, boundDevice)
                     controller.unbind()
                     mutableState.update {
                         it.copy(
@@ -512,6 +515,7 @@ class ColoresViewModel(
                 val alreadyBound =
                     controller.snapshot.value.bound && controller.snapshot.value.deviceId == detected.id
 
+                if (alreadyBound) closeUnboundDevice(device, boundDevice)
                 if (!alreadyBound) {
                     controller.bind(
                         LightingBinding(
@@ -605,8 +609,11 @@ class ColoresViewModel(
             }
     }
 
-    fun onScreenOn() {
-        if (mutableState.value.canWrite) controller.reassert()
+    private suspend fun closeUnboundDevice(
+        candidate: LedDevice?,
+        bound: LedDevice?,
+    ) {
+        withContext(NonCancellable + Dispatchers.IO) { closeIfNotBound(candidate, bound) }
     }
 
     fun onAppBackground() {

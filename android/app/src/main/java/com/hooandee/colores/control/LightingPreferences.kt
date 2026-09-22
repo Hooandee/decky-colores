@@ -73,7 +73,7 @@ class LightingPreferences(
     fun shouldRestoreInBackground(): Boolean {
         val deviceId = activeDeviceId() ?: return false
         val stored = load(deviceId)
-        return stored.power != false && (stored.mode != AppMode.COLOR || stored.chargerOnly)
+        return restoresInBackground(stored)
     }
 
     private fun decode(
@@ -238,3 +238,8 @@ class LightingPreferences(
         const val ACTIVE_DEVICE_KEY = "active_device"
     }
 }
+
+internal fun restoresInBackground(stored: StoredLighting): Boolean =
+    stored.power != false && (stored.chargerOnly || stored.mode !in MODES_WITHOUT_BACKGROUND_WORK)
+
+private val MODES_WITHOUT_BACKGROUND_WORK = setOf(AppMode.COLOR, AppMode.AUDIO, AppMode.AMBIENT)
