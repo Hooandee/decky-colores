@@ -12,6 +12,13 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class LearnedBindingTest {
+    @Test
+    fun `learned singleadc descriptor never carries vendor effects`() {
+        val decoded = decodeLearningDescriptor(encodeLearningDescriptor(SingleAdcJoypadDescriptor(vendorEffects = true)))
+
+        assertEquals(SingleAdcJoypadDescriptor(), decoded)
+    }
+
     private val identity = AndroidDeviceIdentity("Mystery", "mystery", "Maker", emptyMap())
     private val descriptor = SingleAdcJoypadDescriptor()
     private val candidate = ProbeCandidate("singleadc-joypad", 1, ProbeSurface.SINGLEADC_JOYPAD, descriptor, emptySet())
