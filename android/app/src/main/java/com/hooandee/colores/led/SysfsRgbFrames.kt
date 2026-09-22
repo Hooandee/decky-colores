@@ -3,9 +3,10 @@ package com.hooandee.colores.led
 import kotlin.math.roundToInt
 
 internal object SysfsRgbFrames {
-    private val STANDARD_CHANNELS = listOf("red", "green", "blue")
+    val STANDARD_CHANNELS = listOf("red", "green", "blue")
+    private val ACTIVE_TRIGGER = Regex("\\[([^\\]]+)]")
 
-    fun nodes(descriptor: SysfsRgbDescriptor): List<String> =
+    private fun nodes(descriptor: SysfsRgbDescriptor): List<String> =
         when (descriptor.kind) {
             SysfsColorKind.COMPOSITE -> descriptor.members.flatMap(::nodes)
             SysfsColorKind.CHANNEL_NODES -> descriptor.channelNodes
@@ -31,10 +32,24 @@ internal object SysfsRgbFrames {
 
     fun triggerPaths(descriptor: SysfsRgbDescriptor): List<String> = nodes(descriptor).map { "$it/trigger" }.distinct()
 
-    fun channelLayout(descriptor: SysfsRgbDescriptor): List<String> =
+    private fun channelLayout(descriptor: SysfsRgbDescriptor): List<String> =
         descriptor.multiIndex.ifEmpty { List(descriptor.zones) { STANDARD_CHANNELS }.flatten() }
 
-    fun writes(
+    fun write(
+        access: SysfsAccess,
+        descriptor: SysfsRgbDescriptor,
+        colors: List<RgbColor>,
+        brightnessPercent: Int,
+        power: Boolean,
+    ): Boolean {
+        var succeeded = true
+        writes(descriptor, colors, brightnessPercent, power).forEach { (path, value) ->
+            if (!access.write(path, value)) succeeded = false
+        }
+        return succeeded
+    }
+
+    private fun writes(
         descriptor: SysfsRgbDescriptor,
         colors: List<RgbColor>,
         brightnessPercent: Int,
@@ -72,7 +87,7 @@ internal object SysfsRgbFrames {
 
     fun activeTrigger(raw: String?): String? {
         val value = raw?.trim()?.takeIf(String::isNotEmpty) ?: return null
-        val bracketed = Regex("\\[([^\\]]+)]").find(value)?.groupValues?.get(1)?.trim()
+        val bracketed = ACTIVE_TRIGGER.find(value)?.groupValues?.get(1)?.trim()
         return bracketed?.takeIf(String::isNotEmpty) ?: value.takeIf { it.none(Char::isWhitespace) }
     }
 

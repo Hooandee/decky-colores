@@ -2,6 +2,7 @@ package com.hooandee.colores.device.learning
 
 import com.hooandee.colores.device.GenericVendorLed
 import com.hooandee.colores.led.Htr3212Command
+import com.hooandee.colores.led.Htr3212Descriptor
 import com.hooandee.colores.led.PServerCommandExecutor
 import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.led.SettingsProviderCodec
@@ -41,7 +42,7 @@ internal class Htr3212LearningCartridge(
         return driver == "htr3212" &&
             transport == "pserver" &&
             colorKey == GenericVendorLed.COLOR_KEY &&
-            colorFormat == "argb_hex_csv" &&
+            colorFormat == SettingsProviderCodec.ARGB_HEX_CSV &&
             brightnessKey == GenericVendorLed.BRIGHTNESS_KEY &&
             enableKeys.isNotEmpty() &&
             GenericVendorLed.ENABLE_KEYS.containsAll(enableKeys) &&
@@ -49,7 +50,7 @@ internal class Htr3212LearningCartridge(
             hardware.leftBus in BUS_RANGE &&
             hardware.rightBus in BUS_RANGE &&
             hardware.leftBus != hardware.rightBus &&
-            hardware.address == ADDRESS &&
+            hardware.address == HTR3212_I2C_ADDRESS &&
             hardware.leftOrder.isZoneOrder() &&
             hardware.rightOrder.isZoneOrder() &&
             hardware.rgbStartRegister in RGB_START_REGISTERS
@@ -121,10 +122,7 @@ internal class Htr3212LearningCartridge(
     ): RollbackStatus {
         val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return RollbackStatus.RESTORE_FAILED
         if (descriptor.colorKey !in snapshot.values) return restoreRaw(descriptor, snapshot)
-        val allowedKeys = setOf(descriptor.colorKey, descriptor.brightnessKey) + descriptor.enableKeys
-        if (!accepts(candidate) || descriptor.colorKey !in snapshot.values || !allowedKeys.containsAll(snapshot.values.keys)) {
-            return RollbackStatus.RESTORE_FAILED
-        }
+        if (!accepts(candidate) || !descriptor.vendorSettingKeys().containsAll(snapshot.values.keys)) return RollbackStatus.RESTORE_FAILED
         if (!snapshot.values.attemptAll(store::put)) return RollbackStatus.RESTORE_FAILED
         settleVendor()
         val vendorDescriptor = descriptor.copy(driver = "settings_provider", zones = STICKS, htr3212 = null)
@@ -160,11 +158,13 @@ internal class Htr3212LearningCartridge(
     ): RollbackStatus {
         val descriptor = candidate.descriptor as? SettingsProviderDescriptor ?: return RollbackStatus.RESTORE_FAILED
         if (!accepts(candidate)) return RollbackStatus.RESTORE_FAILED
-        val allowedKeys = setOf(descriptor.colorKey, descriptor.brightnessKey) + descriptor.enableKeys
+        val allowedKeys = descriptor.vendorSettingKeys()
         val settings = snapshot.values.filterKeys { it in allowedKeys }
         if (settings.isEmpty()) return RollbackStatus.RESTORE_FAILED
         return restoreSettings(settings)
     }
+
+    private fun SettingsProviderDescriptor.vendorSettingKeys(): Set<String> = setOf(colorKey, brightnessKey) + enableKeys
 
     override fun bindingCandidate(
         candidate: ProbeCandidate,
@@ -331,30 +331,8 @@ internal class Htr3212LearningCartridge(
         val hardware = descriptor.htr3212 ?: return false
         val colors = { values: List<Int> -> values.chunked(CHANNELS_PER_ZONE).map { RgbColor(it[0], it[1], it[2]) } }
         val order = (0 until ZONES_PER_STICK).toList()
-        val leftCommand =
-            Htr3212Command.build(
-                hardware.leftBus,
-                hardware.address,
-                colors(left),
-                order,
-                previous = null,
-                rgbStartRegister = hardware.rgbStartRegister,
-                blockWrite = hardware.blockWrite,
-                explicitInitialization = hardware.explicitInitialization,
-                initialize = false,
-            ) ?: return false
-        val rightCommand =
-            Htr3212Command.build(
-                hardware.rightBus,
-                hardware.address,
-                colors(right),
-                order,
-                previous = null,
-                rgbStartRegister = hardware.rgbStartRegister,
-                blockWrite = hardware.blockWrite,
-                explicitInitialization = hardware.explicitInitialization,
-                initialize = false,
-            ) ?: return false
+        val leftCommand = hardware.stickCommand(hardware.leftBus, colors(left), order, initialize = false) ?: return false
+        val rightCommand = hardware.stickCommand(hardware.rightBus, colors(right), order, initialize = false) ?: return false
         return listOf(leftCommand, rightCommand).all(executor::execute)
     }
 
@@ -385,33 +363,29 @@ internal class Htr3212LearningCartridge(
         val scaled = colors.map { it.scale(brightness) }
         val left = scaled.take(ZONES_PER_STICK)
         val right = scaled.drop(ZONES_PER_STICK).take(ZONES_PER_STICK)
-        val leftCommand =
-            Htr3212Command.build(
-                hardware.leftBus,
-                hardware.address,
-                left,
-                hardware.leftOrder,
-                previous = null,
-                rgbStartRegister = hardware.rgbStartRegister,
-                blockWrite = hardware.blockWrite,
-                explicitInitialization = hardware.explicitInitialization,
-                initialize = initialize,
-            ) ?: return false
-        val rightCommand =
-            Htr3212Command.build(
-                hardware.rightBus,
-                hardware.address,
-                right,
-                hardware.rightOrder,
-                previous = null,
-                rgbStartRegister = hardware.rgbStartRegister,
-                blockWrite = hardware.blockWrite,
-                explicitInitialization = hardware.explicitInitialization,
-                initialize = initialize,
-            ) ?: return false
+        val leftCommand = hardware.stickCommand(hardware.leftBus, left, hardware.leftOrder, initialize) ?: return false
+        val rightCommand = hardware.stickCommand(hardware.rightBus, right, hardware.rightOrder, initialize) ?: return false
         val commands = if (hardware.pairedWrite) listOf("$leftCommand && $rightCommand") else listOf(leftCommand, rightCommand)
         return commands.all(executor::execute)
     }
+
+    private fun Htr3212Descriptor.stickCommand(
+        bus: Int,
+        colors: List<RgbColor>,
+        order: List<Int>,
+        initialize: Boolean,
+    ): String? =
+        Htr3212Command.build(
+            bus,
+            address,
+            colors,
+            order,
+            previous = null,
+            rgbStartRegister = rgbStartRegister,
+            blockWrite = blockWrite,
+            explicitInitialization = explicitInitialization,
+            initialize = initialize,
+        )
 
     private fun RgbColor.scale(brightness: Int): RgbColor {
         val scale = brightness.coerceIn(0, 100) / 100f
@@ -443,7 +417,6 @@ internal class Htr3212LearningCartridge(
     }
 
     private companion object {
-        const val ADDRESS = 0x3c
         val RGB_START_REGISTERS = setOf(0x0d)
         const val STICKS = 2
         const val ZONES_PER_STICK = 4

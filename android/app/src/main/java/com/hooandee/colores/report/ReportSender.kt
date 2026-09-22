@@ -114,9 +114,9 @@ private fun saveReport(
     savedAtEpochMs: Long,
 ): String? =
     runCatching {
-        val directory = File(context.filesDir, "reports").apply { mkdirs() }
-        val target = File(directory, "report-offline.json")
-        val temporary = File(directory, "report-offline.json.tmp")
+        val target = savedReportFile(context)
+        val directory = target.parentFile.apply { mkdirs() }
+        val temporary = File(directory, "${target.name}.tmp")
         temporary.writeText(encodePendingReport(bundle, savedAtEpochMs))
         runCatching {
             Files.move(

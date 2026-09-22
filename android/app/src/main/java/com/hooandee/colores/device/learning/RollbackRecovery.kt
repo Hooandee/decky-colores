@@ -69,17 +69,12 @@ class RollbackRecovery(
     private fun topologyContradicts(hardware: Htr3212Descriptor): Boolean {
         val controllers = topologyReader?.let { reader -> runCatching { reader.read() }.getOrNull() }.orEmpty()
         if (controllers.isEmpty()) return false
-        val left = controllers.any { it.driver == HTR_LEFT_DRIVER && it.bus == hardware.leftBus && it.address == hardware.address }
-        val right = controllers.any { it.driver == HTR_RIGHT_DRIVER && it.bus == hardware.rightBus && it.address == hardware.address }
+        val left = controllers.any { it.driver == HTR3212_LEFT_DRIVER && it.bus == hardware.leftBus && it.address == hardware.address }
+        val right = controllers.any { it.driver == HTR3212_RIGHT_DRIVER && it.bus == hardware.rightBus && it.address == hardware.address }
         return !(left && right)
     }
 
     private fun failed(reason: RollbackFailureReason): Pair<RollbackStatus, RollbackFailureReason?> = RollbackStatus.RESTORE_FAILED to reason
-
-    private companion object {
-        const val HTR_LEFT_DRIVER = "htr3212l"
-        const val HTR_RIGHT_DRIVER = "htr3212r"
-    }
 }
 
 suspend fun restoreAfterLearningRollback(

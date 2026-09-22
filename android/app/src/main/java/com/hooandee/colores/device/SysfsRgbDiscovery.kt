@@ -4,6 +4,7 @@ import com.hooandee.colores.led.FileSysfsAccess
 import com.hooandee.colores.led.SysfsAccess
 import com.hooandee.colores.led.SysfsColorKind
 import com.hooandee.colores.led.SysfsRgbDescriptor
+import com.hooandee.colores.led.SysfsRgbFrames
 import java.io.File
 
 data class SysfsLedNode(
@@ -16,7 +17,7 @@ object SysfsRgbDiscovery {
     private const val MAX_ZONES = 32
     private const val MAX_COMPOSITE_MEMBERS = 8
     private const val PACKED_TOKEN = "rgb"
-    private val CHANNEL_NAMES = listOf("red", "green", "blue")
+    private val CHANNEL_NAMES = SysfsRgbFrames.STANDARD_CHANNELS
     private val CHANNEL_TOKEN = Regex("[a-z][a-z0-9_]*")
     private val CHANNEL_NODE_NAME = Regex("^(.*?)([:_.-]?)(red|green|blue)$", RegexOption.IGNORE_CASE)
     private val EXCLUDED_NAME =

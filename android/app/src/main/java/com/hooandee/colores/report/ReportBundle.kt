@@ -4,17 +4,17 @@ import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import com.hooandee.colores.device.diagnostics.HardwareInventory
-import com.hooandee.colores.device.learning.DetectionOutcome
 import com.hooandee.colores.device.learning.ArchivedRollbackSummary
+import com.hooandee.colores.device.learning.DetectionOutcome
+import com.hooandee.colores.device.learning.HardwareFact
 import com.hooandee.colores.device.learning.HardwareLearningResult
+import com.hooandee.colores.device.learning.HardwareLearningStatus
 import com.hooandee.colores.device.learning.ProbeCandidate
+import com.hooandee.colores.device.learning.RollbackStatus
 import com.hooandee.colores.led.LedDescriptor
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.led.SysfsRgbDescriptor
-import com.hooandee.colores.device.learning.HardwareFact
-import com.hooandee.colores.device.learning.HardwareLearningStatus
-import com.hooandee.colores.device.learning.RollbackStatus
 import org.json.JSONArray
 import org.json.JSONObject
 

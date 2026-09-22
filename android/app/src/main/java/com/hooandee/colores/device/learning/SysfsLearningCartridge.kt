@@ -103,13 +103,7 @@ class SysfsLearningCartridge(
         descriptor: SysfsRgbDescriptor,
         colors: List<RgbColor>,
         brightnessPercent: Int,
-    ): Boolean {
-        var succeeded = true
-        SysfsRgbFrames.writes(descriptor, colors, brightnessPercent, power = true).forEach { (path, value) ->
-            if (!access.write(path, value)) succeeded = false
-        }
-        return succeeded
-    }
+    ): Boolean = SysfsRgbFrames.write(access, descriptor, colors, brightnessPercent, power = true)
 
     private fun SysfsRgbDescriptor.isAcceptable(allowComposite: Boolean): Boolean {
         if (zones !in 1..MAX_ZONES || maxBrightness !in 1..MAX_BRIGHTNESS) return false
@@ -127,7 +121,7 @@ class SysfsLearningCartridge(
 
     private fun SysfsRgbDescriptor.hasCompleteLayout(): Boolean {
         if (multiIndex.isEmpty()) return true
-        return listOf("red", "green", "blue").all { channel -> multiIndex.count { it.equals(channel, ignoreCase = true) } == zones }
+        return SysfsRgbFrames.STANDARD_CHANNELS.all { channel -> multiIndex.count { it.equals(channel, ignoreCase = true) } == zones }
     }
 
     private fun isSafeNode(path: String): Boolean =

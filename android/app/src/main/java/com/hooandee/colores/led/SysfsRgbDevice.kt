@@ -94,13 +94,8 @@ class SysfsRgbDevice internal constructor(
 
     override fun invalidate() = Unit
 
-    private fun writeState(state: LedState): Boolean {
-        var succeeded = true
-        SysfsRgbFrames.writes(descriptor, state.zoneColors, state.brightness, state.power).forEach { (path, value) ->
-            if (!access.write(path, value)) succeeded = false
-        }
-        return succeeded
-    }
+    private fun writeState(state: LedState): Boolean =
+        SysfsRgbFrames.write(access, descriptor, state.zoneColors, state.brightness, state.power)
 
     private fun readBrightnessPercent(): Int {
         val path = brightnessPath ?: return 100

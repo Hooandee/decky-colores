@@ -5,6 +5,9 @@ import android.content.pm.PackageManager
 import android.os.Build
 import com.hooandee.colores.led.AndroidPServerCommandExecutor
 import com.hooandee.colores.led.PServerCommandExecutor
+import com.hooandee.colores.led.restoreOwnerAccess
+import com.hooandee.colores.led.shareWithPServer
+import com.hooandee.colores.led.shellQuoted
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -99,22 +102,6 @@ internal class AndroidHardwareInventorySource(
         } catch (_: PackageManager.NameNotFoundException) {
             PackagePresence.Absent
         }
-
-    private fun File.shareWithPServer(writable: Boolean) {
-        setReadable(false, false)
-        setReadable(true, false)
-        setWritable(false, false)
-        setWritable(true, !writable)
-    }
-
-    private fun File.restoreOwnerAccess() {
-        setReadable(false, false)
-        setReadable(true, true)
-        setWritable(false, false)
-        setWritable(true, true)
-    }
-
-    private fun String.shellQuoted(): String = "'${replace("'", "'\"'\"'")}'"
 
     private companion object {
         const val PROPERTY_TIMEOUT_MS = 250L

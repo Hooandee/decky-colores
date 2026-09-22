@@ -1,5 +1,6 @@
 package com.hooandee.colores.device.diagnostics
 
+import com.hooandee.colores.led.SysfsRgbFrames
 import com.hooandee.colores.report.redactReportText
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -111,7 +112,7 @@ class HardwareInventoryCollector(
             }
             if ("max_brightness" in files) entry.put("max_brightness", text(bounded { source.read("$path/max_brightness") }, 16))
             if ("multi_index" in files) entry.put("multi_index", text(bounded { source.read("$path/multi_index") }, 160))
-            if ("trigger" in files) entry.put("trigger", text(activeTrigger(bounded { source.read("$path/trigger") }), 48))
+            if ("trigger" in files) entry.put("trigger", text(SysfsRgbFrames.activeTrigger(bounded { source.read("$path/trigger") }), 48))
             if (!nodes.add(entry)) truncated += "sysfs.leds"
         }
         if (names.size > MAX_LED_NODES) truncated += "sysfs.leds"
@@ -391,11 +392,6 @@ class HardwareInventoryCollector(
                 }
             }
             return sections
-        }
-
-        internal fun activeTrigger(raw: String?): String? {
-            val value = raw?.trim()?.takeIf(String::isNotEmpty) ?: return null
-            return Regex("\\[([^\\]]+)]").find(value)?.groupValues?.get(1)?.trim() ?: value.takeIf { it.none(Char::isWhitespace) }
         }
 
         private fun daemonExecutor(): ExecutorService =

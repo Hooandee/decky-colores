@@ -45,32 +45,15 @@ class HardwareLearningStore(
     ): Boolean {
         val journal = read(ROLLBACK_KEY) ?: return true
         val attempts = loadRollbackFailure()?.attempts ?: 0
-        val archived =
-            JSONObject()
-                .put("schema", 1)
-                .put("journal", journal)
-                .put("reason", reason.name)
-                .put("attempts", attempts)
-                .put("archived_at", archivedAtEpochMs)
-        if (!write(ROLLBACK_ARCHIVE_KEY, archived.toString())) return false
+        val archived = ArchivedRollback(journal, reason, attempts, archivedAtEpochMs)
+        if (!write(ROLLBACK_ARCHIVE_KEY, archived.toJson().toString())) return false
         if (!remove(ROLLBACK_KEY)) return false
         remove(ROLLBACK_FAILURE_KEY)
         return true
     }
 
     fun loadArchivedRollback(): ArchivedRollback? =
-        read(ROLLBACK_ARCHIVE_KEY)?.let {
-            runCatching {
-                val json = JSONObject(it)
-                require(json.getInt("schema") == 1)
-                ArchivedRollback(
-                    journal = json.getString("journal"),
-                    reason = RollbackFailureReason.valueOf(json.getString("reason")),
-                    attempts = json.getInt("attempts"),
-                    archivedAtEpochMs = json.optLong("archived_at", 0L).takeIf { it > 0L },
-                )
-            }.getOrNull()
-        }
+        read(ROLLBACK_ARCHIVE_KEY)?.let { runCatching { JSONObject(it).toArchivedRollback() }.getOrNull() }
 
     fun saveBinding(binding: LearnedDeviceBinding): Boolean = write(BINDING_KEY, binding.toJson().toString())
 
@@ -176,6 +159,24 @@ private fun JSONObject.toRollbackFailure(): RollbackFailure {
     return RollbackFailure(
         attempts = getInt("attempts").also { require(it > 0) },
         reason = RollbackFailureReason.valueOf(getString("reason")),
+    )
+}
+
+private fun ArchivedRollback.toJson(): JSONObject =
+    JSONObject()
+        .put("schema", 1)
+        .put("journal", journal)
+        .put("reason", reason.name)
+        .put("attempts", attempts)
+        .put("archived_at", archivedAtEpochMs)
+
+private fun JSONObject.toArchivedRollback(): ArchivedRollback {
+    require(getInt("schema") == 1)
+    return ArchivedRollback(
+        journal = getString("journal"),
+        reason = RollbackFailureReason.valueOf(getString("reason")),
+        attempts = getInt("attempts"),
+        archivedAtEpochMs = optLong("archived_at", 0L).takeIf { it > 0L },
     )
 }
 

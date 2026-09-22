@@ -169,8 +169,7 @@ class HardwareLearningSession(
     fun finish(): HardwareLearningResult {
         val currentCandidate = requireNotNull(candidate)
         val currentCartridge = requireNotNull(cartridge)
-        val rollbackStatus = restoreOriginal()
-        snapshot = null
+        val rollbackStatus = restoreAndReleaseSnapshot()
         val capabilities = confirmedCapabilities()
         if (rollbackStatus == RollbackStatus.RESTORE_FAILED) {
             val result = HardwareLearningResult(HardwareLearningStatus.RESTORE_FAILED, currentCandidate, evidence.toList(), capabilities, rollbackStatus)
@@ -220,8 +219,7 @@ class HardwareLearningSession(
             state = HardwareLearningState.Idle
             return null
         }
-        val status = restoreOriginal()
-        snapshot = null
+        val status = restoreAndReleaseSnapshot()
         state =
             when {
                 status == RollbackStatus.RESTORE_FAILED -> HardwareLearningState.Blocked(LearningBlockReason.RESTORE_FAILED)
@@ -253,10 +251,10 @@ class HardwareLearningSession(
 
     private fun confirmedZones(): List<Int> = confirmedZoneIndices(evidence, candidate?.surface)
 
-    private fun restoreOriginal(): RollbackStatus {
+    private fun restoreAndReleaseSnapshot(): RollbackStatus {
+        val captured = snapshot.also { snapshot = null } ?: return RollbackStatus.RESTORE_FAILED
         val currentCandidate = candidate ?: return RollbackStatus.RESTORE_FAILED
         val currentCartridge = cartridge ?: return RollbackStatus.RESTORE_FAILED
-        val captured = snapshot ?: return RollbackStatus.RESTORE_FAILED
         val restored =
             runCatching { currentCartridge.restore(currentCandidate, captured) }
                 .getOrDefault(RollbackStatus.RESTORE_FAILED)
@@ -265,8 +263,7 @@ class HardwareLearningSession(
     }
 
     private fun restoreAndBlock(reason: LearningBlockReason) {
-        val restored = restoreOriginal()
-        snapshot = null
+        val restored = restoreAndReleaseSnapshot()
         val blockReason =
             when {
                 restored == RollbackStatus.RESTORE_FAILED -> LearningBlockReason.RESTORE_FAILED
