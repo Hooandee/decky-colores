@@ -117,7 +117,6 @@ fun DeviceScene(
                                 power = power,
                                 enabled = enabled && perZone,
                                 diameter = ringSize,
-                                showLabel = !compact,
                                 projection = projection,
                                 onClick = { onTargetChange(target) },
                             )
@@ -192,7 +191,6 @@ private fun StickTarget(
     power: Boolean,
     enabled: Boolean,
     diameter: Dp,
-    showLabel: Boolean,
     projection: LedColorProjection,
     onClick: () -> Unit,
 ) {
@@ -202,47 +200,34 @@ private fun StickTarget(
             animationSpec = tween(durationMillis = 180),
             label = "LED preview glow",
         )
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(9.dp),
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier =
+            Modifier
+                .size(diameter)
+                .semantics {
+                    contentDescription = label
+                    this.selected = selected
+                    role = Role.RadioButton
+                },
+        color = Color.Transparent,
+        shape = CircleShape,
     ) {
-        Surface(
-            onClick = onClick,
-            enabled = enabled,
-            modifier =
-                Modifier
-                    .size(diameter)
-                    .semantics {
-                        contentDescription = label
-                        this.selected = selected
-                        role = Role.RadioButton
-                    },
-            color = Color.Transparent,
-            shape = CircleShape,
-        ) {
-            GlassLedRing(
-                segments =
-                    segments.map { segment ->
-                        LedPreviewRingSegment(
-                            color = projection.display(segment.color).toComposeColor(),
-                            startAngle = segment.startAngle,
-                            sweepAngle = segment.sweepAngle,
-                        )
-                    },
-                power = power,
-                glowAlpha = glowAlpha,
-                selected = selected,
-                selectedOutline = MaterialTheme.colorScheme.primary,
-            )
-        }
-        if (showLabel) {
-            Text(
-                text = label,
-                color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            )
-        }
+        GlassLedRing(
+            segments =
+                segments.map { segment ->
+                    LedPreviewRingSegment(
+                        color = projection.display(segment.color).toComposeColor(),
+                        startAngle = segment.startAngle,
+                        sweepAngle = segment.sweepAngle,
+                    )
+                },
+            power = power,
+            glowAlpha = glowAlpha,
+            selected = selected,
+            selectedOutline = MaterialTheme.colorScheme.primary,
+        )
     }
 }
 
