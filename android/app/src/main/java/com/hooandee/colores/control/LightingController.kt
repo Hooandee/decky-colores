@@ -112,6 +112,43 @@ data class ProfileApplication(
     val temperatureBreathe: Boolean,
 )
 
+internal class TemperatureAvailability(
+    private val missesBeforeWithdrawal: Int = 3,
+) {
+    private var available = false
+    private var misses = 0
+
+    fun onBind(initiallyAvailable: Boolean): Boolean {
+        available = initiallyAvailable
+        misses = 0
+        return available
+    }
+
+    fun onReading(
+        sourcePresent: Boolean,
+        celsius: Double?,
+    ): Boolean {
+        when {
+            !sourcePresent -> {
+                available = false
+                misses = 0
+            }
+            celsius != null -> {
+                available = true
+                misses = 0
+            }
+            available -> {
+                misses++
+                if (misses >= missesBeforeWithdrawal) {
+                    available = false
+                    misses = 0
+                }
+            }
+        }
+        return available
+    }
+}
+
 internal fun LightingIntent.availableOn(device: LedDevice): LightingIntent =
     if (mode == AppMode.EFFECT && !device.effectModeAvailable) copy(mode = AppMode.COLOR) else this
 
@@ -216,6 +253,7 @@ class LightingController(
     private var generation = 0L
     private var temperatureCelsius: Double? = null
     private var temperatureAvailable = false
+    private val temperatureAvailability = TemperatureAvailability()
     private var lastFrame: List<RgbColor> = emptyList()
     private var gradientEditing = false
     private var frozenGradientFrame: List<RgbColor> = emptyList()
@@ -354,7 +392,8 @@ class LightingController(
         sensorBands = command.binding.bands
         intent = command.intent.copy(staticColors = command.intent.staticColors.fit(command.binding.zones)).availableOn(command.binding.device)
         temperatureCelsius = command.binding.temperature?.readCelsius()
-        temperatureAvailable = temperatureCelsius != null || command.binding.temperature?.available == true
+        temperatureAvailable =
+            temperatureAvailability.onBind(temperatureCelsius != null || command.binding.temperature?.available == true)
         rendererSignature = null
         val level = runCatching { command.binding.battery.read() }.getOrNull()
         if (level != null) {
@@ -391,7 +430,7 @@ class LightingController(
         batteryLevel = command.levelPercent
         batteryPresent = command.present
         temperatureCelsius = command.temperatureCelsius
-        temperatureAvailable = binding?.temperature != null && command.temperatureCelsius != null
+        temperatureAvailable = temperatureAvailability.onReading(binding?.temperature != null, command.temperatureCelsius)
         if (effectivePower() != previousEffective) {
             binding?.let { applyCurrent(it, manageRenderJob = false) }
         }

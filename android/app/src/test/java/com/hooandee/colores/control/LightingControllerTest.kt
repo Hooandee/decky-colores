@@ -686,6 +686,52 @@ class LightingControllerTest {
         }
 
     @Test
+    fun `a transient missing temperature reading keeps the sensor available`() =
+        runTest {
+            val temperature = FakeTemperature(50.0)
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(FakeDevice(), temperature = temperature), LightingIntent(mode = AppMode.COLOR))
+            advanceTimeBy(100)
+            runCurrent()
+            assertTrue(controller.snapshot.value.temperatureAvailable)
+
+            temperature.celsius = null
+            advanceTimeBy(3_000)
+            runCurrent()
+            assertTrue(controller.snapshot.value.temperatureAvailable)
+
+            temperature.celsius = 51.0
+            advanceTimeBy(3_000)
+            runCurrent()
+            temperature.celsius = null
+            advanceTimeBy(9_000)
+            runCurrent()
+            assertFalse(controller.snapshot.value.temperatureAvailable)
+
+            temperature.celsius = 49.0
+            advanceTimeBy(3_000)
+            runCurrent()
+            assertTrue(controller.snapshot.value.temperatureAvailable)
+        }
+
+    @Test
+    fun `temperature availability withdraws after consecutive misses or a missing source`() {
+        val availability = TemperatureAvailability(missesBeforeWithdrawal = 3)
+
+        assertTrue(availability.onBind(true))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = null))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = null))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = 40.0))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = null))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = null))
+        assertFalse(availability.onReading(sourcePresent = true, celsius = null))
+        assertTrue(availability.onReading(sourcePresent = true, celsius = 41.0))
+        assertFalse(availability.onReading(sourcePresent = false, celsius = null))
+        assertFalse(availability.onBind(false))
+        assertFalse(availability.onReading(sourcePresent = true, celsius = null))
+    }
+
+    @Test
     fun `performance mode reports its metric label`() =
         runTest {
             val device = FakeDevice()
