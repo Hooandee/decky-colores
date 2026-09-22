@@ -192,6 +192,12 @@ export const de: Record<string, string> = {
   "powerLed.section": "Beleuchtung der Einschalttaste (experimentell)",
   "powerLed.label": "Beleuchtung der Einschalttaste ausschalten",
   "powerLed.warning": "Schaltet die LED der Einschalttaste aus.",
+  "powerLed.awakeLabel": "Im Betrieb ausschalten",
+  "powerLed.suspendLabel": "Im Ruhemodus ausschalten",
+  "powerLed.separateWarning": "Du kannst sie bei der Nutzung eingeschaltet lassen und nur im Ruhemodus ausschalten.",
+  "sleepCharging.section": "Ruhemodus",
+  "sleepCharging.label": "Ladeanzeige im Ruhemodus",
+  "sleepCharging.hint": "Lässt die Ringe blinken, während die Konsole im Ruhemodus lädt.",
 
   "report.button": "Bericht senden",
   "report.button.desc": "Funktioniert etwas nicht oder wünschst du dir eine neue Funktion in Colores? Beschreibe es mir; ich sende auch den technischen Beleuchtungskontext mit.",

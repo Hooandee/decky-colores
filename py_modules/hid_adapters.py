@@ -54,6 +54,7 @@ try:
         pct_to_level,
         speed_to_code,
         mode_code,
+        sleep_charging_power_cmd,
         ZONE_CODES,
         MODE_SOLID,
     )
@@ -475,6 +476,10 @@ class AsusAllyHidDevice(_BaseHidDevice):
     # Green is toned down to match the Ally calibration; the gain comes from the
     # profile's color_correction via set_color_correction (see _build_hid_context).
 
+    def __init__(self, transport):
+        super().__init__(transport)
+        self._sleep_charging_indicator = False
+
     @classmethod
     def create(cls):
         if not HID_AVAILABLE:
@@ -493,6 +498,17 @@ class AsusAllyHidDevice(_BaseHidDevice):
 
     def supports_hardware_effects(self):
         return True
+
+    def supports_sleep_charging_indicator(self):
+        return True
+
+    def set_sleep_charging_indicator(self, enabled):
+        self._sleep_charging_indicator = bool(enabled)
+        return self._heal(
+            lambda: self._write(
+                [sleep_charging_power_cmd(self._sleep_charging_indicator)]
+            )
+        )
 
     def _fit(self, zone_colors, brightness):
         colors = [tuple(c) for c in zone_colors] or [(0, 0, 0)]
@@ -520,7 +536,16 @@ class AsusAllyHidDevice(_BaseHidDevice):
 
         def _do():
             new_mode = self._transport.prev_mode != "solid"
-            reps = list(init_cmds()) if new_mode else []
+            reps = (
+                [
+                    *self._transport.awake_restore_cmds(
+                        self._sleep_charging_indicator
+                    ),
+                    *init_cmds(),
+                ]
+                if new_mode
+                else []
+            )
             reps.append(brightness_cmd(3))
             for code, (r, g, b) in zip(ZONE_CODES, self._fit(zone_colors, brightness)):
                 reps.append(zone_cmd(code, MODE_SOLID, r, g, b))
@@ -544,7 +569,14 @@ class AsusAllyHidDevice(_BaseHidDevice):
         r, g, b = self._correct(color)
 
         def _do():
-            reps = list(init_cmds())
+            reps = []
+            if self._transport.prev_mode is None:
+                reps.extend(
+                    self._transport.awake_restore_cmds(
+                        self._sleep_charging_indicator
+                    )
+                )
+            reps.extend(init_cmds())
             reps.append(brightness_cmd(pct_to_level(brightness)))
             for zone in ZONE_CODES:
                 reps.append(zone_cmd(zone, code, r, g, b, speed=speed_byte))

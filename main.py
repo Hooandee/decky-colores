@@ -52,6 +52,9 @@ DEFAULTS = {
     "saved_gradients": [],
     "enabled_experiments": [],
     "power_led_off": False,
+    "power_led_awake_off": None,
+    "power_led_suspend_off": None,
+    "sleep_charging_indicator": False,
     "charger_only": False,
     "force_control": False,
     "hhd_rgb_restore": None,
@@ -237,6 +240,7 @@ class Plugin:
         self._battery_level = 100 if level is None else level
         self._apu_temp = apu_temperature()
         self._apply_power_led()
+        self._apply_sleep_charging_indicator()
         self._capture_startup_factory()
         self._ready = True
 
@@ -260,6 +264,7 @@ class Plugin:
         self._zones = self._capabilities.get("zones", 1) or 1
         self._controller = ctx["device"]
         self._power_led = ctx.get("power_led")
+        self._sleep_charging_controller = ctx.get("sleep_charging_controller")
         self._cpu_sampler = CpuSampler()
         max_render_fps = self._capabilities.get("maxRenderFps", 30)
         self._engine = EffectEngine(self._render, self._zones, max_fps=max_render_fps)
@@ -304,8 +309,46 @@ class Plugin:
     def _apply_power_led(self) -> None:
         if not (self._power_led and self._capabilities.get("powerLed")):
             return
+        if self._capabilities.get("powerLedSeparateStates"):
+            awake, suspend = self._power_led_state_values()
+            explicitly_configured = (
+                self._settings.get("power_led_awake_off") is not None
+                or self._settings.get("power_led_suspend_off") is not None
+                or self._settings.get("power_led_off", False)
+            )
+            if not explicitly_configured:
+                return
+            awake_ok = self._power_led.set_state("awake", awake)
+            suspend_ok = self._power_led.set_state("suspend", suspend)
+            if not (awake_ok and suspend_ok):
+                decky.logger.warning("Colores: separate power LED apply on load failed")
+            return
         if self._settings.get("power_led_off", False) and not self._power_led.set(True):
             decky.logger.warning("Colores: power LED apply on load failed")
+
+    def _apply_sleep_charging_indicator(self) -> bool:
+        if not self._capabilities.get("sleepChargingIndicator"):
+            return False
+        controller = getattr(self, "_sleep_charging_controller", None)
+        if controller is None:
+            return False
+        enabled = bool(self._settings.get("sleep_charging_indicator", False))
+        if controller.set_sleep_charging_indicator(enabled):
+            return True
+        decky.logger.warning(
+            "Colores: sleep charging indicator write failed (enabled=%s)",
+            enabled,
+        )
+        return False
+
+    def _power_led_state_values(self) -> tuple[bool, bool]:
+        legacy = bool(self._settings.get("power_led_off", False))
+        awake = self._settings.get("power_led_awake_off")
+        suspend = self._settings.get("power_led_suspend_off")
+        return (
+            legacy if awake is None else bool(awake),
+            legacy if suspend is None else bool(suspend),
+        )
 
     async def get_version(self) -> str:
         return read_version()
@@ -680,6 +723,7 @@ class Plugin:
     async def get_state(self) -> dict:
         self._init()
         s = self._settings
+        power_led_awake_off, power_led_suspend_off = self._power_led_state_values()
         return {
             "device": self._device,
             "capabilities": self._merged_capabilities(),
@@ -697,6 +741,9 @@ class Plugin:
             "ambilight": s["ambilight"],
             "savedGradients": self._serialized_saved(),
             "powerLedOff": s.get("power_led_off", False),
+            "powerLedAwakeOff": power_led_awake_off,
+            "powerLedSuspendOff": power_led_suspend_off,
+            "sleepChargingIndicator": s.get("sleep_charging_indicator", False),
             "chargerOnly": s.get("charger_only", False),
             "forceControl": s.get("force_control", False),
             "batteryBreathe": s.get("battery_breathe", True),
@@ -894,8 +941,21 @@ class Plugin:
                 return False
         self._reprobe_device()
         ok = self._controller.reconnect()
+        sleep_controller = getattr(self, "_sleep_charging_controller", None)
+        if sleep_controller is not None:
+            if sleep_controller is self._controller:
+                sleep_ok = bool(ok)
+            else:
+                sleep_ok = bool(sleep_controller.reconnect())
+            supports = getattr(
+                sleep_controller, "supports_sleep_charging_indicator", None
+            )
+            self._capabilities["sleepChargingIndicator"] = bool(
+                sleep_ok and callable(supports) and supports()
+            )
         if hasattr(self, "_profiles"):
             self._sync_effective_profile()
+        self._apply_sleep_charging_indicator()
         if self._settings["mode"] == "ambient":
             self._ambilight.stop()
         self._apply()
@@ -910,6 +970,7 @@ class Plugin:
         async with self._suspend_lock:
             if self._suspend_prepared:
                 return
+            self._apply_sleep_charging_indicator()
             self._suspend_prepared = True
             self._resume_handled_at = None
             mode = self._settings["mode"]
@@ -951,6 +1012,34 @@ class Plugin:
         if self._power_led and self._capabilities.get("powerLed"):
             if not self._power_led.set(off):
                 decky.logger.warning("Colores: power LED write failed (off=%s)", off)
+
+    async def set_power_led_state(self, state: str, off: bool) -> None:
+        self._init()
+        if state not in ("awake", "suspend"):
+            raise ValueError("invalid power LED state")
+        if not self._capabilities.get("powerLedSeparateStates"):
+            return
+        awake, suspend = self._power_led_state_values()
+        self._settings["power_led_awake_off"] = off if state == "awake" else awake
+        self._settings["power_led_suspend_off"] = (
+            off if state == "suspend" else suspend
+        )
+        self._settings["power_led_off"] = False
+        self._persist_settings()
+        if self._power_led and not self._power_led.set_state(state, off):
+            decky.logger.warning(
+                "Colores: power LED state write failed (state=%s, off=%s)",
+                state,
+                off,
+            )
+
+    async def set_sleep_charging_indicator(self, enabled: bool) -> None:
+        self._init()
+        if not self._capabilities.get("sleepChargingIndicator"):
+            return
+        self._settings["sleep_charging_indicator"] = bool(enabled)
+        self._persist_settings()
+        self._apply_sleep_charging_indicator()
 
     async def set_experiment(self, feature: str, on: bool) -> None:
         self._init()
@@ -1046,10 +1135,12 @@ class Plugin:
             return not self._controller.supports_per_zone()
         if s["mode"] == "effect":
             effect = s["effect"]
+            if effect["id"] == "spiral" and self._controller.supports_hardware_effects():
+                return False
             if effect.get("use_gradient", False):
                 return True
             if effect["id"] == "spiral":
-                return not self._controller.supports_hardware_effects()
+                return True
             if effect["id"] == "wave":
                 return self._controller.supports_per_zone() or bool(
                     self._capabilities.get("perControllerColor", False)

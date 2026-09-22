@@ -343,6 +343,21 @@ export function useColores() {
     api.setPowerLed(off).catch((e) => console.error("Colores: setPowerLed failed", e));
   };
 
+  const setPowerLedState = (powerLedState: "awake" | "suspend", off: boolean) => {
+    const key = powerLedState === "awake" ? "powerLedAwakeOff" : "powerLedSuspendOff";
+    setState((s) => (s ? { ...s, [key]: off } : s));
+    api
+      .setPowerLedState(powerLedState, off)
+      .catch((e) => console.error("Colores: setPowerLedState failed", e));
+  };
+
+  const setSleepChargingIndicator = (sleepChargingIndicator: boolean) => {
+    setState((s) => (s ? { ...s, sleepChargingIndicator } : s));
+    api.setSleepChargingIndicator(sleepChargingIndicator).catch((e) =>
+      console.error("Colores: setSleepChargingIndicator failed", e),
+    );
+  };
+
   const setForceControl = (forceControl: boolean) => {
     setState((s) => (s ? { ...s, forceControl } : s));
     api.setForceControl(forceControl).catch((e) =>
@@ -423,6 +438,8 @@ export function useColores() {
     deleteGradient,
     setExperiment,
     setPowerLed,
+    setPowerLedState,
+    setSleepChargingIndicator,
     setForceControl,
     setRememberStartup,
     setBatteryBreathe,

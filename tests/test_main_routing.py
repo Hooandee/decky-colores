@@ -86,6 +86,13 @@ class FakeController:
         self.calls.append(("save_startup",))
         return True
 
+    def set_sleep_charging_indicator(self, enabled):
+        self.calls.append(("sleep_charging", enabled))
+        return True
+
+    def supports_sleep_charging_indicator(self):
+        return True
+
 
 class FakeEngine:
     def __init__(self):
@@ -543,6 +550,22 @@ def test_spiral_on_legion_uses_firmware_effect(main_module):
     assert not any(e[0] == "effect" for e in p._engine.events)
 
 
+def test_spiral_on_legion_ignores_stale_gradient_and_uses_firmware_effect(main_module):
+    p = _plugin(
+        main_module,
+        "effect",
+        {"id": "spiral", "speed": 50, "use_gradient": True},
+        hw=True,
+        per_zone=False,
+        per_controller=False,
+    )
+
+    p._apply()
+
+    assert any(c[0] == "hw_effect" and c[1] == "spiral" for c in p._controller.calls)
+    assert not any(e[0] == "effect" for e in p._engine.events)
+
+
 def test_spiral_on_ally_runs_in_software(main_module):
     # Ally (no hardware effects): spiral spins the user's gradient in software.
     p = _plugin(
@@ -673,6 +696,17 @@ def test_reconnect_resets_controller_and_reapplies(main_module):
     assert any(c[0] == "solid" for c in p._controller.calls)
 
 
+def test_reconnect_reasserts_sleep_charging_policy(main_module):
+    p = _plugin(main_module, "solid")
+    p._sleep_charging_controller = p._controller
+    p._capabilities["sleepChargingIndicator"] = True
+    p._settings["sleep_charging_indicator"] = True
+
+    assert asyncio.run(p.reconnect()) is True
+
+    assert ("sleep_charging", True) in p._controller.calls
+
+
 def test_reconnect_restarts_ambient_capture(main_module):
     p = _plugin(main_module, "ambient", hw=False, per_zone=True)
     p._ambilight.events.clear()
@@ -698,6 +732,20 @@ def test_prepare_suspend_is_idempotent_when_hooks_overlap(main_module):
         await asyncio.gather(p.prepare_suspend(), p.prepare_suspend())
 
         assert p._ambilight.events == [("stop_and_wait",)]
+
+    asyncio.run(drive())
+
+
+def test_prepare_suspend_reasserts_sleep_charging_policy(main_module):
+    async def drive():
+        p = _plugin(main_module, "solid", power=True)
+        p._sleep_charging_controller = p._controller
+        p._capabilities["sleepChargingIndicator"] = True
+        p._settings["sleep_charging_indicator"] = True
+
+        await p.prepare_suspend()
+
+        assert ("sleep_charging", True) in p._controller.calls
 
     asyncio.run(drive())
 

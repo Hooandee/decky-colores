@@ -570,6 +570,8 @@ function Content() {
     deleteGradient,
     setExperiment,
     setPowerLed,
+    setPowerLedState,
+    setSleepChargingIndicator,
     setForceControl,
     setRememberStartup,
     setBatteryBreathe,
@@ -762,6 +764,9 @@ function Content() {
     device,
     savedGradients,
     powerLedOff,
+    powerLedAwakeOff,
+    powerLedSuspendOff,
+    sleepChargingIndicator,
     chargerOnly,
     forceControl,
     batteryBreathe,
@@ -1195,8 +1200,13 @@ function Content() {
             lang={lang}
             forceControl={forceControl}
             powerLedOff={powerLedOff}
+            powerLedAwakeOff={powerLedAwakeOff}
+            powerLedSuspendOff={powerLedSuspendOff}
+            sleepChargingIndicator={sleepChargingIndicator}
             onForceControl={setForceControl}
             onPowerLed={setPowerLed}
+            onPowerLedState={setPowerLedState}
+            onSleepChargingIndicator={setSleepChargingIndicator}
             onExperiment={setExperiment}
             onReconnect={reconnect}
           />

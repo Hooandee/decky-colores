@@ -9,6 +9,7 @@ from py_modules.asus_ally_hid import (
     mode_code,
     MODE_SOLID,
 )
+import py_modules.asus_ally_hid as ally_hid
 
 
 def test_buf_pads_to_64():
@@ -19,6 +20,16 @@ def test_buf_pads_to_64():
 def test_brightness_cmd_levels():
     assert brightness_cmd(3) == bytes.fromhex("5abac5c403") + bytes(59)
     assert brightness_cmd(0)[:5] == bytes.fromhex("5abac5c400")
+
+
+def test_sleep_charging_power_cmd_keeps_awake_and_toggles_charging_sleep():
+    assert hasattr(ally_hid, "sleep_charging_power_cmd")
+    assert ally_hid.sleep_charging_power_cmd(False) == (
+        bytes.fromhex("5ad1090102") + bytes(59)
+    )
+    assert ally_hid.sleep_charging_power_cmd(True) == (
+        bytes.fromhex("5ad1090106") + bytes(59)
+    )
 
 
 def test_pct_to_level_quantization():
@@ -58,5 +69,5 @@ def test_init_cmds_is_asus_handshake():
 
 def test_set_apply_order():
     reps = set_apply_cmds()
-    assert reps[0][:2] == bytes([0x5D, 0xB5])  # SET
-    assert reps[1][:2] == bytes([0x5D, 0xB4])  # APPLY
+    assert reps[0][:2] == bytes([0x5D, 0xB5])
+    assert reps[1][:2] == bytes([0x5D, 0xB4])

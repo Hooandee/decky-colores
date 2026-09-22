@@ -192,6 +192,12 @@ export const ptBR: Record<string, string> = {
   "powerLed.section": "Luz do botão de energia (experimental)",
   "powerLed.label": "Desligar a luz do botão de energia",
   "powerLed.warning": "Desliga o LED do botão de energia.",
+  "powerLed.awakeLabel": "Desligar enquanto estiver em uso",
+  "powerLed.suspendLabel": "Desligar durante a suspensão",
+  "powerLed.separateWarning": "Você pode mantê-la acesa ao usar o console e desligá-la apenas durante a suspensão.",
+  "sleepCharging.section": "Suspensão",
+  "sleepCharging.label": "Indicador de carga durante a suspensão",
+  "sleepCharging.hint": "Faz os anéis piscarem enquanto o console está suspenso e carregando.",
 
   "report.button": "Enviar um relatório",
   "report.button.desc": "Encontrou um problema ou tem uma ideia para o Colores? Me conte. Também enviarei o contexto técnico das luzes.",

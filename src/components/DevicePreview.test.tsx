@@ -21,4 +21,19 @@ describe("DevicePreview capability layouts", () => {
     expect(html).toContain("layout.lights");
     expect(html).not.toContain("device.preview.rings");
   });
+
+  it("keeps powered rings visible at low LED brightness", () => {
+    const html = renderToStaticMarkup(createElement(DevicePreview, {
+      colors: [
+        { r: 0, g: 196, b: 255 },
+        { r: 124, g: 92, b: 255 },
+      ],
+      brightness: 10,
+      power: true,
+      layoutKind: "rings",
+    }));
+
+    expect(html).toContain("rgb(14, 62, 77)");
+    expect(html).toContain("rgb(44, 36, 77)");
+  });
 });

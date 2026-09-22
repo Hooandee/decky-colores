@@ -1,6 +1,7 @@
 import types
 
 import power_led
+from device_profiles import POWER_LED_LEDPM
 from power_led import PowerLedController
 
 LPBL = [{"offset": 0x10, "mask": 0x40}]
@@ -54,6 +55,24 @@ def test_multi_field_device(tmp_path):
     assert ctrl.set(False) is True
     assert _byte(path, 0x52) == 0x00 and _byte(path, 0x58) == 0x00
     assert ctrl.get() is False
+
+
+def test_suspend_state_write_preserves_awake_state(tmp_path):
+    path = _ec(tmp_path, {0x52: 0x05, 0x58: 0x08})
+    ctrl = PowerLedController(POWER_LED_LEDPM, ec_io=path)
+
+    assert hasattr(ctrl, "supports_independent_states")
+    assert ctrl.supports_independent_states() is True
+    assert ctrl.set_state("suspend", True) is True
+    assert _byte(path, 0x52) == 0x05
+    assert _byte(path, 0x58) == 0x09
+
+
+def test_shared_power_led_bit_does_not_claim_independent_states(tmp_path):
+    ctrl = PowerLedController(LPBL, ec_io=_ec(tmp_path))
+
+    assert hasattr(ctrl, "supports_independent_states")
+    assert ctrl.supports_independent_states() is False
 
 
 def test_short_ec_node_does_not_raise(tmp_path):

@@ -1,6 +1,7 @@
 import os
 
 from py_modules.device import build_layout, detect_device, lookup_name, read_zone_format, build_capabilities, build_device
+from py_modules.device_profiles import resolve_profile
 import led_device as _led_device_mod
 SysfsRgbDevice = _led_device_mod.SysfsRgbDevice
 NullDevice = _led_device_mod.NullDevice
@@ -247,6 +248,15 @@ def test_build_capabilities_unsupported_when_absent():
     caps = build_capabilities(profile, has_led=False, zones=0, max_brightness=255, ambilight=False)
     assert caps["states"]["color"] == "unsupported"
     assert caps["color"] is False
+    assert caps.get("sleepChargingIndicator") is False
+
+
+def test_sleep_charging_profile_scope_is_limited_to_approved_rog_models():
+    assert resolve_profile("RC71L", "ROG Ally").get("sleep_charging") == "hid_asus_ally"
+    assert resolve_profile("RC72LA", "ROG Ally X").get("sleep_charging") == "hid_asus_ally"
+    assert resolve_profile("RC73XA", "ROG Xbox Ally X").get("sleep_charging") == "hid_asus_ally"
+    assert "sleep_charging" not in resolve_profile("RC73YA", "ROG Xbox Ally")
+    assert "sleep_charging" not in resolve_profile("", "Claw A1M")
 
 
 def test_build_device_ally_returns_sysfs_writer(tmp_path):

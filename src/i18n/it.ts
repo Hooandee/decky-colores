@@ -205,6 +205,12 @@ export const it: Record<string, string> = {
   "powerLed.section": "Spia del pulsante di accensione (sperimentale)",
   "powerLed.label": "Spegni la spia del pulsante di accensione",
   "powerLed.warning": "Spegne il LED del pulsante di accensione.",
+  "powerLed.awakeLabel": "Spegni quando è attiva",
+  "powerLed.suspendLabel": "Spegni durante la sospensione",
+  "powerLed.separateWarning": "Puoi lasciarla accesa mentre usi la console e spegnerla solo durante la sospensione.",
+  "sleepCharging.section": "Sospensione",
+  "sleepCharging.label": "Indicatore di carica durante la sospensione",
+  "sleepCharging.hint": "Fa lampeggiare gli anelli mentre la console è sospesa e in carica.",
 
   "report.button": "Invia una segnalazione",
   "report.button.desc":

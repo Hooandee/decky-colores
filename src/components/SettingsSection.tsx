@@ -7,7 +7,7 @@ import { UpdatePanel } from "../updater/UpdatePanel";
 import { openCustomizeModal } from "./CustomizeModal";
 import { openReportModal } from "./ReportModal";
 import { Divider } from "./Divider";
-import { Capabilities, DeviceInfo } from "../types";
+import { Capabilities, DeviceInfo, PowerLedState } from "../types";
 
 const AUTHOR = "Hooandee";
 const YOUTUBE_URL = "https://www.youtube.com/@Hooandee";
@@ -35,8 +35,13 @@ interface SettingsSectionProps {
   lang: Lang;
   forceControl: boolean;
   powerLedOff: boolean;
+  powerLedAwakeOff: boolean;
+  powerLedSuspendOff: boolean;
+  sleepChargingIndicator: boolean;
   onForceControl: (v: boolean) => void;
   onPowerLed: (v: boolean) => void;
+  onPowerLedState: (state: PowerLedState, value: boolean) => void;
+  onSleepChargingIndicator: (value: boolean) => void;
   onExperiment: (feature: string, val: boolean) => void;
   onReconnect: () => void;
 }
@@ -48,8 +53,13 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
   lang,
   forceControl,
   powerLedOff,
+  powerLedAwakeOff,
+  powerLedSuspendOff,
+  sleepChargingIndicator,
   onForceControl,
   onPowerLed,
+  onPowerLedState,
+  onSleepChargingIndicator,
   onExperiment,
   onReconnect,
 }) => {
@@ -119,10 +129,49 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
     caps.powerLed ? (
       <>
         {sectionTitle(t("powerLed.section"))}
+        {caps.powerLedSeparateStates ? (
+          <>
+            <PanelSectionRow>
+              <ToggleField
+                label={t("powerLed.awakeLabel")}
+                checked={powerLedAwakeOff}
+                onChange={(value) => onPowerLedState("awake", value)}
+                bottomSeparator="none"
+              />
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <ToggleField
+                label={t("powerLed.suspendLabel")}
+                checked={powerLedSuspendOff}
+                onChange={(value) => onPowerLedState("suspend", value)}
+                bottomSeparator="none"
+              />
+            </PanelSectionRow>
+            {hint(t("powerLed.separateWarning"))}
+          </>
+        ) : (
+          <>
+            <PanelSectionRow>
+              <ToggleField label={t("powerLed.label")} checked={powerLedOff} onChange={onPowerLed} bottomSeparator="none" />
+            </PanelSectionRow>
+            {hint(t("powerLed.warning"))}
+          </>
+        )}
+      </>
+    ) : null,
+
+    caps.sleepChargingIndicator ? (
+      <>
+        {sectionTitle(t("sleepCharging.section"))}
         <PanelSectionRow>
-          <ToggleField label={t("powerLed.label")} checked={powerLedOff} onChange={onPowerLed} bottomSeparator="none" />
+          <ToggleField
+            label={t("sleepCharging.label")}
+            description={t("sleepCharging.hint")}
+            checked={sleepChargingIndicator}
+            onChange={onSleepChargingIndicator}
+            bottomSeparator="none"
+          />
         </PanelSectionRow>
-        {hint(t("powerLed.warning"))}
       </>
     ) : null,
 

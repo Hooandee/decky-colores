@@ -6,10 +6,9 @@ joystick rings. It is a single Embedded Controller (EC) bit. The firmware method
 on Bazzite's current kernel `acpi_call` is unavailable, so we write the EC directly via
 the in-tree `ec_sys` debug module.
 
-Config is a list of EC byte/bit entries to SET to turn the LED off (cleared = on):
-  Go S / Go 2  -> [{"offset": 0x10, "mask": 0x40}]            (LPBL, awake + suspend)
-  Legion Go    -> [{"offset": 0x52, "mask": 0x20},            (LEDP, awake)
-                   {"offset": 0x58, "mask": 0x01}]            (LEDM, suspend)
+Config is a list of EC byte/bit entries to SET to turn the LED off (cleared = on).
+Original Legion Go entries include an awake or suspend state; Go S / Go 2 retain a
+single shared bit.
 
 Everything degrades gracefully: with no config or no reachable EC the controller is
 simply unavailable and the UI hides the toggle.
@@ -46,12 +45,23 @@ class PowerLedController:
         except (OSError, IndexError, ValueError):
             return None
 
+    def supports_independent_states(self) -> bool:
+        states = {bit.get("state") for bit in self._config}
+        return {"awake", "suspend"}.issubset(states)
+
     def set(self, off: bool) -> bool:
         """Turn the LED off (off=True) or on (off=False). Returns success."""
-        if not self._config or not self._ensure_loaded():
+        return self._set_bits(self._config, off)
+
+    def set_state(self, state: str, off: bool) -> bool:
+        bits = [bit for bit in self._config if bit.get("state") == state]
+        return self._set_bits(bits, off)
+
+    def _set_bits(self, bits, off: bool) -> bool:
+        if not bits or not self._ensure_loaded():
             return False
         try:
-            for bit in self._config:
+            for bit in bits:
                 current = self._read_byte(bit["offset"])
                 updated = (current | bit["mask"]) if off else (current & ~bit["mask"])
                 if updated != current:
@@ -59,8 +69,6 @@ class PowerLedController:
             return True
         except (OSError, IndexError, ValueError):
             return False
-
-    # --- EC access -------------------------------------------------------------
 
     def _writable(self) -> bool:
         return os.path.exists(self._ec_io) and os.access(self._ec_io, os.W_OK)
