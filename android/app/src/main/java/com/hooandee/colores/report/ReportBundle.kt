@@ -5,6 +5,7 @@ import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import com.hooandee.colores.device.diagnostics.HardwareInventory
 import com.hooandee.colores.device.learning.DetectionOutcome
+import com.hooandee.colores.device.learning.ArchivedRollbackSummary
 import com.hooandee.colores.device.learning.HardwareLearningResult
 import com.hooandee.colores.device.learning.ProbeCandidate
 import com.hooandee.colores.led.LedDescriptor
@@ -59,11 +60,13 @@ data class ReportDiagnostics(
     val facts: List<HardwareFact> = emptyList(),
     val candidates: List<ProbeCandidate> = emptyList(),
     val inventory: HardwareInventory? = null,
+    val archivedRollback: ArchivedRollbackSummary? = null,
 )
 
 fun reportDiagnostics(
     outcome: DetectionOutcome?,
     inventory: HardwareInventory?,
+    archivedRollback: ArchivedRollbackSummary? = null,
 ): ReportDiagnostics =
     ReportDiagnostics(
         detectionOutcome =
@@ -83,6 +86,7 @@ fun reportDiagnostics(
                 is DetectionOutcome.Unsupported, null -> emptyList()
             },
         inventory = inventory,
+        archivedRollback = archivedRollback,
     )
 
 data class ReportSubmissionState(
@@ -145,6 +149,16 @@ fun buildReportBundle(
         .put("sysfs", diagnostics.inventory?.sysfs ?: JSONObject())
         .put("hardware", diagnostics.inventory?.hardware ?: JSONObject())
         .put("discovery", discoveryJson(diagnostics))
+        .apply { diagnostics.archivedRollback?.let { put("rollback_archive", archivedRollbackJson(it)) } }
+
+private fun archivedRollbackJson(archive: ArchivedRollbackSummary): JSONObject =
+    JSONObject()
+        .put("reason", archive.reason.name.lowercase())
+        .put("attempts", archive.attempts)
+        .put("cartridge_id", archive.cartridgeId)
+        .put("cartridge_version", archive.cartridgeVersion)
+        .put("archived_at", archive.archivedAtEpochMs)
+        .put("surface", archive.surface?.name?.lowercase())
 
 private fun discoveryJson(diagnostics: ReportDiagnostics): JSONObject =
     JSONObject()
@@ -274,7 +288,16 @@ fun buildReportBundleForSubmission(
     learningFacts: List<HardwareFact> = emptyList(),
     diagnostics: ReportDiagnostics = ReportDiagnostics(facts = learningFacts),
 ): JSONObject =
-    if ("learning" in categories && (learningResults.isNotEmpty() || learningFacts.isNotEmpty() || restoreFailure || criticalSafetyFailure)) {
+    if (
+        "learning" in categories &&
+        (
+            learningResults.isNotEmpty() ||
+                learningFacts.isNotEmpty() ||
+                restoreFailure ||
+                criticalSafetyFailure ||
+                diagnostics.archivedRollback != null
+        )
+    ) {
         buildHardwareLearningBundle(
             snapshot,
             learningResults,

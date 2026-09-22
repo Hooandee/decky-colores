@@ -39,7 +39,10 @@ class HardwareLearningStore(
         return attempts
     }
 
-    fun archiveRollback(reason: RollbackFailureReason): Boolean {
+    fun archiveRollback(
+        reason: RollbackFailureReason,
+        archivedAtEpochMs: Long = System.currentTimeMillis(),
+    ): Boolean {
         val journal = read(ROLLBACK_KEY) ?: return true
         val attempts = loadRollbackFailure()?.attempts ?: 0
         val archived =
@@ -48,6 +51,7 @@ class HardwareLearningStore(
                 .put("journal", journal)
                 .put("reason", reason.name)
                 .put("attempts", attempts)
+                .put("archived_at", archivedAtEpochMs)
         if (!write(ROLLBACK_ARCHIVE_KEY, archived.toString())) return false
         if (!remove(ROLLBACK_KEY)) return false
         remove(ROLLBACK_FAILURE_KEY)
@@ -63,6 +67,7 @@ class HardwareLearningStore(
                     journal = json.getString("journal"),
                     reason = RollbackFailureReason.valueOf(json.getString("reason")),
                     attempts = json.getInt("attempts"),
+                    archivedAtEpochMs = json.optLong("archived_at", 0L).takeIf { it > 0L },
                 )
             }.getOrNull()
         }
@@ -126,7 +131,39 @@ data class ArchivedRollback(
     val journal: String,
     val reason: RollbackFailureReason,
     val attempts: Int,
+    val archivedAtEpochMs: Long? = null,
 )
+
+data class ArchivedRollbackSummary(
+    val reason: RollbackFailureReason,
+    val attempts: Int,
+    val cartridgeId: String?,
+    val cartridgeVersion: Int?,
+    val archivedAtEpochMs: Long?,
+    val surface: ProbeSurface?,
+)
+
+fun ArchivedRollback.summary(): ArchivedRollbackSummary {
+    val record = runCatching { JSONObject(journal) }.getOrNull()
+    val cartridgeId = record?.optString("cartridge_id")?.takeIf { it.isNotBlank() }?.take(120)
+    return ArchivedRollbackSummary(
+        reason = reason,
+        attempts = attempts,
+        cartridgeId = cartridgeId,
+        cartridgeVersion = record?.optInt("cartridge_version", 0)?.takeIf { it > 0 },
+        archivedAtEpochMs = archivedAtEpochMs,
+        surface = cartridgeId?.let(::probeSurfaceFor),
+    )
+}
+
+private fun probeSurfaceFor(cartridgeId: String): ProbeSurface? =
+    when (cartridgeId) {
+        SETTINGS_PROBE_ID -> ProbeSurface.SETTINGS_PSERVER
+        SINGLEADC_PROBE_ID -> ProbeSurface.SINGLEADC_JOYPAD
+        SYSFS_PROBE_ID -> ProbeSurface.SYSFS_RGB
+        HTR3212_PROBE_ID -> ProbeSurface.HTR3212
+        else -> null
+    }
 
 private fun RollbackFailure.toJson(): JSONObject =
     JSONObject()

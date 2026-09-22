@@ -3,6 +3,13 @@ package com.hooandee.colores.report
 import java.io.ByteArrayInputStream
 import java.util.Base64
 import java.util.zip.GZIPInputStream
+import com.hooandee.colores.device.learning.HardwareLearningStore
+import com.hooandee.colores.device.learning.ProbeSnapshot
+import com.hooandee.colores.device.learning.RollbackFailureReason
+import com.hooandee.colores.device.learning.RollbackRecord
+import com.hooandee.colores.device.learning.encodeLearningDescriptor
+import com.hooandee.colores.device.learning.summary
+import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -141,6 +148,47 @@ class ReportBundleTest {
         assertEquals("sysfs:multi_intensity_hex", reported.getString("driver"))
         assertEquals(2, reported.getInt("zones"))
         assertFalse(discovery.toString().contains("private-ring"))
+    }
+
+    @Test
+    fun `archived rollback journal reaches the report as a summary without snapshot values`() {
+        val values = mutableMapOf<String, String>()
+        val store = HardwareLearningStore(read = values::get, write = { key, value -> values[key] = value; true }, remove = { values.remove(it); true })
+        store.saveRollback(
+            RollbackRecord(
+                sessionId = "session-1",
+                cartridgeId = "singleadc-joypad",
+                cartridgeVersion = 1,
+                descriptorJson = encodeLearningDescriptor(SingleAdcJoypadDescriptor()),
+                snapshot = ProbeSnapshot(mapOf("/sys/bus/platform/devices/singleadc-joypad/custum_rgb_r" to "RAW_SNAPSHOT_77")),
+            ),
+        )
+        store.recordRollbackFailure(RollbackFailureReason.RESTORE_FAILED)
+        store.recordRollbackFailure(RollbackFailureReason.RESTORE_FAILED)
+        assertTrue(store.archiveRollback(RollbackFailureReason.RESTORE_FAILED, archivedAtEpochMs = 1_700_000_000_000L))
+        val archive = requireNotNull(store.loadArchivedRollback()).summary()
+
+        val bundle =
+            buildReportBundleForSubmission(
+                snapshot = snapshot,
+                categories = listOf("learning"),
+                text = "",
+                learningResults = emptyList(),
+                diagnostics = reportDiagnostics(null, null, archive),
+            )
+        val summary = bundle.getJSONObject("rollback_archive")
+        val encoded = bundle.toString()
+
+        assertEquals("hardware_learning", bundle.getString("report_kind"))
+        assertEquals("restore_failed", summary.getString("reason"))
+        assertEquals(2, summary.getInt("attempts"))
+        assertEquals("singleadc-joypad", summary.getString("cartridge_id"))
+        assertEquals(1, summary.getInt("cartridge_version"))
+        assertEquals(1_700_000_000_000L, summary.getLong("archived_at"))
+        assertEquals("singleadc_joypad", summary.getString("surface"))
+        assertFalse(encoded.contains("RAW_SNAPSHOT_77"))
+        assertFalse(encoded.contains("custum_rgb_r"))
+        assertFalse(encoded.contains("session-1"))
     }
 
     @Test

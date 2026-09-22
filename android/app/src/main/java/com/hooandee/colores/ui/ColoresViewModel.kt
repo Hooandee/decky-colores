@@ -48,6 +48,7 @@ import com.hooandee.colores.device.learning.learnedBindingNeedsFingerprint
 import com.hooandee.colores.device.learning.learnedBindingNeedsRevalidation
 import com.hooandee.colores.device.learning.learnedDeviceIdForPromotion
 import com.hooandee.colores.device.learning.resultsFor
+import com.hooandee.colores.device.learning.summary
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.AudioSensitivity
@@ -1059,7 +1060,12 @@ class ColoresViewModel(
                             restoreFailure = current.hardwareLearning.restoreFailure,
                             criticalSafetyFailure = current.hardwareLearning.criticalBlockReason == LearningBlockReason.JOURNAL_UNAVAILABLE,
                             learningFacts = outcome?.facts.orEmpty(),
-                            diagnostics = reportDiagnostics(outcome, inventory),
+                            diagnostics =
+                                reportDiagnostics(
+                                    outcome,
+                                    inventory,
+                                    runCatching { coloresApplication.hardwareLearningStore.loadArchivedRollback()?.summary() }.getOrNull(),
+                                ),
                         )
                     reportSender.submit(bundle)
                 }
