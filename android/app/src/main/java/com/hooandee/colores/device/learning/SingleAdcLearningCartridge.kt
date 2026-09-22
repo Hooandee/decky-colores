@@ -102,10 +102,15 @@ class SingleAdcLearningCartridge(
         val readback = snapshot.values.mapValues { (path, _) -> access.read(path)?.trim() }
         val mismatchedPaths = snapshot.values.filter { (path, value) -> readback[path] != value.trim() }.keys
         val brightnessPath = node(descriptor, "led_level")
+        val normalizablePaths = effectPaths(descriptor).toSet() + brightnessPath
+        val normalizedByFirmware =
+            mismatchedPaths.all { path ->
+                val value = readback[path]?.toIntOrNull() ?: return@all false
+                path in normalizablePaths && (path != brightnessPath || value > 0)
+            }
         return when {
             mismatchedPaths.isEmpty() -> RollbackStatus.RESTORED_AND_READ_BACK
-            mismatchedPaths == setOf(brightnessPath) && readback[brightnessPath]?.toIntOrNull()?.let { it > 0 } == true ->
-                RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK
+            normalizedByFirmware -> RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK
             else -> RollbackStatus.RESTORE_FAILED
         }
     }

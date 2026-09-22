@@ -156,6 +156,28 @@ class SingleAdcLearningCartridgeTest {
     }
 
     @Test
+    fun `firmware normalized effect speed after accepted restore is reported without readback`() {
+        val original = (statePaths + effectPaths).associateWith { "5" }
+        val access = NormalizingBrightnessAccess(original.toMutableMap(), "$base/led_speed", latch, normalizedBrightness = "3")
+        val cartridge = SingleAdcLearningCartridge(access)
+        val candidate = candidate(SingleAdcJoypadDescriptor(base))
+        val snapshot = requireNotNull(cartridge.snapshot(candidate))
+
+        assertEquals(RollbackStatus.RESTORED_WITHOUT_HARDWARE_READBACK, cartridge.restore(candidate, snapshot))
+    }
+
+    @Test
+    fun `a color node that differs after restore remains a failure`() {
+        val original = (statePaths + effectPaths).associateWith { "5" }
+        val access = NormalizingBrightnessAccess(original.toMutableMap(), "$base/custum_rgb_r", latch, normalizedBrightness = "7")
+        val cartridge = SingleAdcLearningCartridge(access)
+        val candidate = candidate(SingleAdcJoypadDescriptor(base))
+        val snapshot = requireNotNull(cartridge.snapshot(candidate))
+
+        assertEquals(RollbackStatus.RESTORE_FAILED, cartridge.restore(candidate, snapshot))
+    }
+
+    @Test
     fun `rollback rejects a snapshot with a partial effect node set`() {
         val original = (statePaths + effectPaths).associateWith { "3" }
         val access = FakeSysfsAccess((statePaths + effectPaths + latch).toSet(), original.toMutableMap())
