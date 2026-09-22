@@ -300,6 +300,7 @@ class ColoresViewModel(
         }
     private var hardwareLearningOperation: Job? = null
     private var identityRetries = 0
+    private var busyRetries = 0
 
     init {
         viewModelScope.launch {
@@ -356,8 +357,10 @@ class ColoresViewModel(
                 val recovery = context.recoverHardwareLearningRollback()
                 if (recovery == LearningRecovery.BUSY) {
                     mutableState.update { it.copy(loading = false, controlAccess = ControlAccess.SERVICE_UNAVAILABLE) }
+                    scheduleBusyRetry()
                     return@launch
                 }
+                busyRetries = 0
                 if (recovery == LearningRecovery.FAILED) {
                     controller.unbind()
                     val rollback = context.hardwareRollbackState()
@@ -632,6 +635,15 @@ class ColoresViewModel(
                     handoff.closeIfUnbound()
                 }
             }
+    }
+
+    private fun scheduleBusyRetry() {
+        if (busyRetries >= MAX_BUSY_RETRIES || mutableState.value.hardwareLearning.dialogOpen) return
+        busyRetries += 1
+        viewModelScope.launch {
+            delay(IDENTITY_RETRY_DELAY_MS)
+            refresh()
+        }
     }
 
     private fun scheduleIdentityRetry(identityComplete: Boolean) {
@@ -1611,6 +1623,8 @@ private fun android.content.Context.readAsset(name: String): String =
     assets.open(name).bufferedReader().use { it.readText() }
 
 private const val MAX_IDENTITY_RETRIES = 2
+
+private const val MAX_BUSY_RETRIES = 3
 
 private const val IDENTITY_RETRY_DELAY_MS = 1_500L
 
