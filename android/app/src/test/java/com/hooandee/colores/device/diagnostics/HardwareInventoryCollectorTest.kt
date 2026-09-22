@@ -50,6 +50,45 @@ class HardwareInventoryCollectorTest {
     }
 
     @Test
+    fun `settings filter rejects user components and package lists`() {
+        val rejected =
+            mapOf(
+                "enabled_accessibility_services" to "com.example.reader/com.example.reader.LightService",
+                "enabled_input_methods" to "com.example.keys/.LightIme",
+                "enabled_notification_listeners" to "com.example.led/com.example.led.Listener",
+                "enabled_notification_policy_access_packages" to "com.example.light",
+                "enabled_print_services" to "com.example.print/.LedPrint",
+                "disabled_system_input_methods" to "com.example.stick/.Ime",
+                "led_light_services" to "1",
+                "joystick_light_account" to "1",
+                "led_device_name" to "Mi consola",
+                "rgb_wifi_light" to "1",
+                "light_target" to "com.example.app/.MainActivity",
+                "led_owner_package" to "com.example.lights.app",
+                "flashlight_mode" to "1",
+                "screen_brightness_mode" to "led",
+            )
+        rejected.forEach { (key, value) -> assertFalse(key, HardwareInventoryCollector.isLightingSetting(key, value)) }
+
+        val accepted =
+            mapOf(
+                "joystick_led_light_picker_color" to "#FF00FF00",
+                "led_light_brightness_percent" to "80",
+                "left_joystick_light_enabled" to "1",
+            )
+        accepted.forEach { (key, value) -> assertTrue(key, HardwareInventoryCollector.isLightingSetting(key, value)) }
+    }
+
+    @Test
+    fun `privileged script excludes component settings before they leave the shell`() {
+        val script = HardwareInventoryCollector.PSERVER_SCRIPT
+
+        listOf("enabled_", "disabled_", "_services", "input_method", "listeners", "packages", "component", "accessibility", "notification")
+            .forEach { assertTrue(it, script.contains(it)) }
+        assertFalse(script.contains("grep -iE 'led|light|rgb|joystick"))
+    }
+
+    @Test
     fun `privileged script only reads`() {
         val script = HardwareInventoryCollector.PSERVER_SCRIPT
 
@@ -137,6 +176,8 @@ class HardwareInventoryCollectorTest {
                 extra,
                 "## settings_secure",
                 "android_id=led",
+                "enabled_accessibility_services=com.example.reader/com.example.reader.LightService",
+                "enabled_notification_listeners=com.example.led/com.example.led.Listener",
                 "## services",
                 "vendor.led: [pserver]",
                 "activity: [android.app.IActivityManager]",

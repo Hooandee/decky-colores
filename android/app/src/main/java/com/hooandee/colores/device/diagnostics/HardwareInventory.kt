@@ -198,8 +198,9 @@ class HardwareInventoryCollector(
         val filtered =
             raw.orEmpty().mapNotNull { line ->
                 val key = line.substringBefore('=', "").trim()
-                if (key.isEmpty() || !SETTINGS_KEY_FILTER.containsMatchIn(key)) return@mapNotNull null
-                "${key.take(80)}=${line.substringAfter('=').trim().take(SETTINGS_VALUE_LIMIT)}"
+                val value = line.substringAfter('=', "").trim()
+                if (!isLightingSetting(key, value)) return@mapNotNull null
+                "${key.take(80)}=${value.take(SETTINGS_VALUE_LIMIT)}"
             }
         return lines(filtered, PSERVER_SETTINGS_CAP, section)
     }
@@ -322,9 +323,31 @@ class HardwareInventoryCollector(
         private val I2C_DEVICE = Regex("\\d+-[0-9a-fA-F]{4}")
         private val I2C_ADAPTER = Regex("i2c-\\d+")
         private val PLATFORM_DEVICE = Regex("joy|pad|led|rgb|light|stick|htr|aw2|sn3|is31", RegexOption.IGNORE_CASE)
-        private val SETTINGS_KEY_FILTER = Regex("led|light|rgb|joystick|handle|stick|color|breath", RegexOption.IGNORE_CASE)
+        private val SETTINGS_KEY_TOKENS =
+            setOf("led", "leds", "light", "lights", "rgb", "joystick", "handle", "stick", "color", "colour", "breath", "breathing")
+        private val SETTINGS_KEY_SEPARATORS = Regex("[_.-]+")
+        private val SETTINGS_KEY_DENIED_PREFIXES = listOf("enabled_", "disabled_")
+        private val SETTINGS_KEY_DENIED_SUFFIXES = listOf("_services")
+        private val SETTINGS_KEY_DENIED_FRAGMENTS =
+            listOf(
+                "input_method",
+                "listeners",
+                "packages",
+                "component",
+                "accessibility",
+                "notification",
+                "account",
+                "bluetooth_name",
+                "device_name",
+                "wifi",
+            )
+        private val COMPONENT_VALUE = Regex("[\\w.]+/[\\w.$]+")
+        private val PACKAGE_VALUE = Regex("^[a-z]\\w*(\\.\\w+){2,}")
         private val SERVICE_FILTER = Regex("led|light|rgb|game|joy|pserver|vendor", RegexOption.IGNORE_CASE)
-        private const val SETTINGS_GREP = "grep -iE 'led|light|rgb|joystick|handle|stick|color|breath' | head -n 120"
+        private const val SETTINGS_GREP =
+            "grep -iE '^[^=]*(^|[_.-])(leds?|lights?|rgb|joystick|handle|stick|colou?r|breath(ing)?)([_.-]|=)' | " +
+                "grep -viE '^(enabled_|disabled_)|^[^=]*(_services|input_method|listeners|packages|component|accessibility|notification|account|bluetooth_name|device_name|wifi)[^=]*=' | " +
+                "head -n 120"
         val PSERVER_SCRIPT =
             listOf(
                 "echo '## settings_system'",
@@ -342,6 +365,20 @@ class HardwareInventoryCollector(
                 "echo '## services'",
                 "service list 2>/dev/null | grep -iE 'led|light|rgb|game|joy|pserver|vendor' | head -n 80",
             ).joinToString("\n")
+
+        internal fun isLightingSetting(
+            key: String,
+            value: String,
+        ): Boolean {
+            val normalized = key.lowercase()
+            if (normalized.isEmpty()) return false
+            if (SETTINGS_KEY_DENIED_PREFIXES.any(normalized::startsWith)) return false
+            if (SETTINGS_KEY_DENIED_SUFFIXES.any(normalized::endsWith)) return false
+            if (SETTINGS_KEY_DENIED_FRAGMENTS.any(normalized::contains)) return false
+            if (normalized.split(SETTINGS_KEY_SEPARATORS).none(SETTINGS_KEY_TOKENS::contains)) return false
+            if (COMPONENT_VALUE.containsMatchIn(value) || PACKAGE_VALUE.containsMatchIn(value)) return false
+            return true
+        }
 
         internal fun parseSections(output: String): Map<String, List<String>> {
             val sections = linkedMapOf<String, MutableList<String>>()
