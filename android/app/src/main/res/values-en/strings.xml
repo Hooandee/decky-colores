@@ -99,7 +99,7 @@
     <string name="control_service_title">Control unavailable</string>
     <string name="control_service_description">The manufacturer control service is not available on this device.</string>
     <string name="status_connected">Connected</string>
-    <string name="power_title">Power</string>
+    <string name="power_title">Lights</string>
     <string name="app_profiles_title">App profiles</string>
     <string name="profile_editing">Editing: %1$s</string>
     <string name="profile_global">Global</string>

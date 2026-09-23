@@ -64,7 +64,7 @@ internal fun glassSwitchColors(): SwitchColors {
         uncheckedThumbColor = if (light) Color.White else scheme.onSurfaceVariant,
         uncheckedTrackColor = if (light) Color(0x1F1B2A3A) else Color.White.copy(alpha = 0.1f),
         uncheckedBorderColor = scheme.outline,
-        uncheckedIconColor = scheme.onSurfaceVariant,
+        uncheckedIconColor = if (light) scheme.onSurfaceVariant else scheme.surface,
     )
 }
 

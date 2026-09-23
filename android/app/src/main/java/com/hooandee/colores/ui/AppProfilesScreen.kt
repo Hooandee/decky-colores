@@ -69,7 +69,6 @@ fun ProfileSelectorPill(
     state: ColoresUiState,
     onOpen: () -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
 ) {
     val app = state.selectedProfileApp()
     val label = app?.label ?: stringResource(R.string.profile_global)
@@ -93,7 +92,7 @@ fun ProfileSelectorPill(
         ) {
             ProfileIcon(app?.icon, label, 24.dp)
             Text(
-                text = if (compact) label else description,
+                text = label,
                 modifier = Modifier.weight(1f, fill = false),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
