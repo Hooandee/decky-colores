@@ -16,8 +16,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.foundation.ScrollState
@@ -36,15 +37,17 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.hooandee.colores.R
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.control.AppMode
@@ -179,141 +182,85 @@ private fun DashboardHeader(
 ) {
     val settingsLabel = stringResource(R.string.settings_open)
     val powerLabel = stringResource(R.string.power_title)
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val showSettingsLabel = maxWidth >= 720.dp
-        val compact = maxWidth < 720.dp
-        @Composable
-        fun SettingsAction() {
-            Surface(
-                onClick = onOpenSettings,
-                modifier =
-                    Modifier
-                        .height(48.dp)
-                        .widthIn(min = 48.dp)
-                        .prismaticPanel(RoundedCornerShape(999.dp))
-                        .semantics { contentDescription = settingsLabel },
-                shape = RoundedCornerShape(999.dp),
-                color = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = if (showSettingsLabel) 16.dp else 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(9.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_settings),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                    )
-                    if (showSettingsLabel) {
-                        Text(settingsLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
-                    }
-                }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = state.devicePresentation.friendlyName.ifBlank { stringResource(R.string.device_unknown) },
+                modifier = Modifier.weight(1f, fill = false),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (state.canWrite) ConnectedDot()
+            if (state.detected == null && (state.hasHardwareLearningCandidates || state.hardwareLearningNeedsReport)) {
+                SetupRequiredPill(needsReport = state.hardwareLearningNeedsReport)
+            }
+            if (state.detected != null) {
+                ProfileSelectorPill(state = state, onOpen = onOpenProfiles)
             }
         }
-
-        if (compact) {
+        if (state.detected?.capabilities?.power == true) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            color = MaterialTheme.colorScheme.primary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 2.2.sp,
-                        )
-                        if (state.canWrite) ConnectedPill(compact = true)
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = state.devicePresentation.friendlyName.ifBlank { stringResource(R.string.device_unknown) },
-                            modifier = Modifier.weight(1f, fill = false),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                        )
-                        if (state.detected == null && (state.hasHardwareLearningCandidates || state.hardwareLearningNeedsReport)) {
-                            SetupRequiredPill(needsReport = state.hardwareLearningNeedsReport)
-                        }
-                        if (state.detected != null) {
-                            ProfileSelectorPill(state = state, onOpen = onOpenProfiles, compact = true)
-                        }
-                    }
-                }
-                if (state.detected?.capabilities?.power == true) {
-                    Switch(
-                        colors = glassSwitchColors(),
-                        checked = state.ledState.power,
-                        onCheckedChange = onPowerChange,
-                        enabled = state.canWrite,
-                        modifier = Modifier.semantics { contentDescription = powerLabel },
-                    )
-                }
-                SettingsAction()
-            }
-        } else {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.app_name),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.4.sp,
-                    )
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = state.devicePresentation.friendlyName.ifBlank { stringResource(R.string.device_unknown) },
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        if (state.canWrite) ConnectedPill()
-                        if (state.detected == null && (state.hasHardwareLearningCandidates || state.hardwareLearningNeedsReport)) {
-                            SetupRequiredPill(needsReport = state.hardwareLearningNeedsReport)
-                        }
-                        if (state.detected != null) {
-                            ProfileSelectorPill(state = state, onOpen = onOpenProfiles)
-                        }
-                    }
-                }
-                if (state.detected?.capabilities?.power == true) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = powerLabel,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.labelLarge,
-                        )
-                        Switch(
-                            colors = glassSwitchColors(),
-                            checked = state.ledState.power,
-                            onCheckedChange = onPowerChange,
+                modifier =
+                    Modifier
+                        .clip(RoundedCornerShape(999.dp))
+                        .toggleable(
+                            value = state.ledState.power,
                             enabled = state.canWrite,
+                            role = Role.Switch,
+                            onValueChange = onPowerChange,
                         )
-                    }
-                }
-                SettingsAction()
+                        .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = powerLabel,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Switch(
+                    colors = glassSwitchColors(),
+                    checked = state.ledState.power,
+                    onCheckedChange = null,
+                    enabled = state.canWrite,
+                    thumbContent = {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_power),
+                            contentDescription = null,
+                            modifier = Modifier.size(SwitchDefaults.IconSize),
+                        )
+                    },
+                )
+            }
+        }
+        Surface(
+            onClick = onOpenSettings,
+            modifier =
+                Modifier
+                    .size(48.dp)
+                    .prismaticPanel(CircleShape)
+                    .semantics { contentDescription = settingsLabel },
+            shape = CircleShape,
+            color = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    painter = painterResource(R.drawable.ic_settings),
+                    contentDescription = null,
+                    modifier = Modifier.size(22.dp),
+                )
             }
         }
     }
@@ -336,31 +283,17 @@ private fun SetupRequiredPill(needsReport: Boolean) {
 }
 
 @Composable
-private fun ConnectedPill(compact: Boolean = false) {
+private fun ConnectedDot() {
     val light = LocalPrismaticStyle.current.light
     val signal = if (light) Color(0xFF12795A) else Color(0xFF82E7C7)
-    val shape = RoundedCornerShape(999.dp)
-    Row(
-        modifier =
-            Modifier
-                .glassTint(signal, shape, emphasis = 0.7f)
-                .padding(horizontal = if (compact) 8.dp else 11.dp, vertical = if (compact) 3.dp else 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            Modifier
-                .size(7.dp)
-                .shadow(6.dp, CircleShape, ambientColor = signal, spotColor = signal)
-                .background(signal, CircleShape),
-        )
-        Text(
-            text = stringResource(R.string.status_connected),
-            color = signal,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.SemiBold,
-        )
-    }
+    val label = stringResource(R.string.status_connected)
+    Box(
+        Modifier
+            .size(9.dp)
+            .shadow(6.dp, CircleShape, ambientColor = signal, spotColor = signal)
+            .background(signal, CircleShape)
+            .semantics { contentDescription = label },
+    )
 }
 
 @Composable
