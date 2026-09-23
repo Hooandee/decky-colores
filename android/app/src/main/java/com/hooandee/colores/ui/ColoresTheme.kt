@@ -4,7 +4,9 @@ import androidx.activity.compose.LocalActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -12,9 +14,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.hooandee.colores.R
 import com.hooandee.colores.settings.AppAppearance
@@ -74,6 +78,15 @@ private val BarlowFamily =
         Font(R.font.barlow_bold, FontWeight.Bold),
     )
 
+private val ColoresShapes =
+    Shapes(
+        extraSmall = RoundedCornerShape(10.dp),
+        small = RoundedCornerShape(14.dp),
+        medium = RoundedCornerShape(18.dp),
+        large = RoundedCornerShape(24.dp),
+        extraLarge = RoundedCornerShape(32.dp),
+    )
+
 private val DefaultTypography = Typography()
 private val ColoresTypography =
     Typography(
@@ -109,6 +122,7 @@ fun ColoresTheme(
     val atmosphere = atmosphereRoles(appearance.accent, dark)
     val primary = roles.primary.toComposeColor().animatedThemeColor()
     val onPrimary = roles.onPrimary.toComposeColor().animatedThemeColor()
+    val accentFill = roles.fill.toComposeColor().animatedThemeColor()
     val primaryContainer = roles.primaryContainer.toComposeColor().animatedThemeColor()
     val onPrimaryContainer = roles.onPrimaryContainer.toComposeColor().animatedThemeColor()
     val backgroundStart = atmosphere.backgroundStart.toComposeColor().animatedThemeColor()
@@ -136,26 +150,33 @@ fun ColoresTheme(
             surfaceVariant = panelSurfaceStrong,
             surfaceContainer = panelSurface,
             surfaceContainerHigh = panelSurfaceStrong,
-            outline = panelOutline,
-            outlineVariant = panelOutlineStrong,
+            outline = panelOutline.copy(alpha = if (dark) 0.46f else 0.5f),
+            outlineVariant = panelOutlineStrong.copy(alpha = if (dark) 0.3f else 0.34f),
         )
     val prismaticStyle =
         (if (dark) DarkPrismaticStyle else LightPrismaticStyle).copy(
             backgroundStart = backgroundStart,
             backgroundMiddle = backgroundMiddle,
             backgroundEnd = backgroundEnd,
-            glowCool = coolGlow.copy(alpha = if (dark) 0.3f else 0.23f),
-            glowWarm = warmGlow.copy(alpha = if (dark) 0.19f else 0.16f),
-            atmosphericBeam = beam.copy(alpha = if (dark) 0.09f else 0.075f),
-            panelSurface = panelSurface.copy(alpha = if (dark) 0.79f else 0.91f),
-            panelSurfaceStrong = panelSurfaceStrong.copy(alpha = if (dark) 0.84f else 0.96f),
+            glowCool = coolGlow.copy(alpha = if (dark) 0.5f else 0.4f),
+            glowWarm = warmGlow.copy(alpha = if (dark) 0.42f else 0.32f),
+            atmosphericBeam = beam.copy(alpha = if (dark) 0.06f else 0.1f),
+            panelSurface = panelSurface.copy(alpha = if (dark) 0.6f else 0.62f),
+            panelSurfaceStrong = panelSurfaceStrong.copy(alpha = if (dark) 0.68f else 0.72f),
             panelOutline = panelOutline.copy(alpha = if (dark) 0.2f else 0.16f),
             panelOutlineStrong = panelOutlineStrong.copy(alpha = if (dark) 0.28f else 0.23f),
-            accentGlow = primary.copy(alpha = if (dark) 0.32f else 0.23f),
+            accentGlow = primary.copy(alpha = if (dark) 0.55f else 0.34f),
+            accentFill = accentFill,
         )
     val activity = LocalActivity.current
+    val statusBarColor = backgroundStart.toArgb()
+    val navigationBarColor = backgroundEnd.toArgb()
     SideEffect {
         activity?.window?.let { window ->
+            @Suppress("DEPRECATION")
+            window.statusBarColor = statusBarColor
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = navigationBarColor
             WindowCompat.getInsetsController(window, window.decorView).apply {
                 isAppearanceLightStatusBars = !dark
                 isAppearanceLightNavigationBars = !dark
@@ -169,6 +190,7 @@ fun ColoresTheme(
         MaterialTheme(
             colorScheme = colors,
             typography = ColoresTypography,
+            shapes = ColoresShapes,
             content = content,
         )
     }

@@ -3,6 +3,7 @@ package com.hooandee.colores.ui
 import com.hooandee.colores.led.LedState
 import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.control.AppMode
+import com.hooandee.colores.gradient.LightingMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -13,6 +14,38 @@ class DashboardModelTest {
     private val blue = RgbColor(0, 0, 255)
     private val green = RgbColor(0, 255, 0)
     private val mixed = LedState(listOf(red, blue), brightness = 70, power = true)
+
+    @Test
+    fun `leaving gradient restores the colors chosen in color mode`() {
+        val gradientFrame = listOf(green, green)
+        val state =
+            ColoresUiState(
+                mode = AppMode.GRADIENT,
+                ledState = mixed.copy(zoneColors = gradientFrame),
+                colorModeColors = listOf(red, blue),
+                editTarget = EditTarget.RIGHT,
+            )
+        val base = state.copy(gradient = state.gradient.copy(mode = LightingMode.GRADIENT))
+
+        AppMode.entries.filterNot { it == AppMode.GRADIENT }.forEach { target ->
+            val restored = base.withColorModeRestored(target)
+            assertEquals(listOf(red, blue), restored.ledState.zoneColors)
+            assertEquals(LightingMode.COLOR, restored.gradient.mode)
+            assertEquals(70, restored.ledState.brightness)
+            assertEquals(EditTarget.BOTH, restored.editTarget)
+        }
+    }
+
+    @Test
+    fun `restored color mode colors adapt to the zone count`() {
+        val state =
+            ColoresUiState(
+                ledState = mixed.copy(zoneColors = List(4) { green }),
+                colorModeColors = listOf(red, red),
+            )
+
+        assertEquals(List(4) { red }, state.withColorModeRestored(AppMode.COLOR).ledState.zoneColors)
+    }
 
     @Test
     fun `reading a target does not alter LED state`() {

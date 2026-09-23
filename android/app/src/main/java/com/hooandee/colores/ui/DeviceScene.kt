@@ -98,7 +98,7 @@ fun DeviceScene(
                             style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.SemiBold,
                         )
-                        if (!compact) {
+                        if (!compact && enabled && perZone) {
                             Text(
                                 text = stringResource(R.string.preview_hint),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -119,7 +119,7 @@ fun DeviceScene(
                             StickTarget(
                                 label = previewModuleLabel(preview, index),
                                 segments = segments,
-                                selected = selectedTarget == target,
+                                selected = enabled && perZone && selectedTarget == target,
                                 power = power,
                                 enabled = enabled && perZone,
                                 diameter = ringSize,
@@ -137,7 +137,7 @@ fun DeviceScene(
                     ) {
                         preview.groups.indices.forEach { index ->
                             val target = if (index == 0) EditTarget.LEFT else EditTarget.RIGHT
-                            val selected = selectedTarget == target
+                            val selected = enabled && perZone && selectedTarget == target
                             Text(
                                 text = previewShortLabel(preview, index),
                                 modifier = Modifier.width(ringSize).clearAndSetSemantics {},
@@ -161,13 +161,19 @@ fun DeviceScene(
                                 .align(Alignment.CenterHorizontally)
                                 .fillMaxWidth(if (compact) 0.64f else 0.72f)
                                 .height(if (compact) 44.dp else 48.dp)
-                                .semantics {
+                                .then(
+                                    if (selectedTarget == EditTarget.BOTH) {
+                                        Modifier.glassTint(MaterialTheme.colorScheme.primary, RoundedCornerShape(999.dp))
+                                    } else {
+                                        Modifier
+                                    },
+                                ).semantics {
                                     role = Role.RadioButton
                                     selected = selectedTarget == EditTarget.BOTH
                                 },
                         color =
                             if (selectedTarget == EditTarget.BOTH) {
-                                MaterialTheme.colorScheme.primaryContainer
+                                Color.Transparent
                             } else if (lightPreview) {
                                 MaterialTheme.colorScheme.surfaceContainer
                             } else {
@@ -175,17 +181,17 @@ fun DeviceScene(
                             },
                         contentColor =
                             if (selectedTarget == EditTarget.BOTH) {
-                                MaterialTheme.colorScheme.onPrimaryContainer
+                                MaterialTheme.colorScheme.onSurface
                             } else {
                                 MaterialTheme.colorScheme.onSurfaceVariant
                             },
                         shape = RoundedCornerShape(999.dp),
                         border =
                             BorderStroke(
-                                width = if (selectedTarget == EditTarget.BOTH) 2.dp else 1.dp,
+                                width = 1.dp,
                                 color =
                                     if (selectedTarget == EditTarget.BOTH) {
-                                        MaterialTheme.colorScheme.primary
+                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
                                     } else if (lightPreview) {
                                         MaterialTheme.colorScheme.outlineVariant
                                     } else {

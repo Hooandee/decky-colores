@@ -125,6 +125,7 @@ data class ColoresUiState(
             brightness = 100,
             power = true,
         ),
+    val colorModeColors: List<RgbColor> = listOf(RgbColor(93, 81, 255), RgbColor(93, 81, 255)),
     val effectivePower: Boolean = true,
     val currentFrame: List<RgbColor> = emptyList(),
     val editTarget: EditTarget = EditTarget.BOTH,
@@ -142,6 +143,7 @@ data class ColoresUiState(
     val temperatureCelsius: Double? = null,
     val temperatureAvailable: Boolean = false,
     val performanceMetric: PerformanceMetric? = null,
+    val performanceLoadPercent: Int? = null,
     val audio: AudioLevelState = AudioLevelState(),
     val audioScale: AudioScale = AudioScale.DEFAULT,
     val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
@@ -324,6 +326,7 @@ class ColoresViewModel(
                         temperatureCelsius = snap.temperatureCelsius,
                         temperatureAvailable = snap.temperatureAvailable,
                         performanceMetric = snap.performanceMetric,
+                        performanceLoadPercent = snap.performanceLoadPercent,
                         audio = snap.audio,
                         audioScale = snap.audioScale,
                         audioSensitivityDb = snap.audioSensitivityDb,
@@ -611,6 +614,7 @@ class ColoresViewModel(
                             gradientSpeed = selectedProfile.gradientSpeed,
                             effectUsesGradient = selectedProfile.effectUsesGradient,
                             ledState = LedState(zoneColors, selectedProfile.brightness, power),
+                            colorModeColors = GradientInterpolator.interpolate(selectedProfile.staticColors, zones),
                             gradientPresentation = gradientPresentation,
                             gradient = hydratedGradient,
                             batteryBreathe = selectedProfile.batteryBreathe,
@@ -1113,6 +1117,7 @@ class ColoresViewModel(
                 gradientSpeed = profile.gradientSpeed,
                 effectUsesGradient = profile.effectUsesGradient,
                 ledState = current.ledState.copy(zoneColors = colors, brightness = profile.brightness),
+                colorModeColors = GradientInterpolator.interpolate(profile.staticColors, zones),
                 gradient =
                     current.gradient.copy(
                         mode = if (gradientMode) LightingMode.GRADIENT else LightingMode.COLOR,
@@ -1143,19 +1148,10 @@ class ColoresViewModel(
         if (current.mode == AppMode.AMBIENT) {
             EffectsService.stopAmbient(getApplication(), AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
         }
-        when (target) {
-            AppMode.GRADIENT -> updateGradient(current.gradient.copy(mode = LightingMode.GRADIENT), apply = false)
-            AppMode.COLOR -> {
-                val color = current.gradient.selectedStop ?: current.editingColor
-                mutableState.update {
-                    it.copy(
-                        gradient = it.gradient.copy(mode = LightingMode.COLOR),
-                        ledState = it.ledState.withTargetColor(EditTarget.BOTH, color),
-                        editTarget = EditTarget.BOTH,
-                    )
-                }
-            }
-            else -> Unit
+        if (target == AppMode.GRADIENT) {
+            updateGradient(current.gradient.copy(mode = LightingMode.GRADIENT), apply = false)
+        } else {
+            mutableState.update { it.withColorModeRestored(target) }
         }
         controller.setMode(target)
         mutableState.update { it.copy(mode = target, profileStoredMode = target) }
@@ -1167,14 +1163,12 @@ class ColoresViewModel(
         val current = mutableState.value
         val preset = current.effects.firstOrNull { it.id == effectId } ?: return
         controller.setEffect(preset.id)
-        if (preset.id != current.effectId) controller.setSpeed(preset.defaultSpeed)
         controller.setMode(AppMode.EFFECT)
         mutableState.update {
             it.copy(
                 mode = AppMode.EFFECT,
                 profileStoredMode = AppMode.EFFECT,
                 effectId = preset.id,
-                speed = if (preset.id != current.effectId) preset.defaultSpeed else it.speed,
             )
         }
         pushColorsToController()
@@ -1362,7 +1356,7 @@ class ColoresViewModel(
         if (current.editingGradientStops) {
             updateGradient(current.gradient.replaceSelectedStop(color), apply = true, debounce = true)
         } else {
-            updateLedState(debounce = true) { state -> state.withTargetColor(current.editTarget, color) }
+            updateLedState(debounce = true, colorEdit = true) { state -> state.withTargetColor(current.editTarget, color) }
         }
     }
 
@@ -1372,7 +1366,7 @@ class ColoresViewModel(
             val changed = current.editingColor.toHsvColor().copy(saturation = saturation.coerceIn(0f, 1f)).toRgbColor()
             updateGradient(current.gradient.replaceSelectedStop(changed), apply = true, debounce = true)
         } else {
-            updateLedState(debounce = true) { state -> state.withTargetSaturation(current.editTarget, saturation) }
+            updateLedState(debounce = true, colorEdit = true) { state -> state.withTargetSaturation(current.editTarget, saturation) }
         }
     }
 
@@ -1447,11 +1441,15 @@ class ColoresViewModel(
 
     private fun updateLedState(
         debounce: Boolean = false,
+        colorEdit: Boolean = false,
         transform: (LedState) -> LedState,
     ) {
         val current = mutableState.value
         if (!current.canWrite || current.detected == null) return
-        mutableState.update { it.copy(ledState = transform(it.ledState)) }
+        mutableState.update {
+            val changed = transform(it.ledState)
+            it.copy(ledState = changed, colorModeColors = if (colorEdit) changed.zoneColors else it.colorModeColors)
+        }
         scheduleCommit(debounce) {
             pushColorsToController()
             persistLighting()
@@ -1524,7 +1522,7 @@ class ColoresViewModel(
     private fun persistLighting() {
         val current = mutableState.value
         if (current.detected == null) return
-        val solid = current.ledState.zoneColors.firstOrNull() ?: RgbColor(93, 81, 255)
+        val solid = current.colorModeColors.firstOrNull() ?: RgbColor(93, 81, 255)
         profileCoordinator.edit(
             current.profileScope,
             ProfilePatch(
@@ -1534,7 +1532,7 @@ class ColoresViewModel(
                 gradientSpeed = current.gradientSpeed,
                 effectUsesGradient = current.effectUsesGradient,
                 solidColor = solid,
-                staticColors = current.ledState.zoneColors,
+                staticColors = current.colorModeColors,
                 gradientStops = current.gradient.stops,
                 brightness = current.ledState.brightness,
                 batteryBreathe = current.batteryBreathe,

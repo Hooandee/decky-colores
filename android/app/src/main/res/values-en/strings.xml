@@ -60,6 +60,7 @@
     <string name="report_category_effects">Effects</string>
     <string name="report_category_sensors">Sensors</string>
     <string name="report_category_audio">Audio</string>
+    <string name="report_category_ambilight">Ambilight</string>
     <string name="report_category_profiles">Profiles</string>
     <string name="report_category_learning">Compatibility</string>
     <string name="report_category_other">Other</string>
@@ -124,6 +125,8 @@
     <string name="profile_search_empty">No app matches your search.</string>
     <string name="color_title">Color</string>
     <string name="rgb_sent_value">RGB output · %1$s</string>
+    <string name="rgb_saved_value">Saved color · %1$s</string>
+    <string name="capture_status_lights_off">Lights off</string>
     <string name="preview_title">Your sticks</string>
     <string name="preview_lights_title">Your lights</string>
     <string name="preview_hint">Choose which light you want to adjust</string>
@@ -331,6 +334,8 @@
     <string name="service_channel_description">Keeps effects and automatic modes running.</string>
     <string name="service_notification_title">Colores active</string>
     <string name="service_notification_text">Keeping effects and automatic profiles running.</string>
+    <string name="service_notification_ambient">Ambilight is capturing the screen to color the lights.</string>
+    <string name="service_notification_audio">Reactive audio is listening to internal sound.</string>
     <string name="settings_legal_title">Source and licenses</string>
     <string name="settings_legal_action">Legal information</string>
     <string name="settings_license_summary">Colores is distributed under GPL-3.0-or-later, without warranty. You may share and modify it under the license terms.</string>

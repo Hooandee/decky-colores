@@ -3,9 +3,7 @@ package com.hooandee.colores.ui
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,12 +28,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -64,14 +60,13 @@ fun ModeNav(
     if (modes.size <= 1) return
     val navSelected = if (selected.isSensor) AppMode.BATTERY else selected
     val entries = modes.filterNot { it.isSensor && it != AppMode.BATTERY }
-    val outerShape = RoundedCornerShape(20.dp)
+    val outerShape = RoundedCornerShape(999.dp)
 
     Surface(
-        modifier = Modifier.fillMaxWidth().height(58.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.66f),
+        modifier = Modifier.fillMaxWidth().height(58.dp).prismaticPanel(outerShape),
+        color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         shape = outerShape,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(5.dp),
@@ -108,19 +103,17 @@ private fun androidx.compose.foundation.layout.RowScope.ModeNavItem(
             label = "mode-nav-width",
         )
     val label = navLabel(mode)
-    val shape = RoundedCornerShape(15.dp)
+    val shape = RoundedCornerShape(999.dp)
     val contentColor =
         when {
             !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.36f)
-            selected -> MaterialTheme.colorScheme.onPrimaryContainer
+            selected -> MaterialTheme.colorScheme.onSurface
             hovered || focused -> MaterialTheme.colorScheme.onSurface
             else -> MaterialTheme.colorScheme.onSurfaceVariant
         }
     val borderColor =
         when {
             focused -> MaterialTheme.colorScheme.primary
-            selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.44f)
-            hovered -> MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.72f)
             else -> Color.Transparent
         }
 
@@ -146,24 +139,11 @@ private fun androidx.compose.foundation.layout.RowScope.ModeNavItem(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .clip(shape)
-                    .background(
-                        if (selected) {
-                            Brush.verticalGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.96f),
-                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f),
-                                ),
-                            )
-                        } else if (hovered || focused) {
-                            Brush.verticalGradient(
-                                listOf(
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
-                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.38f),
-                                ),
-                            )
-                        } else {
-                            Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                    .then(
+                        when {
+                            selected -> Modifier.glassTint(MaterialTheme.colorScheme.primary, shape)
+                            hovered || focused -> Modifier.glassTint(MaterialTheme.colorScheme.onSurface, shape, emphasis = 0.32f)
+                            else -> Modifier
                         },
                     ).border(if (focused) 2.dp else 1.dp, borderColor, shape)
                     .animateContentSize()
@@ -174,7 +154,7 @@ private fun androidx.compose.foundation.layout.RowScope.ModeNavItem(
                 horizontalArrangement = Arrangement.spacedBy(7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ModeGlyph(mode = mode, tint = contentColor, modifier = Modifier.size(20.dp))
+                ModeGlyph(mode = mode, tint = if (selected && enabled) MaterialTheme.colorScheme.primary else contentColor, modifier = Modifier.size(20.dp))
                 if (expanded) {
                     Text(
                         text = label,

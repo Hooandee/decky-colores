@@ -19,4 +19,11 @@ class ProjectionCaptureScopeTest {
     fun `audio keeps user selected capture on Android 14`() {
         assertFalse(shouldCaptureDefaultDisplay(ProjectionRequest.AUDIO, sdk = 34))
     }
+
+    @Test
+    fun `a second launcher copy on top of the task is recognised as duplicate`() {
+        assertTrue(isDuplicateLauncherEntry(taskRoot = false, action = "android.intent.action.MAIN", launcherCategory = true))
+        assertFalse(isDuplicateLauncherEntry(taskRoot = true, action = "android.intent.action.MAIN", launcherCategory = true))
+        assertFalse(isDuplicateLauncherEntry(taskRoot = false, action = null, launcherCategory = false))
+    }
 }

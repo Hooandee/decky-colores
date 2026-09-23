@@ -36,6 +36,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlin.math.roundToInt
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -187,6 +188,7 @@ data class LightingSnapshot(
     val temperatureCelsius: Double? = null,
     val temperatureAvailable: Boolean = false,
     val performanceMetric: PerformanceMetric? = null,
+    val performanceLoadPercent: Int? = null,
     val audio: AudioLevelState = AudioLevelState(),
     val audioScale: AudioScale = AudioScale.DEFAULT,
     val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
@@ -226,6 +228,7 @@ class LightingController(
     private val serviceGate: ServiceGate = NoopServiceGate,
     private val clockMs: () -> Long = { System.nanoTime() / 1_000_000L },
     private val localHour: () -> Double = { defaultLocalHour() },
+    private val screenInteractive: () -> Boolean = { true },
 ) {
     private val commands = Channel<Command>(Channel.UNLIMITED)
 
@@ -252,6 +255,7 @@ class LightingController(
     @Volatile
     private var generation = 0L
     private var temperatureCelsius: Double? = null
+    private var performanceLoad: Double? = null
     private var temperatureAvailable = false
     private val temperatureAvailability = TemperatureAvailability()
     private var lastFrame: List<RgbColor> = emptyList()
@@ -612,6 +616,10 @@ class LightingController(
                 continue
             }
             offApplied = false
+            if (!rendersWhileScreenOff(intent.mode) && !screenInteractive()) {
+                delay(SCREEN_OFF_IDLE_MS)
+                continue
+            }
             val nowSeconds = (clockMs() - startMs) / 1000.0
             val tick = renderer.render(nowSeconds)
             runCatching { binding.device.applyZones(tick.colors, intent.brightness, true) }.rethrowCancellation()
@@ -671,7 +679,7 @@ class LightingController(
                     zones = zones,
                     frameIntervalMs = interval,
                     idleIntervalMs = INDICATOR_IDLE_MS,
-                    value = { binding.performance?.read() },
+                    value = { binding.performance?.read().also { performanceLoad = it } },
                 )
             AppMode.CLOCK ->
                 ClockRenderer(
@@ -752,6 +760,7 @@ class LightingController(
                 temperatureCelsius = temperatureCelsius,
                 temperatureAvailable = binding != null && temperatureAvailable,
                 performanceMetric = binding?.performance?.metric,
+                performanceLoadPercent = performanceLoad?.takeIf { intent.mode == AppMode.PERFORMANCE }?.roundToInt(),
                 audio = binding?.audio?.state?.value ?: AudioLevelState(),
                 audioScale = intent.audioScale,
                 audioSensitivityDb = intent.audioSensitivityDb,
@@ -838,6 +847,7 @@ class LightingController(
 
     companion object {
         const val POWER_OFF_IDLE_MS = 500L
+        const val SCREEN_OFF_IDLE_MS = 500L
         const val INDICATOR_IDLE_MS = 500L
         const val CLOCK_INTERVAL_MS = 30_000L
         const val WATCH_INTERVAL_MS = 3_000L
@@ -858,3 +868,5 @@ internal val com.hooandee.colores.audio.AudioCaptureStatus.keepsAudioCaptureActi
         this == com.hooandee.colores.audio.AudioCaptureStatus.STARTING ||
             this == com.hooandee.colores.audio.AudioCaptureStatus.CAPTURING ||
             this == com.hooandee.colores.audio.AudioCaptureStatus.NO_AUDIO
+
+internal fun rendersWhileScreenOff(mode: AppMode): Boolean = mode != AppMode.AMBIENT

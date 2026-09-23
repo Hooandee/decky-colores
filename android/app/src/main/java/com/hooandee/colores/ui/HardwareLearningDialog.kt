@@ -1,5 +1,13 @@
 package com.hooandee.colores.ui
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,19 +32,21 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -47,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.hooandee.colores.R
@@ -96,25 +107,38 @@ internal fun HardwareLearningDialog(
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 shape = RoundedCornerShape(32.dp),
             ) {
-                Column(Modifier.padding(horizontal = 26.dp, vertical = 22.dp)) {
+                val compactHeight = maxHeight < 560.dp
+                val gutter = if (compactHeight && !landscape) 20.dp else 26.dp
+                val scrollState = rememberScrollState()
+                val zoneQuestion =
+                    (ui.sessionState as? HardwareLearningState.AwaitingAnswer)?.isHtrZone() == true
+                Column(Modifier.padding(horizontal = gutter, vertical = if (compactHeight) 18.dp else 22.dp)) {
                     LearningHeader(ui, onDismiss)
-                    Spacer(Modifier.height(16.dp))
-                    val compactZoneQuestion =
-                        (ui.sessionState as? HardwareLearningState.AwaitingAnswer)?.isHtrZone() == true
-                    if (compactZoneQuestion) {
-                        LearningBody(ui, textAlign = TextAlign.Start, horizontalAlignment = Alignment.Start)
+                    Spacer(Modifier.height(if (compactHeight) 12.dp else 16.dp))
+                    val bodyModifier =
+                        Modifier
+                            .weight(1f, fill = false)
+                            .fillMaxWidth()
+                            .scrollFadeEdges(scrollState)
+                            .verticalScroll(scrollState)
+                    if (zoneQuestion) {
+                        Column(bodyModifier, verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            LearningBody(ui, textAlign = TextAlign.Start, horizontalAlignment = Alignment.Start)
+                            LearningActions(ui, onDismiss, onConsent, onRunProbe, onAnswer, onFinish, onNextCandidate, onReport, recoveryActions, landscape)
+                        }
                     } else if (landscape) {
                         Row(
                             modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(28.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            LearningBeacon(ui.sessionState, 88.dp, Modifier.width(188.dp))
+                            LearningBeacon(ui.sessionState, if (compactHeight) 64.dp else 88.dp, Modifier.width(188.dp), showAreas = !compactHeight)
                             Box(
                                 modifier =
                                     Modifier
                                         .weight(1f)
-                                        .verticalScroll(rememberScrollState())
+                                        .scrollFadeEdges(scrollState)
+                                        .verticalScroll(scrollState)
                                         .padding(end = 6.dp),
                             ) {
                                 LearningBody(ui, textAlign = TextAlign.Start, horizontalAlignment = Alignment.Start)
@@ -122,19 +146,23 @@ internal fun HardwareLearningDialog(
                         }
                     } else {
                         Column(
-                            modifier = Modifier.weight(1f, fill = false).fillMaxWidth().verticalScroll(rememberScrollState()),
+                            modifier = bodyModifier,
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(14.dp),
                         ) {
-                            LearningBeacon(ui.sessionState, 94.dp)
+                            if (compactHeight) {
+                                CompactLearningBeacon(ui.sessionState)
+                            } else {
+                                LearningBeacon(ui.sessionState, 94.dp)
+                            }
                             LearningBody(ui, textAlign = TextAlign.Center, horizontalAlignment = Alignment.CenterHorizontally)
                         }
                     }
-                    if (ui.actionLayout != HardwareLearningActionLayout.NONE) {
-                        Spacer(Modifier.height(16.dp))
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.58f))
-                        Spacer(Modifier.height(14.dp))
-                        LearningActions(ui, onDismiss, onConsent, onRunProbe, onAnswer, onFinish, onNextCandidate, onReport, recoveryActions)
+                    if (ui.actionLayout != HardwareLearningActionLayout.NONE && !zoneQuestion) {
+                        Spacer(Modifier.height(if (compactHeight) 12.dp else 16.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(Modifier.height(if (compactHeight) 12.dp else 14.dp))
+                        LearningActions(ui, onDismiss, onConsent, onRunProbe, onAnswer, onFinish, onNextCandidate, onReport, recoveryActions, landscape)
                     }
                 }
             }
@@ -147,55 +175,58 @@ private fun LearningHeader(
     ui: HardwareLearningUiState,
     onDismiss: () -> Unit,
 ) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        LearningProgress(ui, Modifier.weight(1f))
-        if (ui.canDismiss) {
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier.padding(start = 14.dp).size(40.dp),
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_close),
-                    contentDescription = stringResource(R.string.hardware_learning_close),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LearningProgress(
-    ui: HardwareLearningUiState,
-    modifier: Modifier = Modifier,
-) {
-    val progress = if (ui.candidateCount == 0) 0f else (ui.candidateIndex + 1f) / ui.candidateCount
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(7.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+    val routes = ui.candidateCount.coerceAtLeast(1)
+    Row(Modifier.fillMaxWidth().heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Text(
                 stringResource(R.string.hardware_learning_eyebrow),
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-            )
-            Text(
-                stringResource(R.string.hardware_learning_progress, ui.candidateIndex + 1, ui.candidateCount.coerceAtLeast(1)),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.4.sp,
+                maxLines = 1,
             )
+            if (routes > 1) {
+                val progress = stringResource(R.string.hardware_learning_progress, ui.candidateIndex + 1, routes)
+                Row(
+                    modifier = Modifier.semantics { contentDescription = progress },
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    repeat(routes) { index ->
+                        Box(
+                            Modifier
+                                .height(6.dp)
+                                .width(if (index == ui.candidateIndex) 18.dp else 6.dp)
+                                .background(
+                                    if (index <= ui.candidateIndex) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f),
+                                    CircleShape,
+                                ),
+                        )
+                    }
+                }
+            }
         }
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(3.dp)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.09f), CircleShape),
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .height(3.dp)
-                    .background(MaterialTheme.colorScheme.primary, CircleShape),
-            )
+        if (ui.canDismiss) {
+            Surface(
+                onClick = onDismiss,
+                modifier = Modifier.size(40.dp).prismaticPanel(CircleShape),
+                shape = CircleShape,
+                color = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_close),
+                        contentDescription = stringResource(R.string.hardware_learning_close),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -205,6 +236,7 @@ private fun LearningBeacon(
     state: HardwareLearningState,
     lensSize: Dp,
     modifier: Modifier = Modifier,
+    showAreas: Boolean = true,
 ) {
     Column(
         modifier = modifier,
@@ -219,12 +251,36 @@ private fun LearningBeacon(
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
-        Text(
-            text = stringResource(R.string.hardware_learning_look_areas),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center,
-        )
+        if (showAreas) {
+            Text(
+                text = stringResource(R.string.hardware_learning_look_areas),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactLearningBeacon(state: HardwareLearningState) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OpticalLearningLens(state, 52.dp)
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = stringResource(R.string.hardware_learning_look_device),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = stringResource(R.string.hardware_learning_look_areas),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
 }
 
@@ -233,33 +289,58 @@ private fun OpticalLearningLens(
     state: HardwareLearningState,
     lensSize: Dp,
 ) {
-    val (center, halo) =
+    val target =
         when (state) {
-            is HardwareLearningState.AwaitingAnswer -> Color(0xFF68D9FF) to Color(0x6858AFFF)
-            is HardwareLearningState.Complete -> Color(0xFF86F0C5) to Color(0x5556DDAE)
-            is HardwareLearningState.Blocked -> Color(0xFFFFB38C) to Color(0x55FF835E)
-            else -> MaterialTheme.colorScheme.primary to MaterialTheme.colorScheme.primary.copy(alpha = 0.32f)
+            is HardwareLearningState.AwaitingAnswer -> Color(0xFF5FD8FF)
+            is HardwareLearningState.Complete -> Color(0xFF6FEDBE)
+            is HardwareLearningState.Blocked -> Color(0xFFFF9A7A)
+            else -> MaterialTheme.colorScheme.primary
         }
+    val color by animateColorAsState(target, tween(520), label = "learning-ring-color")
+    val settled = state is HardwareLearningState.Complete
+    val transition = rememberInfiniteTransition(label = "learning-ring")
+    val rotation by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(5200, easing = LinearEasing)), label = "learning-ring-rotation")
+    val breath by transition.animateFloat(0.82f, 1f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "learning-ring-breath")
     val description = stringResource(R.string.hardware_learning_lens_accessibility)
-    Box(
-        modifier =
-            Modifier
-                .size(lensSize)
-                .semantics { contentDescription = description }
-                .drawBehind {
-                    drawCircle(brush = Brush.radialGradient(listOf(halo, Color.Transparent)), radius = size.minDimension * 0.72f)
-                    drawCircle(color = Color.White.copy(alpha = 0.18f), radius = size.minDimension * 0.34f)
-                    drawCircle(
-                        brush = Brush.radialGradient(listOf(Color.White.copy(alpha = 0.95f), center, center.copy(alpha = 0.4f))),
-                        radius = size.minDimension * 0.3f,
-                    )
-                    drawCircle(
-                        color = Color.White.copy(alpha = 0.72f),
-                        radius = size.minDimension * 0.055f,
-                        center = Offset(size.width * 0.43f, size.height * 0.38f),
-                    )
-                },
-    )
+    Canvas(
+        Modifier
+            .size(lensSize)
+            .semantics { contentDescription = description },
+    ) {
+        val stroke = size.minDimension * 0.085f
+        val radius = size.minDimension * 0.34f
+        val glow = if (settled) 1f else breath
+        drawCircle(
+            brush = Brush.radialGradient(listOf(color.copy(alpha = 0.3f * glow), Color.Transparent), radius = size.minDimension * 0.5f),
+            radius = size.minDimension * 0.5f,
+        )
+        drawCircle(
+            brush = Brush.radialGradient(listOf(Color(0xFF1B1F2A), Color(0xFF07090D)), radius = radius),
+            radius = radius - stroke / 2f,
+        )
+        drawCircle(Color.White.copy(alpha = 0.07f), radius, style = Stroke(stroke))
+        listOf(2.4f to 0.1f, 1.6f to 0.18f).forEach { (width, alpha) ->
+            drawCircle(color.copy(alpha = alpha * glow), radius, style = Stroke(stroke * width))
+        }
+        rotate(if (settled) 0f else rotation) {
+            drawCircle(
+                brush =
+                    Brush.sweepGradient(
+                        if (settled) {
+                            listOf(color, color)
+                        } else {
+                            listOf(color.copy(alpha = 0.35f), color, Color.White.copy(alpha = 0.95f), color, color.copy(alpha = 0.35f))
+                        },
+                    ),
+                radius = radius,
+                style = Stroke(stroke, cap = StrokeCap.Round),
+            )
+        }
+        drawCircle(
+            brush = Brush.radialGradient(listOf(color.copy(alpha = 0.22f), Color.Transparent), radius = radius * 0.7f),
+            radius = radius * 0.7f,
+        )
+    }
 }
 
 @Composable
@@ -466,6 +547,7 @@ private fun LearningActions(
     onNextCandidate: () -> Unit,
     onReport: () -> Unit,
     recoveryActions: RecoveryActions,
+    wide: Boolean,
 ) {
     when (ui.actionLayout) {
         HardwareLearningActionLayout.NONE -> Unit
@@ -477,29 +559,39 @@ private fun LearningActions(
             PrimaryLearningButton(stringResource(R.string.hardware_learning_finish), ui.canFinish && !ui.busy, onFinish)
         HardwareLearningActionLayout.OBSERVATION -> {
             val awaiting = ui.sessionState as HardwareLearningState.AwaitingAnswer
-            if (awaiting.isHtrZone()) ZoneLocationActions(awaiting.zone, ui.busy, onAnswer) else ObservationActions(ui.busy, onAnswer)
+            if (awaiting.isHtrZone()) ZoneLocationActions(awaiting.zone, ui.busy, wide, onAnswer) else ObservationActions(ui.busy, onAnswer)
         }
-        HardwareLearningActionLayout.RESULT ->
-            Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        HardwareLearningActionLayout.RESULT -> {
+            val next: (@Composable (Modifier) -> Unit)? =
                 if (ui.hasNextCandidate) {
-                    PrimaryLearningButton(
-                        stringResource(
-                            if (ui.confirmedTwoZoneFallback) {
-                                R.string.hardware_learning_try_multipoint
-                            } else {
-                                R.string.hardware_learning_continue_discovery
-                            },
-                        ),
-                        !ui.busy,
-                        onNextCandidate,
-                    )
-                }
-                if (ui.confirmedTwoZoneFallback || ui.groupedMultipointWithFallback) {
-                    OutlinedButton(onClick = onDismiss, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
-                        Text(stringResource(R.string.hardware_learning_use_two_zones))
+                    { modifier ->
+                        Button(onClick = onNextCandidate, enabled = !ui.busy, modifier = modifier.heightIn(min = 52.dp)) {
+                            Text(
+                                stringResource(
+                                    if (ui.confirmedTwoZoneFallback) {
+                                        R.string.hardware_learning_try_multipoint
+                                    } else {
+                                        R.string.hardware_learning_continue_discovery
+                                    },
+                                ),
+                            )
+                        }
                     }
+                } else {
+                    null
                 }
-                TextButton(onClick = onReport, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            val keep: (@Composable (Modifier) -> Unit)? =
+                if (ui.confirmedTwoZoneFallback || ui.groupedMultipointWithFallback) {
+                    { modifier ->
+                        OutlinedButton(onClick = onDismiss, enabled = !ui.busy, modifier = modifier.heightIn(min = 50.dp)) {
+                            Text(stringResource(R.string.hardware_learning_use_two_zones))
+                        }
+                    }
+                } else {
+                    null
+                }
+            val report: @Composable (Modifier) -> Unit = { modifier ->
+                TextButton(onClick = onReport, enabled = !ui.busy, modifier = modifier.heightIn(min = 48.dp)) {
                     Text(
                         if (ui.showBlockedReport) {
                             stringResource(R.string.hardware_learning_report_blocked)
@@ -509,7 +601,22 @@ private fun LearningActions(
                     )
                 }
             }
-        HardwareLearningActionLayout.REPORT_ONLY -> RecoveryLearningActions(ui, onReport, recoveryActions)
+            if (wide) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    report(Modifier)
+                    Spacer(Modifier.weight(if (next == null && keep == null) 1f else 0.001f))
+                    keep?.invoke(Modifier.weight(1f))
+                    next?.invoke(Modifier.weight(1f))
+                }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    next?.invoke(Modifier.fillMaxWidth())
+                    keep?.invoke(Modifier.fillMaxWidth())
+                    report(Modifier.fillMaxWidth())
+                }
+            }
+        }
+        HardwareLearningActionLayout.REPORT_ONLY -> RecoveryLearningActions(ui, onReport, recoveryActions, wide)
     }
 }
 
@@ -525,23 +632,52 @@ private fun RecoveryLearningActions(
     ui: HardwareLearningUiState,
     onReport: () -> Unit,
     actions: RecoveryActions,
+    wide: Boolean,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+    val buttons: List<@Composable (Modifier) -> Unit> =
         if (ui.discardConfirmation) {
-            PrimaryLearningButton(stringResource(R.string.hardware_learning_discard_confirm), !ui.busy, actions.onConfirmDiscard)
-            OutlinedButton(onClick = actions.onCancelDiscard, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
-                Text(stringResource(R.string.hardware_learning_discard_cancel))
-            }
-            return@Column
+            listOf(
+                { modifier ->
+                    OutlinedButton(onClick = actions.onCancelDiscard, enabled = !ui.busy, modifier = modifier.heightIn(min = 50.dp)) {
+                        Text(stringResource(R.string.hardware_learning_discard_cancel))
+                    }
+                },
+                { modifier ->
+                    Button(onClick = actions.onConfirmDiscard, enabled = !ui.busy, modifier = modifier.heightIn(min = 52.dp)) {
+                        Text(stringResource(R.string.hardware_learning_discard_confirm))
+                    }
+                },
+            )
+        } else {
+            listOfNotNull(
+                { modifier: Modifier ->
+                    TextButton(onClick = onReport, enabled = !ui.busy, modifier = modifier.heightIn(min = 48.dp)) {
+                        Text(stringResource(R.string.hardware_learning_report_critical))
+                    }
+                },
+                { modifier: Modifier ->
+                    OutlinedButton(onClick = actions.onRequestDiscard, enabled = !ui.busy, modifier = modifier.heightIn(min = 50.dp)) {
+                        Text(stringResource(R.string.hardware_learning_discard_restore))
+                    }
+                },
+                if (ui.journalPending) {
+                    { modifier: Modifier ->
+                        Button(onClick = actions.onRetry, enabled = !ui.busy, modifier = modifier.heightIn(min = 52.dp)) {
+                            Text(stringResource(R.string.hardware_learning_retry_restore))
+                        }
+                    }
+                } else {
+                    null
+                },
+            )
         }
-        if (ui.journalPending) {
-            PrimaryLearningButton(stringResource(R.string.hardware_learning_retry_restore), !ui.busy, actions.onRetry)
+    if (wide) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            buttons.forEach { it(Modifier.weight(1f)) }
         }
-        OutlinedButton(onClick = actions.onRequestDiscard, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) {
-            Text(stringResource(R.string.hardware_learning_discard_restore))
-        }
-        TextButton(onClick = onReport, enabled = !ui.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-            Text(stringResource(R.string.hardware_learning_report_critical))
+    } else {
+        Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            buttons.asReversed().forEach { it(Modifier.fillMaxWidth()) }
         }
     }
 }
@@ -635,58 +771,86 @@ private fun ObservationActions(
 private fun ZoneLocationActions(
     zone: Int?,
     busy: Boolean,
+    wide: Boolean,
     onAnswer: (UserObservation, ZoneLocation?) -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ZoneStickGrid(
-                label = stringResource(R.string.hardware_learning_left_stick),
-                locations =
-                    listOf(
-                        ZoneLocation.LEFT_TOP_LEFT,
-                        ZoneLocation.LEFT_TOP_RIGHT,
-                        ZoneLocation.LEFT_BOTTOM_LEFT,
-                        ZoneLocation.LEFT_BOTTOM_RIGHT,
-                    ),
-                busy = busy,
-                onLocation = { onAnswer(UserObservation.YES, it) },
-                modifier = Modifier.weight(1f),
-            )
-            ZoneStickGrid(
-                label = stringResource(R.string.hardware_learning_right_stick),
-                locations =
-                    listOf(
-                        ZoneLocation.RIGHT_TOP_LEFT,
-                        ZoneLocation.RIGHT_TOP_RIGHT,
-                        ZoneLocation.RIGHT_BOTTOM_LEFT,
-                        ZoneLocation.RIGHT_BOTTOM_RIGHT,
-                    ),
-                busy = busy,
-                onLocation = { onAnswer(UserObservation.YES, it) },
-                modifier = Modifier.weight(1f),
-            )
-        }
+    val leftGrid: @Composable (Modifier) -> Unit = { modifier ->
+        ZoneStickGrid(
+            label = stringResource(R.string.hardware_learning_left_stick),
+            locations =
+                listOf(
+                    ZoneLocation.LEFT_TOP_LEFT,
+                    ZoneLocation.LEFT_TOP_RIGHT,
+                    ZoneLocation.LEFT_BOTTOM_LEFT,
+                    ZoneLocation.LEFT_BOTTOM_RIGHT,
+                ),
+            busy = busy,
+            onLocation = { onAnswer(UserObservation.YES, it) },
+            modifier = modifier,
+        )
+    }
+    val rightGrid: @Composable (Modifier) -> Unit = { modifier ->
+        ZoneStickGrid(
+            label = stringResource(R.string.hardware_learning_right_stick),
+            locations =
+                listOf(
+                    ZoneLocation.RIGHT_TOP_LEFT,
+                    ZoneLocation.RIGHT_TOP_RIGHT,
+                    ZoneLocation.RIGHT_BOTTOM_LEFT,
+                    ZoneLocation.RIGHT_BOTTOM_RIGHT,
+                ),
+            busy = busy,
+            onLocation = { onAnswer(UserObservation.YES, it) },
+            modifier = modifier,
+        )
+    }
+    val whole: @Composable () -> Unit = {
         ObservationButton(
             label = stringResource(R.string.hardware_learning_whole_stick),
             enabled = !busy,
             primary = false,
             onClick = { onAnswer(UserObservation.YES, wholeStickLocation(zone)) },
         )
+    }
+    val none: @Composable (Modifier) -> Unit = { modifier ->
+        ObservationButton(
+            label = stringResource(R.string.hardware_learning_none_visible),
+            enabled = !busy,
+            primary = false,
+            onClick = { onAnswer(UserObservation.NO, null) },
+            modifier = modifier,
+        )
+    }
+    val unsure: @Composable (Modifier) -> Unit = { modifier ->
+        ObservationButton(
+            label = stringResource(R.string.hardware_learning_unsure),
+            enabled = !busy,
+            primary = false,
+            onClick = { onAnswer(UserObservation.UNSURE, null) },
+            modifier = modifier,
+        )
+    }
+    if (wide) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.Bottom) {
+            leftGrid(Modifier.weight(1f))
+            rightGrid(Modifier.weight(1f))
+            Column(Modifier.weight(1.2f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                whole()
+                none(Modifier)
+                unsure(Modifier)
+            }
+        }
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            leftGrid(Modifier.weight(1f))
+            rightGrid(Modifier.weight(1f))
+        }
+        whole()
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            ObservationButton(
-                label = stringResource(R.string.hardware_learning_none_visible),
-                enabled = !busy,
-                primary = false,
-                onClick = { onAnswer(UserObservation.NO, null) },
-                modifier = Modifier.weight(1f),
-            )
-            ObservationButton(
-                label = stringResource(R.string.hardware_learning_unsure),
-                enabled = !busy,
-                primary = false,
-                onClick = { onAnswer(UserObservation.UNSURE, null) },
-                modifier = Modifier.weight(1f),
-            )
+            none(Modifier.weight(1f))
+            unsure(Modifier.weight(1f))
         }
     }
 }
@@ -718,7 +882,7 @@ private fun ZoneStickGrid(
                                 .semantics { contentDescription = "$label, $position" },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                     ) {
-                        Text(zoneArrow(rowIndex, columnIndex))
+                        ZoneGlyph(rowIndex, columnIndex)
                     }
                 }
             }
@@ -737,13 +901,22 @@ private fun zonePositionLabel(row: Int, column: Int): String =
         },
     )
 
-private fun zoneArrow(row: Int, column: Int): String =
-    when {
-        row == 0 && column == 0 -> "↖"
-        row == 0 -> "↗"
-        column == 0 -> "↙"
-        else -> "↘"
+@Composable
+private fun ZoneGlyph(
+    row: Int,
+    column: Int,
+) {
+    val ring = MaterialTheme.colorScheme.onSurfaceVariant
+    val dot = Color(0xFFFF4FD8)
+    Canvas(Modifier.size(24.dp)) {
+        val radius = size.minDimension / 2f - 1.5.dp.toPx()
+        drawCircle(ring.copy(alpha = 0.7f), radius, style = Stroke(1.5.dp.toPx()))
+        val offset = radius * 0.62f
+        val center = Offset(size.width / 2f + if (column == 0) -offset else offset, size.height / 2f + if (row == 0) -offset else offset)
+        drawCircle(dot.copy(alpha = 0.35f), 5.dp.toPx(), center)
+        drawCircle(dot, 3.dp.toPx(), center)
     }
+}
 
 private fun HardwareLearningState.AwaitingAnswer.isHtrZone(): Boolean =
     candidate.surface == ProbeSurface.HTR3212 && step == ProbeStep.ZONE

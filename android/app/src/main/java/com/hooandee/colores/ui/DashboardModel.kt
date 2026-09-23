@@ -1,6 +1,8 @@
 package com.hooandee.colores.ui
 
 import com.hooandee.colores.control.AppMode
+import com.hooandee.colores.gradient.GradientInterpolator
+import com.hooandee.colores.gradient.LightingMode
 import com.hooandee.colores.led.LedState
 import com.hooandee.colores.led.RgbColor
 import kotlin.math.abs
@@ -29,6 +31,17 @@ fun LedState.previewEndpointColors(gradientMode: Boolean): Pair<RgbColor, RgbCol
 fun ColoresUiState.devicePreviewFrame(): List<RgbColor> {
     val dynamic = mode.isDynamic || (mode == AppMode.GRADIENT && gradientAnimated)
     return if (dynamic) currentFrame.ifEmpty { ledState.zoneColors } else ledState.zoneColors
+}
+
+internal fun ColoresUiState.withColorModeRestored(target: AppMode): ColoresUiState {
+    val zones = ledState.zoneColors.size.coerceAtLeast(1)
+    val colors =
+        if (colorModeColors.size == zones) colorModeColors else GradientInterpolator.interpolate(colorModeColors, zones)
+    return copy(
+        gradient = gradient.copy(mode = LightingMode.COLOR),
+        ledState = ledState.copy(zoneColors = colors),
+        editTarget = EditTarget.BOTH,
+    )
 }
 
 fun LedState.colorForEditing(target: EditTarget): RgbColor {

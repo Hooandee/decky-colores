@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -99,10 +98,12 @@ internal fun SensorScaleDialog(
                             SensorBandEditor(model, projection, { model = it }, Modifier.weight(1f).fillMaxHeight())
                         }
                     } else {
-                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            SensorBandList(model, projection, { model = model.select(it) }, Modifier.fillMaxWidth().weight(0.9f))
-                            SensorBandEditor(model, projection, { model = it }, Modifier.fillMaxWidth().weight(1.1f))
-                        }
+                        StackedPanes(
+                            maxHeight = maxHeight,
+                            firstWeight = 0.9f,
+                            first = { SensorBandList(model, projection, { model = model.select(it) }, it) },
+                            second = { SensorBandEditor(model, projection, { model = it }, it) },
+                        )
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -238,7 +239,7 @@ private fun SensorBandEditor(
                 Text(stringResource(R.string.saturation_title), style = MaterialTheme.typography.labelMedium)
                 Text("${(saturation * 100).roundToInt()}%", fontWeight = FontWeight.SemiBold)
             }
-            Slider(
+            GlassSlider(
                 value = saturation,
                 onValueChange = {
                     val changed = band.color.toHsvColor().copy(saturation = it).toRgbColor()
@@ -257,7 +258,7 @@ private fun SensorBandEditor(
                     style = MaterialTheme.typography.bodySmall,
                 )
             } else {
-                Slider(
+                GlassSlider(
                     value = band.min.toFloat(),
                     onValueChange = { onChange(model.updateThreshold(it.roundToInt())) },
                     valueRange = range.first.toFloat()..range.last.toFloat(),

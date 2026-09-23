@@ -206,6 +206,48 @@ class LightingControllerTest {
         }
 
     @Test
+    fun `ambient stops writing while the screen is off and resumes when it wakes`() =
+        runTest {
+            val device = FakeDevice(recommendedFrameIntervalMs = 80)
+            val ambient = MutableAmbientFrameSource().apply {
+                update(List(8) { RgbColor(0, 0, 0) }, AmbientCaptureStatus.CAPTURING, 1L)
+            }
+            var interactive = true
+            val controller =
+                LightingController(
+                    backgroundScope,
+                    RecordingGate(),
+                    clockMs = { testScheduler.currentTime },
+                    screenInteractive = { interactive },
+                )
+            controller.bind(
+                binding(device, zones = 8, ambient = ambient),
+                LightingIntent(mode = AppMode.AMBIENT, ambientSmoothing = 0, ambientVividness = 0),
+            )
+            advanceTimeBy(400)
+            runCurrent()
+
+            interactive = false
+            advanceTimeBy(600)
+            runCurrent()
+            val whileAwake = device.writes.size
+            advanceTimeBy(5_000)
+            runCurrent()
+            assertEquals(whileAwake, device.writes.size)
+
+            interactive = true
+            advanceTimeBy(1_000)
+            runCurrent()
+            assertTrue(device.writes.size > whileAwake)
+        }
+
+    @Test
+    fun `only ambient pauses with the screen off`() {
+        assertFalse(rendersWhileScreenOff(AppMode.AMBIENT))
+        AppMode.entries.filterNot { it == AppMode.AMBIENT }.forEach { assertTrue(rendersWhileScreenOff(it)) }
+    }
+
+    @Test
     fun `audio mode waits on the saved color without authorization and stops when leaving the mode`() =
         runTest {
             val device = FakeDevice(recommendedFrameIntervalMs = 80)

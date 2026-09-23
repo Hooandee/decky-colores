@@ -32,7 +32,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -495,6 +494,8 @@ private fun ApplicationCard(
                     selected = selected == language,
                     onClick = { onSelected(language) },
                     shape = SegmentedButtonDefaults.itemShape(index, AppLanguage.entries.size),
+                    colors = glassSegmentedColors(),
+                    icon = {},
                 ) {
                     Text(
                         when (language) {
@@ -544,6 +545,8 @@ private fun AppearanceCard(
                     selected = appearance.themeMode == mode,
                     onClick = { onThemeModeChange(mode) },
                     shape = SegmentedButtonDefaults.itemShape(index, ThemeMode.entries.size),
+                    colors = glassSegmentedColors(),
+                    icon = {},
                 ) {
                     Text(
                         when (mode) {
@@ -586,7 +589,7 @@ private fun AppearanceCard(
                     Text(toHex(appearance.accent), fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
                 }
                 Text(stringResource(R.string.saturation_title), style = MaterialTheme.typography.labelMedium)
-                Slider(
+                GlassSlider(
                     value = hsv.saturation,
                     onValueChange = { saturation -> onAccentChange(hsv.copy(saturation = saturation).toRgbColor()) },
                     valueRange = 0f..1f,
@@ -618,7 +621,7 @@ private fun SettingsToggleRow(
                 Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled, colors = glassSwitchColors())
     }
 }
 

@@ -1,5 +1,6 @@
 package com.hooandee.colores.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -10,12 +11,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -27,9 +30,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.ScrollState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
@@ -183,9 +190,9 @@ private fun DashboardHeader(
                     Modifier
                         .height(48.dp)
                         .widthIn(min = 48.dp)
-                        .prismaticPanel(RoundedCornerShape(14.dp))
+                        .prismaticPanel(RoundedCornerShape(999.dp))
                         .semantics { contentDescription = settingsLabel },
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(999.dp),
                 color = Color.Transparent,
                 contentColor = MaterialTheme.colorScheme.onSurface,
             ) {
@@ -247,6 +254,7 @@ private fun DashboardHeader(
                 }
                 if (state.detected?.capabilities?.power == true) {
                     Switch(
+                        colors = glassSwitchColors(),
                         checked = state.ledState.power,
                         onCheckedChange = onPowerChange,
                         enabled = state.canWrite,
@@ -298,6 +306,7 @@ private fun DashboardHeader(
                             style = MaterialTheme.typography.labelLarge,
                         )
                         Switch(
+                            colors = glassSwitchColors(),
                             checked = state.ledState.power,
                             onCheckedChange = onPowerChange,
                             enabled = state.canWrite,
@@ -328,27 +337,29 @@ private fun SetupRequiredPill(needsReport: Boolean) {
 
 @Composable
 private fun ConnectedPill(compact: Boolean = false) {
-    Surface(
-        color = Color(0xFF17372F),
-        contentColor = Color(0xFF82E7C7),
-        shape = RoundedCornerShape(999.dp),
+    val light = LocalPrismaticStyle.current.light
+    val signal = if (light) Color(0xFF12795A) else Color(0xFF82E7C7)
+    val shape = RoundedCornerShape(999.dp)
+    Row(
+        modifier =
+            Modifier
+                .glassTint(signal, shape, emphasis = 0.7f)
+                .padding(horizontal = if (compact) 8.dp else 11.dp, vertical = if (compact) 3.dp else 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = if (compact) 8.dp else 10.dp, vertical = if (compact) 3.dp else 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Surface(
-                modifier = Modifier.size(6.dp),
-                color = Color(0xFF82E7C7),
-                shape = RoundedCornerShape(999.dp),
-            ) {}
-            Text(
-                text = stringResource(R.string.status_connected),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        Box(
+            Modifier
+                .size(7.dp)
+                .shadow(6.dp, CircleShape, ambientColor = signal, spotColor = signal)
+                .background(signal, CircleShape),
+        )
+        Text(
+            text = stringResource(R.string.status_connected),
+            color = signal,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }
 
@@ -470,7 +481,7 @@ private fun DashboardModeLayout(
         }
 
         @Composable
-        fun Panel(panelModifier: Modifier) {
+        fun Panel(panelModifier: Modifier) = key(if (state.mode.isSensor) AppMode.BATTERY else state.mode) {
             ModeControlPanel(
                 state = state,
                 perZone = perZone,
@@ -493,12 +504,13 @@ private fun DashboardModeLayout(
                     Panel(Modifier.weight(1.12f).fillMaxHeight())
                 }
             } else {
+                val scrollState = remember(if (state.mode.isSensor) AppMode.BATTERY else state.mode) { ScrollState(0) }
                 Column(
-                    modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxSize().scrollFadeEdges(scrollState).verticalScroll(scrollState),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     if (state.mode == AppMode.AUDIO) Scene(Modifier.fillMaxWidth().height(360.dp)) else Scene(Modifier.fillMaxWidth(), wrapContent = true)
-                    Panel(Modifier.fillMaxWidth().height(440.dp))
+                    Panel(Modifier.fillMaxWidth().heightIn(max = 440.dp))
                 }
             }
         }

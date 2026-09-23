@@ -98,7 +98,7 @@ fun GradientControls(
                 GradientTile(
                     label = presetLabel(preset.id),
                     colors = preset.stops.map(projection::display),
-                    selected = preset.id == gradient.selectedPresetId,
+                    selected = gradient.showsPreset(preset),
                     onClick = { actions.onPresetChange(preset) },
                 )
             }

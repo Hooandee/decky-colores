@@ -6,6 +6,47 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AccentPaletteTest {
+    private val sampleAccents =
+        listOf(
+            RgbColor(0, 0, 0),
+            RgbColor(255, 255, 255),
+            RgbColor(255, 240, 0),
+            RgbColor(0, 40, 255),
+            RgbColor(141, 131, 255),
+            RgbColor(255, 154, 170),
+            RgbColor(255, 54, 85),
+            RgbColor(35, 205, 116),
+            RgbColor(128, 128, 128),
+        )
+
+    @Test
+    fun `accent text stays readable on the brightest glass surface`() {
+        sampleAccents.forEach { accent ->
+            assertTrue(contrastRatio(accentRoles(accent, dark = true).primary, DarkGlassSurface) >= 4.5)
+            assertTrue(contrastRatio(accentRoles(accent, dark = false).primary, LightGlassSurface) >= 4.5)
+        }
+    }
+
+    @Test
+    fun `accent fill separates from glass and keeps a white thumb visible`() {
+        val white = RgbColor(255, 255, 255)
+        sampleAccents.forEach { accent ->
+            listOf(false, true).forEach { dark ->
+                val fill = accentRoles(accent, dark).fill
+                val surface = if (dark) DarkGlassSurface else LightGlassSurface
+                assertTrue("$accent dark=$dark", contrastRatio(fill, surface) >= 3.0)
+                assertTrue("$accent dark=$dark", contrastRatio(fill, white) >= 3.0)
+            }
+        }
+    }
+
+    @Test
+    fun `accent fill keeps the chosen hue`() {
+        val fill = accentRoles(RgbColor(255, 54, 85), dark = true).fill
+        val distance = kotlin.math.abs(fill.toHsvColor().hue - RgbColor(255, 54, 85).toHsvColor().hue)
+        assertTrue(minOf(distance, 360f - distance) < 6f)
+    }
+
     @Test
     fun `generated accent roles keep readable foreground contrast`() {
         val accents =

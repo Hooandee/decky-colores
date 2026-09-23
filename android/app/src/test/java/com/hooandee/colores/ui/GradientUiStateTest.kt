@@ -149,4 +149,13 @@ class GradientUiStateTest {
         assertEquals(LightingMode.COLOR, state.mode)
         assertEquals(listOf(red), state.stops)
     }
+
+    @Test
+    fun `a preset stops showing as selected once its colors are edited`() {
+        val state = GradientUiState().selectPreset(preset, zones = 4)
+
+        assertTrue(state.showsPreset(preset))
+        assertFalse(state.replaceSelectedStop(RgbColor(1, 2, 3)).showsPreset(preset))
+        assertEquals(preset.id, state.replaceSelectedStop(RgbColor(1, 2, 3)).selectedPresetId)
+    }
 }

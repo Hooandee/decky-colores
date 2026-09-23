@@ -23,7 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -98,10 +97,12 @@ internal fun AudioScaleDialog(
                             AudioScaleColorEditor(model, projection, { model = it }, Modifier.weight(1f).fillMaxHeight())
                         }
                     } else {
-                        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            AudioScaleOverview(model, level, active, projection, { model = model.select(it) }, Modifier.fillMaxWidth().weight(0.9f))
-                            AudioScaleColorEditor(model, projection, { model = it }, Modifier.fillMaxWidth().weight(1.1f))
-                        }
+                        StackedPanes(
+                            maxHeight = maxHeight,
+                            firstWeight = 0.9f,
+                            first = { AudioScaleOverview(model, level, active, projection, { model = model.select(it) }, it) },
+                            second = { AudioScaleColorEditor(model, projection, { model = it }, it) },
+                        )
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -235,7 +236,7 @@ private fun AudioScaleColorEditor(
                 Text(stringResource(R.string.saturation_title), style = MaterialTheme.typography.labelMedium)
                 Text("${(saturation * 100).roundToInt()}%", fontWeight = FontWeight.SemiBold)
             }
-            Slider(
+            GlassSlider(
                 value = saturation,
                 onValueChange = {
                     val changed = color.toHsvColor().copy(saturation = it).toRgbColor()
@@ -256,7 +257,7 @@ private fun AudioScaleColorEditor(
                     Text(stringResource(R.string.audio_scale_threshold_title), style = MaterialTheme.typography.labelMedium)
                     Text(stringResource(R.string.audio_scale_threshold, threshold), fontWeight = FontWeight.SemiBold)
                 }
-                Slider(
+                GlassSlider(
                     value = threshold.toFloat(),
                     onValueChange = { onChange(model.updateThreshold(it.roundToInt())) },
                     valueRange = range.first.toFloat()..range.last.toFloat(),

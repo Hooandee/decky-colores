@@ -41,6 +41,9 @@ data class GradientUiState(
             selectedPresetId = preset.id,
         )
 
+    fun showsPreset(preset: GradientPreset): Boolean =
+        preset.id == selectedPresetId && stops == GradientInterpolator.interpolate(preset.stops, stops.size)
+
     fun restorePreset(zones: Int): GradientUiState {
         val preset = presets.firstOrNull { it.id == selectedPresetId } ?: return this
         return selectPreset(preset, zones)
