@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private val viewModel by viewModels<ColoresViewModel>()
     private var projectionRequest = ProjectionRequest.NONE
     private var afterNotificationPermission = ProjectionRequest.NONE
+    private var captureInFlight = false
     private val projectionLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val data = result.data
@@ -46,10 +47,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             projectionRequest = ProjectionRequest.NONE
+            captureInFlight = false
         }
     private val audioPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) launchProjectionConsent(ProjectionRequest.AUDIO) else viewModel.onAudioAuthorizationDenied()
+            if (granted) {
+                launchProjectionConsent(ProjectionRequest.AUDIO)
+            } else {
+                captureInFlight = false
+                viewModel.onAudioAuthorizationDenied()
+            }
         }
     private val notificationPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
@@ -60,8 +67,13 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (isDuplicateLauncherEntry(isTaskRoot, intent?.action, intent?.hasCategory(Intent.CATEGORY_LAUNCHER) == true)) {
+            finish()
+            return
+        }
         projectionRequest = restoredProjectionRequest(savedInstanceState?.getString(STATE_PROJECTION_REQUEST))
         afterNotificationPermission = restoredProjectionRequest(savedInstanceState?.getString(STATE_AFTER_NOTIFICATION))
+        captureInFlight = projectionRequest != ProjectionRequest.NONE || afterNotificationPermission != ProjectionRequest.NONE
         setContent {
             val appearance by (application as ColoresApplication).appPreferences.appearance.collectAsState()
             ColoresTheme(appearance) {
@@ -137,6 +149,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestNotificationPermissionIfNeeded(request: ProjectionRequest) {
+        if (captureInFlight) return
+        captureInFlight = true
         val granted = ContextCompat.checkSelfPermission(this, NOTIFICATION_PERMISSION) == PackageManager.PERMISSION_GRANTED
         if (shouldRequestNotificationPermission(Build.VERSION.SDK_INT, granted)) {
             afterNotificationPermission = request
@@ -150,7 +164,7 @@ class MainActivity : AppCompatActivity() {
         when (request) {
             ProjectionRequest.AUDIO -> requestAudioPermission()
             ProjectionRequest.AMBIENT -> launchProjectionConsent(ProjectionRequest.AMBIENT)
-            ProjectionRequest.NONE -> Unit
+            ProjectionRequest.NONE -> captureInFlight = false
         }
     }
 
@@ -183,6 +197,12 @@ internal fun <T> launchFirstAvailable(
     candidates: List<T>,
     launch: (T) -> Boolean,
 ): Boolean = candidates.any(launch)
+
+internal fun isDuplicateLauncherEntry(
+    taskRoot: Boolean,
+    action: String?,
+    launcherCategory: Boolean,
+): Boolean = !taskRoot && action == Intent.ACTION_MAIN && launcherCategory
 
 internal fun shouldCaptureDefaultDisplay(
     request: ProjectionRequest,

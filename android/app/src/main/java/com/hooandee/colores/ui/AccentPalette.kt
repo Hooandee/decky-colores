@@ -8,6 +8,7 @@ import kotlin.math.pow
 data class AccentRoles(
     val primary: RgbColor,
     val onPrimary: RgbColor,
+    val fill: RgbColor,
     val primaryContainer: RgbColor,
     val onPrimaryContainer: RgbColor,
 )
@@ -25,18 +26,23 @@ data class AtmosphereRoles(
     val panelOutlineStrong: RgbColor,
 )
 
+internal val DarkGlassSurface = RgbColor(44, 46, 56)
+internal val LightGlassSurface = RgbColor(228, 230, 236)
+
 fun accentRoles(
     accent: RgbColor,
     dark: Boolean,
 ): AccentRoles {
-    val background = if (dark) RgbColor(18, 19, 25) else RgbColor(255, 255, 255)
-    val primary = visiblePrimary(accent.sanitized(), background, dark)
-    val primaryContainer = blend(background, primary, if (dark) 0.28 else 0.18)
+    val source = accent.sanitized()
+    val surface = if (dark) DarkGlassSurface else LightGlassSurface
+    val primary = visiblePrimary(source, surface, dark)
+    val primaryContainer = blend(if (dark) RgbColor(18, 19, 25) else RgbColor(255, 255, 255), primary, if (dark) 0.28 else 0.18)
     return AccentRoles(
         primary = primary,
-        onPrimary = readableForeground(primary),
+        onPrimary = tonalForeground(primary),
+        fill = accentFill(source, dark),
         primaryContainer = primaryContainer,
-        onPrimaryContainer = readableForeground(primaryContainer),
+        onPrimaryContainer = tonalForeground(primaryContainer),
     )
 }
 
@@ -46,8 +52,8 @@ fun atmosphereRoles(
 ): AtmosphereRoles {
     val source = accent.sanitized().toHsvColor()
     val saturation = if (source.saturation < 0.08f) 0f else source.saturation.coerceIn(0.18f, 0.72f)
-    val cool = HsvColor(source.hue + 22f, saturation * 0.82f, if (dark) 0.72f else 0.78f).toRgbColor()
-    val warm = HsvColor(source.hue - 18f, saturation * 0.68f, if (dark) 0.58f else 0.86f).toRgbColor()
+    val cool = HsvColor(source.hue + 38f, saturation * 0.86f, if (dark) 0.72f else 0.78f).toRgbColor()
+    val warm = HsvColor(source.hue - 34f, saturation * 0.74f, if (dark) 0.58f else 0.86f).toRgbColor()
     val beam = HsvColor(source.hue, saturation * 0.72f, if (dark) 0.92f else 0.68f).toRgbColor()
     val darkNeutral = RgbColor(9, 10, 12)
     val lightNeutral = RgbColor(245, 247, 249)
@@ -73,17 +79,46 @@ private fun visiblePrimary(
     dark: Boolean,
 ): RgbColor {
     var hsv = source.toHsvColor()
-    repeat(40) {
+    repeat(60) {
         val candidate = hsv.toRgbColor()
-        if (contrastRatio(candidate, surface) >= 3.0) return candidate
+        if (contrastRatio(candidate, surface) >= 4.5) return candidate
         hsv =
             if (dark) {
-                if (hsv.value < 1f) hsv.copy(value = (hsv.value + 0.05f).coerceAtMost(1f)) else hsv.copy(saturation = (hsv.saturation - 0.05f).coerceAtLeast(0f))
+                if (hsv.value < 1f) hsv.copy(value = (hsv.value + 0.04f).coerceAtMost(1f)) else hsv.copy(saturation = (hsv.saturation - 0.04f).coerceAtLeast(0f))
             } else {
-                hsv.copy(value = (hsv.value - 0.05f).coerceAtLeast(0f))
+                hsv.copy(value = (hsv.value - 0.04f).coerceAtLeast(0f))
             }
     }
     return hsv.toRgbColor()
+}
+
+private fun accentFill(
+    source: RgbColor,
+    dark: Boolean,
+): RgbColor {
+    val band = if (dark) 0.19..0.3 else 0.06..0.22
+    val hsv = source.toHsvColor().let { if (it.saturation < 0.08f) it.copy(saturation = 0f) else it }
+    for (step in 100 downTo 0) {
+        val candidate = hsv.copy(value = step / 100f).toRgbColor()
+        val luminance = candidate.relativeLuminance()
+        if (luminance <= band.endInclusive) {
+            if (luminance >= band.start) return candidate
+            break
+        }
+    }
+    for (step in (hsv.saturation * 100).toInt() downTo 0) {
+        val candidate = hsv.copy(saturation = step / 100f, value = 1f).toRgbColor()
+        if (candidate.relativeLuminance() >= band.start) return candidate
+    }
+    return RgbColor(128, 128, 128)
+}
+
+private fun tonalForeground(background: RgbColor): RgbColor {
+    val readable = readableForeground(background)
+    if (readable == RgbColor(255, 255, 255)) return readable
+    val hsv = background.toHsvColor()
+    val ink = HsvColor(hsv.hue, hsv.saturation.coerceAtMost(0.7f), 0.16f).toRgbColor()
+    return if (contrastRatio(background, ink) >= 4.5) ink else readable
 }
 
 fun contrastRatio(

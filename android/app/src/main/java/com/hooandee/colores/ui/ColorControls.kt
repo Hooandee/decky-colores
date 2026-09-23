@@ -72,11 +72,11 @@ fun ColorControlPanel(
         contentColor = MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(32.dp),
     ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val fontScale = LocalDensity.current.fontScale
             val colorAreaHeight = if (compact || (maxHeight < 380.dp && fontScale <= 1.15f)) 108.dp else 170.dp
             ScrollablePanelContent(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = if (compact) 14.dp else 18.dp, vertical = if (compact) 10.dp else 14.dp),
                 verticalArrangement = Arrangement.Top,
             ) {
@@ -184,6 +184,8 @@ private fun TargetSelector(
                     onClick = { onTargetChange(item) },
                     enabled = enabled,
                     shape = SegmentedButtonDefaults.itemShape(index, targets.size),
+                    colors = glassSegmentedColors(),
+                    icon = {},
                     label = { Text(targetLabel(item)) },
                 )
             }
@@ -214,7 +216,10 @@ private fun CurrentColor(
                 if (state.mixedTarget) {
                     stringResource(R.string.target_mixed)
                 } else {
-                    stringResource(R.string.rgb_sent_value, state.editingColor.toHexString())
+                    stringResource(
+                        if (state.effectivePower) R.string.rgb_sent_value else R.string.rgb_saved_value,
+                        state.editingColor.toHexString(),
+                    )
                 },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,

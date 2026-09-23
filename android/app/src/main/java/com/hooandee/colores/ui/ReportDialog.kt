@@ -2,6 +2,22 @@ package com.hooandee.colores.ui
 
 import android.content.ClipData
 import android.content.ClipboardManager
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,9 +28,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -70,7 +83,7 @@ internal fun AndroidReportDialog(
             Surface(
                 modifier =
                     Modifier
-                        .widthIn(max = 900.dp)
+                        .widthIn(max = if (submission.result == null && !submission.sending) 900.dp else 560.dp)
                         .fillMaxWidth()
                         .heightIn(max = 680.dp)
                         .prismaticPanel(RoundedCornerShape(28.dp), strong = true),
@@ -118,6 +131,7 @@ internal fun AndroidReportDialog(
 
 private fun Set<String>.toggle(value: String): Set<String> = if (value in this) this - value else this + value
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ReportForm(
     selected: Set<String>,
@@ -128,64 +142,194 @@ private fun ReportForm(
     onClose: () -> Unit,
     lockedCategories: Boolean,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxWidth().padding(22.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        item { Text(stringResource(R.string.report_title), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-        item { Text(stringResource(R.string.report_intro), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        item {
-            Text(
-                text = stringResource(R.string.report_categories).uppercase(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        item {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(REPORT_CATEGORIES) { category ->
-                    FilterChip(
-                        selected = category in selected,
-                        onClick = { if (!lockedCategories) onToggle(category) },
-                        enabled = !lockedCategories || category in selected,
-                        label = { Text(reportCategoryLabel(category)) },
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val wide = maxWidth >= 720.dp
+        val compact = maxWidth < 480.dp
+        val gutter = if (compact) 18.dp else 24.dp
+        val scrollState = rememberScrollState()
+        Column(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = gutter, end = gutter - 8.dp, top = gutter - 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.report_title),
+                    modifier = Modifier.weight(1f),
+                    style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                IconButton(onClick = onClose) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_close),
+                        contentDescription = stringResource(R.string.report_close),
                     )
                 }
             }
-        }
-        item {
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-                maxLines = 6,
-                label = { Text(stringResource(R.string.report_description)) },
-                supportingText = { if (!canSubmitReport(text)) Text(stringResource(R.string.report_description_hint)) },
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f, fill = false)
+                        .fillMaxWidth()
+                        .scrollFadeEdges(scrollState)
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = gutter, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                val intro: @Composable () -> Unit = {
+                    Text(
+                        stringResource(R.string.report_intro),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                val categories: @Composable () -> Unit = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = stringResource(R.string.report_categories).uppercase(),
+                            style = MaterialTheme.typography.labelMedium,
+                            letterSpacing = 1.2.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            REPORT_CATEGORIES.forEach { category ->
+                                ReportCategoryChip(
+                                    label = reportCategoryLabel(category),
+                                    selected = category in selected,
+                                    enabled = !lockedCategories || category in selected,
+                                    onClick = { if (!lockedCategories) onToggle(category) },
+                                )
+                            }
+                        }
+                    }
+                }
+                val description: @Composable (Int) -> Unit = { lines ->
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = onTextChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = lines,
+                        maxLines = lines + 4,
+                        shape = RoundedCornerShape(18.dp),
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline,
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f),
+                                focusedContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
+                            ),
+                        label = { Text(stringResource(R.string.report_description)) },
+                        supportingText = { if (!canSubmitReport(text)) Text(stringResource(R.string.report_description_hint)) },
+                    )
+                }
+                if (wide) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        Column(Modifier.weight(0.5f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            intro()
+                            categories()
+                        }
+                        Column(Modifier.weight(0.5f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            description(4)
+                            ReportPrivacyCard()
+                        }
+                    }
+                } else {
+                    intro()
+                    categories()
+                    description(if (compact) 3 else 4)
+                    ReportPrivacyCard()
+                }
+            }
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = gutter)
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
             )
-        }
-        item { ReportPrivacyCard() }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
-                OutlinedButton(onClick = onClose) { Text(stringResource(R.string.report_close)) }
-                Button(onClick = onSubmit, enabled = canSubmitReport(text)) { Text(stringResource(R.string.report_send)) }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = gutter, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(
+                    onClick = onClose,
+                    modifier = if (compact) Modifier.weight(1f).heightIn(min = 48.dp) else Modifier.heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.report_close)) }
+                Button(
+                    onClick = onSubmit,
+                    enabled = canSubmitReport(text),
+                    modifier = if (compact) Modifier.weight(1f).heightIn(min = 48.dp) else Modifier.widthIn(min = 160.dp).heightIn(min = 48.dp),
+                ) { Text(stringResource(R.string.report_send)) }
             }
         }
     }
 }
 
 @Composable
+private fun ReportCategoryChip(
+    label: String,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    FilterChip(
+        selected = selected,
+        onClick = onClick,
+        enabled = enabled,
+        label = { Text(label, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium) },
+        modifier = Modifier.heightIn(min = 40.dp),
+        shape = RoundedCornerShape(999.dp),
+        colors =
+            FilterChipDefaults.filterChipColors(
+                containerColor = Color.Transparent,
+                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = if (LocalPrismaticStyle.current.light) 0.16f else 0.26f),
+                selectedLabelColor = MaterialTheme.colorScheme.onSurface,
+                disabledContainerColor = Color.Transparent,
+            ),
+        border =
+            FilterChipDefaults.filterChipBorder(
+                enabled = enabled,
+                selected = selected,
+                borderColor = MaterialTheme.colorScheme.outline,
+                selectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.62f),
+                disabledBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                disabledSelectedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.4f),
+                borderWidth = 1.dp,
+                selectedBorderWidth = 1.dp,
+            ),
+    )
+}
+
+@Composable
 private fun ReportPrivacyCard() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .glassTint(MaterialTheme.colorScheme.onSurface, shape, emphasis = 0.2f)
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(stringResource(R.string.report_privacy_title), fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.report_privacy_public), style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.report_privacy_private), style = MaterialTheme.typography.bodySmall)
-            Text(stringResource(R.string.report_privacy_no_pii), style = MaterialTheme.typography.bodySmall)
+        Text(stringResource(R.string.report_privacy_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        listOf(R.string.report_privacy_public, R.string.report_privacy_private, R.string.report_privacy_no_pii).forEach { line ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box(
+                    Modifier
+                        .padding(top = 7.dp)
+                        .size(5.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                )
+                Text(
+                    stringResource(line),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
         }
     }
 }
@@ -198,6 +342,7 @@ private fun reportCategoryLabel(category: String): String =
         "effects" -> stringResource(R.string.report_category_effects)
         "sensors" -> stringResource(R.string.report_category_sensors)
         "audio" -> stringResource(R.string.report_category_audio)
+        "ambilight" -> stringResource(R.string.report_category_ambilight)
         "profiles" -> stringResource(R.string.report_category_profiles)
         "learning" -> stringResource(R.string.report_category_learning)
         else -> stringResource(R.string.report_category_other)
@@ -214,14 +359,24 @@ private fun ReportResultBody(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("✓", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
+        Box(
+            Modifier.size(64.dp).glassTint(MaterialTheme.colorScheme.primary, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("✓", style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        }
         Text(stringResource(R.string.report_done_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Text(stringResource(R.string.report_done_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Surface(shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+        Text(
+            stringResource(R.string.report_done_description),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Box(Modifier.glassTint(MaterialTheme.colorScheme.primary, RoundedCornerShape(18.dp), emphasis = 0.7f)) {
             Text(
                 code,
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+                letterSpacing = 1.5.sp,
                 style = MaterialTheme.typography.headlineSmall,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,

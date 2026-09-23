@@ -91,6 +91,7 @@ class ColoresApplication : Application() {
         LightingController(
             scope = applicationScope,
             serviceGate = effectsServiceGate,
+            screenInteractive = { screenState.interactive.value },
         )
     }
 

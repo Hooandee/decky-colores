@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.MaterialTheme
@@ -65,10 +66,10 @@ fun RingColorPicker(
                 .focusable(enabled)
                 .pointerInput(enabled) {
                     if (!enabled) return@pointerInput
-                    fun update(position: Offset) {
-                        val hue = ((atan2(position.y - size.height / 2f, position.x - size.width / 2f) * 180f / PI.toFloat()) + 360f) % 360f
-                        onColorChange(HsvColor(hue, saturation, 1f).toRgbColor())
-                    }
+                    detectTapGestures { position -> onColorChange(ringColorAt(position, size.width, size.height, saturation)) }
+                }.pointerInput(enabled) {
+                    if (!enabled) return@pointerInput
+                    fun update(position: Offset) = onColorChange(ringColorAt(position, size.width, size.height, saturation))
                     detectDragGestures(onDragStart = ::update, onDrag = { c, _ -> c.consume(); update(c.position) })
                 },
     ) {
@@ -132,3 +133,13 @@ fun RingColorPicker(
 }
 
 private const val RING_SEGMENTS = 120
+
+internal fun ringColorAt(
+    position: Offset,
+    width: Int,
+    height: Int,
+    saturation: Float,
+): RgbColor {
+    val hue = ((atan2(position.y - height / 2f, position.x - width / 2f) * 180f / PI.toFloat()) + 360f) % 360f
+    return HsvColor(hue, if (saturation < 0.05f) 1f else saturation, 1f).toRgbColor()
+}

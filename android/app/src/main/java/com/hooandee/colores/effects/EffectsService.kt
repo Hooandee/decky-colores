@@ -246,6 +246,7 @@ class EffectsService : Service() {
             projectionOwner = CaptureOwner.AUDIO
             projection = active
             projectionCallback = callback
+            refreshNotification()
             application.audioCaptureSession.start(AndroidPlaybackCapture(this, active)) { error ->
                 Log.e(TAG, "audio capture failed", error)
                 postOnMain {
@@ -275,6 +276,7 @@ class EffectsService : Service() {
             projection = null
             projectionCallback = null
             projectionOwner = null
+            refreshNotification()
             if (active != null && callback != null) runCatching { active.unregisterCallback(callback) }
             if (stopProjection) runCatching { active?.stop() }
         }
@@ -311,6 +313,7 @@ class EffectsService : Service() {
             projectionOwner = CaptureOwner.AMBIENT
             projection = active
             projectionCallback = callback
+            refreshNotification()
             application.ambientCaptureSession.start(active, config) { error ->
                 Log.e(TAG, "ambient capture failed", error)
                 postOnMain {
@@ -339,6 +342,7 @@ class EffectsService : Service() {
             projection = null
             projectionCallback = null
             projectionOwner = null
+            refreshNotification()
             if (active != null && callback != null) runCatching { active.unregisterCallback(callback) }
             if (stopProjection) runCatching { active?.stop() }
         }
@@ -346,6 +350,11 @@ class EffectsService : Service() {
             application.lightingController.onAmbientStateChanged()
         }
         if (releaseLease && projectionOwner == null) releaseCaptureLease()
+    }
+
+    private fun refreshNotification() {
+        if (!foreground) return
+        runCatching { getSystemService(NotificationManager::class.java)?.notify(NOTIFICATION_ID, buildNotification()) }
     }
 
     private fun buildNotification(): Notification {
@@ -366,7 +375,15 @@ class EffectsService : Service() {
             }
         return builder
             .setContentTitle(getString(R.string.service_notification_title))
-            .setContentText(getString(R.string.service_notification_text))
+            .setContentText(
+                getString(
+                    when (projectionOwner) {
+                        CaptureOwner.AMBIENT -> R.string.service_notification_ambient
+                        CaptureOwner.AUDIO -> R.string.service_notification_audio
+                        null -> R.string.service_notification_text
+                    },
+                ),
+            )
             .setSmallIcon(R.drawable.ic_stat_colores)
             .setContentIntent(contentIntent)
             .setOngoing(true)

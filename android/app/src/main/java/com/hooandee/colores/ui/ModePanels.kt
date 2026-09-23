@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,7 +34,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -174,7 +174,7 @@ private fun PanelSurface(
         shape = RoundedCornerShape(32.dp),
     ) {
         ScrollablePanelContent(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth(),
             contentPadding = PaddingValues(horizontal = if (compact) 14.dp else 18.dp, vertical = if (compact) 12.dp else 16.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 14.dp),
         ) {
@@ -193,7 +193,9 @@ private fun EffectsPanel(
     modeActions: ModeActions,
 ) {
     SectionLabel(stringResource(R.string.effects_title))
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    val effectsListState =
+        rememberLazyListState(initialFirstVisibleItemIndex = state.effects.indexOfFirst { it.id == state.effectId }.coerceAtLeast(0))
+    LazyRow(state = effectsListState, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         items(state.effects, key = { it.id }) { preset ->
             EffectChip(
                 label = effectLabel(preset.id),
@@ -244,6 +246,7 @@ private fun EffectsPanel(
                         )
                     }
                     Switch(
+                        colors = glassSwitchColors(),
                         checked = state.effectUsesGradient,
                         onCheckedChange = modeActions.onEffectGradientChange,
                         enabled = state.canWrite,
@@ -320,7 +323,11 @@ private fun ColorSwatchRow(state: ColoresUiState) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = stringResource(R.string.rgb_sent_value, state.editingColor.toHexString()),
+            text =
+                stringResource(
+                    if (state.effectivePower) R.string.rgb_sent_value else R.string.rgb_saved_value,
+                    state.editingColor.toHexString(),
+                ),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.labelMedium,
         )
@@ -351,6 +358,7 @@ private fun SensorsPanel(
                     onClick = { modeActions.onSensorModeChange(mode) },
                     enabled = state.canWrite,
                     shape = SegmentedButtonDefaults.itemShape(index, sensorModes.size),
+                    colors = glassSegmentedColors(),
                     contentPadding = PaddingValues(horizontal = if (compact) 4.dp else 12.dp),
                     icon = {},
                     label = {
@@ -407,19 +415,21 @@ private fun BatteryContent(
         description = stringResource(R.string.battery_description),
         value = state.batteryLevelPercent?.let { stringResource(R.string.battery_level_value, it) },
         status = if (state.charging) stringResource(R.string.battery_charging) else null,
+        level = state.batteryLevelPercent?.let { it / 100f },
     ) {
-        SettingsControlRow(
-            label = stringResource(R.string.battery_breathe),
-            checked = state.batteryBreathe,
-            enabled = state.canWrite,
-            onCheckedChange = modeActions.onBatteryBreatheChange,
-        )
-        OutlinedButton(
-            onClick = onCustomize,
-            enabled = state.canWrite,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.sensor_scale_customize))
+        ControlGroup {
+            SettingsControlRow(
+                label = stringResource(R.string.battery_breathe),
+                checked = state.batteryBreathe,
+                enabled = state.canWrite,
+                onCheckedChange = modeActions.onBatteryBreatheChange,
+            )
+            ControlGroupDivider()
+            ControlGroupAction(
+                label = stringResource(R.string.sensor_scale_customize),
+                enabled = state.canWrite,
+                onClick = onCustomize,
+            )
         }
         BrightnessRow(state, onBrightnessChange)
     }
@@ -449,18 +459,19 @@ private fun TemperatureContent(
         value = state.temperatureCelsius?.let { stringResource(R.string.temperature_value, it) },
         status = null,
     ) {
-        SettingsControlRow(
-            label = stringResource(R.string.temperature_breathe),
-            checked = state.temperatureBreathe,
-            enabled = state.canWrite,
-            onCheckedChange = modeActions.onTemperatureBreatheChange,
-        )
-        OutlinedButton(
-            onClick = onCustomize,
-            enabled = state.canWrite,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.sensor_scale_customize))
+        ControlGroup {
+            SettingsControlRow(
+                label = stringResource(R.string.temperature_breathe),
+                checked = state.temperatureBreathe,
+                enabled = state.canWrite,
+                onCheckedChange = modeActions.onTemperatureBreatheChange,
+            )
+            ControlGroupDivider()
+            ControlGroupAction(
+                label = stringResource(R.string.sensor_scale_customize),
+                enabled = state.canWrite,
+                onClick = onCustomize,
+            )
         }
         BrightnessRow(state, onBrightnessChange)
     }
@@ -488,50 +499,14 @@ private fun PerformanceContent(
             PerformanceMetric.GPU -> stringResource(R.string.performance_source_gpu)
             PerformanceMetric.CPU -> stringResource(R.string.performance_source_cpu)
         }
-    Column(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 190.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
+    val load = state.performanceLoadPercent
+    EditorialModeLayout(
+        title = stringResource(R.string.performance_title),
+        description = stringResource(R.string.performance_description),
+        value = load?.let { stringResource(R.string.percent_value, it) } ?: source,
+        status = if (load != null) source else stringResource(R.string.performance_source_active),
+        level = load?.let { it / 100f },
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    text = stringResource(R.string.performance_title).uppercase(),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.8.sp,
-                )
-                Text(
-                    text = source,
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    softWrap = false,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                ModeExplanationAction(
-                    title = stringResource(R.string.performance_title),
-                    description = stringResource(R.string.performance_description),
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Box(Modifier.size(6.dp).background(Color(0xFF8DE8C5), CircleShape))
-                    Text(
-                        text = stringResource(R.string.performance_source_active),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Medium,
-                    )
-                }
-            }
-        }
         BrightnessRow(state, onBrightnessChange)
     }
 }
@@ -740,7 +715,7 @@ private fun AudioPanel(
     val compact = LocalCompactDashboard.current
     var editingScale by remember { mutableStateOf(false) }
     val status =
-        when (state.audio.status) {
+        if (!state.ledState.power) stringResource(R.string.capture_status_lights_off) else when (state.audio.status) {
             AudioCaptureStatus.AUTHORIZATION_REQUIRED -> stringResource(R.string.audio_status_authorization_required)
             AudioCaptureStatus.STARTING -> stringResource(R.string.audio_status_starting)
             AudioCaptureStatus.CAPTURING -> stringResource(R.string.audio_status_capturing)
@@ -924,7 +899,7 @@ private fun AmbientPanel(
     actions: ModeActions,
 ) {
     val status =
-        when (state.ambient.status) {
+        if (!state.ledState.power) stringResource(R.string.capture_status_lights_off) else when (state.ambient.status) {
             AmbientCaptureStatus.AUTHORIZATION_REQUIRED -> stringResource(R.string.ambient_status_authorization_required)
             AmbientCaptureStatus.STARTING -> stringResource(R.string.ambient_status_starting)
             AmbientCaptureStatus.CAPTURING -> stringResource(R.string.ambient_status_capturing)
@@ -971,6 +946,7 @@ private fun AmbientPanel(
                             onClick = { actions.onAmbientSamplingModeChange(mode) },
                             enabled = state.canWrite,
                             shape = SegmentedButtonDefaults.itemShape(index, AmbientSamplingMode.entries.size),
+                            colors = glassSegmentedColors(),
                             contentPadding = PaddingValues(horizontal = 8.dp),
                             icon = {},
                         ) {
@@ -1205,7 +1181,8 @@ private fun AmbientSceneWindow(
                             color = statusColor,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                     OutlinedButton(
@@ -1286,48 +1263,53 @@ private fun EditorialModeLayout(
     value: String?,
     status: String?,
     compactValue: Boolean = false,
+    level: Float? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val compact = LocalCompactDashboard.current
     if (compact) {
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         text = title.uppercase(),
+                        modifier = Modifier.weight(1f, fill = false),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Medium,
-                        letterSpacing = 1.2.sp,
+                        letterSpacing = 1.4.sp,
+                        maxLines = 1,
                     )
-                    if (status != null) {
-                        Text(
-                            text = status,
-                            color = MaterialTheme.colorScheme.primary,
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                    }
+                    ModeExplanationAction(
+                        title = title,
+                        description = description,
+                        modifier = Modifier.height(36.dp),
+                    )
                 }
-                Column(horizontalAlignment = Alignment.End) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
                         text = value ?: title,
-                        style = if (value != null) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        softWrap = false,
+                        modifier = Modifier.weight(1f, fill = false),
+                        style = if (value != null) MaterialTheme.typography.displaySmall else MaterialTheme.typography.titleLarge,
+                        fontWeight = if (value != null) FontWeight.Bold else FontWeight.SemiBold,
+                        maxLines = if (value != null) 1 else 2,
+                        softWrap = value == null,
                     )
-                    ModeExplanationAction(title = title, description = description)
+                    if (status != null) StatusPill(status)
                 }
+                if (level != null) LevelMeter(level, Modifier.padding(top = 6.dp))
             }
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
         }
         return
     }
@@ -1338,7 +1320,7 @@ private fun EditorialModeLayout(
         verticalAlignment = Alignment.Top,
     ) {
         Column(
-            modifier = Modifier.weight(0.42f).heightIn(min = 190.dp),
+            modifier = Modifier.weight(0.42f).heightIn(min = 156.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1362,6 +1344,7 @@ private fun EditorialModeLayout(
                         maxLines = 1,
                         softWrap = false,
                     )
+                    if (level != null) LevelMeter(level)
                 } else {
                     Text(
                         text = title,
@@ -1396,7 +1379,7 @@ private fun EditorialModeLayout(
             modifier =
                 Modifier
                     .weight(0.58f)
-                    .heightIn(min = 190.dp)
+                    .heightIn(min = 156.dp)
                     .drawBehind {
                         drawLine(
                             color = dividerColor,
@@ -1423,7 +1406,7 @@ private fun SettingsControlRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1434,10 +1417,102 @@ private fun SettingsControlRow(
             fontWeight = FontWeight.Medium,
         )
         Switch(
+            colors = glassSwitchColors(),
             checked = checked,
             onCheckedChange = onCheckedChange,
             enabled = enabled,
         )
+    }
+}
+
+@Composable
+private fun StatusPill(text: String) {
+    val shape = RoundedCornerShape(999.dp)
+    Row(
+        modifier =
+            Modifier
+                .glassTint(MaterialTheme.colorScheme.primary, shape, emphasis = 0.8f)
+                .padding(horizontal = 12.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(6.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+        Text(
+            text = text,
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun LevelMeter(
+    level: Float,
+    modifier: Modifier = Modifier,
+) {
+    val fill = LocalPrismaticStyle.current.accentFill
+    val track = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+    Canvas(modifier.fillMaxWidth().height(6.dp)) {
+        val radius = androidx.compose.ui.geometry.CornerRadius(size.height / 2f)
+        drawRoundRect(track, cornerRadius = radius)
+        val width = size.width * level.coerceIn(0f, 1f)
+        if (width > 0f) {
+            drawRoundRect(
+                brush = Brush.horizontalGradient(listOf(fill.copy(alpha = 0.5f), fill), endX = width),
+                size = androidx.compose.ui.geometry.Size(width.coerceAtLeast(size.height), size.height),
+                cornerRadius = radius,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ControlGroup(content: @Composable ColumnScope.() -> Unit) {
+    val shape = RoundedCornerShape(20.dp)
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .glassTint(MaterialTheme.colorScheme.onSurface, shape, emphasis = 0.2f)
+                .padding(horizontal = 14.dp, vertical = 2.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun ControlGroupDivider() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant),
+    )
+}
+
+@Composable
+private fun ControlGroupAction(
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+        color = Color.Transparent,
+        contentColor = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        shape = RoundedCornerShape(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Medium)
+            Text("›", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.titleLarge)
+        }
     }
 }
 
@@ -1550,18 +1625,22 @@ private fun EffectChip(
     enabled: Boolean,
     onClick: () -> Unit,
 ) {
+    val shape = RoundedCornerShape(999.dp)
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier.height(44.dp).semantics { this.selected = selected },
-        color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-        shape = RoundedCornerShape(14.dp),
-        border =
-            BorderStroke(
-                if (selected) 2.dp else 1.dp,
-                if (selected) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.1f),
-            ),
+        modifier =
+            Modifier
+                .height(44.dp)
+                .glassTint(
+                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    shape,
+                    emphasis = if (selected) 1f else 0.2f,
+                ).semantics { this.selected = selected },
+        color = Color.Transparent,
+        contentColor = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+        shape = shape,
+        border = if (selected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)) else null,
     ) {
         Box(modifier = Modifier.padding(horizontal = 18.dp), contentAlignment = Alignment.Center) {
             Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
@@ -1590,7 +1669,7 @@ internal fun ValueSlider(
             Spacer(Modifier.width(12.dp))
             Text(valueLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
-        Slider(
+        GlassSlider(
             value = value,
             onValueChange = onValueChange,
             onValueChangeFinished = onValueChangeFinished,

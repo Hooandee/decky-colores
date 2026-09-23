@@ -113,13 +113,11 @@ internal fun GradientEditorDialog(
                             GradientColorPane(state, actions, Modifier.weight(0.92f).fillMaxHeight())
                         }
                     } else {
-                        Column(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(14.dp),
-                        ) {
-                            GradientZonesPane(state, actions, Modifier.fillMaxWidth().weight(1f))
-                            GradientColorPane(state, actions, Modifier.fillMaxWidth().weight(1f))
-                        }
+                        StackedPanes(
+                            maxHeight = maxHeight,
+                            first = { GradientZonesPane(state, actions, it) },
+                            second = { GradientColorPane(state, actions, it) },
+                        )
                     }
                 }
             }

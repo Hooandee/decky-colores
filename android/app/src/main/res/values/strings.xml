@@ -60,6 +60,7 @@
     <string name="report_category_effects">Efectos</string>
     <string name="report_category_sensors">Sensores</string>
     <string name="report_category_audio">Audio</string>
+    <string name="report_category_ambilight">Ambilight</string>
     <string name="report_category_profiles">Perfiles</string>
     <string name="report_category_learning">Compatibilidad</string>
     <string name="report_category_other">Otro</string>
@@ -124,6 +125,8 @@
     <string name="profile_search_empty">Ninguna app coincide con la búsqueda.</string>
     <string name="color_title">Color</string>
     <string name="rgb_sent_value">RGB enviado · %1$s</string>
+    <string name="rgb_saved_value">Color guardado · %1$s</string>
+    <string name="capture_status_lights_off">Luces apagadas</string>
     <string name="preview_title">Tus sticks</string>
     <string name="preview_lights_title">Tus luces</string>
     <string name="preview_hint">Elige qué luz quieres ajustar</string>
@@ -331,6 +334,8 @@
     <string name="service_channel_description">Mantiene activos los efectos y modos automáticos.</string>
     <string name="service_notification_title">Colores activo</string>
     <string name="service_notification_text">Manteniendo efectos y perfiles automáticos en marcha.</string>
+    <string name="service_notification_ambient">Ambilight está capturando la pantalla para colorear las luces.</string>
+    <string name="service_notification_audio">Audio reactivo está escuchando el sonido interno.</string>
     <string name="settings_legal_title">Código y licencias</string>
     <string name="settings_legal_action">Información legal</string>
     <string name="settings_license_summary">Colores se distribuye bajo GPL-3.0-or-later, sin garantía. Puedes compartirlo y modificarlo respetando los términos de la licencia.</string>
