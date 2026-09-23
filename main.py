@@ -25,6 +25,7 @@ from performance import gpu_busy_percent, CpuSampler
 from saved_gradients import upsert_gradient, remove_gradient
 from hhd_rgb_control import HhdRgbControl
 from suspend_monitor import SuspendMonitor
+from ssd_activity import ActivityPulse, SsdActivity, active as ssd_active
 import self_updater
 from colores_report import collector as report_collector
 from colores_report import client as report_client
@@ -54,6 +55,9 @@ DEFAULTS = {
     "power_led_off": False,
     "power_led_awake_off": None,
     "power_led_suspend_off": None,
+    "ssd_activity_led": False,
+    "ssd_activity_direction": "both",
+    "ssd_activity_sensitivity": 50,
     "sleep_charging_indicator": False,
     "charger_only": False,
     "force_control": False,
@@ -203,6 +207,10 @@ class Plugin:
         if getattr(self, "_ready", False):
             return
         self._stopping = False
+        self._ssd_task = None
+        self._ssd_sampler = SsdActivity()
+        self._ssd_pulse = ActivityPulse()
+        self._ssd_led_off = None
         self._suspend_prepared = False
         self._suspend_lock = asyncio.Lock()
         self._resume_lock = asyncio.Lock()
@@ -315,16 +323,83 @@ class Plugin:
                 self._settings.get("power_led_awake_off") is not None
                 or self._settings.get("power_led_suspend_off") is not None
                 or self._settings.get("power_led_off", False)
+                or self._settings.get("ssd_activity_led", False)
             )
             if not explicitly_configured:
                 return
-            awake_ok = self._power_led.set_state("awake", awake)
+            awake_ok = self._power_led.set_state(
+                "awake", True if self._settings.get("ssd_activity_led") else awake
+            )
             suspend_ok = self._power_led.set_state("suspend", suspend)
             if not (awake_ok and suspend_ok):
                 decky.logger.warning("Colores: separate power LED apply on load failed")
             return
-        if self._settings.get("power_led_off", False) and not self._power_led.set(True):
+        if (self._settings.get("power_led_off", False) or
+                self._settings.get("ssd_activity_led")) and not self._power_led.set(True):
             decky.logger.warning("Colores: power LED apply on load failed")
+
+    def _set_ssd_led(self, off: bool) -> bool:
+        if off == self._ssd_led_off:
+            return True
+        if self._capabilities.get("powerLedSeparateStates"):
+            ok = self._power_led.set_state("awake", off)
+        else:
+            ok = self._power_led.set(off)
+        if ok:
+            self._ssd_led_off = off
+        return ok
+
+    def _sync_ssd_task(self) -> None:
+        task = self._ssd_task
+        enabled = self._settings.get("ssd_activity_led") and self._capabilities.get("powerLed")
+        if enabled and (task is None or task.done()) and not self._stopping:
+            self._ssd_sampler.previous = None
+            self._ssd_pulse = ActivityPulse()
+            self._ssd_led_off = None
+            self._ssd_task = asyncio.create_task(self._ssd_watch())
+        elif not enabled and task:
+            if not task.done():
+                task.cancel()
+            self._ssd_task = None
+            self._ssd_sampler.previous = None
+            self._ssd_pulse = ActivityPulse()
+            self._ssd_led_off = None
+            if self._capabilities.get("powerLedSeparateStates"):
+                self._power_led.set_state("awake", self._power_led_state_values()[0])
+            else:
+                self._power_led.set(bool(self._settings.get("power_led_off")))
+
+    def _restore_ssd_led(self) -> None:
+        if self._settings.get("ssd_activity_led") and self._power_led and self._capabilities.get("powerLed"):
+            if self._capabilities.get("powerLedSeparateStates"):
+                self._power_led.set_state("awake", self._power_led_state_values()[0])
+            else:
+                self._power_led.set(bool(self._settings.get("power_led_off")))
+
+    async def _ssd_watch(self) -> None:
+        sampling_failed = False
+        try:
+            while True:
+                if not self._suspend_prepared:
+                    try:
+                        read, write = self._ssd_sampler.sample()
+                        sampling_failed = False
+                        activity = ssd_active(
+                            read, write,
+                            self._settings["ssd_activity_direction"],
+                            self._settings["ssd_activity_sensitivity"],
+                        )
+                        lit = self._ssd_pulse.update(activity, time.monotonic())
+                        if not self._set_ssd_led(not lit):
+                            decky.logger.warning("Colores: SSD activity LED write failed")
+                    except (OSError, ValueError) as error:
+                        if not sampling_failed:
+                            decky.logger.warning("Colores: SSD activity sampling failed: %s", error)
+                        sampling_failed = True
+                        await asyncio.sleep(2)
+                await asyncio.sleep(0.05)
+        except asyncio.CancelledError:
+            raise
 
     def _apply_sleep_charging_indicator(self) -> bool:
         if not self._capabilities.get("sleepChargingIndicator"):
@@ -743,6 +818,9 @@ class Plugin:
             "powerLedOff": s.get("power_led_off", False),
             "powerLedAwakeOff": power_led_awake_off,
             "powerLedSuspendOff": power_led_suspend_off,
+            "ssdActivityLed": s.get("ssd_activity_led", False),
+            "ssdActivityDirection": s.get("ssd_activity_direction", "both"),
+            "ssdActivitySensitivity": s.get("ssd_activity_sensitivity", 50),
             "sleepChargingIndicator": s.get("sleep_charging_indicator", False),
             "chargerOnly": s.get("charger_only", False),
             "forceControl": s.get("force_control", False),
@@ -972,6 +1050,14 @@ class Plugin:
                 return
             self._apply_sleep_charging_indicator()
             self._suspend_prepared = True
+            if self._settings.get("ssd_activity_led"):
+                self._ssd_sampler.previous = None
+                self._ssd_pulse = ActivityPulse()
+                self._ssd_led_off = None
+                if self._capabilities.get("powerLedSeparateStates"):
+                    self._power_led.set_state("awake", True)
+                else:
+                    self._power_led.set(bool(self._settings.get("power_led_off")))
             self._resume_handled_at = None
             mode = self._settings["mode"]
             if mode == "ambient":
@@ -1007,8 +1093,11 @@ class Plugin:
 
     async def set_power_led(self, off: bool) -> None:
         self._init()
+        if off:
+            self._settings["ssd_activity_led"] = False
         self._settings["power_led_off"] = off
         self._persist_settings()
+        self._sync_ssd_task()
         if self._power_led and self._capabilities.get("powerLed"):
             if not self._power_led.set(off):
                 decky.logger.warning("Colores: power LED write failed (off=%s)", off)
@@ -1025,13 +1114,37 @@ class Plugin:
             off if state == "suspend" else suspend
         )
         self._settings["power_led_off"] = False
+        if state == "awake" and off:
+            self._settings["ssd_activity_led"] = False
         self._persist_settings()
+        self._sync_ssd_task()
         if self._power_led and not self._power_led.set_state(state, off):
             decky.logger.warning(
                 "Colores: power LED state write failed (state=%s, off=%s)",
                 state,
                 off,
             )
+
+    async def set_ssd_activity_led(self, enabled: bool, direction: str,
+                                   sensitivity: int) -> None:
+        self._init()
+        if direction not in ("read", "write", "both"):
+            raise ValueError("invalid SSD activity direction")
+        if isinstance(sensitivity, bool) or not isinstance(sensitivity, int) or not 0 <= sensitivity <= 100:
+            raise ValueError("invalid SSD activity sensitivity")
+        if enabled and not self._capabilities.get("powerLed"):
+            return
+        self._settings.update(
+            ssd_activity_led=bool(enabled),
+            ssd_activity_direction=direction,
+            ssd_activity_sensitivity=sensitivity,
+        )
+        if enabled:
+            self._settings["power_led_off"] = False
+            if self._capabilities.get("powerLedSeparateStates"):
+                self._settings["power_led_awake_off"] = False
+        self._persist_settings()
+        self._sync_ssd_task()
 
     async def set_sleep_charging_indicator(self, enabled: bool) -> None:
         self._init()
@@ -1273,6 +1386,7 @@ class Plugin:
         )
         self._suspend_monitor.start()
         self._apply()
+        self._sync_ssd_task()
         self._reassert_task = asyncio.create_task(self._acquire_and_reassert())
         self._charger_task = asyncio.create_task(self._charger_watch())
         self._resume_task = asyncio.create_task(self._resume_watch())
@@ -1384,6 +1498,7 @@ class Plugin:
             "_resume_task",
             "_force_control_task",
             "_startup_task",
+            "_ssd_task",
         ):
             task = getattr(self, attr, None)
             if task:
@@ -1395,6 +1510,8 @@ class Plugin:
     async def _unload(self):
         await self._stop_background_tasks()
         if getattr(self, "_ready", False):
+            self._restore_ssd_led()
+        if getattr(self, "_ready", False):
             await self._restore_hhd_rgb()
         if getattr(self, "_ambilight", None):
             self._ambilight.stop()
@@ -1404,6 +1521,8 @@ class Plugin:
 
     async def _uninstall(self):
         await self._stop_background_tasks()
+        if getattr(self, "_ready", False):
+            self._restore_ssd_led()
         if getattr(self, "_ready", False):
             await self._restore_hhd_rgb()
         decky.logger.info("Colores uninstalled")
