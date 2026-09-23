@@ -133,6 +133,9 @@ export interface ColoresState {
   powerLedOff: boolean;
   powerLedAwakeOff: boolean;
   powerLedSuspendOff: boolean;
+  ssdActivityLed: boolean;
+  ssdActivityDirection: SsdActivityDirection;
+  ssdActivitySensitivity: number;
   sleepChargingIndicator: boolean;
   chargerOnly: boolean;
   forceControl: boolean;
@@ -151,6 +154,7 @@ export interface GradientPreset {
 }
 
 export type PowerLedState = "awake" | "suspend";
+export type SsdActivityDirection = "read" | "write" | "both";
 
 export type EffectColorNeed = "color" | "gradient" | "none";
 

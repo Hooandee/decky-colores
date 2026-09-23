@@ -1,5 +1,5 @@
 import { FC, Fragment, ReactNode, useEffect, useState } from "react";
-import { ButtonItem, Focusable, Navigation, PanelSectionRow, ToggleField } from "@decky/ui";
+import { ButtonItem, Dropdown, Focusable, Navigation, PanelSectionRow, SliderField, ToggleField } from "@decky/ui";
 
 import { getVersion } from "../api";
 import { useI18n, LanguageSelector, type Lang } from "../i18n";
@@ -7,7 +7,7 @@ import { UpdatePanel } from "../updater/UpdatePanel";
 import { openCustomizeModal } from "./CustomizeModal";
 import { openReportModal } from "./ReportModal";
 import { Divider } from "./Divider";
-import { Capabilities, DeviceInfo, PowerLedState } from "../types";
+import { Capabilities, DeviceInfo, PowerLedState, SsdActivityDirection } from "../types";
 
 const AUTHOR = "Hooandee";
 const YOUTUBE_URL = "https://www.youtube.com/@Hooandee";
@@ -37,10 +37,14 @@ interface SettingsSectionProps {
   powerLedOff: boolean;
   powerLedAwakeOff: boolean;
   powerLedSuspendOff: boolean;
+  ssdActivityLed: boolean;
+  ssdActivityDirection: SsdActivityDirection;
+  ssdActivitySensitivity: number;
   sleepChargingIndicator: boolean;
   onForceControl: (v: boolean) => void;
   onPowerLed: (v: boolean) => void;
   onPowerLedState: (state: PowerLedState, value: boolean) => void;
+  onSsdActivityLed: (enabled: boolean, direction: SsdActivityDirection, sensitivity: number) => void;
   onSleepChargingIndicator: (value: boolean) => void;
   onExperiment: (feature: string, val: boolean) => void;
   onReconnect: () => void;
@@ -55,10 +59,14 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
   powerLedOff,
   powerLedAwakeOff,
   powerLedSuspendOff,
+  ssdActivityLed,
+  ssdActivityDirection,
+  ssdActivitySensitivity,
   sleepChargingIndicator,
   onForceControl,
   onPowerLed,
   onPowerLedState,
+  onSsdActivityLed,
   onSleepChargingIndicator,
   onExperiment,
   onReconnect,
@@ -155,6 +163,41 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
               <ToggleField label={t("powerLed.label")} checked={powerLedOff} onChange={onPowerLed} bottomSeparator="none" />
             </PanelSectionRow>
             {hint(t("powerLed.warning"))}
+          </>
+        )}
+        <PanelSectionRow>
+          <ToggleField
+            label={t("powerLed.ssdActivity")}
+            description={t("powerLed.ssdHint")}
+            checked={ssdActivityLed}
+            onChange={(enabled) => onSsdActivityLed(enabled, ssdActivityDirection, ssdActivitySensitivity)}
+            bottomSeparator="none"
+          />
+        </PanelSectionRow>
+        {ssdActivityLed && (
+          <>
+            <PanelSectionRow>
+              <Dropdown
+                rgOptions={(["read", "write", "both"] as const).map((direction) => ({
+                  data: direction, label: t(`powerLed.ssd.${direction}`),
+                }))}
+                selectedOption={ssdActivityDirection}
+                menuLabel={t("powerLed.ssdDirection")}
+                onChange={(option) => onSsdActivityLed(true, option.data, ssdActivitySensitivity)}
+              />
+            </PanelSectionRow>
+            <PanelSectionRow>
+              <SliderField
+                label={t("powerLed.ssdSensitivity")}
+                value={ssdActivitySensitivity}
+                min={0}
+                max={100}
+                step={1}
+                valueSuffix="%"
+                showValue
+                onChange={(value) => onSsdActivityLed(true, ssdActivityDirection, value)}
+              />
+            </PanelSectionRow>
           </>
         )}
       </>

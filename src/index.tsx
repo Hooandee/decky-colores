@@ -571,6 +571,7 @@ function Content() {
     setExperiment,
     setPowerLed,
     setPowerLedState,
+    setSsdActivityLed,
     setSleepChargingIndicator,
     setForceControl,
     setRememberStartup,
@@ -766,6 +767,9 @@ function Content() {
     powerLedOff,
     powerLedAwakeOff,
     powerLedSuspendOff,
+    ssdActivityLed,
+    ssdActivityDirection,
+    ssdActivitySensitivity,
     sleepChargingIndicator,
     chargerOnly,
     forceControl,
@@ -1202,10 +1206,14 @@ function Content() {
             powerLedOff={powerLedOff}
             powerLedAwakeOff={powerLedAwakeOff}
             powerLedSuspendOff={powerLedSuspendOff}
+            ssdActivityLed={ssdActivityLed}
+            ssdActivityDirection={ssdActivityDirection}
+            ssdActivitySensitivity={ssdActivitySensitivity}
             sleepChargingIndicator={sleepChargingIndicator}
             onForceControl={setForceControl}
             onPowerLed={setPowerLed}
             onPowerLedState={setPowerLedState}
+            onSsdActivityLed={setSsdActivityLed}
             onSleepChargingIndicator={setSleepChargingIndicator}
             onExperiment={setExperiment}
             onReconnect={reconnect}

@@ -9,6 +9,7 @@ import {
   RGB,
   SensorBand,
   SensorKind,
+  SsdActivityDirection,
 } from "./types";
 import * as api from "./api";
 import { useRunningApp } from "./apps/useRunningApp";
@@ -339,16 +340,27 @@ export function useColores() {
   };
 
   const setPowerLed = (off: boolean) => {
-    setState((s) => (s ? { ...s, powerLedOff: off } : s));
+    setState((s) => (s ? { ...s, powerLedOff: off, ssdActivityLed: off ? false : s.ssdActivityLed } : s));
     api.setPowerLed(off).catch((e) => console.error("Colores: setPowerLed failed", e));
   };
 
   const setPowerLedState = (powerLedState: "awake" | "suspend", off: boolean) => {
     const key = powerLedState === "awake" ? "powerLedAwakeOff" : "powerLedSuspendOff";
-    setState((s) => (s ? { ...s, [key]: off } : s));
+    setState((s) => (s ? { ...s, [key]: off, ssdActivityLed: powerLedState === "awake" && off ? false : s.ssdActivityLed } : s));
     api
       .setPowerLedState(powerLedState, off)
       .catch((e) => console.error("Colores: setPowerLedState failed", e));
+  };
+
+  const setSsdActivityLed = (enabled: boolean, direction: SsdActivityDirection, sensitivity: number) => {
+    setState((s) => (s ? {
+      ...s, ssdActivityLed: enabled, ssdActivityDirection: direction,
+      ssdActivitySensitivity: sensitivity,
+      powerLedOff: enabled ? false : s.powerLedOff,
+      powerLedAwakeOff: enabled ? false : s.powerLedAwakeOff,
+    } : s));
+    api.setSsdActivityLed(enabled, direction, sensitivity).catch((e) =>
+      console.error("Colores: setSsdActivityLed failed", e));
   };
 
   const setSleepChargingIndicator = (sleepChargingIndicator: boolean) => {
@@ -439,6 +451,7 @@ export function useColores() {
     setExperiment,
     setPowerLed,
     setPowerLedState,
+    setSsdActivityLed,
     setSleepChargingIndicator,
     setForceControl,
     setRememberStartup,
