@@ -121,6 +121,42 @@ def test_detect_device_falls_back_to_device_tree_model(tmp_path):
     assert info["name"] == "AYN Odin 2 Portal"
 
 
+def test_detect_device_uses_armada_fallback_on_arm(tmp_path):
+    info = detect_device(str(tmp_path), machine="aarch64")
+
+    assert info["name"] == "Armada OS Device"
+    assert info["displayNameKey"] == "device.armadaOs"
+
+
+def test_detect_device_uses_armada_fallback_from_os_release(tmp_path):
+    release = tmp_path / "etc/os-release"
+    release.parent.mkdir(parents=True)
+    release.write_text('ID=armada\nPRETTY_NAME="Armada OS"\n')
+
+    info = detect_device(str(tmp_path), machine="x86_64")
+
+    assert info["name"] == "Armada OS Device"
+    assert info["displayNameKey"] == "device.armadaOs"
+
+
+def test_detect_device_keeps_real_model_on_arm(tmp_path):
+    model = tmp_path / "sys/firmware/devicetree/base/model"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"Known ARM Handheld\x00")
+
+    info = detect_device(str(tmp_path), machine="aarch64")
+
+    assert info["name"] == "Known ARM Handheld"
+    assert info["displayNameKey"] is None
+
+
+def test_detect_device_keeps_unknown_on_non_arm_non_armada(tmp_path):
+    info = detect_device(str(tmp_path), machine="x86_64")
+
+    assert info["name"] == "Unknown device"
+    assert info["displayNameKey"] is None
+
+
 def test_read_zone_format_packed_decimal(tmp_path):
     led = os.path.join(str(tmp_path), "ally:rgb:joystick_rings")
     os.makedirs(led)

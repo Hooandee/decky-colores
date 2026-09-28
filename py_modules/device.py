@@ -1,4 +1,5 @@
 import os
+import platform
 
 from device_profiles import profile_for_discovered_adapter, profile_for_hid_signatures, resolve_profile_match
 from led_device import (
@@ -48,6 +49,26 @@ def _read(path):
         return ""
 
 
+def _is_armada_os(sysfs_root):
+    for relative_path in ("etc/os-release", "run/host/etc/os-release"):
+        release = _read(os.path.join(sysfs_root, relative_path))
+        values = []
+        for line in release.splitlines():
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            if key in {"ID", "NAME", "PRETTY_NAME"}:
+                values.append(value.strip().strip('"\''))
+        if any("armada" in value.lower() for value in values):
+            return True
+    return False
+
+
+def _is_arm(machine):
+    normalized = (machine or "").strip().lower()
+    return normalized in {"aarch64", "arm64"} or normalized.startswith("arm")
+
+
 def lookup_name(board, product):
     for field, value, name in DEVICE_REGISTRY:
         candidate = board if field == "board" else product
@@ -56,7 +77,7 @@ def lookup_name(board, product):
     return product or board or "Unknown device"
 
 
-def detect_device(sysfs_root="/"):
+def detect_device(sysfs_root="/", machine=None):
     dmi = os.path.join(sysfs_root, "sys/class/dmi/id")
     board = _read(os.path.join(dmi, "board_name"))
     product = _read(os.path.join(dmi, "product_name"))
@@ -64,8 +85,16 @@ def detect_device(sysfs_root="/"):
     model = product or _read(os.path.join(sysfs_root, "sys/firmware/devicetree/base/model"))
     if not model:
         model = _read(os.path.join(sysfs_root, "proc/device-tree/model"))
+    name = lookup_name(board, product) if product or board else model or "Unknown device"
+    display_name_key = None
+    if name == "Unknown device" and (
+        _is_arm(platform.machine() if machine is None else machine) or _is_armada_os(sysfs_root)
+    ):
+        name = "Armada OS Device"
+        display_name_key = "device.armadaOs"
     return {
-        "name": lookup_name(board, product) if product or board else model or "Unknown device",
+        "name": name,
+        "displayNameKey": display_name_key,
         "board": board,
         "product": product,
         "vendor": vendor,
@@ -299,7 +328,9 @@ def build_device(sysfs_root="/", ambilight=False):
         profile = hid_profile
     elif hid_profile is not None and profile.get("fallback", {}).get("driver") == "hid_oxp_v2":
         profile["fallback"]["driver"] = hid_profile["driver"]
-    info["name"] = profile["name"]
+    if profile["name"] != "Unknown device":
+        info["name"] = profile["name"]
+        info["displayNameKey"] = None
     power_led = PowerLedController(profile.get("power_led"))
     battery = battery_present(os.path.join(sysfs_root, "sys/class/power_supply"))
     temperature = temperature_available(
@@ -354,6 +385,7 @@ def build_device(sysfs_root="/", ambilight=False):
         portal_name = info.get("model") or "Multizone RGB device"
         profile = profile_for_discovered_adapter("portal_sysfs", portal_name)
         info["name"] = profile["name"]
+        info["displayNameKey"] = None
         device = MultiSysfsRgbDevice(portal_nodes, color_order=profile["color_order"])
         capabilities = build_capabilities(
             profile, device.available, profile["zones"], 255, ambilight,
@@ -377,6 +409,7 @@ def build_device(sysfs_root="/", ambilight=False):
             "hp_omen_platform", info.get("product") or info.get("model") or "HP OMEN"
         )
         info["name"] = profile["name"]
+        info["displayNameKey"] = None
         capabilities = build_capabilities(
             profile, True, profile["zones"], 1, ambilight,
             power_led, battery, temperature,

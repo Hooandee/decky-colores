@@ -17,6 +17,7 @@ import {
 import { LuBug, LuLightbulb } from "react-icons/lu";
 
 import { ReportResult, submitReport } from "../api";
+import { deviceDisplayName } from "../deviceName";
 import { I18nProvider, useI18n } from "../i18n";
 import {
   canSubmit,
@@ -217,7 +218,7 @@ const ReportBody: FC<{ device: DeviceInfo; closeModal?: () => void }> = ({
       }}
     >
       <div style={{ fontSize: theme.font.value, color: theme.color.textPrimary }}>
-        {device.name}
+        {deviceDisplayName(device, t)}
       </div>
       {children}
     </div>

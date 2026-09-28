@@ -13,6 +13,7 @@ export const de: Record<string, string> = {
   "profiles.inactiveHint": "Wird angewendet, sobald du dieses Spiel startest.",
 
   "device.noLeds": "Auf diesem Gerät wurden keine steuerbaren LEDs erkannt.",
+  "device.armadaOs": "Armada-OS-Gerät",
   "device.preview.rings": "Joystick-Ringe",
   "device.preview.bar": "Lichtleiste",
   "device.preview.off": "Aus",

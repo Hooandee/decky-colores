@@ -34,6 +34,7 @@ const es: Record<string, string> = {
   "profiles.inactiveHint": "Se aplicará cuando abras este juego.",
 
   "device.noLeds": "No se detectaron LEDs controlables en este dispositivo.",
+  "device.armadaOs": "Dispositivo Armada OS",
   "device.preview.rings": "Anillos del joystick",
   "device.preview.bar": "Barra de luz",
   "device.preview.off": "Apagado",
@@ -279,6 +280,7 @@ const en: Record<string, string> = {
   "profiles.inactiveHint": "It will apply when you open this game.",
 
   "device.noLeds": "No controllable LEDs detected on this device.",
+  "device.armadaOs": "Armada OS Device",
   "device.preview.rings": "Joystick rings",
   "device.preview.bar": "Light bar",
   "device.preview.off": "Off",
