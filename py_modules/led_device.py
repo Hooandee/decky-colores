@@ -293,6 +293,20 @@ PORTAL_LED_NAMES = tuple(
     + [f"rgb:r{index}" for index in range(1, 5)]
 )
 
+ODIN2_LED_NAMES = (
+    "left-joystick",
+    "left-side",
+    "right-side",
+    "right-joystick",
+)
+
+
+def discover_odin2_leds(leds_dir):
+    nodes = [os.path.join(leds_dir, name) for name in ODIN2_LED_NAMES]
+    if all(os.path.exists(os.path.join(path, "multi_intensity")) for path in nodes):
+        return nodes
+    return []
+
 
 def discover_portal_leds(leds_dir):
     nodes = []
@@ -369,6 +383,56 @@ class MultiSysfsRgbDevice(LedDevice):
                 success = False
                 self.last_error = device.last_error or "sysfs write failed"
         return success
+
+
+class Odin2RgbDevice(LedDevice):
+    def __init__(self, node_paths, max_brightness=255):
+        self._nodes = list(node_paths)
+        self._zones = len(self._nodes)
+        self._max_brightness = max_brightness or 255
+        self.last_error = None
+
+    @property
+    def available(self):
+        return bool(self._nodes) and all(
+            os.path.exists(os.path.join(path, "multi_intensity"))
+            for path in self._nodes
+        )
+
+    @property
+    def led_path(self):
+        return self._nodes[0] if self._nodes else None
+
+    def supports_per_zone(self):
+        return True
+
+    def reconnect(self):
+        return self.available
+
+    def apply_zones(self, zone_colors, brightness, power):
+        self.last_error = None
+        if not self._nodes:
+            self.last_error = "no Odin 2 RGB nodes"
+            return False
+
+        colors = self._fit(zone_colors)
+        level = self._level(brightness, power)
+        try:
+            for path, color in zip(self._nodes, colors):
+                r, g, b = (_clamp8(channel) for channel in color)
+                with open(os.path.join(path, "multi_intensity"), "w") as handle:
+                    handle.write(f"{r} {g} {b}")
+                brightness_path = os.path.join(path, "brightness")
+                if os.path.exists(brightness_path):
+                    with open(brightness_path, "w") as handle:
+                        handle.write(str(level))
+            return True
+        except OSError as error:
+            self.last_error = str(error)
+            return False
+
+    def apply_solid(self, color, brightness, power):
+        return self.apply_zones([tuple(color)] * self._zones, brightness, power)
 
 
 class HpOmenRgbDevice(LedDevice):

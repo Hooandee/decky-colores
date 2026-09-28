@@ -7,15 +7,24 @@ from py_modules.ambilight import (
     Ambilight,
     CAP_W,
     CAP_H,
+    CaptureBackend,
     _gst_command,
+    _native_env,
     _read_latest_frames,
     _replace_with_latest,
     alpha_for,
     avg_region,
     boost_saturation,
     lerp,
+    resolve_capture_backend,
     subdivide,
 )
+
+
+@pytest.fixture(autouse=True)
+def _capture_backend(monkeypatch):
+    backend = CaptureBackend("test", "/usr/bin/pw-dump", "/usr/bin/gst-launch-1.0")
+    monkeypatch.setattr(ambilight_mod, "resolve_capture_backend", lambda: backend)
 
 
 def _split_frame():
@@ -111,11 +120,88 @@ def test_run_shows_fallback_color_when_source_missing(monkeypatch):
 
 
 def test_gst_command_uses_leaky_queue_before_scaling():
-    cmd = _gst_command(68, 24, 14)
+    cmd = _gst_command("/native/gst-launch-1.0", 68, 24, 14)
+    assert cmd[0] == "/native/gst-launch-1.0"
     assert "queue" in cmd
     assert "leaky=downstream" in cmd
     assert cmd.index("queue") < cmd.index("videoscale")
     assert "path=68" in cmd
+
+
+def test_native_env_removes_guest_library_and_gstreamer_paths(monkeypatch):
+    monkeypatch.setattr(
+        ambilight_mod,
+        "user_env",
+        lambda runtime_dir: {
+            "XDG_RUNTIME_DIR": runtime_dir,
+            "LD_LIBRARY_PATH": "/guest/lib",
+            "LD_PRELOAD": "guest.so",
+            "GST_PLUGIN_PATH": "/guest/gst",
+            "GST_PLUGIN_SYSTEM_PATH": "/guest/system-gst",
+        },
+    )
+
+    env = _native_env("/run/user/1000", "/native/gst")
+
+    assert env["XDG_RUNTIME_DIR"] == "/run/user/1000"
+    assert env["GST_PLUGIN_PATH"] == "/native/gst"
+    assert "LD_LIBRARY_PATH" not in env
+    assert "LD_PRELOAD" not in env
+    assert "GST_PLUGIN_SYSTEM_PATH" not in env
+
+
+def test_resolve_capture_backend_prefers_complete_system_backend(monkeypatch):
+    paths = {
+        "gst-launch-1.0": "/host/gst-launch-1.0",
+        "gst-inspect-1.0": "/host/gst-inspect-1.0",
+        "pw-dump": "/host/pw-dump",
+    }
+    monkeypatch.setattr(ambilight_mod, "_native_bin", paths.get)
+    monkeypatch.setattr(ambilight_mod, "_has_pipewiresrc", lambda *args: True)
+
+    backend = resolve_capture_backend()
+
+    assert backend == CaptureBackend("system", "/host/pw-dump", "/host/gst-launch-1.0")
+
+
+def test_resolve_capture_backend_uses_valid_arm64_bundle(monkeypatch):
+    paths = {
+        "gst-launch-1.0": "/host/gst-launch-1.0",
+        "gst-inspect-1.0": "/host/gst-inspect-1.0",
+        "pw-dump": None,
+    }
+    monkeypatch.setattr(ambilight_mod, "_native_bin", paths.get)
+    monkeypatch.setattr(ambilight_mod, "_host_architecture", lambda: "aarch64")
+    monkeypatch.setattr(ambilight_mod, "_valid_vendor_files", lambda: True)
+    monkeypatch.setattr(ambilight_mod, "_has_pipewiresrc", lambda *args: True)
+
+    backend = resolve_capture_backend()
+
+    assert backend.name == "bundled-arm64"
+    assert backend.gst_plugin_path == str(ambilight_mod._VENDOR_GST_DIR)
+
+
+def test_resolve_capture_backend_rejects_bundle_on_wrong_architecture(monkeypatch):
+    monkeypatch.setattr(
+        ambilight_mod,
+        "_native_bin",
+        lambda name: None if name == "pw-dump" else f"/host/{name}",
+    )
+    monkeypatch.setattr(ambilight_mod, "_host_architecture", lambda: "x86_64")
+    monkeypatch.setattr(ambilight_mod, "_valid_vendor_files", lambda: True)
+    monkeypatch.setattr(ambilight_mod, "_has_pipewiresrc", lambda *args: True)
+
+    assert resolve_capture_backend() is None
+
+
+def test_vendor_validation_rejects_checksum_mismatch(tmp_path, monkeypatch):
+    executable = tmp_path / "pw-dump"
+    executable.write_bytes(b"unexpected")
+    executable.chmod(0o755)
+    monkeypatch.setattr(ambilight_mod, "_VENDOR_PW_DUMP", executable)
+    monkeypatch.setattr(ambilight_mod, "_VENDOR_HASHES", {executable: "0" * 64})
+
+    assert ambilight_mod._valid_vendor_files() is False
 
 
 def test_replace_with_latest_keeps_only_latest_item():

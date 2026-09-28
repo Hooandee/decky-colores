@@ -6,10 +6,13 @@ from led_device import (
     HpOmenRgbDevice,
     MultiSysfsRgbDevice,
     NullDevice,
+    ODIN2_LED_NAMES,
+    Odin2RgbDevice,
     PORTAL_LED_NAMES,
     SysfsRgbDevice,
     ValveLedsDevice,
     discover_portal_leds,
+    discover_odin2_leds,
     discover_valve_leds,
 )
 from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device, discover_hid_drivers
@@ -196,7 +199,7 @@ def _find_rgb_led(leds_dir, required_name=None, allow_packed=False):
 
     candidates = sorted(entries, key=lambda c: ("rgb" not in c.lower(), c.lower()))
     for name in candidates:
-        if name in PORTAL_LED_NAMES:
+        if name in PORTAL_LED_NAMES or name in ODIN2_LED_NAMES:
             continue
         path = os.path.join(leds_dir, name)
         if os.path.exists(os.path.join(path, "multi_intensity")) and _valid_rgb_schema(
@@ -328,6 +331,24 @@ def build_device(sysfs_root="/", ambilight=False):
         profile["experimental"] = _all_experimental(profile)
 
     leds_dir = os.path.join(sysfs_root, "sys/class/leds")
+    odin2_nodes = discover_odin2_leds(leds_dir)
+    if odin2_nodes:
+        max_brightness = _max_brightness(
+            _read(os.path.join(odin2_nodes[0], "max_brightness"))
+        )
+        device = Odin2RgbDevice(odin2_nodes, max_brightness)
+        capabilities = build_capabilities(
+            profile, True, len(odin2_nodes), max_brightness, ambilight,
+            power_led, battery, temperature,
+        )
+        capabilities["perZone"] = device.supports_per_zone()
+        return _with_sleep_charging(profile, {
+            "info": info,
+            "capabilities": capabilities,
+            "device": device,
+            "power_led": power_led,
+        })
+
     portal_nodes = discover_portal_leds(leds_dir) if not matched else []
     if portal_nodes:
         portal_name = info.get("model") or "Multizone RGB device"

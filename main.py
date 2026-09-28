@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import pwd
-import shutil
 import time
 
 import decky
@@ -17,7 +16,7 @@ from effects import (
     interpolate_gradient,
 )
 from lighting_profiles import LightingProfileStore
-from ambilight import Ambilight
+from ambilight import Ambilight, capture_available
 from audio import AudioReactive
 from power_supply import charger_online, battery_level
 from thermal import apu_temperature
@@ -255,7 +254,7 @@ class Plugin:
                 self._persist_settings()
 
     def _build_context(self) -> dict:
-        ambilight_available = shutil.which("gst-launch-1.0") is not None
+        ambilight_available = capture_available()
         return build_device(ambilight=ambilight_available)
 
     def _setup_device(self, ctx: dict) -> None:

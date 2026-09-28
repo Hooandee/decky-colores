@@ -1,6 +1,12 @@
 import asyncio
+from dataclasses import dataclass
+import hashlib
 import json
 import logging
+import os
+from pathlib import Path
+import platform
+import subprocess
 
 from run_as_user import user_env, user_cred
 
@@ -16,7 +22,126 @@ CAP_H = 18
 # otherwise ambient mode stays dark until the user manually re-selects it.
 RETRY_INTERVAL = 3.0
 
+_NATIVE_ENV_KEYS = (
+    "LD_LIBRARY_PATH",
+    "LD_PRELOAD",
+    "GST_PLUGIN_PATH",
+    "GST_PLUGIN_SYSTEM_PATH",
+)
+_VENDOR_ROOT = Path(__file__).resolve().parent / "vendor" / "arm64"
+_VENDOR_PW_DUMP = _VENDOR_ROOT / "bin" / "pw-dump"
+_VENDOR_GST_DIR = _VENDOR_ROOT / "lib64" / "gstreamer-1.0"
+_VENDOR_HASHES = {
+    _VENDOR_PW_DUMP: "3a2b9a13842e0338b3551b5a9dbe4a89a544f6e7df8e242d971097a0a6bdda63",
+    _VENDOR_GST_DIR / "libgstpipewire.so": "b1227d19e9bcb40941d9fcfebed662e08db6234c16aa1ed1ab74c74e26d5220b",
+}
+
 _FULL_REGION = [0.0, 0.0, 1.0, 1.0]
+
+
+@dataclass(frozen=True)
+class CaptureBackend:
+    name: str
+    pw_dump: str
+    gst_launch: str
+    gst_plugin_path: str | None = None
+
+
+def _native_bin(name):
+    host_bin = Path("/run/host/usr/bin")
+    if host_bin.is_dir():
+        host_path = host_bin / name
+        if host_path.is_file() and os.access(host_path, os.X_OK):
+            return str(host_path)
+        return None
+    local_path = Path("/usr/bin") / name
+    if local_path.is_file() and os.access(local_path, os.X_OK):
+        return str(local_path)
+    return None
+
+
+def _native_env(runtime_dir=None, gst_plugin_path=None):
+    env = user_env(runtime_dir) if runtime_dir else os.environ.copy()
+    for key in _NATIVE_ENV_KEYS:
+        env.pop(key, None)
+    if gst_plugin_path:
+        env["GST_PLUGIN_PATH"] = str(gst_plugin_path)
+    return env
+
+
+def _host_architecture():
+    uname = _native_bin("uname")
+    if uname:
+        try:
+            result = subprocess.run(
+                [uname, "-m"],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+                env=_native_env(),
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip().lower()
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return platform.machine().lower()
+
+
+def _valid_vendor_files():
+    for path, expected in _VENDOR_HASHES.items():
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            return False
+        if digest != expected:
+            logger.error("ambilight fallback checksum mismatch: %s", path)
+            return False
+    return os.access(_VENDOR_PW_DUMP, os.X_OK)
+
+
+def _has_pipewiresrc(gst_inspect, plugin_path=None):
+    try:
+        result = subprocess.run(
+            [gst_inspect, "pipewiresrc"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+            check=False,
+            env=_native_env(gst_plugin_path=plugin_path),
+        )
+        return result.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def resolve_capture_backend():
+    """Select one coherent native backend, preferring the host over the bundle."""
+    gst_launch = _native_bin("gst-launch-1.0")
+    gst_inspect = _native_bin("gst-inspect-1.0")
+    system_pw_dump = _native_bin("pw-dump")
+    if not gst_launch or not gst_inspect:
+        return None
+
+    if system_pw_dump and _has_pipewiresrc(gst_inspect):
+        return CaptureBackend("system", system_pw_dump, gst_launch)
+
+    if (
+        _host_architecture() in {"aarch64", "arm64"}
+        and _valid_vendor_files()
+        and _has_pipewiresrc(gst_inspect, _VENDOR_GST_DIR)
+    ):
+        return CaptureBackend(
+            "bundled-arm64",
+            str(_VENDOR_PW_DUMP),
+            gst_launch,
+            str(_VENDOR_GST_DIR),
+        )
+    return None
+
+
+def capture_available():
+    return resolve_capture_backend() is not None
 
 
 def subdivide(region, count):
@@ -62,10 +187,10 @@ def alpha_for(smoothing):
     return max(0.04, 1.0 - s / 100.0)
 
 
-def _gst_command(node, width, height):
+def _gst_command(gst_launch, node, width, height):
     caps = f"video/x-raw,format=RGB,width={width},height={height}"
     return [
-        "gst-launch-1.0", "-q", "pipewiresrc", f"path={int(node)}",
+        gst_launch, "-q", "pipewiresrc", f"path={int(node)}",
         "!", "queue", "leaky=downstream", "max-size-buffers=2",
         "!", "videoconvert", "!", "videoscale", "!", caps, "!", "fdsink", "fd=1",
     ]
@@ -101,6 +226,11 @@ class Ambilight:
         self.status = "idle"
         self._current = [(0, 0, 0)] * self._zones
         self._targets = [(0, 0, 0)] * self._zones
+        self._backend = resolve_capture_backend()
+        if self._backend:
+            logger.info("ambilight capture backend: %s", self._backend.name)
+        else:
+            logger.warning("ambilight capture backend unavailable")
 
     @property
     def running(self):
@@ -114,7 +244,8 @@ class Ambilight:
         return [tuple(color)] * self._zones
 
     def _env(self):
-        return user_env(self._runtime_dir)
+        plugin_path = self._backend.gst_plugin_path if self._backend else None
+        return _native_env(self._runtime_dir, plugin_path)
 
     def _cred(self):
         return user_cred(self._uid, self._gid)
@@ -129,9 +260,11 @@ class Ambilight:
         # Async so the retry loop never blocks the event loop while waiting on pw-dump
         # (it runs every RETRY_INTERVAL while the source is missing).
         proc = None
+        if self._backend is None:
+            return None
         try:
             proc = await asyncio.create_subprocess_exec(
-                "pw-dump",
+                self._backend.pw_dump,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
                 env=self._env(),
@@ -192,6 +325,14 @@ class Ambilight:
         # or vanish (leaving Game Mode) and reappear — we recover from both automatically.
         frame_bytes = CAP_W * CAP_H * 3
         while True:
+            if self._backend is None:
+                self._backend = resolve_capture_backend()
+                if self._backend is None:
+                    self.status = "unavailable"
+                    self._apply(self._fallback())
+                    await asyncio.sleep(RETRY_INTERVAL)
+                    continue
+                logger.info("ambilight capture backend: %s", self._backend.name)
             node = await self._find_node()
             if node is None:
                 logger.warning("gamescope PipeWire node not found; retrying")
@@ -201,7 +342,7 @@ class Ambilight:
                 continue
 
             interval = self._capture_interval()
-            command = _gst_command(node, CAP_W, CAP_H)
+            command = _gst_command(self._backend.gst_launch, node, CAP_W, CAP_H)
             proc = None
             reader_task = None
             logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / interval)

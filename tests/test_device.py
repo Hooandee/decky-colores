@@ -6,6 +6,7 @@ import led_device as _led_device_mod
 SysfsRgbDevice = _led_device_mod.SysfsRgbDevice
 NullDevice = _led_device_mod.NullDevice
 MultiSysfsRgbDevice = _led_device_mod.MultiSysfsRgbDevice
+Odin2RgbDevice = _led_device_mod.Odin2RgbDevice
 HpOmenRgbDevice = _led_device_mod.HpOmenRgbDevice
 ValveLedsDevice = _led_device_mod.ValveLedsDevice
 
@@ -64,6 +65,17 @@ def _make_portal_leds(root, count=8):
         _make_led(root, name, {
             "multi_index": "blue green red",
             "multi_max_intensity": "255 255 255",
+            "multi_intensity": "0 0 0",
+            "brightness": "0",
+            "max_brightness": "255",
+        })
+
+
+def _make_odin2_leds(root, count=4):
+    names = ("left-joystick", "left-side", "right-side", "right-joystick")
+    for name in names[:count]:
+        _make_led(root, name, {
+            "multi_index": "red green blue",
             "multi_intensity": "0 0 0",
             "brightness": "0",
             "max_brightness": "255",
@@ -288,6 +300,28 @@ def test_complete_portal_topology_builds_uniform_multi_node_device(tmp_path):
     assert ctx["capabilities"]["zones"] == 1
     assert ctx["capabilities"]["perZone"] is False
     assert ctx["capabilities"]["color"] is True
+
+
+def test_complete_odin2_topology_builds_per_zone_device(tmp_path):
+    root = str(tmp_path)
+    _make_odin2_leds(root)
+
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], Odin2RgbDevice)
+    assert ctx["capabilities"]["zones"] == 4
+    assert ctx["capabilities"]["perZone"] is True
+    assert ctx["capabilities"]["color"] is True
+
+
+def test_partial_odin2_topology_does_not_claim_rgb_support(tmp_path):
+    root = str(tmp_path)
+    _make_odin2_leds(root, count=3)
+
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], NullDevice)
+    assert ctx["capabilities"]["color"] is False
 
 
 def test_partial_portal_topology_does_not_claim_generic_led_support(tmp_path):
