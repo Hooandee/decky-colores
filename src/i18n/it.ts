@@ -13,6 +13,7 @@ export const it: Record<string, string> = {
   "profiles.inactiveHint": "Verrà applicato quando avvii questo gioco.",
 
   "device.noLeds": "Nessun LED controllabile rilevato su questo dispositivo.",
+  "device.armadaOs": "Dispositivo Armada OS",
   "device.preview.rings": "Anelli degli stick",
   "device.preview.bar": "Barra luminosa",
   "device.preview.off": "Spento",

@@ -6,6 +6,7 @@ import led_device as _led_device_mod
 SysfsRgbDevice = _led_device_mod.SysfsRgbDevice
 NullDevice = _led_device_mod.NullDevice
 MultiSysfsRgbDevice = _led_device_mod.MultiSysfsRgbDevice
+Odin2RgbDevice = _led_device_mod.Odin2RgbDevice
 HpOmenRgbDevice = _led_device_mod.HpOmenRgbDevice
 ValveLedsDevice = _led_device_mod.ValveLedsDevice
 
@@ -70,6 +71,17 @@ def _make_portal_leds(root, count=8):
         })
 
 
+def _make_odin2_leds(root, count=4):
+    names = ("left-joystick", "left-side", "right-side", "right-joystick")
+    for name in names[:count]:
+        _make_led(root, name, {
+            "multi_index": "red green blue",
+            "multi_intensity": "0 0 0",
+            "brightness": "0",
+            "max_brightness": "255",
+        })
+
+
 def test_lookup_name_matches_board():
     assert lookup_name("RC73XA", "ROG Xbox Ally X RC73XA_RC73XA") == "ROG Xbox Ally X"
 
@@ -107,6 +119,42 @@ def test_detect_device_falls_back_to_device_tree_model(tmp_path):
 
     assert info["model"] == "AYN Odin 2 Portal"
     assert info["name"] == "AYN Odin 2 Portal"
+
+
+def test_detect_device_uses_armada_fallback_on_arm(tmp_path):
+    info = detect_device(str(tmp_path), machine="aarch64")
+
+    assert info["name"] == "Armada OS Device"
+    assert info["displayNameKey"] == "device.armadaOs"
+
+
+def test_detect_device_uses_armada_fallback_from_os_release(tmp_path):
+    release = tmp_path / "etc/os-release"
+    release.parent.mkdir(parents=True)
+    release.write_text('ID=armada\nPRETTY_NAME="Armada OS"\n')
+
+    info = detect_device(str(tmp_path), machine="x86_64")
+
+    assert info["name"] == "Armada OS Device"
+    assert info["displayNameKey"] == "device.armadaOs"
+
+
+def test_detect_device_keeps_real_model_on_arm(tmp_path):
+    model = tmp_path / "sys/firmware/devicetree/base/model"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"Known ARM Handheld\x00")
+
+    info = detect_device(str(tmp_path), machine="aarch64")
+
+    assert info["name"] == "Known ARM Handheld"
+    assert info["displayNameKey"] is None
+
+
+def test_detect_device_keeps_unknown_on_non_arm_non_armada(tmp_path):
+    info = detect_device(str(tmp_path), machine="x86_64")
+
+    assert info["name"] == "Unknown device"
+    assert info["displayNameKey"] is None
 
 
 def test_read_zone_format_packed_decimal(tmp_path):
@@ -288,6 +336,28 @@ def test_complete_portal_topology_builds_uniform_multi_node_device(tmp_path):
     assert ctx["capabilities"]["zones"] == 1
     assert ctx["capabilities"]["perZone"] is False
     assert ctx["capabilities"]["color"] is True
+
+
+def test_complete_odin2_topology_builds_per_zone_device(tmp_path):
+    root = str(tmp_path)
+    _make_odin2_leds(root)
+
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], Odin2RgbDevice)
+    assert ctx["capabilities"]["zones"] == 4
+    assert ctx["capabilities"]["perZone"] is True
+    assert ctx["capabilities"]["color"] is True
+
+
+def test_partial_odin2_topology_does_not_claim_rgb_support(tmp_path):
+    root = str(tmp_path)
+    _make_odin2_leds(root, count=3)
+
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], NullDevice)
+    assert ctx["capabilities"]["color"] is False
 
 
 def test_partial_portal_topology_does_not_claim_generic_led_support(tmp_path):

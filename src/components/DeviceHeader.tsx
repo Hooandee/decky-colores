@@ -1,6 +1,8 @@
 import { FC } from "react";
 
 import { rgbToCss } from "../color";
+import { deviceDisplayName } from "../deviceName";
+import { useI18n } from "../i18n";
 import { theme } from "../theme";
 import { DeviceInfo, RGB } from "../types";
 
@@ -8,15 +10,17 @@ export const DeviceHeader: FC<{
   device: DeviceInfo;
   color: RGB;
 }> = ({ device, color }) => {
+  const { t } = useI18n();
+  const displayName = deviceDisplayName(device, t);
   const detail = [device.product, device.board].find(
-    (value) => value && value.toLowerCase() !== device.name.toLowerCase(),
+    (value) => value && value.toLowerCase() !== displayName.toLowerCase(),
   );
   const lightColor = rgbToCss(color);
 
   return (
     <div
       role="status"
-      aria-label={device.name}
+      aria-label={displayName}
       style={{
         display: "inline-flex",
         alignItems: "center",
@@ -54,7 +58,7 @@ export const DeviceHeader: FC<{
           textOverflow: "ellipsis",
         }}
       >
-        {device.name}
+        {displayName}
       </span>
       {detail ? (
         <>

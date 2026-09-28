@@ -13,6 +13,7 @@ export const ptBR: Record<string, string> = {
   "profiles.inactiveHint": "Será aplicado quando você abrir este jogo.",
 
   "device.noLeds": "Nenhum LED controlável foi detectado neste dispositivo.",
+  "device.armadaOs": "Dispositivo Armada OS",
   "device.preview.rings": "Anéis dos joysticks",
   "device.preview.bar": "Barra de luz",
   "device.preview.off": "Desligado",

@@ -4,8 +4,10 @@ from py_modules.led_device import (
     ApexRgbDevice,
     HpOmenRgbDevice,
     MultiSysfsRgbDevice,
+    Odin2RgbDevice,
     SysfsRgbDevice,
     ValveLedsDevice,
+    discover_odin2_leds,
     discover_valve_leds,
 )
 
@@ -141,6 +143,41 @@ def _make_portal_nodes(tmp_path, count=8):
         (node / "max_brightness").write_text("255")
         nodes.append(str(node))
     return nodes
+
+
+def _make_odin2_nodes(tmp_path, count=4):
+    names = ("left-joystick", "left-side", "right-side", "right-joystick")
+    for name in names[:count]:
+        node = tmp_path / name
+        node.mkdir()
+        (node / "multi_intensity").write_text("0 0 0")
+        (node / "brightness").write_text("0")
+        (node / "max_brightness").write_text("255")
+    return discover_odin2_leds(str(tmp_path))
+
+
+def test_odin2_device_writes_each_zone_and_brightness(tmp_path):
+    nodes = _make_odin2_nodes(tmp_path)
+    device = Odin2RgbDevice(nodes, max_brightness=255)
+
+    assert device.available is True
+    assert device.supports_per_zone() is True
+    assert device.apply_zones(
+        [(255, 0, 0), (0, 255, 0), (0, 0, 255), (10, 20, 30)],
+        50,
+        True,
+    ) is True
+    assert [_read(os.path.join(node, "multi_intensity")) for node in nodes] == [
+        "255 0 0",
+        "0 255 0",
+        "0 0 255",
+        "10 20 30",
+    ]
+    assert all(_read(os.path.join(node, "brightness")) == "128" for node in nodes)
+
+
+def test_odin2_discovery_rejects_partial_topology(tmp_path):
+    assert _make_odin2_nodes(tmp_path, count=3) == []
 
 
 def test_multi_sysfs_uniform_color_uses_each_nodes_channel_order(tmp_path):

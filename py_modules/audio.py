@@ -2,6 +2,8 @@ import array
 import asyncio
 import logging
 import math
+import os
+from pathlib import Path
 
 from effects import frame_vu
 from run_as_user import user_env, user_cred
@@ -15,6 +17,37 @@ CHUNK = 1024  # samples per frame (~64ms at 16kHz)
 FULL_SCALE = 8000.0  # RMS mapped to level 1.0
 DYNAMIC_RANGE_DB = 40.0
 RETRY_INTERVAL = 3.0
+MONITOR_POLL_INTERVAL = 1.0
+CAPTURE_LATENCY_MS = round(CHUNK * 1000 / RATE)
+
+
+def _native_bin(name):
+    host_bin = Path("/run/host/usr/bin")
+    if host_bin.is_dir():
+        path = host_bin / name
+        return str(path) if path.is_file() and os.access(path, os.X_OK) else None
+    path = Path("/usr/bin") / name
+    return str(path) if path.is_file() and os.access(path, os.X_OK) else None
+
+
+def _native_env(runtime_dir):
+    env = user_env(runtime_dir)
+    for key in ("LD_LIBRARY_PATH", "LD_PRELOAD"):
+        env.pop(key, None)
+    return env
+
+
+def _capture_command(parec, device):
+    return [
+        parec,
+        "--format=s16le",
+        f"--rate={RATE}",
+        "--channels=1",
+        f"--device={device}",
+        f"--latency-msec={CAPTURE_LATENCY_MS}",
+        f"--process-time-msec={CAPTURE_LATENCY_MS}",
+        "--raw",
+    ]
 
 
 def _level_from_pcm(data):
@@ -40,6 +73,8 @@ class AudioReactive:
         self._proc = None
         self._level = 0.0
         self.status = "idle"
+        self._parec = _native_bin("parec")
+        self._pactl = _native_bin("pactl")
 
     @property
     def running(self):
@@ -50,7 +85,7 @@ class AudioReactive:
         return self._level
 
     def _env(self):
-        return user_env(self._runtime_dir)
+        return _native_env(self._runtime_dir)
 
     def _cred(self):
         return user_cred(self._uid, self._gid)
@@ -82,16 +117,43 @@ class AudioReactive:
         self._level += (target - self._level) * alpha
         return self._level
 
+    async def _default_monitor(self):
+        proc = None
+        if self._pactl is None:
+            return None
+        try:
+            proc = await _spawn(
+                self._pactl,
+                "get-default-sink",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env=self._env(),
+                **self._cred(),
+            )
+            out, _ = await asyncio.wait_for(proc.communicate(), timeout=2)
+            sink = out.decode(errors="replace").strip()
+            if proc.returncode == 0 and sink:
+                return f"{sink}.monitor"
+        except (OSError, asyncio.TimeoutError):
+            if proc is not None:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+        return None
+
     async def _run(self):
-        command = [
-            "parec", "--format=s16le", f"--rate={RATE}", "--channels=1",
-            "--device=@DEFAULT_MONITOR@", "--raw",
-        ]
         while True:
+            if self._parec is None:
+                self.status = "unavailable"
+                await asyncio.sleep(RETRY_INTERVAL)
+                continue
             proc = None
+            route_changed = False
+            device = await self._default_monitor() or "@DEFAULT_MONITOR@"
             try:
                 proc = await _spawn(
-                    *command,
+                    *_capture_command(self._parec, device),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     env=self._env(),
@@ -99,11 +161,22 @@ class AudioReactive:
                 )
                 self._proc = proc
                 self.status = "running"
+                loop = asyncio.get_running_loop()
+                next_monitor_check = loop.time() + MONITOR_POLL_INTERVAL
                 while True:
                     data = await proc.stdout.readexactly(CHUNK * 2)
                     self._apply(frame_vu(self._ease(_level_from_pcm(data)), self._zones))
+                    if loop.time() >= next_monitor_check:
+                        current = await self._default_monitor()
+                        next_monitor_check = loop.time() + MONITOR_POLL_INTERVAL
+                        if current and current != device:
+                            logger.info("audio output changed: %s -> %s", device, current)
+                            self.status = "reconnecting"
+                            route_changed = True
+                            break
             except asyncio.IncompleteReadError:
                 self.status = "no_source"
+                await self._log_exit(proc)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -117,4 +190,19 @@ class AudioReactive:
                         pass
                 if self._proc is proc:
                     self._proc = None
-            await asyncio.sleep(RETRY_INTERVAL)
+            if not route_changed:
+                await asyncio.sleep(RETRY_INTERVAL)
+
+    async def _log_exit(self, proc):
+        if proc is None:
+            return
+        error = b""
+        try:
+            error = await proc.stderr.read()
+        except (OSError, ValueError):
+            pass
+        logger.warning(
+            "audio capture ended (rc=%s): %s",
+            proc.returncode,
+            error.decode(errors="replace")[:300],
+        )

@@ -20,6 +20,7 @@ export interface DeviceInfo {
   name: string;
   board: string;
   product: string;
+  displayNameKey?: "device.armadaOs" | null;
 }
 
 export interface ZoneGroup {

@@ -1,0 +1,22 @@
+{
+  "architecture": "aarch64",
+  "license": "MIT",
+  "source": "https://pipewire.org/",
+  "source_rpm": "pipewire-1.6.9-1.fc44.src.rpm",
+  "artifacts": [
+    {
+      "path": "bin/pw-dump",
+      "package": "pipewire-utils-1.6.9-1.fc44.aarch64",
+      "sha256": "3a2b9a13842e0338b3551b5a9dbe4a89a544f6e7df8e242d971097a0a6bdda63"
+    },
+    {
+      "path": "lib64/gstreamer-1.0/libgstpipewire.so",
+      "package": "pipewire-gstreamer-1.6.9-1.fc44.aarch64",
+      "sha256": "b1227d19e9bcb40941d9fcfebed662e08db6234c16aa1ed1ab74c74e26d5220b"
+    }
+  ],
+  "licenses": [
+    "licenses/COPYING",
+    "licenses/LICENSE"
+  ]
+}
