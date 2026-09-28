@@ -70,7 +70,7 @@ jobs:
         run: pnpm test:i18n
       - name: Run the frontend test suite
         run: pnpm test:fe
-      - name: Build the frontend
-        run: pnpm build
-      - name: Verify build output exists
-        run: test -f dist/index.js
+      - name: Build and package the plugin
+        run: pnpm package:plugin
+      - name: Verify build outputs exist
+        run: test -f dist/index.js && test -f Colores.zip

@@ -35,12 +35,7 @@ jobs:
           pnpm typecheck
           pnpm test:i18n
           pnpm test:fe
-          pnpm build
-          rm -f dist/*.map
-          staging=$(mktemp -d)
-          mkdir -p "$staging/Colores"
-          cp -rL dist main.py plugin.json package.json README.md LICENSE py_modules assets "$staging/Colores"
-          (cd "$staging" && zip -r "$GITHUB_WORKSPACE/Colores.zip" Colores)
+          pnpm package:plugin
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

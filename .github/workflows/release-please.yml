@@ -50,13 +50,7 @@ jobs:
           pnpm typecheck
           pnpm test:i18n
           pnpm test:fe
-          pnpm build
-          rm -f dist/*.map
-          staging=$(mktemp -d)
-          mkdir -p "$staging/Colores"
-          cp -rL dist main.py plugin.json package.json README.md LICENSE py_modules assets "$staging/Colores"
-          (cd "$staging" && zip -r "$GITHUB_WORKSPACE/Colores.zip" Colores)
-          unzip -l "$GITHUB_WORKSPACE/Colores.zip"
+          pnpm package:plugin
 
       - name: Attach plugin zip to release
         if: ${{ steps.release.outputs.release_created }}
