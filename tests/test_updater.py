@@ -68,6 +68,23 @@ def test_check_shapes_release(monkeypatch):
     assert result["error"] == ""
 
 
+def test_check_reads_releases_from_fork(monkeypatch):
+    monkeypatch.setattr(updater, "_cache", None)
+    monkeypatch.setattr(updater, "read_version", lambda: "0.29.1")
+    monkeypatch.setattr(updater, "_repo_slug", lambda: "decky-colores")
+    requested = {}
+
+    def release(url, accept):
+        requested["url"] = url
+        return json.dumps(_release_payload(tag="decky-colores-v0.29.1")).encode()
+
+    monkeypatch.setattr(updater, "_http_get", release)
+
+    updater.check(force=True)
+
+    assert requested["url"] == "https://api.github.com/repos/jl-casella/decky-colores/releases/latest"
+
+
 def test_check_network_error(monkeypatch):
     monkeypatch.setattr(updater, "_cache", None)
     monkeypatch.setattr(updater, "read_version", lambda: "0.14.0")
