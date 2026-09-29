@@ -22,9 +22,14 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.11"
+      - run: sudo apt-get update && sudo apt-get install -y gettext
       - run: pip install -r requirements-dev.txt
       - run: ruff check py_modules main.py tests
       - run: python -m pytest -q
+      - run: ruff check armada/package/contents/code armada/tests
+      - run: python -m unittest discover -s armada/tests -v
+      - run: python -m json.tool armada/package/metadata.json >/dev/null
+      - run: sh armada/scripts/package_widget.sh
 
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
@@ -50,8 +55,30 @@ jobs:
             echo "Release $TAG already exists" >&2
             exit 1
           fi
-          gh release create "$TAG" Colores.zip \
+          NOTES_FILE="$RUNNER_TEMP/decky-colores-release-notes.md"
+          cat > "$NOTES_FILE" <<'EOF'
+          ## Colores for Decky
+
+          - Fixed audio-reactive lighting with automatic output-device tracking and capture reconnection.
+          - Added native ARM64 and FEX support for Ambilight.
+          - Added Odin 2 per-zone RGB control for both joysticks and side lights.
+          - Improved localized device identification on ARM handhelds.
+
+          ## Armada OS Plasma widget
+
+          - Added an installable `Armada-OS.plasmoid` package.
+          - Control RGB lighting directly from the Plasma panel.
+          - Switch between Eco, Balanced, and Performance profiles.
+          - Automatically follows the language configured in Plasma.
+          - Includes English, Spanish, German, Italian, and Brazilian Portuguese.
+
+          ## Downloads
+
+          - `Colores.zip`: Decky Loader plugin.
+          - `Armada-OS.plasmoid`: Plasma 6 widget.
+          EOF
+          gh release create "$TAG" Colores.zip Armada-OS.plasmoid \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Colores v${VERSION}" \
-            --notes "Armada OS compatibility release with native ARM64/FEX capture, reliable audio capture, Odin 2 per-zone RGB, and localized device identification."
+            --notes-file "$NOTES_FILE"

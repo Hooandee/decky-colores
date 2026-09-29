@@ -1,0 +1,18 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [
+            {
+                "Name": "Armada"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Controls RGB lighting and performance profiles on Armada OS",
+        "Icon": "preferences-desktop-color",
+        "Id": "com.armada.armadaos",
+        "License": "MIT",
+        "Name": "Armada OS",
+        "Version": "0.29.1"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
