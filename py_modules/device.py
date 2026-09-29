@@ -115,6 +115,24 @@ _STICK_ANCHORS = [
 ]
 
 
+def build_odin2_layout():
+    """Map Odin 2's physical pairs to the matching outer screen edges."""
+    return [
+        {
+            "name": "Left stick",
+            "region": [0.0, 0.0, 0.20, 1.0],
+            "zones": [0, 1],
+            "kind": "shared-edge",
+        },
+        {
+            "name": "Right stick",
+            "region": [0.80, 0.0, 1.0, 1.0],
+            "zones": [2, 3],
+            "kind": "shared-edge",
+        },
+    ]
+
+
 def build_layout(zones, swap_sticks=False, layout_kind="rings"):
     if zones <= 0:
         return []
@@ -373,6 +391,7 @@ def build_device(sysfs_root="/", ambilight=False):
             power_led, battery, temperature,
         )
         capabilities["perZone"] = device.supports_per_zone()
+        capabilities["layout"] = build_odin2_layout()
         return _with_sleep_charging(profile, {
             "info": info,
             "capabilities": capabilities,
