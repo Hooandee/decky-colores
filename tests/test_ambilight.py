@@ -12,9 +12,11 @@ from py_modules.ambilight import (
     _native_env,
     _read_latest_frames,
     _replace_with_latest,
+    adaptive_alpha,
     alpha_for,
     avg_region,
     boost_saturation,
+    dominant_region,
     lerp,
     resolve_capture_backend,
     subdivide,
@@ -62,6 +64,44 @@ def test_global_color_sampling_averages_full_frame_for_all_logical_zones():
     amb._update_targets(_split_frame())
 
     assert amb._targets == [(127, 0, 127), (127, 0, 127)]
+
+
+def test_odin2_shared_edges_use_one_dominant_color_per_side():
+    layout = [
+        {
+            "name": "Left stick",
+            "region": [0.0, 0.0, 0.20, 1.0],
+            "zones": [0, 1],
+            "kind": "shared-edge",
+        },
+        {
+            "name": "Right stick",
+            "region": [0.80, 0.0, 1.0, 1.0],
+            "zones": [2, 3],
+            "kind": "shared-edge",
+        },
+    ]
+    amb = Ambilight(lambda colors: None, zones=4, runtime_dir=None, layout=layout)
+    frame = bytearray(amb._capture_width * amb._capture_height * 3)
+    for y in range(amb._capture_height):
+        for x in range(amb._capture_width):
+            if x < amb._capture_width * 0.20:
+                color = (240, 20, 10)
+            elif x >= amb._capture_width * 0.80:
+                color = (10, 30, 240)
+            else:
+                color = (0, 0, 0)
+            index = (y * amb._capture_width + x) * 3
+            frame[index : index + 3] = bytes(color)
+
+    amb._options = {"saturation": 1.0}
+    amb._update_targets(bytes(frame))
+
+    assert (amb._capture_width, amb._capture_height) == (64, 36)
+    assert amb._targets[0] == amb._targets[1]
+    assert amb._targets[2] == amb._targets[3]
+    assert amb._targets[0][0] > amb._targets[0][2]
+    assert amb._targets[2][2] > amb._targets[2][0]
 
 
 def test_run_retries_when_source_missing(monkeypatch):
@@ -297,6 +337,21 @@ def test_avg_region_isolates_corner():
     assert avg[0] > 0 and avg[1] > 0
 
 
+def test_dominant_region_ignores_black_and_avoids_muddy_average():
+    frame = bytearray(_solid_frame(10, 10, (0, 0, 0)))
+    for pixel in range(20):
+        index = pixel * 3
+        frame[index : index + 3] = bytes((240, 20, 10))
+    for pixel in range(20, 30):
+        index = pixel * 3
+        frame[index : index + 3] = bytes((10, 20, 240))
+
+    color = dominant_region(bytes(frame), 10, 10, (0.0, 0.0, 1.0, 1.0))
+
+    assert color[0] > 200
+    assert color[2] < 50
+
+
 def test_boost_saturation_increases_spread():
     base = (140, 120, 100)
     boosted = boost_saturation(base, 1.6)
@@ -316,6 +371,12 @@ def test_alpha_for_mapping():
     assert alpha_for(0) == 1.0
     assert alpha_for(100) == 0.04
     assert 0.2 < alpha_for(75) < 0.3
+
+
+def test_adaptive_alpha_accelerates_large_changes_only():
+    base = alpha_for(75)
+    assert adaptive_alpha((100, 100, 100), (110, 100, 100), base) == base
+    assert adaptive_alpha((0, 0, 0), (255, 0, 0), base) == 1.0
 
 
 def test_subdivide_splits_region_horizontally():

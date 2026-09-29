@@ -1,4 +1,5 @@
 import asyncio
+import colorsys
 from dataclasses import dataclass
 import hashlib
 import json
@@ -15,6 +16,8 @@ logger = logging.getLogger("colores.ambilight")
 GAMESCOPE_NODE = "gamescope"
 CAP_W = 32
 CAP_H = 18
+ODIN2_CAP_W = 64
+ODIN2_CAP_H = 36
 
 # Seconds between reconnect attempts when the gamescope source is missing or the
 # stream drops. On a cold boot the user's PipeWire/gamescope session isn't ready when
@@ -172,6 +175,38 @@ def avg_region(frame, width, height, region):
     return (r // n, g // n, b // n)
 
 
+def dominant_region(frame, width, height, region):
+    """Pick the prevalent visible hue instead of washing mixed colors to gray."""
+    x0, y0, x1, y1 = region
+    cx0 = max(0, int(x0 * width))
+    cx1 = min(width, max(cx0 + 1, int(x1 * width)))
+    cy0 = max(0, int(y0 * height))
+    cy1 = min(height, max(cy0 + 1, int(y1 * height)))
+    buckets = [[] for _ in range(12)]
+    pixel_count = max(1, (cx1 - cx0) * (cy1 - cy0))
+    for y in range(cy0, cy1):
+        base = y * width * 3
+        for x in range(cx0, cx1):
+            i = base + x * 3
+            color = (frame[i], frame[i + 1], frame[i + 2])
+            highest = max(color)
+            chroma = highest - min(color)
+            if highest < 24 or chroma < 32:
+                continue
+            hue, _, _ = colorsys.rgb_to_hsv(*(channel / 255 for channel in color))
+            buckets[min(11, int(hue * 12))].append((color, chroma))
+
+    winner = max(buckets, key=len)
+    if len(winner) < max(3, (pixel_count + 19) // 20):
+        return avg_region(frame, width, height, region)
+
+    weight = sum(chroma for _, chroma in winner)
+    return tuple(
+        round(sum(color[channel] * chroma for color, chroma in winner) / weight)
+        for channel in range(3)
+    )
+
+
 def boost_saturation(color, factor):
     r, g, b = color
     gray = r * 0.299 + g * 0.587 + b * 0.114
@@ -185,6 +220,11 @@ def lerp(current, target, alpha):
 def alpha_for(smoothing):
     s = max(0, min(100, smoothing))
     return max(0.04, 1.0 - s / 100.0)
+
+
+def adaptive_alpha(current, target, base_alpha):
+    delta = max(abs(current[index] - target[index]) for index in range(3))
+    return max(base_alpha, min(1.0, delta / 128.0))
 
 
 def _gst_command(gst_launch, node, width, height):
@@ -220,6 +260,14 @@ class Ambilight:
         self._gid = gid
         self._max_fps = max_fps
         self._layout = layout or [{"name": "Lights", "region": _FULL_REGION, "zones": list(range(self._zones))}]
+        self._adaptive_zones = {
+            zone
+            for group in self._layout
+            if group.get("kind") == "shared-edge"
+            for zone in group["zones"]
+        }
+        self._capture_width = ODIN2_CAP_W if self._adaptive_zones else CAP_W
+        self._capture_height = ODIN2_CAP_H if self._adaptive_zones else CAP_H
         self._task = None
         self._proc = None
         self._options = {}
@@ -323,7 +371,7 @@ class Ambilight:
         # Outer reconnect loop: keep trying to find the gamescope source and capture it
         # until stop() cancels us. The source can be absent at boot (session not up yet)
         # or vanish (leaving Game Mode) and reappear — we recover from both automatically.
-        frame_bytes = CAP_W * CAP_H * 3
+        frame_bytes = self._capture_width * self._capture_height * 3
         while True:
             if self._backend is None:
                 self._backend = resolve_capture_backend()
@@ -342,7 +390,12 @@ class Ambilight:
                 continue
 
             interval = self._capture_interval()
-            command = _gst_command(self._backend.gst_launch, node, CAP_W, CAP_H)
+            command = _gst_command(
+                self._backend.gst_launch,
+                node,
+                self._capture_width,
+                self._capture_height,
+            )
             proc = None
             reader_task = None
             logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / interval)
@@ -405,21 +458,55 @@ class Ambilight:
     def _update_targets(self, frame):
         sat = float(self._options.get("saturation", 1.4))
         if self._options.get("global_color"):
-            target = boost_saturation(avg_region(frame, CAP_W, CAP_H, _FULL_REGION), sat)
+            target = boost_saturation(
+                avg_region(frame, self._capture_width, self._capture_height, _FULL_REGION),
+                sat,
+            )
             self._targets = [target] * self._zones
             return
         bottom_edge = self._options.get("sampling") == "bottom_edge"
         for group in self._layout:
             indices = group["zones"]
             region = group["region"]
+            if group.get("kind") == "shared-edge":
+                target = boost_saturation(
+                    dominant_region(
+                        frame,
+                        self._capture_width,
+                        self._capture_height,
+                        region,
+                    ),
+                    sat,
+                )
+                for zone in indices:
+                    if 0 <= zone < self._zones:
+                        self._targets[zone] = target
+                continue
             if bottom_edge:
                 x0, y0, x1, y1 = region
                 region = (x0, y1 - (y1 - y0) * 0.28, x1, y1)
             for sub, zone in zip(subdivide(region, len(indices)), indices):
                 if 0 <= zone < self._zones:
-                    self._targets[zone] = boost_saturation(avg_region(frame, CAP_W, CAP_H, sub), sat)
+                    self._targets[zone] = boost_saturation(
+                        avg_region(
+                            frame,
+                            self._capture_width,
+                            self._capture_height,
+                            sub,
+                        ),
+                        sat,
+                    )
 
     def _tick(self):
-        alpha = alpha_for(self._options.get("smoothing", 75))
-        self._current = [lerp(c, t, alpha) for c, t in zip(self._current, self._targets)]
+        base_alpha = alpha_for(self._options.get("smoothing", 75))
+        self._current = [
+            lerp(
+                current,
+                target,
+                adaptive_alpha(current, target, base_alpha)
+                if zone in self._adaptive_zones
+                else base_alpha,
+            )
+            for zone, (current, target) in enumerate(zip(self._current, self._targets))
+        ]
         self._apply(list(self._current))

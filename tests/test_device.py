@@ -348,6 +348,20 @@ def test_complete_odin2_topology_builds_per_zone_device(tmp_path):
     assert ctx["capabilities"]["zones"] == 4
     assert ctx["capabilities"]["perZone"] is True
     assert ctx["capabilities"]["color"] is True
+    assert ctx["capabilities"]["layout"] == [
+        {
+            "name": "Left stick",
+            "region": [0.0, 0.0, 0.20, 1.0],
+            "zones": [0, 1],
+            "kind": "shared-edge",
+        },
+        {
+            "name": "Right stick",
+            "region": [0.80, 0.0, 1.0, 1.0],
+            "zones": [2, 3],
+            "kind": "shared-edge",
+        },
+    ]
 
 
 def test_partial_odin2_topology_does_not_claim_rgb_support(tmp_path):
