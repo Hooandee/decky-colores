@@ -11,6 +11,10 @@ Colores is now ready to run natively on Armada OS:
 - **Reliable audio-reactive lighting.** It uses the host's native tools, automatically follows audio output changes, and reconnects capture without restarting the plugin.
 - **Ambilight on ARM64 and FEX environments.** It detects a complete PipeWire/GStreamer backend and, when needed, uses the bundled ARM64 fallback verified with checksums.
 - **Per-zone RGB on Odin 2.** It detects all four lighting nodes and independently controls the left joystick, left side, right side, and right joystick.
+- **Armada OS plasmoid for Plasma 6.** The source includes an installable widget
+  combining the RGB light switch with the Eco, Balanced, and Performance
+  profiles. It follows Plasma's configured language and is distributed as
+  `Armada-OS.plasmoid`; see its [documentation and installation guide](armada/README.en.md).
 
 <p align="center">
   <a href="https://ko-fi.com/hooandee"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
@@ -87,9 +91,14 @@ Made with a lot of love for handhelds ❤️.
 
 ## Development
 
+In addition to the Decky plugin, this repository contains the Armada OS
+plasmoid source under [`armada/`](armada/README.en.md). To build both
+deliverables:
+
 ```bash
 pnpm install && pnpm build   # builds dist/index.js
 python -m pytest             # backend tests
+pnpm package:plasmoid        # builds Armada-OS.plasmoid
 ```
 
 ## License

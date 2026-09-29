@@ -1,0 +1,64 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Armada OS 0.29.1\n"
+"PO-Revision-Date: 2026-09-29 00:00-0300\n"
+"Last-Translator: Armada OS contributors\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Unavailable"
+msgstr "No disponibles"
+
+msgid "On"
+msgstr "Encendidas"
+
+msgid "Off"
+msgstr "Apagadas"
+
+msgid "Partially on"
+msgstr "Encendidas parcialmente"
+
+msgid "Unknown state"
+msgstr "Estado desconocido"
+
+msgid "Unknown"
+msgstr "Desconocido"
+
+msgid "Applying change…"
+msgstr "Aplicando cambio…"
+
+msgid "RGB lighting hardware is unavailable"
+msgstr "El hardware de luces RGB no está disponible"
+
+msgid "Decky or Colores is unavailable"
+msgstr "Decky o Colores no están disponibles"
+
+msgid "Could not read the RGB lighting state"
+msgstr "No se pudo consultar el estado de las luces RGB"
+
+msgid "Could not read the performance profile"
+msgstr "No se pudo consultar el perfil de rendimiento"
+
+msgid "Could not change the performance profile"
+msgstr "No se pudo cambiar el perfil de rendimiento"
+
+msgid "RGB lights"
+msgstr "Luces RGB"
+
+msgid "Turn RGB lights on or off"
+msgstr "Encender o apagar las luces RGB"
+
+msgid "Activate Eco profile"
+msgstr "Activar perfil Eco"
+
+msgid "Activate Balanced profile"
+msgstr "Activar perfil Balanced"
+
+msgid "Activate Performance profile"
+msgstr "Activar perfil Performance"
+
+msgid "Active: %1"
+msgstr "Activo: %1"

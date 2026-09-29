@@ -6,6 +6,7 @@
   "scripts": {
     "build": "rollup -c --forceExit",
     "package:plugin": "sh scripts/package_plugin.sh",
+    "package:plasmoid": "sh armada/scripts/package_widget.sh",
     "watch": "rollup -c -w",
     "typecheck": "tsc --noEmit",
     "test:fe": "vitest run",

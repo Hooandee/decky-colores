@@ -48,6 +48,26 @@ jobs:
       - run: ruff check py_modules main.py tests
       - run: python -m pytest -v
 
+  plasma-widget:
+    needs: changes
+    if: needs.changes.outputs.decky == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - run: sudo apt-get update && sudo apt-get install -y gettext
+      - run: pip install ruff
+      - run: ruff check armada/package/contents/code armada/tests
+      - run: python -m unittest discover -s armada/tests -v
+      - run: python -m json.tool armada/package/metadata.json >/dev/null
+      - run: sh -n armada/scripts/package_widget.sh
+      - run: sh armada/scripts/package_widget.sh
+      - run: test -f Armada-OS.plasmoid
+
   frontend-build:
     needs: changes
     if: needs.changes.outputs.decky == 'true'

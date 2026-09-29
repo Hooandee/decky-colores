@@ -8,5 +8,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 *.zip
+*.plasmoid
 *.tar.gz
 .superpowers/
