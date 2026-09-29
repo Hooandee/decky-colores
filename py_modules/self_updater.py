@@ -25,7 +25,7 @@ import decky
 
 from version import read_version  # top-level import (Decky adds py_modules to sys.path)
 
-_GITHUB_OWNER = "Hooandee"
+_GITHUB_OWNER = "jl-casella"
 _UA = "decky-self-updater"
 
 # Session cache: only hit GitHub once per Steam session (force=True bypasses it).
