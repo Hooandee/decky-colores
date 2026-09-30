@@ -468,6 +468,20 @@ class Ambilight:
         for group in self._layout:
             indices = group["zones"]
             region = group["region"]
+            if group.get("kind") == "shared-full":
+                target = boost_saturation(
+                    avg_region(
+                        frame,
+                        self._capture_width,
+                        self._capture_height,
+                        region,
+                    ),
+                    sat,
+                )
+                for zone in indices:
+                    if 0 <= zone < self._zones:
+                        self._targets[zone] = target
+                continue
             if group.get("kind") == "shared-edge":
                 target = boost_saturation(
                     dominant_region(

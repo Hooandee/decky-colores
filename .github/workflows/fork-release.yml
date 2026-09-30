@@ -61,7 +61,12 @@ jobs:
 
           - Fixed audio-reactive lighting with automatic output-device tracking and capture reconnection.
           - Added native ARM64 and FEX support for Ambilight.
-          - Added Odin 2 per-zone RGB control for both joysticks and side lights.
+          - Added per-zone RGB control for AYN Odin 2 and its joystick and side lights.
+          - Added native eight-zone RGB support for AYN Odin 3, including its separate color-channel topology.
+          - Added per-zone RGB support for AYN Portal and Thor plus compatible Retroid Pocket models.
+          - Added native RGB profiles for KONKR Pocket FIT Elite and 16-zone MANGMI handhelds.
+          - Matched Armada OS color correction, gamma, channel ordering, brightness scaling, and safe failure behavior.
+          - Added topology-aware Ambilight: shared screen edges on known left/right layouts and safe global sampling otherwise.
           - Improved localized device identification on ARM handhelds.
 
           ## Armada OS Plasma widget

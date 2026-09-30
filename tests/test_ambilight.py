@@ -104,6 +104,23 @@ def test_odin2_shared_edges_use_one_dominant_color_per_side():
     assert amb._targets[2][2] > amb._targets[2][0]
 
 
+def test_shared_full_layout_uses_one_average_color_for_every_zone():
+    layout = [{
+        "name": "Lights",
+        "region": [0.0, 0.0, 1.0, 1.0],
+        "zones": [0, 1, 2],
+        "kind": "shared-full",
+    }]
+    amb = Ambilight(lambda colors: None, zones=3, runtime_dir=None, layout=layout)
+    amb._options = {"saturation": 1.0}
+    amb._capture_width = 2
+    amb._capture_height = 1
+
+    amb._update_targets(bytes([255, 0, 0, 0, 0, 255]))
+
+    assert amb._targets == [(127, 0, 127)] * 3
+
+
 def test_run_retries_when_source_missing(monkeypatch):
     # Cold boot: the gamescope node isn't there yet. The capture must keep retrying
     # (and stay alive) instead of giving up after one miss — otherwise ambient mode

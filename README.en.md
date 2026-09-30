@@ -10,7 +10,7 @@ Colores is now ready to run natively on Armada OS:
 
 - **Reliable audio-reactive lighting.** It uses the host's native tools, automatically follows audio output changes, and reconnects capture without restarting the plugin.
 - **Ambilight on ARM64 and FEX environments.** It detects a complete PipeWire/GStreamer backend and, when needed, uses the bundled ARM64 fallback verified with checksums.
-- **Per-zone RGB on Odin 2.** It detects all four lighting nodes and independently controls the left joystick, left side, right side, and right joystick.
+- **Native RGB for the Armada family.** It uses Armada OS hardware profiles for per-zone control on AYN Odin 2, Odin 3, Portal, and Thor; Retroid Pocket; KONKR Pocket FIT Elite; and MANGMI, preserving color correction, brightness, and Ambilight for each known topology.
 - **Armada OS plasmoid for Plasma 6.** The source includes an installable widget
   combining the RGB light switch with the Eco, Balanced, and Performance
   profiles. It follows Plasma's configured language and is distributed as
