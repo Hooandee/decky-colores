@@ -1,5 +1,8 @@
 import os
 
+import pytest
+
+from armada_rgb import ArmadaRgbDevice, profile_for_model
 from py_modules.device import build_layout, detect_device, lookup_name, read_zone_format, build_capabilities, build_device
 from py_modules.device_profiles import resolve_profile
 import led_device as _led_device_mod
@@ -80,6 +83,29 @@ def _make_odin2_leds(root, count=4):
             "brightness": "0",
             "max_brightness": "255",
         })
+
+
+def _make_model(root, model):
+    path = os.path.join(root, "sys/firmware/devicetree/base/model")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as handle:
+        handle.write(model.encode() + b"\x00")
+
+
+def _make_armada_profile_leds(root, model, count=None):
+    profile = profile_for_model(model, root)
+    targets = profile["backend"]["targets"]
+    if count is not None:
+        targets = targets[:count]
+    for target in targets:
+        name = target.split("=", 1)[-1]
+        files = {"brightness": "0", "max_brightness": "255"}
+        if profile["backend"]["type"] == "multicolor":
+            files.update({
+                "multi_index": "red green blue",
+                "multi_intensity": "0 0 0",
+            })
+        _make_led(root, name, files)
 
 
 def test_lookup_name_matches_board():
@@ -322,7 +348,7 @@ def test_build_device_ally_returns_sysfs_writer(tmp_path):
     assert open(intensity).read() == "16711680 16711680 16711680 16711680"
 
 
-def test_complete_portal_topology_builds_uniform_multi_node_device(tmp_path):
+def test_complete_portal_topology_builds_per_zone_armada_device(tmp_path):
     root = str(tmp_path)
     model = tmp_path / "sys/firmware/devicetree/base/model"
     model.parent.mkdir(parents=True)
@@ -331,11 +357,47 @@ def test_complete_portal_topology_builds_uniform_multi_node_device(tmp_path):
 
     ctx = build_device(root)
 
-    assert isinstance(ctx["device"], MultiSysfsRgbDevice)
+    assert isinstance(ctx["device"], ArmadaRgbDevice)
     assert ctx["info"]["name"] == "AYN Odin 2 Portal"
-    assert ctx["capabilities"]["zones"] == 1
-    assert ctx["capabilities"]["perZone"] is False
+    assert ctx["capabilities"]["zones"] == 8
+    assert ctx["capabilities"]["perZone"] is True
     assert ctx["capabilities"]["color"] is True
+    assert ctx["capabilities"]["layout"][0]["zones"] == [0, 1, 2, 3]
+    assert ctx["capabilities"]["layout"][1]["zones"] == [4, 5, 6, 7]
+
+
+@pytest.mark.parametrize(
+    ("model", "zones", "layout_kind"),
+    [
+        ("AYN Thor", 8, "shared-edge"),
+        ("AYN Odin 3", 8, "shared-edge"),
+        ("KONKR Pocket FIT Elite", 1, "shared-full"),
+        ("MANGMI Pocket Max", 16, "shared-full"),
+    ],
+)
+def test_armada_catalog_families_expose_expected_zones(tmp_path, model, zones, layout_kind):
+    root = str(tmp_path)
+    _make_model(root, model)
+    _make_armada_profile_leds(root, model)
+
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], ArmadaRgbDevice)
+    assert ctx["info"]["name"] == model
+    assert ctx["capabilities"]["zones"] == zones
+    assert ctx["capabilities"]["perZone"] is (zones > 1)
+    assert ctx["capabilities"]["layout"][0]["kind"] == layout_kind
+
+
+def test_partial_odin3_topology_does_not_claim_rgb_support(tmp_path):
+    root = str(tmp_path)
+    _make_model(root, "AYN Odin 3")
+    _make_armada_profile_leds(root, "AYN Odin 3", count=23)
+
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], NullDevice)
+    assert ctx["capabilities"]["color"] is False
 
 
 def test_complete_odin2_topology_builds_per_zone_device(tmp_path):

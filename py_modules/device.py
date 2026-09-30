@@ -1,6 +1,7 @@
 import os
 import platform
 
+from armada_rgb import build_armada_device, layout_for_profile
 from device_profiles import profile_for_discovered_adapter, profile_for_hid_signatures, resolve_profile_match
 from led_device import (
     ApexRgbDevice,
@@ -398,6 +399,36 @@ def build_device(sysfs_root="/", ambilight=False):
             "device": device,
             "power_led": power_led,
         })
+
+    armada_match = build_armada_device(info.get("model"), leds_dir, sysfs_root)
+    if armada_match is not None:
+        armada_profile, device = armada_match
+        if device.available:
+            zones = device.zone_count
+            profile.update({
+                "name": info["model"],
+                "driver": "multi_sysfs",
+                "zones": zones,
+                "per_zone": zones > 1,
+                "experimental": [],
+                "max_render_fps": 10,
+            })
+            info["name"] = info["model"]
+            info["displayNameKey"] = None
+            capabilities = build_capabilities(
+                profile, True, zones, 255, ambilight,
+                power_led, battery, temperature,
+            )
+            capabilities["perZone"] = device.supports_per_zone()
+            capabilities["layout"] = layout_for_profile(
+                info["model"], armada_profile, zones
+            )
+            return _with_sleep_charging(profile, {
+                "info": info,
+                "capabilities": capabilities,
+                "device": device,
+                "power_led": power_led,
+            })
 
     portal_nodes = discover_portal_leds(leds_dir) if not matched else []
     if portal_nodes:

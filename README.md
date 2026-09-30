@@ -10,7 +10,7 @@ Colores ya está preparado para funcionar de forma nativa en Armada OS:
 
 - **Audio reactivo estable.** Usa las herramientas nativas del host, sigue automáticamente los cambios de salida de audio y reconecta la captura sin reiniciar el plugin.
 - **Ambilight en ARM64 y entornos FEX.** Detecta un backend PipeWire/GStreamer completo y, cuando hace falta, utiliza el fallback ARM64 incluido y verificado mediante checksums.
-- **RGB por zona en Odin 2.** Detecta los cuatro nodos de iluminación y permite controlar de forma independiente joystick izquierdo, lateral izquierdo, lateral derecho y joystick derecho.
+- **RGB nativo para la familia Armada.** Usa los perfiles de hardware de Armada OS para controlar por zona AYN Odin 2, Odin 3, Portal y Thor; Retroid Pocket; KONKR Pocket FIT Elite; y MANGMI, conservando corrección de color, brillo y Ambilight según la topología conocida.
 - **Plasmoide Armada OS para Plasma 6.** El source incluye un widget instalable
   que reúne el interruptor de las luces RGB y los perfiles Eco, Balanced y
   Performance. Sigue el idioma configurado en Plasma y se distribuye como
