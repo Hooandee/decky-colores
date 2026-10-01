@@ -32,7 +32,7 @@ In this video I show and explain the plugin in depth:
 | ASUS ROG | Ally, Ally X, Xbox Ally, Xbox Ally X | 4 RGB zones around the joystick rings |
 | Lenovo Legion | Go, Go 2, Go S | Per-controller color, reconnect button (see below) |
 | MSI | Claw, Claw 8 AI+ | 9 zones |
-| AYN | Thor (Linux, Armada OS) | One color per joystick ring |
+| AYN | Thor (Linux, Armada OS) | 8 zones around the joystick rings |
 
 Not on the list? Colores still tries to use your device by reading whatever LEDs the system exposes. Those features show up marked as experimental: you can try them, but they may not behave well until I get that machine in hand to calibrate it. If there are no controllable LEDs at all, the plugin tells you instead of hanging.
 

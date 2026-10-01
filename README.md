@@ -32,7 +32,7 @@ En este vídeo enseño y explico el plugin a fondo:
 | ASUS ROG | Ally, Ally X, Xbox Ally, Xbox Ally X | 4 zonas RGB en los anillos de los joysticks |
 | Lenovo Legion | Go, Go 2, Go S | Color por mando, botón de reconexión (ver más abajo) |
 | MSI | Claw, Claw 8 AI+ | 9 zonas |
-| AYN | Thor (Linux, Armada OS) | Un color por anillo de joystick |
+| AYN | Thor (Linux, Armada OS) | 8 zonas en los anillos de los joysticks |
 
 ¿Tu consola no está en la lista? Colores intenta usarla igualmente leyendo los LEDs que el sistema expone. Verás esas funciones marcadas como experimentales: puedes probarlas, pero puede que no respondan bien hasta que tenga esa máquina entre manos para calibrarla. Si ni siquiera hay LEDs que controlar, el plugin te lo dice y no se queda colgado.
 
