@@ -118,12 +118,13 @@ PORTAL_SYSFS = {
     "experimental": [],
 }
 
-# Linux exposes the AYN Thor's stick rings as rgb:l1..l4 and rgb:r1..r4; the ring a
-# node belongs to is certain from its name, its position inside the ring is not.
+# Linux groups the Thor's HTR3212 channels as rgb:l1..l4 / rgb:r1..r4, but the device
+# tree wires l1/r1 to channels 10-12 and l2-l4/r2-r4 to 1-9. Zones follow the channel
+# order, which is the identity order the Android HTR3212 driver uses (shared gridLayout).
 AYN_THOR_STICK_RINGS = {
     **PORTAL_SYSFS,
-    "zones": 2,
-    "stick_groups": [[0, 1, 2, 3], [4, 5, 6, 7]],
+    "zones": 8,
+    "stick_groups": [[1], [2], [3], [0], [5], [6], [7], [4]],
 }
 
 DEVICE_TREE_PROFILES = {
