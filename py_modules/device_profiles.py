@@ -118,6 +118,18 @@ PORTAL_SYSFS = {
     "experimental": [],
 }
 
+# Linux exposes the AYN Thor's stick rings as rgb:l1..l4 and rgb:r1..r4; the ring a
+# node belongs to is certain from its name, its position inside the ring is not.
+AYN_THOR_STICK_RINGS = {
+    **PORTAL_SYSFS,
+    "zones": 2,
+    "stick_groups": [[0, 1, 2, 3], [4, 5, 6, 7]],
+}
+
+DEVICE_TREE_PROFILES = {
+    "AYN Thor": AYN_THOR_STICK_RINGS,
+}
+
 OMEN_PLATFORM = {
     "driver": "hp_omen_platform",
     "color_order": "rgb",
@@ -226,7 +238,7 @@ def profile_for_hid_signatures(info, drivers):
 
 def profile_for_discovered_adapter(adapter, name):
     if adapter == "portal_sysfs":
-        return _profile(PORTAL_SYSFS, name)
+        return _profile(DEVICE_TREE_PROFILES.get(name, PORTAL_SYSFS), name)
     if adapter == "hp_omen_platform":
         return _profile(OMEN_PLATFORM, name)
     return None
