@@ -10,6 +10,7 @@ import logging
 import math
 import os
 import re
+import threading
 
 from led_device import LedDevice
 
@@ -22,6 +23,7 @@ BUNDLED_CATALOG = os.path.join(os.path.dirname(__file__), "armada_rgb_profiles.j
 _SAFE_TARGET = re.compile(r"^[A-Za-z0-9:_.-]+$")
 _CHANNELS = ("red", "green", "blue")
 _CORRECTION_TRIGGERS = {"always", *_CHANNELS}
+_ARMADA_WRITE_LOCK = threading.RLock()
 
 
 class ArmadaProfileError(ValueError):
@@ -222,6 +224,10 @@ class ArmadaRgbDevice(LedDevice):
         self._zones = self._zone_count()
         self._max_brightness = 255
         self.last_error = None
+        # A channels profile (Odin 3) is one logical frame spread over 24
+        # sysfs attributes. Keep each frame/blank transaction indivisible if
+        # callers ever reach this device from more than one worker thread.
+        self._write_lock = _ARMADA_WRITE_LOCK
 
     def _zone_count(self):
         if self._backend == "multicolor":
@@ -361,25 +367,26 @@ class ArmadaRgbDevice(LedDevice):
                 pass
 
     def apply_zones(self, zone_colors, brightness, power):
-        self.last_error = None
-        colors = self._fit(zone_colors)
-        prepared = []
-        try:
-            prepared = (
-                self._prepare_channels(colors, brightness, power)
-                if self._backend == "channels"
-                else self._prepare_multicolor(colors, brightness, power)
-            )
-            for item in prepared:
-                for handle, value in item["writes"]:
-                    _write_open_file(handle, value)
-            return True
-        except (OSError, UnicodeError, ValueError) as error:
-            self.last_error = str(error)
-            self._blank(prepared)
-            return False
-        finally:
-            _close_all(prepared)
+        with self._write_lock:
+            self.last_error = None
+            colors = self._fit(zone_colors)
+            prepared = []
+            try:
+                prepared = (
+                    self._prepare_channels(colors, brightness, power)
+                    if self._backend == "channels"
+                    else self._prepare_multicolor(colors, brightness, power)
+                )
+                for item in prepared:
+                    for handle, value in item["writes"]:
+                        _write_open_file(handle, value)
+                return True
+            except (OSError, UnicodeError, ValueError) as error:
+                self.last_error = str(error)
+                self._blank(prepared)
+                return False
+            finally:
+                _close_all(prepared)
 
     def apply_solid(self, color, brightness, power):
         return self.apply_zones([tuple(color)] * self._zones, brightness, power)

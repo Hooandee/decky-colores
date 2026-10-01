@@ -11,8 +11,35 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build-emulator:
+    if: github.repository == 'jl-casella/decky-colores' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: emulator
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: emulator/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm run runtime
+      - run: npx electron-builder --linux AppImage --arm64
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Colores-Emulator-arm64
+          path: emulator/release/Colores-Emulator-*-arm64.AppImage
+          if-no-files-found: error
+
   release:
     if: github.repository == 'jl-casella/decky-colores' && github.ref == 'refs/heads/main'
+    needs: build-emulator
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,6 +71,11 @@ jobs:
       - run: pnpm test:fe
       - run: pnpm package:plugin
 
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Colores-Emulator-arm64
+          path: release-assets
+
       - name: Publish release in this fork
         env:
           GH_TOKEN: ${{ github.token }}
@@ -51,6 +83,8 @@ jobs:
           set -euo pipefail
           VERSION="$(node -p "require('./package.json').version")"
           TAG="decky-colores-v${VERSION}"
+          EMULATOR="release-assets/Colores-Emulator-${VERSION}-arm64.AppImage"
+          test -f "$EMULATOR"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "Release $TAG already exists" >&2
             exit 1
@@ -68,6 +102,7 @@ jobs:
           - Matched Armada OS color correction, gamma, channel ordering, brightness scaling, and safe failure behavior.
           - Added topology-aware Ambilight: shared screen edges on known left/right layouts and safe global sampling otherwise.
           - Improved localized device identification on ARM handhelds.
+          - Added the ARM64 Colores Emulator AppImage for testing plugins without physical hardware.
 
           ## Armada OS Plasma widget
 
@@ -81,8 +116,9 @@ jobs:
 
           - `Colores.zip`: Decky Loader plugin.
           - `Armada-OS.plasmoid`: Plasma 6 widget.
+          - `Colores-Emulator-<version>-arm64.AppImage`: ARM64 emulator.
           EOF
-          gh release create "$TAG" Colores.zip Armada-OS.plasmoid \
+          gh release create "$TAG" Colores.zip Armada-OS.plasmoid "$EMULATOR" \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "Colores v${VERSION}" \

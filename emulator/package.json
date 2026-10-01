@@ -1,0 +1,67 @@
+{
+  "name": "colores-emulator",
+  "version": "0.29.3",
+  "private": true,
+  "type": "module",
+  "author": "jl-casella",
+  "desktopName": "colores-emulator",
+  "description": "ARM64 desktop emulator for Colores Decky plugin releases",
+  "main": "dist/main.mjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "runtime": "node scripts/prepare-python.mjs",
+    "start": "npm run build && electron --no-sandbox .",
+    "test": "node --test test/*.node.mjs && python3 -m unittest discover -s worker/tests -v",
+    "package": "npm run test && npm run build && npm run runtime && electron-builder --linux AppImage --arm64"
+  },
+  "dependencies": {
+    "adm-zip": "^0.6.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.2"
+  },
+  "build": {
+    "appId": "io.github.jl-casella.colores-emulator",
+    "productName": "Colores Emulator",
+    "executableName": "colores-emulator",
+    "afterPack": "scripts/after-pack.cjs",
+    "directories": {
+      "output": "release"
+    },
+    "asar": true,
+    "asarUnpack": [
+      "worker/worker.py"
+    ],
+    "files": [
+      "dist/**/*",
+      "worker/worker.py",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "runtime",
+        "to": "runtime",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Development",
+      "synopsis": "Run Colores against virtual Armada RGB hardware",
+      "description": "Loads a trusted Colores Decky plugin ZIP and visualizes its RGB, audio and Ambilight output without physical hardware.",
+      "artifactName": "Colores-Emulator-${version}-arm64.${ext}"
+    }
+  },
+  "allowScripts": {
+    "electron@44.5.1": true,
+    "esbuild@0.28.2": true
+  }
+}

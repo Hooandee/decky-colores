@@ -212,6 +212,9 @@ class Plugin:
             logger=decky.logger,
         )
         self._hhd_rgb_lock = asyncio.Lock()
+        self._capture_transition_generation = 0
+        self._capture_transition_task = None
+        self._capture_owner = None
         self._hhd_rgb_status = None
         self._setup_device(self._build_context())
         self._store = SettingsStore(
@@ -712,9 +715,6 @@ class Plugin:
         if key == self._current_app_key:
             return self._profile_state("game" if key else "global", key)
         self._current_app_key = key
-        self._ambilight.stop()
-        self._audio.stop()
-        self._engine.stop()
         self._sync_effective_profile()
         self._apply()
         return self._profile_state("game" if key else "global", key)
@@ -956,7 +956,8 @@ class Plugin:
             self._sync_effective_profile()
         self._apply_sleep_charging_indicator()
         if self._settings["mode"] == "ambient":
-            self._ambilight.stop()
+            await self._ambilight.stop_and_wait()
+            self._capture_owner = None
         self._apply()
         return bool(ok)
 
@@ -1150,6 +1151,13 @@ class Plugin:
     def _apply(self) -> None:
         if getattr(self, "_suspend_prepared", False):
             return
+        capture_target = self._effective_power() and self._settings["mode"] in (
+            "ambient",
+            "vu",
+        )
+        if self._capture_work_active() and not capture_target:
+            self._schedule_capture_transition()
+            return
         if self._controller.supports_hardware_effects() and not self._wants_render_loop():
             self._apply_hardware()
             return
@@ -1184,39 +1192,34 @@ class Plugin:
     def _apply_per_zone(self) -> None:
         s = self._settings
         if not self._effective_power():
-            self._ambilight.stop()
-            self._audio.stop()
-            self._engine.set_static([(0, 0, 0)] * self._zones)
+            if self._capture_work_active():
+                self._schedule_capture_transition()
+            else:
+                self._engine.set_static([(0, 0, 0)] * self._zones)
             return
 
-        if s["mode"] == "ambient":
-            self._audio.stop()
-            self._engine.stop()
-            amb = s["ambilight"]
-            self._ambilight.start(
-                {
-                    "saturation": 1.0 + (amb["vividness"] / 100) * 1.5,
-                    "smoothing": amb["smoothing"],
-                    "fps": amb.get("fps", 10),
-                    "sampling": amb.get("sampling", "columns"),
-                    "global_color": not (
-                        self._capabilities.get("perZone")
-                        or self._capabilities.get("perControllerColor")
-                    ),
-                    "fallback": tuple(s["color"]),
-                }
-            )
-            return
-
-        if s["mode"] == "vu":
-            self._ambilight.stop()
-            self._engine.stop()
-            self._audio.start()
+        if s["mode"] in ("ambient", "vu") or self._capture_work_active():
+            self._schedule_capture_transition()
             return
 
         self._ambilight.stop()
         self._audio.stop()
+        self._apply_non_capture_mode()
 
+    def _capture_work_active(self) -> bool:
+        task = getattr(self, "_capture_transition_task", None)
+        return bool(
+            getattr(self, "_capture_owner", None)
+            or (task is not None and not task.done())
+            or self._ambilight.running
+            or self._audio.running
+        )
+
+    def _apply_non_capture_mode(self) -> None:
+        s = self._settings
+        if not self._effective_power():
+            self._engine.set_static([(0, 0, 0)] * self._zones)
+            return
         if s["mode"] == "battery":
             self._engine.start_battery(self._battery_state)
         elif s["mode"] == "temperature":
@@ -1246,6 +1249,104 @@ class Plugin:
                 )
         else:
             self._engine.set_static([tuple(s["color"])] * self._zones)
+
+    def _schedule_capture_transition(self) -> None:
+        """Serialize capture-mode handoffs before any new effect can write RGB."""
+        self._capture_transition_generation += 1
+        generation = self._capture_transition_generation
+        mode = self._settings["mode"]
+        decky.logger.info(
+            "Colores: RGB mode transition requested owner=%s target=%s generation=%s",
+            self._capture_owner,
+            mode,
+            generation,
+        )
+        task = self._capture_transition_task
+        if (
+            mode in ("ambient", "vu")
+            and (task is None or task.done())
+            and getattr(self, "_capture_owner", None) is None
+            and not self._ambilight.running
+            and not self._audio.running
+            and not self._engine.running
+        ):
+            self._start_capture_mode(mode)
+            self._capture_owner = mode
+            decky.logger.info(
+                "Colores: RGB mode transition complete owner=%s generation=%s",
+                mode,
+                generation,
+            )
+            return
+        if task is None or task.done():
+            self._capture_transition_task = asyncio.create_task(
+                self._run_capture_transition_queue()
+            )
+
+    def _start_capture_mode(self, mode: str) -> None:
+        if mode == "ambient":
+            s = self._settings
+            amb = s["ambilight"]
+            self._ambilight.start(
+                {
+                    "saturation": 1.0 + (amb["vividness"] / 100) * 1.5,
+                    "smoothing": amb["smoothing"],
+                    "fps": amb.get("fps", 10),
+                    "sampling": amb.get("sampling", "columns"),
+                    "global_color": not (
+                        self._capabilities.get("perZone")
+                        or self._capabilities.get("perControllerColor")
+                    ),
+                    "fallback": tuple(s["color"]),
+                }
+            )
+        elif mode == "vu":
+            self._audio.start()
+
+    async def _run_capture_transition_queue(self) -> None:
+        while True:
+            generation = self._capture_transition_generation
+            mode = self._settings["mode"]
+            active = self._effective_power() and mode in ("ambient", "vu")
+            target = mode if active else None
+            decky.logger.info(
+                "Colores: RGB mode transition stopping owner=%s target=%s generation=%s",
+                self._capture_owner,
+                target,
+                generation,
+            )
+            # Stop and join every producer before starting another. The task
+            # finally blocks reap capture processes and cancel frame readers.
+            await self._ambilight.stop_and_wait()
+            await self._audio.stop_and_wait()
+            await self._engine.stop_and_wait()
+            self._capture_owner = None
+
+            if generation != self._capture_transition_generation:
+                decky.logger.info(
+                    "Colores: RGB transition superseded generation=%s latest=%s",
+                    generation,
+                    self._capture_transition_generation,
+                )
+                continue
+
+            if target is not None:
+                self._start_capture_mode(target)
+            else:
+                # Clear the coordinator before applying the requested non-
+                # capture mode so _apply can safely select its normal backend.
+                self._capture_transition_task = None
+                self._apply()
+
+            self._capture_owner = target
+            decky.logger.info(
+                "Colores: RGB mode transition complete owner=%s generation=%s",
+                target,
+                generation,
+            )
+            if generation == self._capture_transition_generation:
+                self._capture_transition_task = None
+                return
 
     async def _main(self):
         self._init()
@@ -1393,16 +1494,30 @@ class Plugin:
 
     async def _unload(self):
         await self._stop_background_tasks()
+        transition = getattr(self, "_capture_transition_task", None)
+        if transition is not None:
+            await asyncio.gather(transition, return_exceptions=True)
         if getattr(self, "_ready", False):
             await self._restore_hhd_rgb()
         if getattr(self, "_ambilight", None):
-            self._ambilight.stop()
+            await self._ambilight.stop_and_wait()
+        if getattr(self, "_audio", None):
+            await self._audio.stop_and_wait()
         if getattr(self, "_engine", None):
-            self._engine.stop()
+            await self._engine.stop_and_wait()
         decky.logger.info("Colores unloaded")
 
     async def _uninstall(self):
         await self._stop_background_tasks()
+        transition = getattr(self, "_capture_transition_task", None)
+        if transition is not None:
+            await asyncio.gather(transition, return_exceptions=True)
+        if getattr(self, "_ambilight", None):
+            await self._ambilight.stop_and_wait()
+        if getattr(self, "_audio", None):
+            await self._audio.stop_and_wait()
+        if getattr(self, "_engine", None):
+            await self._engine.stop_and_wait()
         if getattr(self, "_ready", False):
             await self._restore_hhd_rgb()
         decky.logger.info("Colores uninstalled")

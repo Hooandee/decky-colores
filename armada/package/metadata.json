@@ -12,7 +12,7 @@
         "Id": "com.armada.armadaos",
         "License": "MIT",
         "Name": "Armada OS",
-        "Version": "0.29.2"
+        "Version": "0.29.3"
     },
     "X-Plasma-API-Minimum-Version": "6.0"
 }

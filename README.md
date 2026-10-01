@@ -15,6 +15,10 @@ Colores ya está preparado para funcionar de forma nativa en Armada OS:
   que reúne el interruptor de las luces RGB y los perfiles Eco, Balanced y
   Performance. Sigue el idioma configurado en Plasma y se distribuye como
   `Armada-OS.plasmoid`; consulta su [documentación e instalación](armada/README.md).
+- **Emulador de hardware Armada.** La herramienta ARM64 incluida en
+  [`emulator/`](emulator/README.md) carga un ZIP real de Colores, ejecuta su UI
+  y backend y muestra los LEDs sobre una consola virtual. Incluye patrones,
+  video y audio para probar Ambilight y el modo reactivo sin hardware físico.
 
 <p align="center">
   <a href="https://ko-fi.com/hooandee"><img src="https://img.shields.io/badge/Ko--fi-Inv%C3%ADtame%20un%20caf%C3%A9-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
@@ -91,14 +95,15 @@ Hecho con todo el cariño por las portátiles ❤️.
 
 ## Desarrollo
 
-Además del plugin de Decky, este repositorio contiene el código fuente del
-plasmoide Armada OS en [`armada/`](armada/README.md). Para generar ambos
-entregables:
+Además del plugin de Decky, este repositorio contiene el plasmoide Armada OS en
+[`armada/`](armada/README.md) y el emulador en
+[`emulator/`](emulator/README.md). Para generar los entregables:
 
 ```bash
 pnpm install && pnpm build   # genera dist/index.js
 python -m pytest             # tests del backend
 pnpm package:plasmoid        # genera Armada-OS.plasmoid
+npm run package:emulator     # genera el AppImage ARM64 del emulador
 ```
 
 ## Licencia

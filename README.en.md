@@ -15,6 +15,10 @@ Colores is now ready to run natively on Armada OS:
   combining the RGB light switch with the Eco, Balanced, and Performance
   profiles. It follows Plasma's configured language and is distributed as
   `Armada-OS.plasmoid`; see its [documentation and installation guide](armada/README.en.md).
+- **Armada hardware emulator.** The ARM64 tool under
+  [`emulator/`](emulator/README.en.md) loads a real Colores ZIP, runs its UI and
+  backend, and renders the LEDs on a virtual handheld. Built-in patterns, video,
+  and audio exercise Ambilight and audio-reactive mode without physical hardware.
 
 <p align="center">
   <a href="https://ko-fi.com/hooandee"><img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
@@ -92,13 +96,14 @@ Made with a lot of love for handhelds ❤️.
 ## Development
 
 In addition to the Decky plugin, this repository contains the Armada OS
-plasmoid source under [`armada/`](armada/README.en.md). To build both
-deliverables:
+plasmoid under [`armada/`](armada/README.en.md) and the emulator under
+[`emulator/`](emulator/README.en.md). To build the deliverables:
 
 ```bash
 pnpm install && pnpm build   # builds dist/index.js
 python -m pytest             # backend tests
 pnpm package:plasmoid        # builds Armada-OS.plasmoid
+npm run package:emulator     # builds the ARM64 emulator AppImage
 ```
 
 ## License

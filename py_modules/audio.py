@@ -94,15 +94,31 @@ class AudioReactive:
         if self.running:
             return
         self.stop()
+        logger.info("audio worker starting")
         self._task = asyncio.get_event_loop().create_task(self._run())
 
     def stop(self):
         self.status = "idle"
         if self._task is not None:
+            logger.info("audio worker stop requested")
             self._task.cancel()
             self._task = None
         self._kill()
         self._level = 0.0
+
+    async def stop_and_wait(self):
+        task = self._task
+        proc = self._proc
+        if task is not None:
+            logger.info("audio worker stopping")
+        self.stop()
+        pending = [task] if task is not None else []
+        if proc is not None:
+            pending.append(proc.wait())
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        if task is not None or proc is not None:
+            logger.info("audio worker stopped; capture process reaped")
 
     def _kill(self):
         if self._proc is not None:
@@ -140,6 +156,15 @@ class AudioReactive:
                     proc.kill()
                 except ProcessLookupError:
                     pass
+                await asyncio.gather(proc.wait(), return_exceptions=True)
+        except asyncio.CancelledError:
+            if proc is not None:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                await asyncio.gather(proc.wait(), return_exceptions=True)
+            raise
         return None
 
     async def _run(self):
@@ -188,6 +213,7 @@ class AudioReactive:
                         proc.kill()
                     except ProcessLookupError:
                         pass
+                    await asyncio.gather(proc.wait(), return_exceptions=True)
                 if self._proc is proc:
                     self._proc = None
             if not route_changed:

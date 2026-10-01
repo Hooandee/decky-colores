@@ -101,6 +101,9 @@ class FakeEngine:
     def stop(self):
         self.events.append(("stop",))
 
+    async def stop_and_wait(self):
+        self.events.append(("stop_and_wait",))
+
     @property
     def running(self):
         return False
@@ -144,6 +147,13 @@ class FakeAudio:
 
     def stop(self):
         self.events.append(("stop",))
+
+    @property
+    def running(self):
+        return False
+
+    async def stop_and_wait(self):
+        self.events.append(("stop_and_wait",))
 
     def start(self, options=None):
         self.events.append(("start", options))
@@ -229,6 +239,9 @@ def _plugin(
     p._resume_lock = asyncio.Lock()
     p._resume_handled_at = None
     p._hhd_rgb_lock = asyncio.Lock()
+    p._capture_transition_generation = 0
+    p._capture_transition_task = None
+    p._capture_owner = None
     p._hhd_rgb_status = None
     p._controller = FakeController(hw, per_zone)
     p._engine = FakeEngine()
@@ -432,8 +445,84 @@ def test_vu_mode_starts_audio_capture(main_module):
     p = _plugin(main_module, "vu", hw=False, per_zone=True)
     p._apply()
     assert any(e[0] == "start" for e in p._audio.events)
-    assert ("stop",) in p._ambilight.events
-    assert p._engine.events and p._engine.events[-1][0] == "stop"
+    assert p._capture_owner == "vu"
+
+
+def test_ambilight_to_audio_waits_for_ambilight_before_starting_audio(main_module):
+    async def drive():
+        p = _plugin(main_module, "ambient", hw=False, per_zone=True)
+        p._apply()
+        timeline = []
+        ambilight_stop = p._ambilight.stop_and_wait
+        engine_stop = p._engine.stop_and_wait
+        audio_stop = p._audio.stop_and_wait
+        audio_start = p._audio.start
+
+        async def record_ambilight_stop():
+            await ambilight_stop()
+            timeline.append("ambilight stopped")
+
+        async def record_engine_stop():
+            await engine_stop()
+            timeline.append("engine stopped")
+
+        async def record_audio_stop():
+            await audio_stop()
+            timeline.append("audio stopped")
+
+        def record_audio_start(options=None):
+            timeline.append("audio started")
+            audio_start(options)
+
+        p._ambilight.stop_and_wait = record_ambilight_stop
+        p._engine.stop_and_wait = record_engine_stop
+        p._audio.stop_and_wait = record_audio_stop
+        p._audio.start = record_audio_start
+        p._settings["mode"] = "vu"
+        p._apply()
+        await p._capture_transition_task
+
+        assert p._capture_owner == "vu"
+        assert timeline == [
+            "ambilight stopped",
+            "audio stopped",
+            "engine stopped",
+            "audio started",
+        ]
+
+    asyncio.run(drive())
+
+
+def test_rapid_ambilight_audio_switches_leave_only_latest_worker_running(main_module):
+    async def drive():
+        p = _plugin(main_module, "ambient", hw=False, per_zone=True)
+        p._apply()
+        entered_stop = asyncio.Event()
+        release_stop = asyncio.Event()
+        original_stop = p._ambilight.stop_and_wait
+
+        async def blocked_stop():
+            entered_stop.set()
+            await release_stop.wait()
+            await original_stop()
+
+        p._ambilight.stop_and_wait = blocked_stop
+        p._settings["mode"] = "vu"
+        p._apply()
+        await entered_stop.wait()
+        p._settings["mode"] = "ambient"
+        p._apply()
+        p._settings["mode"] = "vu"
+        p._apply()
+        release_stop.set()
+        await p._capture_transition_task
+
+        starts = [event for event in p._audio.events if event[0] == "start"]
+        assert len(starts) == 1
+        assert p._capture_owner == "vu"
+        assert sum(event[0] == "start" for event in p._ambilight.events) == 1
+
+    asyncio.run(drive())
 
 
 def test_non_vu_mode_stops_audio(main_module):
@@ -712,7 +801,7 @@ def test_reconnect_restarts_ambient_capture(main_module):
     p._ambilight.events.clear()
     ok = asyncio.run(p.reconnect())
     assert ok is True
-    assert [event[0] for event in p._ambilight.events] == ["stop", "start"]
+    assert [event[0] for event in p._ambilight.events] == ["stop_and_wait", "start"]
 
 
 def test_prepare_suspend_stops_capture_without_changing_user_intent(main_module):

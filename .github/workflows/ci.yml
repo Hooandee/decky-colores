@@ -94,3 +94,30 @@ jobs:
         run: pnpm package:plugin
       - name: Verify build outputs exist
         run: test -f dist/index.js && test -f Colores.zip
+
+  arm64-emulator:
+    needs: changes
+    if: needs.changes.outputs.decky == 'true'
+    runs-on: ubuntu-24.04-arm
+    defaults:
+      run:
+        working-directory: emulator
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: emulator/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npm run runtime
+      - run: npx electron-builder --linux AppImage --arm64
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: Colores-Emulator-arm64
+          path: emulator/release/Colores-Emulator-*-arm64.AppImage
+          if-no-files-found: error

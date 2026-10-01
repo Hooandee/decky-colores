@@ -10,4 +10,10 @@ __pycache__/
 *.zip
 *.plasmoid
 *.tar.gz
+emulator/dist/
+emulator/release/
+emulator/release-*/
+emulator/node_modules/
+emulator/runtime/python/
+emulator/.build-tmp/
 .superpowers/

@@ -1,4 +1,6 @@
 import json
+import threading
+import time
 
 import pytest
 
@@ -213,6 +215,50 @@ def test_known_side_layouts_share_ambilight_by_side():
     assert layout[0]["zones"] == [0, 1, 2, 3]
     assert layout[1]["zones"] == [4, 5, 6, 7]
     assert {group["kind"] for group in layout} == {"shared-edge"}
+
+
+def test_odin3_eight_zone_channel_frames_are_serialized(tmp_path, monkeypatch):
+    profile = profile_for_model("AYN Odin 3")
+    for target in profile["backend"]["targets"]:
+        _make_node(tmp_path, target.split("=", 1)[1])
+    device = ArmadaRgbDevice(str(tmp_path), profile["backend"])
+    second_device = ArmadaRgbDevice(str(tmp_path), profile["backend"])
+    assert device.zone_count == 8
+    assert len(profile["backend"]["targets"]) == 24
+    original_write = armada_rgb._write_open_file
+    guard = threading.Lock()
+    active = 0
+    maximum_active = 0
+
+    def tracked_write(handle, value):
+        nonlocal active, maximum_active
+        with guard:
+            active += 1
+            maximum_active = max(maximum_active, active)
+        time.sleep(0.001)
+        try:
+            original_write(handle, value)
+        finally:
+            with guard:
+                active -= 1
+
+    monkeypatch.setattr(armada_rgb, "_write_open_file", tracked_write)
+    frame_a = [(255, 0, 0)] * 8
+    frame_b = [(0, 0, 255)] * 8
+    results = []
+    workers = [
+        threading.Thread(target=lambda frame=frame: results.append(
+        (device if frame is frame_a else second_device).apply_zones(frame, 100, True)
+        ))
+        for frame in (frame_a, frame_b)
+    ]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+
+    assert results == [True, True]
+    assert maximum_active == 1
 
 
 def test_unknown_geometry_uses_safe_global_ambilight_layout():

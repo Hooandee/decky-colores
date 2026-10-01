@@ -327,7 +327,16 @@ class Ambilight:
                     proc.kill()
                 except ProcessLookupError:
                     pass
+                await asyncio.gather(proc.wait(), return_exceptions=True)
             return None
+        except asyncio.CancelledError:
+            if proc is not None:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+                await asyncio.gather(proc.wait(), return_exceptions=True)
+            raise
         for obj in data:
             props = (obj.get("info") or {}).get("props") or {}
             if props.get("node.name") == GAMESCOPE_NODE and "Video" in str(
@@ -341,11 +350,13 @@ class Ambilight:
         if self.running:
             return
         self.stop()
+        logger.info("ambilight worker starting")
         self._task = asyncio.get_event_loop().create_task(self._run())
 
     def stop(self):
         self.status = "idle"
         if self._task is not None:
+            logger.info("ambilight worker stop requested")
             self._task.cancel()
             self._task = None
         self._kill()
@@ -353,11 +364,15 @@ class Ambilight:
     async def stop_and_wait(self):
         task = self._task
         proc = self._proc
+        if task is not None:
+            logger.info("ambilight worker stopping")
         self.stop()
         pending = [task] if task is not None else []
         if proc is not None:
             pending.append(proc.wait())
         await asyncio.gather(*pending, return_exceptions=True)
+        if task is not None or proc is not None:
+            logger.info("ambilight worker stopped; capture process reaped")
 
     def _kill(self):
         if self._proc is not None:
@@ -437,6 +452,7 @@ class Ambilight:
                         proc.kill()
                     except ProcessLookupError:
                         pass
+                    await asyncio.gather(proc.wait(), return_exceptions=True)
                 if self._proc is proc:
                     self._proc = None
             await asyncio.sleep(RETRY_INTERVAL)

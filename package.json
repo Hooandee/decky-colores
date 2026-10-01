@@ -1,12 +1,14 @@
 {
   "name": "decky-colores",
-  "version": "0.29.2",
+  "version": "0.29.3",
   "description": "Beautiful RGB LED control for handheld gaming PCs.",
   "type": "module",
   "scripts": {
     "build": "rollup -c --forceExit",
     "package:plugin": "sh scripts/package_plugin.sh",
     "package:plasmoid": "sh armada/scripts/package_widget.sh",
+    "package:emulator": "npm --prefix emulator run package",
+    "test:emulator": "npm --prefix emulator test",
     "watch": "rollup -c -w",
     "typecheck": "tsc --noEmit",
     "test:fe": "vitest run",
