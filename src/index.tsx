@@ -740,6 +740,7 @@ function Content() {
                 {t("load.retry")}
               </ButtonItem>
             </PanelSectionRow>
+            <UpdateFloatingTray lang={lang} info={updateInfo} status={updateStatus} />
           </>
         ) : (
           <PanelSectionRow>
@@ -1101,6 +1102,7 @@ function Content() {
                 {t("load.retry")}
               </ButtonItem>
             </PanelSectionRow>
+            <UpdateFloatingTray lang={lang} info={updateInfo} status={updateStatus} />
           </>
         ) : (
           <PanelSectionRow>

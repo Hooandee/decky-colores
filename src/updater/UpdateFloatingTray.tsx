@@ -17,9 +17,9 @@ interface Props {
 
 const TRAY_INSET = 16;
 
-let sessionDismissed = false;
+let dismissedVersion: string | null = null;
 const listeners = new Set<() => void>();
-const getDismissed = () => sessionDismissed;
+const getDismissedVersion = () => dismissedVersion;
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
@@ -54,8 +54,8 @@ function useReservedScrollPadding(cardRef: { current: HTMLDivElement | null }): 
   }, [cardRef]);
 }
 
-function dismiss(): void {
-  sessionDismissed = true;
+function dismiss(version: string): void {
+  dismissedVersion = version;
   listeners.forEach((listener) => listener());
 }
 
@@ -131,8 +131,8 @@ const VisibleUpdateTray: FC<{ lang: Lang; info: UpdateInfo }> = ({ lang, info })
             color: theme.color.textPrimary,
             boxShadow: `inset 0 0 0 1px ${theme.color.hairline}`,
           }}
-          onActivate={() => run(dismiss)}
-          onClick={() => run(dismiss)}
+          onActivate={() => run(() => dismiss(info.latest))}
+          onClick={() => run(() => dismiss(info.latest))}
         >
           {t.later}
         </Focusable>
@@ -142,7 +142,7 @@ const VisibleUpdateTray: FC<{ lang: Lang; info: UpdateInfo }> = ({ lang, info })
 };
 
 export const UpdateFloatingTray: FC<Props> = ({ lang, info, status }) => {
-  const dismissed = useSyncExternalStore(subscribe, getDismissed, getDismissed);
-  if (info?.has_update !== true || dismissed || status === "installing" || status === "done") return null;
+  const dismissed = useSyncExternalStore(subscribe, getDismissedVersion, getDismissedVersion);
+  if (info?.has_update !== true || info.latest === dismissed || status === "installing" || status === "done") return null;
   return <VisibleUpdateTray lang={lang} info={info} />;
 };
