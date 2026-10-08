@@ -5,6 +5,7 @@ import { getUpdaterStrings } from "./strings";
 describe("Italian updater copy", () => {
   it("returns all updater strings from one catalog", () => {
     expect(getUpdaterStrings("it")).toEqual({
+      floating: { title: "Nuova versione disponibile", update: "Aggiorna", later: "Più tardi" },
       panel: {
         version: "Versione",
         latest: "(più recente)",
@@ -29,6 +30,7 @@ describe("Italian updater copy", () => {
   });
   it("falls back to the English catalog for an invalid runtime language", () => {
     expect(getUpdaterStrings("unsupported" as Lang)).toEqual({
+      floating: { title: "New version available", update: "Update", later: "Later" },
       panel: {
         version: "Version",
         latest: "(latest)",

@@ -45,6 +45,7 @@ import { Tabs } from "./components/Tabs";
 import { I18nProvider, useI18n } from "./i18n";
 import { useUpdate } from "./updater/useUpdate";
 import { AlertDot } from "./updater/AlertDot";
+import { UpdateFloatingTray } from "./updater/UpdateFloatingTray";
 import { useLayout } from "./nav/store";
 import { visibleIds } from "./nav/layout";
 import {
@@ -580,7 +581,7 @@ function Content() {
     reconnect,
   } = useColores();
   const { t, lang } = useI18n();
-  const { hasUpdate } = useUpdate(lang);
+  const { hasUpdate, info: updateInfo, status: updateStatus } = useUpdate(lang);
   const [ambStatus, setAmbStatus] = useState<string>("idle");
   const [audStatus, setAudStatus] = useState<string>("idle");
   const [tempReading, setTempReading] = useState<number | null>(null);
@@ -739,6 +740,7 @@ function Content() {
                 {t("load.retry")}
               </ButtonItem>
             </PanelSectionRow>
+            <UpdateFloatingTray lang={lang} info={updateInfo} status={updateStatus} />
           </>
         ) : (
           <PanelSectionRow>
@@ -1100,6 +1102,7 @@ function Content() {
                 {t("load.retry")}
               </ButtonItem>
             </PanelSectionRow>
+            <UpdateFloatingTray lang={lang} info={updateInfo} status={updateStatus} />
           </>
         ) : (
           <PanelSectionRow>
@@ -1212,6 +1215,7 @@ function Content() {
           />
         </>
       )}
+      <UpdateFloatingTray lang={lang} info={updateInfo} status={updateStatus} />
     </PanelSection>
   );
 }

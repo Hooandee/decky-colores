@@ -6,8 +6,8 @@ import { getUpdaterStrings } from "./strings";
 const LANGUAGES = ["es", "en", "it", "de", "pt-BR"] as const satisfies readonly Lang[];
 
 function updaterValues(lang: Lang): string[] {
-  const { panel, modal, availableTitle } = getUpdaterStrings(lang);
-  return [...Object.values(panel), ...Object.values(modal), availableTitle];
+  const { floating, panel, modal, availableTitle } = getUpdaterStrings(lang);
+  return [...Object.values(floating), ...Object.values(panel), ...Object.values(modal), availableTitle];
 }
 
 describe("Updater translation content", () => {
