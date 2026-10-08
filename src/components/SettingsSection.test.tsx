@@ -6,9 +6,11 @@ import { SettingsSection } from "./SettingsSection";
 
 vi.mock("@decky/ui", () => ({
   ButtonItem: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+  Dropdown: ({ menuLabel }: { menuLabel: string }) => <div>{menuLabel}</div>,
   Focusable: ({ children }: { children: React.ReactNode }) => <span>{children}</span>,
   Navigation: { NavigateToExternalWeb: vi.fn() },
   PanelSectionRow: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  SliderField: ({ label }: { label: string }) => <div>{label}</div>,
   ToggleField: ({ label }: { label: string }) => <div>{label}</div>,
 }));
 
@@ -52,7 +54,7 @@ const capabilities = {
   layoutKind: "rings",
 } as Capabilities;
 
-const renderSettings = (caps: Capabilities) =>
+const renderSettings = (caps: Capabilities, ssdActivityLed = false) =>
   renderToStaticMarkup(
     <SettingsSection
       caps={caps}
@@ -63,10 +65,14 @@ const renderSettings = (caps: Capabilities) =>
       powerLedOff={false}
       powerLedAwakeOff={false}
       powerLedSuspendOff={true}
+      ssdActivityLed={ssdActivityLed}
+      ssdActivityDirection="both"
+      ssdActivitySensitivity={50}
       sleepChargingIndicator={false}
       onForceControl={() => {}}
       onPowerLed={() => {}}
       onPowerLedState={() => {}}
+      onSsdActivityLed={() => {}}
       onSleepChargingIndicator={() => {}}
       onExperiment={() => {}}
       onReconnect={() => {}}
@@ -91,6 +97,16 @@ describe("SettingsSection power LED", () => {
     expect(html).toContain("powerLed.label");
     expect(html).not.toContain("powerLed.awakeLabel");
     expect(html).not.toContain("powerLed.suspendLabel");
+  });
+
+  it("shows activity controls beneath the power LED setting when enabled", () => {
+    const enabled = renderSettings(capabilities, true);
+    const disabled = renderSettings(capabilities);
+    expect(enabled).toContain("powerLed.ssdActivity");
+    expect(enabled).toContain("powerLed.ssdDirection");
+    expect(enabled).toContain("powerLed.ssdSensitivity");
+    expect(disabled).not.toContain("powerLed.ssdSensitivity");
+    expect(renderSettings({ ...capabilities, powerLed: false })).not.toContain("powerLed.ssdActivity");
   });
 });
 

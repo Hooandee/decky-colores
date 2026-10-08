@@ -1,5 +1,5 @@
 import { callable } from "@decky/api";
-import { ColoresState, GradientPreset, PowerLedState, ProfileState, SensorBand, SensorKind } from "./types";
+import { ColoresState, GradientPreset, PowerLedState, ProfileState, SensorBand, SensorKind, SsdActivityDirection } from "./types";
 
 export const getState = callable<[], ColoresState>("get_state");
 export const setPower = callable<[on: boolean], void>("set_power");
@@ -21,6 +21,7 @@ export const getVersion = callable<[], string>("get_version");
 export const setExperiment = callable<[feature: string, on: boolean], void>("set_experiment");
 export const setPowerLed = callable<[off: boolean], void>("set_power_led");
 export const setPowerLedState = callable<[state: PowerLedState, off: boolean], void>("set_power_led_state");
+export const setSsdActivityLed = callable<[enabled: boolean, direction: SsdActivityDirection, sensitivity: number], void>("set_ssd_activity_led");
 export const setSleepChargingIndicator = callable<[enabled: boolean], void>("set_sleep_charging_indicator");
 export const reconnect = callable<[], boolean>("reconnect");
 export const setForceControl = callable<[on: boolean], void>("set_force_control");
