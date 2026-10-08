@@ -9,7 +9,6 @@ vi.mock("@decky/ui", () => ({
   showModal: vi.fn(),
 }));
 vi.mock("./UpdateModal", () => ({ UpdateModal: () => null }));
-vi.stubGlobal("window", { innerWidth: 1280 });
 
 const info: UpdateInfo = { current: "0.20.0", latest: "0.21.0", has_update: true, notes: "", download_url: "", error: "" };
 
@@ -21,7 +20,7 @@ describe("UpdateFloatingTray", () => {
     expect(html).toContain('aria-label="Actualizar"');
     expect(html).toContain('aria-label="Más tarde"');
     expect(html).toContain('aria-live="polite"');
-    expect(html).toContain('data-update-tray="spacer"');
+    expect(html).toContain("position:sticky");
   });
 
   it.each([null, { ...info, has_update: false }])("renders nothing without an available update: %j", (value) => {
