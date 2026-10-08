@@ -3,17 +3,25 @@
 ## [0.30.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.29.1...decky-colores-v0.30.0) (2026-10-08)
 
 
-### Features
+### Español
 
-* **updater:** show a floating update card in the quick access menu ([87f82c8](https://github.com/Hooandee/decky-colores/commit/87f82c8f35da1e27b9fd4c0d95546242be8f0595))
-* **updater:** show a floating update card with an Update action ([b53419e](https://github.com/Hooandee/decky-colores/commit/b53419eebc31966298fc1f7a3ca42f68598b39ab))
+* **Actualizaciones:** Cuando sale una versión nueva ya no te la pierdes: aparece un aviso abajo en el menú rápido con la versión que tienes y la nueva. «Actualizar» abre las novedades para instalarla y «Más tarde» lo esconde hasta que reinicies Steam. También sale si Colores no consigue cargar, porque muchas veces actualizar es lo que lo arregla.
 
+### English
 
-### Bug Fixes
+* **Updates:** You won't miss a new version anymore: a notice shows up at the bottom of the quick access menu with the version you have and the new one. "Update" opens the release notes so you can install it, and "Later" hides it until you restart Steam. It also shows up if Colores fails to load, since updating is often what fixes it.
 
-* **updater:** dismiss the update card per release and show it on load errors ([7707b36](https://github.com/Hooandee/decky-colores/commit/7707b36f7a9c596eec8ec5c14a0cd0e8fd78efb1))
-* **updater:** keep the update card sticky with a gamepad row ([97b603f](https://github.com/Hooandee/decky-colores/commit/97b603f2c0b1358b4bd210f2705048149f21b406))
-* **updater:** reserve the update card height so gamepad focus stays visible ([3991a5c](https://github.com/Hooandee/decky-colores/commit/3991a5ccbb3175254dcbe08892f56d31b110fa48))
+### Italiano
+
+* **Aggiornamenti:** Quando esce una nuova versione non te la perdi più: in fondo al menu di accesso rapido compare un avviso con la versione che hai e quella nuova. «Aggiorna» apre le novità per installarla e «Più tardi» lo nasconde finché non riavvii Steam. Compare anche se Colores non riesce a caricarsi, perché spesso è proprio l'aggiornamento a risolvere.
+
+### Deutsch
+
+* **Updates:** Eine neue Version verpasst du nicht mehr: Unten im Schnellzugriffsmenü erscheint ein Hinweis mit deiner Version und der neuen. „Aktualisieren“ öffnet die Neuerungen zum Installieren, und „Später“ blendet ihn aus, bis du Steam neu startest. Er erscheint auch, wenn Colores nicht laden kann, denn oft behebt genau das Update das Problem.
+
+### Português (Brasil)
+
+* **Atualizações:** Você não perde mais uma versão nova: aparece um aviso embaixo no menu de acesso rápido com a versão que você tem e a nova. "Atualizar" abre as novidades para instalar e "Mais tarde" esconde o aviso até você reiniciar o Steam. Ele também aparece se o Colores não conseguir carregar, porque muitas vezes atualizar é o que resolve.
 
 ## [0.29.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.29.0...decky-colores-v0.29.1) (2026-09-22)
 
