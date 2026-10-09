@@ -241,3 +241,84 @@ def test_subdivide_splits_region_horizontally():
 
 def test_subdivide_single_returns_region():
     assert subdivide([0.1, 0.2, 0.3, 0.4], 1) == [(0.1, 0.2, 0.3, 0.4)]
+
+
+def test_host_capture_python_prefers_the_host_root(tmp_path):
+    host = tmp_path / "proc/self/root"
+    (host / "usr/bin").mkdir(parents=True)
+    (host / "usr/bin/python3").write_text("")
+    (host / "usr/lib64").mkdir(parents=True)
+    (host / "usr/lib64/libpipewire-0.3.so.0").write_text("")
+    assert ambilight_mod.host_capture_python(str(tmp_path)) == str(host / "usr/bin/python3")
+
+
+def test_host_capture_python_needs_libpipewire(tmp_path):
+    (tmp_path / "usr/bin").mkdir(parents=True)
+    (tmp_path / "usr/bin/python3").write_text("")
+    assert ambilight_mod.host_capture_python(str(tmp_path)) is None
+
+
+def test_run_uses_the_pipewire_helper_without_pw_dump(monkeypatch):
+    monkeypatch.setattr(ambilight_mod, "RETRY_INTERVAL", 0.001)
+    commands = []
+
+    async def fake_exec(*command, **kwargs):
+        commands.append(command)
+        raise OSError("stop here")
+
+    async def no_pipewiresrc():
+        return False
+
+    async def must_not_run():
+        raise AssertionError("pw-dump used")
+
+    monkeypatch.setattr(ambilight_mod, "_gst_has_pipewiresrc", no_pipewiresrc)
+    monkeypatch.setattr(ambilight_mod, "_helper_python", lambda: "/host/python3")
+    monkeypatch.setattr(ambilight_mod.asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(ambilight_mod, "_backend", None)
+    amb = Ambilight(lambda colors: None, zones=2, runtime_dir=None)
+    amb._find_node = must_not_run
+
+    async def drive():
+        amb.start({"fps": 10})
+        await asyncio.sleep(0.02)
+        amb.stop()
+
+    asyncio.run(drive())
+    assert commands[0] == (
+        "/host/python3", ambilight_mod.PW_CAPTURE, "gamescope",
+        str(ambilight_mod.CAP_W), str(ambilight_mod.CAP_H), "10",
+    )
+
+
+def test_the_capture_helper_is_only_offered_on_arm(monkeypatch):
+    monkeypatch.setattr(ambilight_mod, "host_capture_python", lambda root="/": "/host/python3")
+    monkeypatch.setattr(ambilight_mod.shutil, "which", lambda name: None)
+    monkeypatch.setattr(ambilight_mod.device_tree, "is_arm", lambda root="/": False)
+    assert ambilight_mod.capture_available() is False
+    monkeypatch.setattr(ambilight_mod.device_tree, "is_arm", lambda root="/": True)
+    assert ambilight_mod.capture_available() is True
+
+
+def test_a_slow_gst_inspect_does_not_pin_the_gst_backend(monkeypatch):
+    class Slow:
+        killed = False
+
+        async def wait(self):
+            await asyncio.sleep(60)
+
+        def kill(self):
+            Slow.killed = True
+
+    async def fake_exec(*command, **kwargs):
+        return Slow()
+
+    async def fast_wait_for(awaitable, timeout):
+        awaitable.close()
+        raise asyncio.TimeoutError
+
+    monkeypatch.setattr(ambilight_mod.shutil, "which", lambda name: "/usr/bin/" + name)
+    monkeypatch.setattr(ambilight_mod.asyncio, "create_subprocess_exec", fake_exec)
+    monkeypatch.setattr(ambilight_mod.asyncio, "wait_for", fast_wait_for)
+    assert asyncio.run(ambilight_mod._gst_has_pipewiresrc()) is False
+    assert Slow.killed
