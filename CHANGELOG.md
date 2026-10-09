@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.30.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.29.1...decky-colores-v0.30.0) (2026-10-08)
+
+
+### Español
+
+* **Actualizaciones:** Cuando sale una versión nueva ya no te la pierdes: aparece un aviso abajo en el menú rápido con la versión que tienes y la nueva. «Actualizar» abre las novedades para instalarla y «Más tarde» lo esconde hasta que reinicies Steam. También sale si Colores no consigue cargar, porque muchas veces actualizar es lo que lo arregla.
+
+### English
+
+* **Updates:** You won't miss a new version anymore: a notice shows up at the bottom of the quick access menu with the version you have and the new one. "Update" opens the release notes so you can install it, and "Later" hides it until you restart Steam. It also shows up if Colores fails to load, since updating is often what fixes it.
+
+### Italiano
+
+* **Aggiornamenti:** Quando esce una nuova versione non te la perdi più: in fondo al menu di accesso rapido compare un avviso con la versione che hai e quella nuova. «Aggiorna» apre le novità per installarla e «Più tardi» lo nasconde finché non riavvii Steam. Compare anche se Colores non riesce a caricarsi, perché spesso è proprio l'aggiornamento a risolvere.
+
+### Deutsch
+
+* **Updates:** Eine neue Version verpasst du nicht mehr: Unten im Schnellzugriffsmenü erscheint ein Hinweis mit deiner Version und der neuen. „Aktualisieren“ öffnet die Neuerungen zum Installieren, und „Später“ blendet ihn aus, bis du Steam neu startest. Er erscheint auch, wenn Colores nicht laden kann, denn oft behebt genau das Update das Problem.
+
+### Português (Brasil)
+
+* **Atualizações:** Você não perde mais uma versão nova: aparece um aviso embaixo no menu de acesso rápido com a versão que você tem e a nova. "Atualizar" abre as novidades para instalar e "Mais tarde" esconde o aviso até você reiniciar o Steam. Ele também aparece se o Colores não conseguir carregar, porque muitas vezes atualizar é o que resolve.
+
 ## [0.29.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.29.0...decky-colores-v0.29.1) (2026-09-22)
 
 
