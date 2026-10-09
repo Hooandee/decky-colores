@@ -174,6 +174,9 @@ class FakeSuspendMonitor:
     async def stop_and_wait(self):
         self.events.append(("stop_and_wait",))
 
+    def stop_now(self):
+        self.events.append(("stop_now",))
+
     def diagnostics(self):
         return {
             "running": True,
@@ -1323,7 +1326,7 @@ def test_unload_restores_hhd_rgb_ownership(main_module):
 
 def test_stopping_background_tasks_waits_for_suspend_monitor(main_module):
     async def drive():
-        p = _plugin(main_module, "solid")
+        p = _plugin(main_module, "solid", hhd_takeover=True)
         p._suspend_monitor = FakeSuspendMonitor()
 
         await p._stop_background_tasks()
@@ -1489,3 +1492,50 @@ def test_force_control_watch_noop_when_off(main_module, monkeypatch):
     _drive_watch(main_module, p)
     assert p._controller.invalidated is False
     assert not p._controller.calls
+
+
+def test_report_environment_names_arm_host_under_fex(main_module, monkeypatch):
+    plugin = _plugin(main_module, "solid")
+    plugin._device = {"name": "AYN Thor", "model": "AYN Thor"}
+    tree = main_module.device_tree
+    monkeypatch.setattr(tree, "is_arm", lambda root="/": True)
+    monkeypatch.setattr(tree, "model", lambda root="/": "AYN Thor")
+    monkeypatch.setattr(tree, "compatible", lambda root="/": ["ayn,thor", "qcom,sm8550"])
+    monkeypatch.setattr(tree, "soc", lambda root="/": "Snapdragon SM8550")
+    monkeypatch.setattr(tree, "host_os_release", lambda root="/": {"PRETTY_NAME": "Armada OS"})
+
+    env = plugin._report_environment()
+
+    assert env["os"] == "Armada OS"
+    assert env["architecture"] == "arm64"
+    assert env["device_tree_model"] == "AYN Thor"
+    assert env["device_tree_compatible"] == ["ayn,thor", "qcom,sm8550"]
+    assert env["soc"] == "Snapdragon SM8550"
+
+
+def test_unload_without_hhd_finishes_without_yielding_to_the_loop(main_module):
+    # Decky closes the plugin socket on stop and its read loop then spins without
+    # yielding, so an unload that needs another loop turn is killed after 5 s.
+    async def drive():
+        p = _plugin(main_module, "solid")
+        p._suspend_monitor = FakeSuspendMonitor()
+        p._charger_task = asyncio.get_running_loop().create_future()
+        coro = p._unload()
+        try:
+            coro.send(None)
+        except StopIteration:
+            pass
+        else:
+            coro.close()
+            raise AssertionError("_unload suspended")
+        assert p._suspend_monitor.events == [("stop_now",)]
+        assert p._charger_task.cancelled()
+        assert p._stopping is True
+
+    asyncio.run(drive())
+
+
+def test_unload_before_main_still_finishes(main_module):
+    asyncio.run(main_module.Plugin()._unload())
+
+

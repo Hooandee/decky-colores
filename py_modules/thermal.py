@@ -7,6 +7,12 @@ THERMAL_ROOT = "/sys/class/thermal"
 _HWMON_PREFERENCE = ("k10temp", "coretemp", "amdgpu")
 
 
+# ARM device trees expose one sensor per CPU cluster (cpu*_thermal, cpuss-*) next to
+# PMIC and battery limit zones that are not temperatures of the chip.
+def _is_arm_cpu_sensor(name):
+    return name.startswith("cpu") and name.endswith(("_thermal", "-thermal"))
+
+
 def _read(path):
     try:
         with open(path, "r") as handle:
@@ -40,7 +46,7 @@ def _thermal_zone_temp(root):
         entries = os.listdir(root)
     except OSError:
         return None
-    best = None
+    best = cpu_best = None
     for name in entries:
         if not name.startswith("thermal_zone"):
             continue
@@ -48,10 +54,13 @@ def _thermal_zone_temp(root):
         value = _millidegrees(_read(os.path.join(zone, "temp")))
         if value is None:
             continue
-        if "x86_pkg_temp" in (_read(os.path.join(zone, "type")) or ""):
+        zone_type = _read(os.path.join(zone, "type")) or ""
+        if "x86_pkg_temp" in zone_type:
             return value
+        if _is_arm_cpu_sensor(zone_type):
+            cpu_best = value if cpu_best is None else max(cpu_best, value)
         best = value if best is None else max(best, value)
-    return best
+    return cpu_best if cpu_best is not None else best
 
 
 def apu_temperature(hwmon_root=HWMON_ROOT, thermal_root=THERMAL_ROOT):
@@ -61,6 +70,14 @@ def apu_temperature(hwmon_root=HWMON_ROOT, thermal_root=THERMAL_ROOT):
             value = _millidegrees(_read(os.path.join(chips[pref], "temp1_input")))
             if value is not None:
                 return value
+    cpu = [
+        _millidegrees(_read(os.path.join(chip, "temp1_input")))
+        for label, chip in chips.items()
+        if _is_arm_cpu_sensor(label)
+    ]
+    cpu = [value for value in cpu if value is not None]
+    if cpu:
+        return max(cpu)
     zone = _thermal_zone_temp(thermal_root)
     if zone is not None:
         return zone

@@ -189,21 +189,22 @@ def _find_rgb_led(leds_dir, required_name=None, allow_packed=False):
         path = os.path.join(leds_dir, required_name)
         return path if os.path.exists(os.path.join(path, "multi_intensity")) else None
 
+    return next(_rgb_led_candidates(leds_dir, allow_packed), None)
+
+
+def _rgb_led_candidates(leds_dir, allow_packed=False):
     try:
         entries = os.listdir(leds_dir)
     except OSError:
-        return None
-
-    candidates = sorted(entries, key=lambda c: ("rgb" not in c.lower(), c.lower()))
-    for name in candidates:
+        return
+    for name in sorted(entries, key=lambda c: ("rgb" not in c.lower(), c.lower())):
         if name in PORTAL_LED_NAMES:
             continue
         path = os.path.join(leds_dir, name)
         if os.path.exists(os.path.join(path, "multi_intensity")) and _valid_rgb_schema(
             path, allow_packed=allow_packed
         ):
-            return path
-    return None
+            yield path
 
 
 def _valid_rgb_schema(led_path, allow_packed=False):
@@ -214,6 +215,14 @@ def _valid_rgb_schema(led_path, allow_packed=False):
         return False
     groups = [tokens[index : index + 3] for index in range(0, len(tokens), 3)]
     return all(set(group) == _CHANNEL_NAMES and group == groups[0] for group in groups)
+
+
+def _discover_rgb_nodes(leds_dir):
+    return [
+        path for path in _rgb_led_candidates(leds_dir)
+        if "kbd" not in os.path.basename(path).lower()
+        and len(_read(os.path.join(path, "multi_index")).split()) == 3
+    ]
 
 
 def _rgb_channel_order(led_path, default="rgb"):
@@ -287,6 +296,21 @@ def _with_sleep_charging(profile, context):
     return context
 
 
+def _multi_sysfs_context(profile, device, info, ambilight, power_led, battery, temperature):
+    info["name"] = profile["name"]
+    capabilities = build_capabilities(
+        profile, device.available, profile["zones"], 255, ambilight,
+        power_led, battery, temperature,
+    )
+    capabilities["perZone"] = device.supports_per_zone()
+    return _with_sleep_charging(profile, {
+        "info": info,
+        "capabilities": capabilities,
+        "device": device,
+        "power_led": power_led,
+    })
+
+
 def build_device(sysfs_root="/", ambilight=False):
     info = detect_device(sysfs_root)
     profile, matched = resolve_profile_match(info["board"], info["product"])
@@ -330,21 +354,13 @@ def build_device(sysfs_root="/", ambilight=False):
     leds_dir = os.path.join(sysfs_root, "sys/class/leds")
     portal_nodes = discover_portal_leds(leds_dir) if not matched else []
     if portal_nodes:
-        portal_name = info.get("model") or "Multizone RGB device"
-        profile = profile_for_discovered_adapter("portal_sysfs", portal_name)
-        info["name"] = profile["name"]
-        device = MultiSysfsRgbDevice(portal_nodes, color_order=profile["color_order"])
-        capabilities = build_capabilities(
-            profile, device.available, profile["zones"], 255, ambilight,
-            power_led, battery, temperature,
+        profile = profile_for_discovered_adapter(
+            "portal_sysfs", info.get("model") or "Multizone RGB device"
         )
-        capabilities["perZone"] = device.supports_per_zone()
-        return _with_sleep_charging(profile, {
-            "info": info,
-            "capabilities": capabilities,
-            "device": device,
-            "power_led": power_led,
-        })
+        device = MultiSysfsRgbDevice(
+            portal_nodes, color_order=profile["color_order"], groups=profile.get("stick_groups"),
+        )
+        return _multi_sysfs_context(profile, device, info, ambilight, power_led, battery, temperature)
 
     identity = " ".join(
         str(info.get(field) or "") for field in ("vendor", "product", "board", "model")
@@ -367,6 +383,16 @@ def build_device(sysfs_root="/", ambilight=False):
             "device": omen_device,
             "power_led": power_led,
         })
+
+    rgb_nodes = _discover_rgb_nodes(leds_dir) if not matched else []
+    if len(rgb_nodes) > 1:
+        profile = profile_for_discovered_adapter(
+            "generic_multi_sysfs", info.get("model") or "Multizone RGB device"
+        )
+        device = MultiSysfsRgbDevice(
+            rgb_nodes, color_order=[_rgb_channel_order(path) for path in rgb_nodes],
+        )
+        return _multi_sysfs_context(profile, device, info, ambilight, power_led, battery, temperature)
 
     led_path = (
         _find_rgb_led(

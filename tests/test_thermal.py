@@ -76,3 +76,22 @@ def test_available_true_when_sensor_present(tmp_path):
 
 def test_missing_roots_return_none(tmp_path):
     assert apu_temperature(str(tmp_path / "no_hw"), str(tmp_path / "no_th")) is None
+
+
+def test_arm_uses_hottest_cpu_sensor_over_pmic(tmp_path):
+    hw = str(tmp_path / "hwmon")
+    _hwmon(hw, "hwmon0", "pm8550_tz", 30000)
+    _hwmon(hw, "hwmon1", "cpu0_top_thermal", 51000)
+    _hwmon(hw, "hwmon2", "cpu7_top_thermal", 58000)
+    _hwmon(hw, "hwmon3", "pm8550b_ibat_lvl0", 90000)
+    assert apu_temperature(hw, str(tmp_path / "thermal")) == 58.0
+
+
+def test_arm_thermal_zone_prefers_cpu_zones(tmp_path):
+    hw = str(tmp_path / "hwmon")
+    os.makedirs(hw)
+    th = str(tmp_path / "thermal")
+    _zone(th, "thermal_zone0", 95000, "pm8550b-ibat-lvl0")
+    _zone(th, "thermal_zone1", 47000, "cpu-0-0-top-thermal")
+    _zone(th, "thermal_zone2", 53000, "cpuss-1-thermal")
+    assert apu_temperature(hw, th) == 53.0

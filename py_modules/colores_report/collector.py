@@ -275,6 +275,15 @@ def _snap_power_supply(root: str) -> dict:
     return out
 
 
+def _snap_i2c(root: str) -> dict:
+    out: dict = {}
+    for node in sorted(_glob(root, "sys/bus/i2c/devices/*"))[:_SNAP_MAX_NODES]:
+        name = _read_str(os.path.join(node, "name"))
+        if name:
+            out[os.path.basename(node)] = name
+    return out
+
+
 def _snap_identity(root: str) -> dict:
     dmi = os.path.join(root, "sys/class/dmi/id")
     product = _read_str(os.path.join(dmi, "product_name"))
@@ -328,6 +337,7 @@ def sysfs_snapshot(
         "modules": [],
         "platform_rgb": {},
         "power_supply": {},
+        "i2c": {},
     }
     for key, fn in (
         ("identity", _snap_identity),
@@ -336,6 +346,7 @@ def sysfs_snapshot(
         ("modules", _snap_modules),
         ("platform_rgb", _snap_platform_rgb),
         ("power_supply", _snap_power_supply),
+        ("i2c", _snap_i2c),
     ):
         try:
             snap[key] = fn(root)
@@ -343,7 +354,7 @@ def sysfs_snapshot(
             pass
     if not _within(snap, cap):
         snap["truncated"] = True
-        for key in ("modules", "hid", "leds", "platform_rgb", "power_supply", "identity"):
+        for key in ("modules", "i2c", "hid", "leds", "platform_rgb", "power_supply", "identity"):
             if _within(snap, cap):
                 break
             snap[key] = [] if isinstance(snap[key], list) else {}
@@ -393,6 +404,7 @@ def build_bundle(
     logs: list,
     errors: list | None = None,
     runtime: dict | None = None,
+    journal: dict | None = None,
     kind: str = "bug",
     kernel: dict | None = None,
     sysfs: dict | None = None,
@@ -412,6 +424,7 @@ def build_bundle(
         "logs": logs or [],
         "errors": errors or [],
         "runtime": runtime or {},
+        "journal": journal or {},
         "kernel": kernel or {},
         "sysfs": sysfs or {},
     }

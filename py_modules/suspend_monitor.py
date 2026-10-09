@@ -174,7 +174,7 @@ class SuspendMonitor:
             "last_error": self._last_error,
         }
 
-    async def stop_and_wait(self):
+    def _cancel(self):
         self._stopping = True
         tasks = list(self._transitions)
         if self._runner:
@@ -182,8 +182,17 @@ class SuspendMonitor:
             tasks.append(self._runner)
         for task in self._transitions:
             task.cancel()
+        return tasks
+
+    async def stop_and_wait(self):
+        tasks = self._cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        self._release_inhibitor()
+        self._disconnect()
+
+    def stop_now(self):
+        self._cancel()
         self._release_inhibitor()
         self._disconnect()
 

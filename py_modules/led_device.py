@@ -313,20 +313,23 @@ def discover_portal_leds(leds_dir):
 
 
 class MultiSysfsRgbDevice(LedDevice):
-    def __init__(self, node_paths, color_order="rgb", color_correction=(1.0, 1.0, 1.0)):
+    def __init__(self, node_paths, color_order="rgb", color_correction=(1.0, 1.0, 1.0), groups=None):
         self._nodes = list(node_paths)
-        self._zones = len(self._nodes)
+        # Per-zone needs a profile: the LED order inside a ring is per machine.
+        self._groups = [list(group) for group in groups] if groups else None
+        self._zones = len(self._groups) if self._groups else len(self._nodes)
         self._max_brightness = 255
+        orders = [color_order] * len(self._nodes) if isinstance(color_order, str) else list(color_order)
         self._devices = [
             SysfsRgbDevice(
                 path,
                 zones=1,
                 max_brightness=self._node_max(path),
-                color_order=color_order,
+                color_order=order,
                 index_format="decimal",
                 color_correction=color_correction,
             )
-            for path in self._nodes
+            for path, order in zip(self._nodes, orders)
         ]
         self.last_error = None
 
@@ -348,7 +351,7 @@ class MultiSysfsRgbDevice(LedDevice):
         return self._nodes[0] if self._nodes else None
 
     def supports_per_zone(self):
-        return False
+        return self._groups is not None
 
     def reconnect(self):
         return self.available
@@ -357,18 +360,27 @@ class MultiSysfsRgbDevice(LedDevice):
         for device in self._devices:
             device.invalidate()
 
+    def _write(self, index, color, brightness, power):
+        device = self._devices[index]
+        if device.apply_zones([tuple(color)], brightness, power):
+            return True
+        self.last_error = device.last_error or "sysfs write failed"
+        return False
+
     def apply_zones(self, zone_colors, brightness, power):
-        colors = list(zone_colors) or [(0, 0, 0)]
-        return self.apply_solid(colors[0], brightness, power)
+        if self._groups is None:
+            return self.apply_solid((list(zone_colors) or [(0, 0, 0)])[0], brightness, power)
+        self.last_error = None
+        results = [
+            self._write(index, color, brightness, power)
+            for color, group in zip(self._fit(zone_colors), self._groups)
+            for index in group
+        ]
+        return all(results)
 
     def apply_solid(self, color, brightness, power):
         self.last_error = None
-        success = True
-        for device in self._devices:
-            if not device.apply_zones([tuple(color)], brightness, power):
-                success = False
-                self.last_error = device.last_error or "sysfs write failed"
-        return success
+        return all([self._write(index, color, brightness, power) for index in range(len(self._devices))])
 
 
 class HpOmenRgbDevice(LedDevice):

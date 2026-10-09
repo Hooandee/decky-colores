@@ -1,7 +1,10 @@
 import asyncio
 import json
 import logging
+import os
+import shutil
 
+import device_tree
 from run_as_user import user_env, user_cred
 
 logger = logging.getLogger("colores.ambilight")
@@ -17,6 +20,57 @@ CAP_H = 18
 RETRY_INTERVAL = 3.0
 
 _FULL_REGION = [0.0, 0.0, 1.0, 1.0]
+
+# Armada's GStreamer (host and FEX guest) lacks pipewiresrc, so capture can also run
+# pw_capture.py on the host Python.
+PW_CAPTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pw_capture.py")
+_PIPEWIRE_LIBS = (
+    "usr/lib64/libpipewire-0.3.so.0",
+    "usr/lib/libpipewire-0.3.so.0",
+    "usr/lib/aarch64-linux-gnu/libpipewire-0.3.so.0",
+    "usr/lib/x86_64-linux-gnu/libpipewire-0.3.so.0",
+)
+
+
+def host_capture_python(root="/"):
+    for base in device_tree.host_roots(root):
+        python = os.path.join(base, "usr/bin/python3")
+        if os.path.exists(python) and any(
+            os.path.exists(os.path.join(base, lib)) for lib in _PIPEWIRE_LIBS
+        ):
+            return python
+    return None
+
+
+def _helper_python():
+    return host_capture_python() if device_tree.is_arm() else None
+
+
+def capture_available():
+    return shutil.which("gst-launch-1.0") is not None or _helper_python() is not None
+
+
+_backend = None
+
+
+async def _gst_has_pipewiresrc():
+    if shutil.which("gst-launch-1.0") is None:
+        return False
+    inspect = shutil.which("gst-inspect-1.0")
+    if inspect is None:
+        return True
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            inspect, "--exists", "pipewiresrc",
+            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+        )
+    except OSError:
+        return True
+    try:
+        return await asyncio.wait_for(proc.wait(), timeout=20) == 0
+    except asyncio.TimeoutError:
+        proc.kill()
+        return False
 
 
 def subdivide(region, count):
@@ -155,6 +209,14 @@ class Ambilight:
                 return obj.get("id")
         return None
 
+    async def _select_backend(self):
+        global _backend
+        if _backend is None:
+            python = None if await _gst_has_pipewiresrc() else _helper_python()
+            _backend = ("pipewire", python) if python else ("gst", None)
+            logger.info("ambilight capture backend: %s", _backend[0])
+        return _backend
+
     def start(self, options):
         self._options = options or {}
         if self.running:
@@ -191,17 +253,24 @@ class Ambilight:
         # until stop() cancels us. The source can be absent at boot (session not up yet)
         # or vanish (leaving Game Mode) and reappear — we recover from both automatically.
         frame_bytes = CAP_W * CAP_H * 3
+        backend, python = await self._select_backend()
         while True:
-            node = await self._find_node()
-            if node is None:
-                logger.warning("gamescope PipeWire node not found; retrying")
-                self.status = "no_source"
-                self._apply(self._fallback())
-                await asyncio.sleep(RETRY_INTERVAL)
-                continue
-
             interval = self._capture_interval()
-            command = _gst_command(node, CAP_W, CAP_H)
+            if backend == "pipewire":
+                node = GAMESCOPE_NODE
+                command = [
+                    python, PW_CAPTURE, node,
+                    str(CAP_W), str(CAP_H), str(round(1.0 / interval)),
+                ]
+            else:
+                node = await self._find_node()
+                if node is None:
+                    logger.warning("gamescope PipeWire node not found; retrying")
+                    self.status = "no_source"
+                    self._apply(self._fallback())
+                    await asyncio.sleep(RETRY_INTERVAL)
+                    continue
+                command = _gst_command(node, CAP_W, CAP_H)
             proc = None
             reader_task = None
             logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / interval)
