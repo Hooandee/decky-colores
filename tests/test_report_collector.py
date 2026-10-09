@@ -213,6 +213,7 @@ def test_sysfs_snapshot_never_raises_on_missing_root():
         "modules": [],
         "platform_rgb": {},
         "power_supply": {},
+        "i2c": {},
     }
 
 
@@ -316,3 +317,13 @@ def test_sysfs_snapshot_latch_attrs_absent_when_missing(tmp_path):
     entry = sysfs_snapshot(root=str(tmp_path))["leds"][0]
     assert entry["enabled"] is None
     assert entry["effect"] is None
+
+
+def test_sysfs_snapshot_names_i2c_chips(tmp_path):
+    for node, name in (("3-003c", "htr3212l\n"), ("6-003c", "htr3212r\n")):
+        dev = tmp_path / "sys/bus/i2c/devices" / node
+        dev.mkdir(parents=True)
+        (dev / "name").write_text(name)
+    (tmp_path / "sys/bus/i2c/devices/i2c-3").mkdir()
+    snap = sysfs_snapshot(root=str(tmp_path))
+    assert snap["i2c"] == {"3-003c": "htr3212l", "6-003c": "htr3212r"}

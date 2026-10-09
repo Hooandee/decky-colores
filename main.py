@@ -2,7 +2,6 @@ import asyncio
 import json
 import os
 import pwd
-import shutil
 import time
 
 import decky
@@ -17,7 +16,7 @@ from effects import (
     interpolate_gradient,
 )
 from lighting_profiles import LightingProfileStore
-from ambilight import Ambilight
+from ambilight import Ambilight, capture_available as ambilight_capture_available
 from audio import AudioReactive
 from power_supply import charger_online, battery_level
 from thermal import apu_temperature
@@ -26,6 +25,9 @@ from saved_gradients import upsert_gradient, remove_gradient
 from hhd_rgb_control import HhdRgbControl
 from suspend_monitor import SuspendMonitor
 import self_updater
+import device_tree
+import journal
+import journal_context
 from colores_report import collector as report_collector
 from colores_report import client as report_client
 
@@ -94,6 +96,9 @@ RESUME_SUSPEND_THRESHOLD = 1.0
 RESUME_RECONNECT_ATTEMPTS = 3
 RESUME_RECONNECT_INTERVAL = 1.0
 RESUME_DEDUP_INTERVAL = 5.0
+JOURNAL_CONTEXT_DELAY = 5.0
+JOURNAL_CONTEXT_INTERVAL = 900.0
+STOCK_HOSTNAMES = frozenset({"localhost", "steamdeck", "armada"})
 
 
 def _rgb(values):
@@ -255,8 +260,7 @@ class Plugin:
                 self._persist_settings()
 
     def _build_context(self) -> dict:
-        ambilight_available = shutil.which("gst-launch-1.0") is not None
-        return build_device(ambilight=ambilight_available)
+        return build_device(ambilight=ambilight_capture_available())
 
     def _setup_device(self, ctx: dict) -> None:
         self._device = ctx["info"]
@@ -279,6 +283,7 @@ class Plugin:
             max_fps=max_render_fps,
         )
         self._audio = AudioReactive(self._render, self._zones, runtime_dir, uid, gid)
+        self._journal_device()
 
     def _reprobe_device(self) -> bool:
         if self._controller.available:
@@ -405,6 +410,12 @@ class Plugin:
             hostname = socket.gethostname()
         except Exception:  # noqa: BLE001
             hostname = None
+        try:
+            os_id = str(device_tree.host_os_release().get("ID") or "").lower()
+        except Exception:  # noqa: BLE001
+            os_id = ""
+        if hostname and (hostname.lower() in STOCK_HOSTNAMES or hostname.lower() == os_id):
+            hostname = None
         return home, hostname
 
     async def _build_report_bundle(
@@ -452,6 +463,7 @@ class Plugin:
                 logs=logs,
                 errors=errors,
                 runtime=runtime,
+                journal=self._journal_report(),
                 kernel=kernel,
                 sysfs=snapshot,
                 home=home,
@@ -514,24 +526,17 @@ class Plugin:
             except OSError:
                 return None
 
-        os_name = None
-        try:
-            rel = {}
-            with open("/etc/os-release") as f:
-                for line in f:
-                    if "=" in line:
-                        k, v = line.rstrip().split("=", 1)
-                        rel[k] = v.strip('"')
-            os_name = rel.get("PRETTY_NAME") or rel.get("NAME")
-        except Exception:  # noqa: BLE001
-            pass
-        kernel = None
+        rel = device_tree.host_os_release()
+        os_name = rel.get("PRETTY_NAME") or rel.get("NAME")
+        kernel = machine = None
         try:
             u = os.uname()
             kernel = f"{u.sysname} {u.release}"
+            machine = u.machine
         except Exception:  # noqa: BLE001
             pass
         dev = getattr(self, "_device", {}) or {}
+        arm = device_tree.is_arm()
         return {
             "plugin_version": read_version(),
             "decky_version": getattr(decky, "DECKY_VERSION", None),
@@ -541,6 +546,10 @@ class Plugin:
             "board_name": dev.get("board") or _dmi("board_name"),
             "os": os_name,
             "kernel": kernel,
+            "architecture": "arm64" if arm else machine,
+            "device_tree_model": device_tree.model() or None,
+            "device_tree_compatible": device_tree.compatible() if arm else None,
+            "soc": device_tree.soc() if arm else None,
         }
 
     def _report_stores(self) -> dict:
@@ -959,6 +968,7 @@ class Plugin:
         if self._settings["mode"] == "ambient":
             self._ambilight.stop()
         self._apply()
+        self._journal_device()
         return bool(ok)
 
     async def get_ambilight_status(self) -> str:
@@ -974,6 +984,7 @@ class Plugin:
             self._suspend_prepared = True
             self._resume_handled_at = None
             mode = self._settings["mode"]
+            self._journal_state("suspend", changed_only=False, mode=mode)
             if mode == "ambient":
                 await self._ambilight.stop_and_wait()
                 decky.logger.info("Colores: ambilight capture stopped for suspend")
@@ -1122,6 +1133,7 @@ class Plugin:
         self._controller.apply_zones(
             zone_colors, self._settings["brightness"], self._effective_power()
         )
+        self._journal_hw(zone_colors)
 
     def _save_and_apply(self) -> None:
         self._persist_settings()
@@ -1151,6 +1163,7 @@ class Plugin:
     def _apply(self) -> None:
         if getattr(self, "_suspend_prepared", False):
             return
+        self._journal_mode()
         if self._controller.supports_hardware_effects() and not self._wants_render_loop():
             self._apply_hardware()
             return
@@ -1181,6 +1194,7 @@ class Plugin:
             )
         else:
             self._controller.apply_solid(tuple(s["color"]), brightness, power)
+        self._journal_hw(s["mode"])
 
     def _apply_per_zone(self) -> None:
         s = self._settings
@@ -1249,7 +1263,9 @@ class Plugin:
             self._engine.set_static([tuple(s["color"])] * self._zones)
 
     async def _main(self):
+        self._start_journal()
         self._init()
+        self._journal_device()
         if self._settings.get("force_control"):
             await self._claim_hhd_rgb()
             self._controller.invalidate()
@@ -1278,6 +1294,13 @@ class Plugin:
         self._resume_task = asyncio.create_task(self._resume_watch())
         if self._capabilities.get("conflictsWithSystemRgb"):
             self._force_control_task = asyncio.create_task(self._force_control_watch())
+        if journal.active is not None:
+            self._journal_state(
+                "power_source", ac=self._ac_online, bat=self._battery_level
+            )
+            self._journal_context_task = asyncio.create_task(
+                self._journal_context_watch()
+            )
 
     async def _charger_watch(self) -> None:
         try:
@@ -1290,8 +1313,14 @@ class Plugin:
                 if temp is not None:
                     self._apu_temp = temp
                 online = charger_online()
+                self._journal_runtime()
                 if online != getattr(self, "_ac_online", True):
                     self._ac_online = online
+                    self._journal_state(
+                        "power_source",
+                        ac=online,
+                        bat=getattr(self, "_battery_level", None),
+                    )
                     if self._settings.get("charger_only", False):
                         self._apply()
         except asyncio.CancelledError:
@@ -1339,8 +1368,13 @@ class Plugin:
             self._suspend_prepared = False
             for attempt in range(RESUME_RECONNECT_ATTEMPTS):
                 try:
-                    if await self.reconnect():
+                    with journal.internal():
+                        restored = await self.reconnect()
+                    if restored:
                         self._resume_handled_at = time.monotonic()
+                        self._journal_state(
+                            "resume", changed_only=False, ok=True, attempts=attempt + 1
+                        )
                         return True
                 except asyncio.CancelledError:
                     raise
@@ -1348,6 +1382,13 @@ class Plugin:
                     decky.logger.warning("Colores: resume reconnect failed: %s", error)
                 if attempt + 1 < RESUME_RECONNECT_ATTEMPTS:
                     await asyncio.sleep(RESUME_RECONNECT_INTERVAL)
+            self._journal_state(
+                "resume",
+                level="WARNING",
+                changed_only=False,
+                ok=False,
+                attempts=RESUME_RECONNECT_ATTEMPTS,
+            )
             return False
 
     async def _resume_after_suspend_signal(self) -> None:
@@ -1372,11 +1413,20 @@ class Plugin:
             decky.logger.warning("Colores: force-control watch failed: %s", error)
 
     async def _stop_background_tasks(self):
-        async with self._hhd_rgb_lock:
+        # Decky closes the plugin socket when it stops us and its read loop then spins
+        # without yielding, so without an HHD handback nothing here may wait on the loop.
+        wait = bool((getattr(self, "_capabilities", None) or {}).get("hhdRgbTakeover"))
+        if wait:
+            async with self._hhd_rgb_lock:
+                self._stopping = True
+        else:
             self._stopping = True
         monitor = getattr(self, "_suspend_monitor", None)
         if monitor:
-            await monitor.stop_and_wait()
+            if wait:
+                await monitor.stop_and_wait()
+            else:
+                monitor.stop_now()
         tasks = []
         for attr in (
             "_reassert_task",
@@ -1384,26 +1434,223 @@ class Plugin:
             "_resume_task",
             "_force_control_task",
             "_startup_task",
+            "_journal_context_task",
         ):
             task = getattr(self, attr, None)
             if task:
                 task.cancel()
                 tasks.append(task)
-        if tasks:
+        if tasks and wait:
             await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _unload(self):
-        await self._stop_background_tasks()
-        if getattr(self, "_ready", False):
-            await self._restore_hhd_rgb()
-        if getattr(self, "_ambilight", None):
-            self._ambilight.stop()
-        if getattr(self, "_engine", None):
-            self._engine.stop()
-        decky.logger.info("Colores unloaded")
+        try:
+            await self._stop_background_tasks()
+            if getattr(self, "_ready", False):
+                await self._restore_hhd_rgb()
+            if getattr(self, "_ambilight", None):
+                self._ambilight.stop()
+            if getattr(self, "_engine", None):
+                self._engine.stop()
+            decky.logger.info("Colores unloaded")
+        finally:
+            self._stop_journal("unload")
 
     async def _uninstall(self):
-        await self._stop_background_tasks()
-        if getattr(self, "_ready", False):
-            await self._restore_hhd_rgb()
-        decky.logger.info("Colores uninstalled")
+        try:
+            await self._stop_background_tasks()
+            if getattr(self, "_ready", False):
+                await self._restore_hhd_rgb()
+            decky.logger.info("Colores uninstalled")
+        finally:
+            self._stop_journal("uninstall")
+
+    def _start_journal(self) -> None:
+        if journal.active is not None:
+            return
+        runtime_dir = getattr(decky, "DECKY_PLUGIN_RUNTIME_DIR", "")
+        if not runtime_dir:
+            return
+        try:
+            diary = journal.Journal(os.path.join(runtime_dir, "logs"))
+            diary.start()
+            handler = journal.JournalHandler(diary)
+            decky.logger.addHandler(handler)
+            self._journal_handler = handler
+            self._journal_restore_handlers = journal.queue_logger_handlers(decky.logger)
+        except Exception as error:  # noqa: BLE001
+            decky.logger.error("Colores: journal unavailable: %s", error)
+            return
+        journal.active = diary
+        self._loop_watchdog = journal.LoopWatchdog(diary)
+        self._loop_watchdog_task = asyncio.get_running_loop().create_task(
+            self._loop_watchdog.beat()
+        )
+        self._loop_watchdog.start()
+        diary.write(
+            "INFO",
+            "session",
+            "start",
+            version=read_version(),
+            decky=getattr(decky, "DECKY_VERSION", None),
+        )
+
+    def _stop_journal(self, reason: str) -> None:
+        diary = journal.active
+        if diary is None:
+            return
+        journal.active = None
+        watchdog = getattr(self, "_loop_watchdog", None)
+        if watchdog is not None:
+            watchdog.stop()
+        task = getattr(self, "_loop_watchdog_task", None)
+        if task is not None:
+            task.cancel()
+        diary.write("INFO", "session", "stop", reason=reason)
+        restore = getattr(self, "_journal_restore_handlers", None)
+        if restore is not None:
+            restore()
+            self._journal_restore_handlers = None
+        handler = getattr(self, "_journal_handler", None)
+        if handler is not None:
+            decky.logger.removeHandler(handler)
+            self._journal_handler = None
+        diary.stop(timeout=1.0)
+
+    @staticmethod
+    def _journal_report() -> dict | None:
+        diary = journal.active
+        if diary is None:
+            return None
+        try:
+            report = journal.collect(diary.directory)
+        except Exception as error:  # noqa: BLE001
+            return {"schema": 1, "error": type(error).__name__}
+        report["dropped"] = diary.dropped
+        report["write_failures"] = diary.write_failures
+        return report
+
+    def _journal_state(
+        self, kind: str, *, level: str = "INFO", changed_only: bool = True, **fields
+    ) -> None:
+        diary = journal.active
+        if diary is None:
+            return
+        if changed_only:
+            seen = self.__dict__.setdefault("_journal_seen", {})
+            if seen.get(kind) == fields:
+                return
+            seen[kind] = fields
+        diary.write(level, "state", kind, **fields)
+
+    def _journal_device(self) -> None:
+        controller = getattr(self, "_controller", None)
+        if journal.active is None or controller is None:
+            return
+        device = getattr(self, "_device", None) or {}
+        capabilities = getattr(self, "_capabilities", None) or {}
+        self._journal_state(
+            "device",
+            name=device.get("name"),
+            product=device.get("product"),
+            board=device.get("board"),
+            driver=type(controller).__name__,
+            route=getattr(controller, "route", None),
+            zones=capabilities.get("zones"),
+            perZone=bool(capabilities.get("perZone")),
+            available=bool(getattr(controller, "available", False)),
+            ledPath=getattr(controller, "led_path", None),
+            lastError=getattr(controller, "last_error", None),
+        )
+
+    def _journal_mode(self) -> None:
+        if journal.active is None:
+            return
+        settings = self._settings
+        mode = settings.get("mode")
+        effect = settings.get("effect") or {}
+        self._journal_state(
+            "mode",
+            mode=mode,
+            effect=effect.get("id") if mode == "effect" else None,
+            power=self._effective_power(),
+            app=getattr(self, "_current_app_key", None),
+        )
+
+    def _journal_runtime(self) -> None:
+        if journal.active is None:
+            return
+        seen = getattr(self, "_journal_seen", None) or {}
+        for kind in ("ambilight", "audio"):
+            status = getattr(getattr(self, f"_{kind}", None), "status", None)
+            if status == "idle" and kind not in seen:
+                continue
+            self._journal_state(kind, status=status)
+        if self._capabilities.get("hhdRgbTakeover"):
+            self._journal_state(
+                "hhd_rgb",
+                status=getattr(self, "_hhd_rgb_status", None),
+                force_control=bool(self._settings.get("force_control")),
+                restore_pending=self._settings.get("hhd_rgb_restore") is True,
+            )
+
+    def _journal_hw(self, value) -> None:
+        diary = journal.active
+        if diary is None:
+            return
+        controller = self._controller
+        error = getattr(controller, "last_error", None)
+        if error == getattr(self, "_journal_hw_error", None):
+            return
+        self._journal_hw_error = error
+        target = (
+            getattr(controller, "led_path", None)
+            or getattr(controller, "route", None)
+            or "controller"
+        )
+        driver = type(controller).__name__
+        if error:
+            journal.write_failed(target, value, error, by=driver)
+        else:
+            diary.write("INFO", "hw", "write_recovered", target=str(target), by=driver)
+
+    def _read_journal_context(self) -> dict:
+        home = getattr(decky, "DECKY_USER_HOME", None) or os.path.expanduser("~")
+        homebrew = getattr(decky, "DECKY_HOME", None) or os.path.join(home, "homebrew")
+        return journal_context.context_snapshot(
+            os.path.join(homebrew, "plugins"),
+            os.path.join(homebrew, "settings", "loader.json"),
+            self._run_capture,
+        )
+
+    async def _journal_context_watch(self) -> None:
+        diary = journal.active
+        if diary is None:
+            return
+        loop = asyncio.get_running_loop()
+        try:
+            last = await loop.run_in_executor(
+                None, journal.last_record, diary.directory, "context"
+            )
+            await asyncio.sleep(JOURNAL_CONTEXT_DELAY)
+            while journal.active is diary:
+                context = await loop.run_in_executor(None, self._read_journal_context)
+                if journal_context.needs_snapshot(
+                    last, context, ("plugins", "services", "rivals")
+                ):
+                    changes = journal_context.context_changes(last, context)
+                    extra = {"changes": changes} if changes else {}
+                    diary.write("INFO", "context", "snapshot", **context, **extra)
+                    last = {"t": time.time(), **context}
+                await asyncio.sleep(JOURNAL_CONTEXT_INTERVAL)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            diary.write("WARNING", "context", "failed", error=type(error).__name__)
+
+
+journal.trace_calls(
+    Plugin,
+    automatic=frozenset({"prepare_suspend", "set_current_app"}),
+    hidden_arguments=frozenset({"submit_report"}),
+)
