@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.31.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.30.0...decky-colores-v0.31.0) (2026-10-09)
+
+
+### Features
+
+* Ambilight on Armada OS ([75e7455](https://github.com/Hooandee/decky-colores/commit/75e745558acf1784fa420ba5701039fe8dbccb12))
+* first-class ARM support on Linux ([e40eadb](https://github.com/Hooandee/decky-colores/commit/e40eadb52fffddebe34b81dd39e51a8d1e6bd475))
+* keep a week-long diary and attach it to reports ([3228d07](https://github.com/Hooandee/decky-colores/commit/3228d079db935e3e8d2213b2d51bff4f7a327081))
+* light every RGB LED on machines without a profile ([b10a502](https://github.com/Hooandee/decky-colores/commit/b10a502a7dc61c92bf24ba87c14907eaff04175c))
+* read ARM identity and CPU temperature under FEX ([34be565](https://github.com/Hooandee/decky-colores/commit/34be565cbd61d64e746c4f9e5b9904b240b414b3))
+
 ## [0.30.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.29.1...decky-colores-v0.30.0) (2026-10-08)
 
 
