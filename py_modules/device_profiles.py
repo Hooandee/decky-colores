@@ -118,14 +118,14 @@ PORTAL_SYSFS = {
     "experimental": [],
 }
 
-# Linux groups the Thor's HTR3212 channels as rgb:l1..l4 / rgb:r1..r4, but the device
-# tree wires l1/r1 to channels 10-12 and l2-l4/r2-r4 to 1-9. Zones follow the channel
-# order, which is the identity order the Android HTR3212 driver uses (shared gridLayout).
+# The device tree wires rgb:l1/r1 to HTR3212 channels 10-12 and l2-l4/r2-r4 to 1-9;
+# zones follow channel order, as on Android.
 AYN_THOR_STICK_RINGS = {
     **PORTAL_SYSFS,
     "zones": 8,
     "stick_groups": [[1], [2], [3], [0], [5], [6], [7], [4]],
 }
+
 
 DEVICE_TREE_PROFILES = {
     "AYN Thor": AYN_THOR_STICK_RINGS,
@@ -240,6 +240,8 @@ def profile_for_hid_signatures(info, drivers):
 def profile_for_discovered_adapter(adapter, name):
     if adapter == "portal_sysfs":
         return _profile(DEVICE_TREE_PROFILES.get(name, PORTAL_SYSFS), name)
+    if adapter == "generic_multi_sysfs":
+        return _profile(PORTAL_SYSFS, name)
     if adapter == "hp_omen_platform":
         return _profile(OMEN_PLATFORM, name)
     return None

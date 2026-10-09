@@ -567,3 +567,4 @@ def test_multi_sysfs_stick_groups_color_each_ring_independently(tmp_path):
     assert device.apply_zones([(255, 0, 0), (0, 0, 255)], 100, True) is True
     assert all(_read(os.path.join(node, "multi_intensity")) == "0 0 255" for node in nodes[:4])
     assert all(_read(os.path.join(node, "multi_intensity")) == "255 0 0" for node in nodes[4:])
+
