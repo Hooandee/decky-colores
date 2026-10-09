@@ -1,5 +1,53 @@
 # Changelog
 
+## [0.31.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.30.0...decky-colores-v0.31.0) (2026-10-09)
+
+
+### Español
+
+* **AYN Thor con Armada OS:** Los anillos de los joysticks tienen sus ocho zonas, así que degradados, efectos y Ambilight se reparten alrededor de cada stick igual que en Android.
+* **Ambilight en Armada OS:** Ambilight ya funciona en el Thor con Armada OS y las luces siguen lo que pasa en pantalla.
+* **Consolas ARM:** Colores reconoce bien las consolas ARM con Linux y la temperatura usa los sensores del procesador, así que el modo temperatura marca lo que de verdad se calienta.
+* **Consolas sin perfil:** Si Colores encuentra varias luces RGB en una consola que todavía no conoce, ahora las enciende todas en lugar de solo la primera.
+* **Reportes más útiles:** Colores guarda un diario de los últimos días y lo adjunta a los reportes, así que podemos entender un fallo aunque no tengamos tu consola.
+* **Actualizaciones más limpias:** Al actualizar o recargar, Colores se cierra en un instante en lugar de quedarse colgado unos segundos.
+
+### English
+
+* **AYN Thor on Armada OS:** The joystick rings get their eight zones, so gradients, effects and Ambilight spread around each stick just like on Android.
+* **Ambilight on Armada OS:** Ambilight now works on the Thor with Armada OS and the lights follow what happens on screen.
+* **ARM handhelds:** Colores correctly recognizes ARM handhelds running Linux, and temperature uses the processor sensors, so temperature mode shows what is really heating up.
+* **Handhelds without a profile:** If Colores finds several RGB lights on a handheld it doesn't know yet, it now lights all of them instead of only the first.
+* **More useful reports:** Colores keeps a diary of the last few days and attaches it to reports, so we can understand a problem even without your handheld.
+* **Cleaner updates:** When updating or reloading, Colores closes instantly instead of hanging for a few seconds.
+
+### Italiano
+
+* **AYN Thor con Armada OS:** Gli anelli dei joystick hanno le loro otto zone, così sfumature, effetti e Ambilight si distribuiscono intorno a ogni stick come su Android.
+* **Ambilight su Armada OS:** Ambilight ora funziona sul Thor con Armada OS e le luci seguono quello che succede sullo schermo.
+* **Console ARM:** Colores riconosce correttamente le console ARM con Linux e la temperatura usa i sensori del processore, così la modalità temperatura mostra cosa si sta davvero scaldando.
+* **Console senza profilo:** Se Colores trova più luci RGB su una console che non conosce ancora, ora le accende tutte invece della sola prima.
+* **Segnalazioni più utili:** Colores tiene un diario degli ultimi giorni e lo allega alle segnalazioni, così possiamo capire un problema anche senza avere la tua console.
+* **Aggiornamenti più puliti:** Quando aggiorni o ricarichi, Colores si chiude all'istante invece di restare bloccato per qualche secondo.
+
+### Deutsch
+
+* **AYN Thor mit Armada OS:** Die Joystick-Ringe haben ihre acht Zonen, sodass sich Verläufe, Effekte und Ambilight wie unter Android um jeden Stick verteilen.
+* **Ambilight unter Armada OS:** Ambilight funktioniert jetzt auf dem Thor mit Armada OS, und die Beleuchtung folgt dem Geschehen auf dem Bildschirm.
+* **ARM-Handhelds:** Colores erkennt ARM-Handhelds mit Linux zuverlässig, und die Temperatur kommt von den Prozessorsensoren, sodass der Temperaturmodus zeigt, was wirklich warm wird.
+* **Handhelds ohne Profil:** Findet Colores auf einem noch unbekannten Handheld mehrere RGB-Leuchten, schaltet es jetzt alle ein statt nur die erste.
+* **Hilfreichere Berichte:** Colores führt ein Protokoll der letzten Tage und hängt es an Berichte an, damit wir ein Problem auch ohne dein Gerät verstehen können.
+* **Sauberere Updates:** Beim Aktualisieren oder Neuladen beendet sich Colores sofort, statt ein paar Sekunden hängen zu bleiben.
+
+### Português (Brasil)
+
+* **AYN Thor com Armada OS:** Os anéis dos joysticks ganham suas oito zonas, então degradês, efeitos e Ambilight se espalham ao redor de cada analógico como no Android.
+* **Ambilight no Armada OS:** O Ambilight agora funciona no Thor com Armada OS e as luzes acompanham o que acontece na tela.
+* **Portáteis ARM:** O Colores reconhece corretamente portáteis ARM com Linux, e a temperatura usa os sensores do processador, então o modo temperatura mostra o que está realmente esquentando.
+* **Portáteis sem perfil:** Se o Colores encontrar várias luzes RGB em um portátil que ainda não conhece, agora acende todas em vez de só a primeira.
+* **Relatórios mais úteis:** O Colores mantém um diário dos últimos dias e o anexa aos relatórios, para entendermos um problema mesmo sem ter o seu portátil.
+* **Atualizações mais limpas:** Ao atualizar ou recarregar, o Colores fecha na hora em vez de ficar travado por alguns segundos.
+
 ## [0.30.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.29.1...decky-colores-v0.30.0) (2026-10-08)
 
 
