@@ -539,3 +539,27 @@ def test_build_device_oxp_without_node_degrades(tmp_path):
     ctx = build_device(root)
     assert ctx["capabilities"]["color"] is False
     assert type(ctx["device"]).__name__ == "NullDevice"
+
+
+def test_ayn_thor_on_linux_maps_its_eight_zones_in_channel_order(tmp_path):
+    root = str(tmp_path)
+    model = tmp_path / "sys/firmware/devicetree/base/model"
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"AYN Thor\x00")
+    _make_portal_leds(root)
+
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], MultiSysfsRgbDevice)
+    assert ctx["info"]["name"] == "AYN Thor"
+    assert ctx["capabilities"]["zones"] == 8
+    assert ctx["capabilities"]["perZone"] is True
+    assert [group["zones"] for group in ctx["capabilities"]["layout"]] == [[0, 1, 2, 3], [4, 5, 6, 7]]
+
+    zones = [(index, 0, 0) for index in range(8)]
+    assert ctx["device"].apply_zones(zones, 100, True) is True
+    first = {}
+    for name in ("l1", "l2", "l3", "l4", "r1", "r2", "r3", "r4"):
+        with open(os.path.join(root, "sys/class/leds", f"rgb:{name}", "multi_intensity")) as handle:
+            first[name] = int(handle.read().split()[2])
+    assert first == {"l2": 0, "l3": 1, "l4": 2, "l1": 3, "r2": 4, "r3": 5, "r4": 6, "r1": 7}

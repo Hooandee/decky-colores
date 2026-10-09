@@ -333,7 +333,9 @@ def build_device(sysfs_root="/", ambilight=False):
         portal_name = info.get("model") or "Multizone RGB device"
         profile = profile_for_discovered_adapter("portal_sysfs", portal_name)
         info["name"] = profile["name"]
-        device = MultiSysfsRgbDevice(portal_nodes, color_order=profile["color_order"])
+        device = MultiSysfsRgbDevice(
+            portal_nodes, color_order=profile["color_order"], groups=profile.get("stick_groups"),
+        )
         capabilities = build_capabilities(
             profile, device.available, profile["zones"], 255, ambilight,
             power_led, battery, temperature,
