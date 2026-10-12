@@ -294,22 +294,113 @@ PORTAL_LED_NAMES = tuple(
 )
 
 
+# Ring nodes on SM8550 are blue-green-red. Other SoCs use the same rgb:l*/rgb:r*
+# names with a different channel order, or with no multi_index at all.
+def _ring_channel_index(path):
+    try:
+        with open(os.path.join(path, "multi_index")) as handle:
+            channels = handle.read().strip().lower().split()
+    except OSError:
+        return None
+    if not channels or (len(channels) == 3 and set(channels) == {"red", "green", "blue"}):
+        return channels
+    return None
+
+
 def discover_portal_leds(leds_dir):
     nodes = []
     for name in PORTAL_LED_NAMES:
         path = os.path.join(leds_dir, name)
-        try:
-            with open(os.path.join(path, "multi_index")) as handle:
-                channels = handle.read().strip().lower().split()
-        except OSError:
-            return []
+        channels = _ring_channel_index(path)
         required = ("multi_intensity", "brightness", "max_brightness")
-        if channels != ["blue", "green", "red"] or not all(
+        if channels is None or not all(
             os.path.exists(os.path.join(path, filename)) for filename in required
         ):
             return []
         nodes.append(path)
     return nodes
+
+
+# pwm-leds-multicolor zones used by AYN Odin 2 and other ARM boards. The names are
+# the sysfs contract; the SoC underneath does not matter.
+PANEL_LED_ORDER = (
+    ("left-joystick", "left_joystick"),
+    ("left-side", "left_side"),
+    ("right-joystick", "right_joystick"),
+    ("right-side", "right_side"),
+)
+PANEL_LED_NAMES = {name for aliases in PANEL_LED_ORDER for name in aliases}
+
+# Same exclusions as the color-leds scanner: system indicators are not panels.
+LOOSE_LED_EXCLUDE = (
+    "power",
+    "batt",
+    "charge",
+    "charging",
+    "disk",
+    "mmc",
+    "caps",
+    "num",
+    "scroll",
+    "backlight",
+    "input",
+    "default",
+    "kbd",
+    "keyboard",
+    "status",
+    "indicator",
+    "lcd",
+    "flash",
+    "torch",
+)
+
+
+def _excluded_led_name(name):
+    lower = name.lower()
+    return any(keyword in lower for keyword in LOOSE_LED_EXCLUDE)
+
+
+def discover_discrete_rgb_zones(leds_dir):
+    """Group separate red/green/blue sysfs LEDs into left and right zones.
+
+    This is the layout color-leds drives on ARM boards that do not expose a
+    multicolor node. Each returned zone maps a channel to one or more LED dirs.
+    """
+    try:
+        entries = os.listdir(leds_dir)
+    except OSError:
+        return []
+    sides = {
+        "left": {"r": [], "g": [], "b": []},
+        "right": {"r": [], "g": [], "b": []},
+    }
+    for entry in entries:
+        path = os.path.join(leds_dir, entry)
+        if os.path.isfile(os.path.join(path, "multi_intensity")):
+            continue
+        if not os.path.isfile(os.path.join(path, "brightness")):
+            continue
+        lower = entry.lower()
+        if _excluded_led_name(lower):
+            continue
+        if lower.startswith("l:") or lower.startswith("l_") or "left" in lower:
+            side = sides["left"]
+        elif lower.startswith("r:") or lower.startswith("r_") or "right" in lower:
+            side = sides["right"]
+        else:
+            continue
+        if ":r" in lower or "_r" in lower or "red" in lower:
+            side["r"].append(path)
+        elif ":g" in lower or "_g" in lower or "green" in lower:
+            side["g"].append(path)
+        elif ":b" in lower or "_b" in lower or "blue" in lower:
+            side["b"].append(path)
+    zones = []
+    for side in ("left", "right"):
+        channels = sides[side]
+        if channels["r"] and channels["g"] and channels["b"]:
+            zones.append({channel: sorted(paths) for channel, paths in channels.items()})
+    return zones
 
 
 class MultiSysfsRgbDevice(LedDevice):
@@ -381,6 +472,72 @@ class MultiSysfsRgbDevice(LedDevice):
     def apply_solid(self, color, brightness, power):
         self.last_error = None
         return all([self._write(index, color, brightness, power) for index in range(len(self._devices))])
+
+
+class DiscreteRgbDevice(LedDevice):
+    """Writes one RGB color across separate red, green and blue brightness files."""
+
+    def __init__(self, zones):
+        self._channel_zones = [
+            {channel: list(paths) for channel, paths in zone.items()} for zone in zones
+        ]
+        self._zones = len(self._channel_zones)
+        self._max_brightness = 255
+        self.last_error = None
+
+    @property
+    def available(self):
+        return self._zones > 0
+
+    @property
+    def led_path(self):
+        if not self._channel_zones:
+            return None
+        for channel in "rgb":
+            paths = self._channel_zones[0][channel]
+            if paths:
+                return paths[0]
+        return None
+
+    def supports_per_zone(self):
+        return self._zones > 1
+
+    def reconnect(self):
+        return self.available
+
+    def apply_zones(self, zone_colors, brightness, power):
+        self.last_error = None
+        return all(
+            self._write_zone(zone, color, brightness, power)
+            for color, zone in zip(self._fit(zone_colors), self._channel_zones)
+        )
+
+    def apply_solid(self, color, brightness, power):
+        return self.apply_zones([tuple(color)] * max(self._zones, 1), brightness, power)
+
+    def _write_zone(self, zone, color, brightness, power):
+        components = dict(zip("rgb", (_clamp8(channel) for channel in color)))
+        try:
+            for channel in "rgb":
+                for path in zone[channel]:
+                    maximum = self._channel_max(path)
+                    level = round((_clamp_pct(brightness) / 100) * maximum) if power else 0
+                    value = round(components[channel] / 255 * level)
+                    with open(os.path.join(path, "brightness"), "w") as handle:
+                        handle.write(str(value))
+            return True
+        except OSError as error:
+            self.last_error = str(error)
+            return False
+
+    @staticmethod
+    def _channel_max(path):
+        try:
+            with open(os.path.join(path, "max_brightness")) as handle:
+                value = int(handle.read().strip())
+        except (OSError, ValueError):
+            return 255
+        return value if value > 0 else 255
 
 
 class HpOmenRgbDevice(LedDevice):

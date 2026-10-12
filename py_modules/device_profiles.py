@@ -118,6 +118,13 @@ PORTAL_SYSFS = {
     "experimental": [],
 }
 
+# Joystick and side panels (left-joystick, left-side, …). The zone names are the
+# contract; the same sysfs shows up on SM8550 and on later ARM SoCs.
+PANEL_SYSFS = {
+    **PORTAL_SYSFS,
+    "color_order": "rgb",
+}
+
 # The device tree wires rgb:l1/r1 to HTR3212 channels 10-12 and l2-l4/r2-r4 to 1-9;
 # zones follow channel order, as on Android.
 AYN_THOR_STICK_RINGS = {
@@ -237,11 +244,19 @@ def profile_for_hid_signatures(info, drivers):
     return None
 
 
-def profile_for_discovered_adapter(adapter, name):
+def profile_for_discovered_adapter(adapter, name, zones=None, stick_groups=None):
     if adapter == "portal_sysfs":
         return _profile(DEVICE_TREE_PROFILES.get(name, PORTAL_SYSFS), name)
     if adapter == "generic_multi_sysfs":
         return _profile(PORTAL_SYSFS, name)
+    if adapter in ("named_panels", "discrete_rgb"):
+        profile = _profile(PANEL_SYSFS, name)
+        if adapter == "discrete_rgb":
+            profile["driver"] = "discrete_sysfs"
+        profile["zones"] = zones or 1
+        if stick_groups:
+            profile["stick_groups"] = stick_groups
+        return profile
     if adapter == "hp_omen_platform":
         return _profile(OMEN_PLATFORM, name)
     return None
