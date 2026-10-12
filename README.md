@@ -33,6 +33,7 @@ En este vídeo enseño y explico el plugin a fondo:
 | Lenovo Legion | Go, Go 2, Go S | Color por mando, botón de reconexión (ver más abajo) |
 | MSI | Claw, Claw 8 AI+ | 9 zonas |
 | AYN | Thor (Linux, Armada OS) | 8 zonas en los anillos de los joysticks |
+| ARM | Linux, cualquier SoC | Paneles y joysticks por sysfs (`left-joystick`, `left-side`, anillos `rgb:l*`/`rgb:r*` y canales RGB sueltos), no solo SM8550. Thor conserva el mapa de 8 zonas |
 
 ¿Tu consola no está en la lista? Colores intenta usarla igualmente leyendo los LEDs que el sistema expone. Verás esas funciones marcadas como experimentales: puedes probarlas, pero puede que no respondan bien hasta que tenga esa máquina entre manos para calibrarla. Si ni siquiera hay LEDs que controlar, el plugin te lo dice y no se queda colgado.
 

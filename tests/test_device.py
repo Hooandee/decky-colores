@@ -580,6 +580,77 @@ def _arm_model(tmp_path, name):
     model.write_bytes(name.encode() + b"\x00")
 
 
+def test_ring_nodes_follow_each_boards_channel_order(tmp_path):
+    root = str(tmp_path)
+    _arm_model(tmp_path, "AYN Odin 2 Portal")
+    names = [f"rgb:l{i}" for i in range(1, 5)] + [f"rgb:r{i}" for i in range(1, 5)]
+    for name in names:
+        _make_led(root, name, {
+            "multi_index": "red green blue",
+            "multi_intensity": "0 0 0",
+            "brightness": "0",
+            "max_brightness": "255",
+        })
+
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], MultiSysfsRgbDevice)
+    assert ctx["device"].apply_solid((255, 0, 0), 100, True) is True
+    with open(os.path.join(root, "sys/class/leds/rgb:l1/multi_intensity")) as handle:
+        assert handle.read() == "255 0 0"
+
+
+def test_named_led_panels_are_zones_on_any_soc(tmp_path):
+    root = str(tmp_path)
+    _arm_model(tmp_path, "AYANEO Pocket S2")
+    for name in ("left-joystick", "left-side", "right-joystick", "right-side"):
+        _make_led(root, name, {
+            "multi_intensity": "0 0 0",
+            "brightness": "0",
+            "max_brightness": "255",
+        })
+    _make_led(root, "power-led", {
+        "multi_intensity": "0 0 0",
+        "brightness": "0",
+        "max_brightness": "255",
+    })
+
+    ctx = build_device(root)
+
+    assert isinstance(ctx["device"], MultiSysfsRgbDevice)
+    assert ctx["info"]["name"] == "AYANEO Pocket S2"
+    assert ctx["capabilities"]["zones"] == 4
+    assert ctx["capabilities"]["perZone"] is True
+    assert [group["zones"] for group in ctx["capabilities"]["layout"]] == [[0, 1], [2, 3]]
+    assert ctx["device"].apply_zones([(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0)], 100, True)
+    leds = os.path.join(root, "sys/class/leds")
+    assert open(os.path.join(leds, "left-joystick/multi_intensity")).read() == "255 0 0"
+    assert open(os.path.join(leds, "left-side/multi_intensity")).read() == "0 255 0"
+    assert open(os.path.join(leds, "right-joystick/multi_intensity")).read() == "0 0 255"
+    assert open(os.path.join(leds, "right-side/multi_intensity")).read() == "255 255 0"
+    assert open(os.path.join(leds, "power-led/multi_intensity")).read() == "0 0 0"
+
+
+def test_discrete_rgb_channels_drive_left_and_right(tmp_path):
+    root = str(tmp_path)
+    _arm_model(tmp_path, "SM8650 Handheld")
+    for name in ("l:red", "l:green", "l:blue", "r:red", "r:green", "r:blue"):
+        _make_led(root, name, {"brightness": "0", "max_brightness": "255"})
+
+    ctx = build_device(root)
+    device = ctx["device"]
+
+    assert type(device).__name__ == "DiscreteRgbDevice"
+    assert ctx["capabilities"]["zones"] == 2
+    assert ctx["capabilities"]["perZone"] is True
+    assert device.apply_zones([(255, 0, 0), (0, 0, 255)], 100, True) is True
+    leds = os.path.join(root, "sys/class/leds")
+    assert open(os.path.join(leds, "l:red/brightness")).read() == "255"
+    assert open(os.path.join(leds, "l:green/brightness")).read() == "0"
+    assert open(os.path.join(leds, "r:blue/brightness")).read() == "255"
+    assert open(os.path.join(leds, "r:red/brightness")).read() == "0"
+
+
 def test_unknown_machine_drives_every_rgb_node_uniformly(tmp_path):
     root = str(tmp_path)
     _arm_model(tmp_path, "Some ARM Handheld")
