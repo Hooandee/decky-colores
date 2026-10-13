@@ -127,8 +127,30 @@ AYN_THOR_STICK_RINGS = {
 }
 
 
+STICK_CHANNELS_SYSFS = {
+    "driver": "discrete_sysfs",
+    "color_order": "rgb",
+    "zones": 1,
+    "max_render_fps": 10,
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "experimental": [],
+}
+
+# Zones run clockwise from each stick's top-left LED, which is l4 on the left ring
+# and r1 on the right one.
+AYN_ODIN3_STICK_CHANNELS = {
+    **STICK_CHANNELS_SYSFS,
+    "zones": 8,
+    "stick_groups": [[3], [0], [1], [2], [4], [5], [6], [7]],
+    "stick_positions": 4,
+}
+
 DEVICE_TREE_PROFILES = {
     "AYN Thor": AYN_THOR_STICK_RINGS,
+}
+
+STICK_CHANNEL_PROFILES = {
+    "AYN Odin 3": AYN_ODIN3_STICK_CHANNELS,
 }
 
 OMEN_PLATFORM = {
@@ -242,6 +264,8 @@ def profile_for_discovered_adapter(adapter, name):
         return _profile(DEVICE_TREE_PROFILES.get(name, PORTAL_SYSFS), name)
     if adapter == "generic_multi_sysfs":
         return _profile(PORTAL_SYSFS, name)
+    if adapter == "stick_channels":
+        return _profile(STICK_CHANNEL_PROFILES.get(name, STICK_CHANNELS_SYSFS), name)
     if adapter == "hp_omen_platform":
         return _profile(OMEN_PLATFORM, name)
     return None

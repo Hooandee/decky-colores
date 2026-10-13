@@ -3,6 +3,7 @@ import os
 from device_profiles import profile_for_discovered_adapter, profile_for_hid_signatures, resolve_profile_match
 from led_device import (
     ApexRgbDevice,
+    DiscreteRgbDevice,
     HpOmenRgbDevice,
     MultiSysfsRgbDevice,
     NullDevice,
@@ -10,6 +11,7 @@ from led_device import (
     SysfsRgbDevice,
     ValveLedsDevice,
     discover_portal_leds,
+    discover_stick_channels,
     discover_valve_leds,
 )
 from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device, discover_hid_drivers
@@ -232,6 +234,14 @@ def _rgb_channel_order(led_path, default="rgb"):
     return default
 
 
+def _stick_channel_groups(profile, left, right):
+    expected = profile.get("stick_positions")
+    if expected and left == right == expected:
+        return profile["stick_groups"]
+    sticks = (list(range(left)), list(range(left, left + right)))
+    return [stick for stick in sticks if stick]
+
+
 _IMPLEMENTED_DRIVERS = {
     "sysfs",
     "hid_msi",
@@ -240,6 +250,7 @@ _IMPLEMENTED_DRIVERS = {
     "hid_asus_ally",
     "valve_leds",
     "multi_sysfs",
+    "discrete_sysfs",
     "hp_omen_platform",
 }
 
@@ -360,6 +371,17 @@ def build_device(sysfs_root="/", ambilight=False):
         device = MultiSysfsRgbDevice(
             portal_nodes, color_order=profile["color_order"], groups=profile.get("stick_groups"),
         )
+        return _multi_sysfs_context(profile, device, info, ambilight, power_led, battery, temperature)
+
+    sides = discover_stick_channels(leds_dir) if not matched else {}
+    if sides:
+        profile = profile_for_discovered_adapter(
+            "stick_channels", info.get("model") or "Stick LEDs"
+        )
+        left, right = sides.get("l", []), sides.get("r", [])
+        groups = _stick_channel_groups(profile, len(left), len(right))
+        profile["zones"] = len(groups)
+        device = DiscreteRgbDevice(left + right, groups)
         return _multi_sysfs_context(profile, device, info, ambilight, power_led, battery, temperature)
 
     identity = " ".join(

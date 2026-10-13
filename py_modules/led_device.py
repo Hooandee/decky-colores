@@ -312,6 +312,84 @@ def discover_portal_leds(leds_dir):
     return nodes
 
 
+STICK_CHANNEL_NAME = re.compile(r"^(?P<side>[lr]):(?P<channel>[rgb])(?P<position>\d+)$")
+
+
+def discover_stick_channels(leds_dir):
+    try:
+        entries = os.listdir(leds_dir)
+    except OSError:
+        return {}
+    positions = {}
+    for entry in entries:
+        match = STICK_CHANNEL_NAME.match(entry)
+        path = os.path.join(leds_dir, entry)
+        if not match or not os.path.isfile(os.path.join(path, "brightness")):
+            continue
+        key = (match["side"], int(match["position"]))
+        positions.setdefault(key, {})[match["channel"]] = path
+    sides = {}
+    for (side, _), channels in sorted(positions.items()):
+        if len(channels) == 3:
+            sides.setdefault(side, []).append(channels)
+    return sides
+
+
+class DiscreteRgbDevice(LedDevice):
+    def __init__(self, positions, groups):
+        self._positions = [dict(position) for position in positions]
+        self._groups = [list(group) for group in groups]
+        self._zones = len(self._groups)
+        self._maxima = {
+            path: self._node_max(path) for position in self._positions for path in position.values()
+        }
+        self.last_error = None
+
+    @staticmethod
+    def _node_max(path):
+        try:
+            with open(os.path.join(path, "max_brightness")) as handle:
+                value = int(handle.read().strip())
+        except (OSError, ValueError):
+            return 255
+        return value if value > 0 else 255
+
+    @property
+    def available(self):
+        return bool(self._positions) and all(
+            os.path.exists(os.path.join(path, "brightness")) for path in self._maxima
+        )
+
+    @property
+    def led_path(self):
+        return self._positions[0]["r"] if self._positions else None
+
+    def supports_per_zone(self):
+        return self._zones > 1
+
+    def _write(self, position, color, scale):
+        for channel, value in zip("rgb", color):
+            path = position[channel]
+            level = round(_clamp8(value) / 255 * scale * self._maxima[path])
+            with open(os.path.join(path, "brightness"), "w") as handle:
+                handle.write(str(level))
+
+    def apply_zones(self, zone_colors, brightness, power):
+        self.last_error = None
+        scale = _clamp_pct(brightness) / 100 if power else 0
+        try:
+            for color, group in zip(self._fit(zone_colors), self._groups):
+                for index in group:
+                    self._write(self._positions[index], color, scale)
+            return True
+        except OSError as error:
+            self.last_error = str(error)
+            return False
+
+    def apply_solid(self, color, brightness, power):
+        return self.apply_zones([tuple(color)] * self._zones, brightness, power)
+
+
 class MultiSysfsRgbDevice(LedDevice):
     def __init__(self, node_paths, color_order="rgb", color_correction=(1.0, 1.0, 1.0), groups=None):
         self._nodes = list(node_paths)
