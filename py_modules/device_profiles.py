@@ -118,13 +118,6 @@ PORTAL_SYSFS = {
     "experimental": [],
 }
 
-# Joystick and side panels (left-joystick, left-side, …). The zone names are the
-# contract; the same sysfs shows up on SM8550 and on later ARM SoCs.
-PANEL_SYSFS = {
-    **PORTAL_SYSFS,
-    "color_order": "rgb",
-}
-
 # The device tree wires rgb:l1/r1 to HTR3212 channels 10-12 and l2-l4/r2-r4 to 1-9;
 # zones follow channel order, as on Android.
 AYN_THOR_STICK_RINGS = {
@@ -134,8 +127,30 @@ AYN_THOR_STICK_RINGS = {
 }
 
 
+STICK_CHANNELS_SYSFS = {
+    "driver": "discrete_sysfs",
+    "color_order": "rgb",
+    "zones": 1,
+    "max_render_fps": 10,
+    "supported_effects": ["breathing", "rainbow", "wave", "cycle"],
+    "experimental": [],
+}
+
+# Zones run clockwise from each stick's top-left LED, which is l4 on the left ring
+# and r1 on the right one.
+AYN_ODIN3_STICK_CHANNELS = {
+    **STICK_CHANNELS_SYSFS,
+    "zones": 8,
+    "stick_groups": [[3], [0], [1], [2], [4], [5], [6], [7]],
+    "stick_positions": 4,
+}
+
 DEVICE_TREE_PROFILES = {
     "AYN Thor": AYN_THOR_STICK_RINGS,
+}
+
+STICK_CHANNEL_PROFILES = {
+    "AYN Odin 3": AYN_ODIN3_STICK_CHANNELS,
 }
 
 OMEN_PLATFORM = {
@@ -244,19 +259,13 @@ def profile_for_hid_signatures(info, drivers):
     return None
 
 
-def profile_for_discovered_adapter(adapter, name, zones=None, stick_groups=None):
+def profile_for_discovered_adapter(adapter, name):
     if adapter == "portal_sysfs":
         return _profile(DEVICE_TREE_PROFILES.get(name, PORTAL_SYSFS), name)
     if adapter == "generic_multi_sysfs":
         return _profile(PORTAL_SYSFS, name)
-    if adapter in ("named_panels", "discrete_rgb"):
-        profile = _profile(PANEL_SYSFS, name)
-        if adapter == "discrete_rgb":
-            profile["driver"] = "discrete_sysfs"
-        profile["zones"] = zones or 1
-        if stick_groups:
-            profile["stick_groups"] = stick_groups
-        return profile
+    if adapter == "stick_channels":
+        return _profile(STICK_CHANNEL_PROFILES.get(name, STICK_CHANNELS_SYSFS), name)
     if adapter == "hp_omen_platform":
         return _profile(OMEN_PLATFORM, name)
     return None

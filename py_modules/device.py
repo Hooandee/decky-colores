@@ -5,16 +5,13 @@ from led_device import (
     ApexRgbDevice,
     DiscreteRgbDevice,
     HpOmenRgbDevice,
-    LOOSE_LED_EXCLUDE,
     MultiSysfsRgbDevice,
     NullDevice,
-    PANEL_LED_NAMES,
-    PANEL_LED_ORDER,
     PORTAL_LED_NAMES,
     SysfsRgbDevice,
     ValveLedsDevice,
-    discover_discrete_rgb_zones,
     discover_portal_leds,
+    discover_stick_channels,
     discover_valve_leds,
 )
 from hid_adapters import HID_AVAILABLE, HID_DRIVERS, build_hid_device, discover_hid_drivers
@@ -120,8 +117,6 @@ FEATURES = ("color", "brightness", "effects", "ambilight")
 def read_zone_format(led_path):
     multi_index = _read(os.path.join(led_path, "multi_index"))
     tokens = multi_index.split()
-    if not tokens and os.path.exists(os.path.join(led_path, "multi_intensity")):
-        return 1, "decimal"
     if tokens and all(token.lower() in _CHANNEL_NAMES for token in tokens):
         return max(1, len(tokens) // 3), "decimal"
     if os.path.basename(led_path) == _ALLY_RGB_NODE and tokens and all(
@@ -216,44 +211,20 @@ def _rgb_led_candidates(leds_dir, allow_packed=False):
 
 def _valid_rgb_schema(led_path, allow_packed=False):
     tokens = _read(os.path.join(led_path, "multi_index")).lower().split()
-    # pwm-leds-multicolor on some ARM boards exposes multi_intensity and no index.
-    # color-leds writes R G B there; do the same when the node is not a system LED.
-    if not tokens:
-        name = os.path.basename(led_path).lower()
-        return os.path.exists(os.path.join(led_path, "multi_intensity")) and not any(
-            keyword in name for keyword in LOOSE_LED_EXCLUDE
-        )
     if tokens and all(token == _PACKED_COLOR_NAME for token in tokens):
         return allow_packed or os.path.basename(led_path) == _ALLY_RGB_NODE
-    if len(tokens) % 3:
+    if not tokens or len(tokens) % 3:
         return False
     groups = [tokens[index : index + 3] for index in range(0, len(tokens), 3)]
     return all(set(group) == _CHANNEL_NAMES and group == groups[0] for group in groups)
 
 
 def _discover_rgb_nodes(leds_dir):
-    nodes = []
-    for path in _rgb_led_candidates(leds_dir):
-        name = os.path.basename(path).lower()
-        if "kbd" in name:
-            continue
-        count = len(_read(os.path.join(path, "multi_index")).split())
-        if count == 3 or (count == 0 and not any(keyword in name for keyword in LOOSE_LED_EXCLUDE)):
-            nodes.append(path)
-    return nodes
-
-
-def _order_panel_nodes(paths):
-    by_name = {os.path.basename(path): path for path in paths}
-    if not by_name or any(name not in PANEL_LED_NAMES for name in by_name):
-        return []
-    ordered = []
-    for aliases in PANEL_LED_ORDER:
-        for alias in aliases:
-            if alias in by_name:
-                ordered.append(by_name[alias])
-                break
-    return ordered if len(ordered) == len(by_name) else []
+    return [
+        path for path in _rgb_led_candidates(leds_dir)
+        if "kbd" not in os.path.basename(path).lower()
+        and len(_read(os.path.join(path, "multi_index")).split()) == 3
+    ]
 
 
 def _rgb_channel_order(led_path, default="rgb"):
@@ -261,6 +232,14 @@ def _rgb_channel_order(led_path, default="rgb"):
     if len(tokens) >= 3 and set(tokens[:3]) == _CHANNEL_NAMES:
         return "".join(token[0] for token in tokens[:3])
     return default
+
+
+def _stick_channel_groups(profile, left, right):
+    expected = profile.get("stick_positions")
+    if expected and left == right == expected:
+        return profile["stick_groups"]
+    sticks = (list(range(left)), list(range(left, left + right)))
+    return [stick for stick in sticks if stick]
 
 
 _IMPLEMENTED_DRIVERS = {
@@ -390,10 +369,19 @@ def build_device(sysfs_root="/", ambilight=False):
             "portal_sysfs", info.get("model") or "Multizone RGB device"
         )
         device = MultiSysfsRgbDevice(
-            portal_nodes,
-            color_order=[_rgb_channel_order(path) for path in portal_nodes],
-            groups=profile.get("stick_groups"),
+            portal_nodes, color_order=profile["color_order"], groups=profile.get("stick_groups"),
         )
+        return _multi_sysfs_context(profile, device, info, ambilight, power_led, battery, temperature)
+
+    sides = discover_stick_channels(leds_dir) if not matched else {}
+    if sides:
+        profile = profile_for_discovered_adapter(
+            "stick_channels", info.get("model") or "Stick LEDs"
+        )
+        left, right = sides.get("l", []), sides.get("r", [])
+        groups = _stick_channel_groups(profile, len(left), len(right))
+        profile["zones"] = len(groups)
+        device = DiscreteRgbDevice(left + right, groups)
         return _multi_sysfs_context(profile, device, info, ambilight, power_led, battery, temperature)
 
     identity = " ".join(
@@ -419,22 +407,6 @@ def build_device(sysfs_root="/", ambilight=False):
         })
 
     rgb_nodes = _discover_rgb_nodes(leds_dir) if not matched else []
-    panel_nodes = _order_panel_nodes(rgb_nodes)
-    if panel_nodes:
-        groups = [[index] for index in range(len(panel_nodes))] if len(panel_nodes) > 1 else None
-        profile = profile_for_discovered_adapter(
-            "named_panels",
-            info.get("model") or "LED panels",
-            zones=len(panel_nodes),
-            stick_groups=groups,
-        )
-        device = MultiSysfsRgbDevice(
-            panel_nodes,
-            color_order=[_rgb_channel_order(path) for path in panel_nodes],
-            groups=groups,
-        )
-        return _multi_sysfs_context(profile, device, info, ambilight, power_led, battery, temperature)
-
     if len(rgb_nodes) > 1:
         profile = profile_for_discovered_adapter(
             "generic_multi_sysfs", info.get("model") or "Multizone RGB device"
@@ -483,17 +455,6 @@ def build_device(sysfs_root="/", ambilight=False):
             led_path = None
 
     if not led_path:
-        discrete_zones = discover_discrete_rgb_zones(leds_dir) if not matched else []
-        if discrete_zones:
-            profile = profile_for_discovered_adapter(
-                "discrete_rgb",
-                info.get("model") or "RGB channels",
-                zones=len(discrete_zones),
-            )
-            device = DiscreteRgbDevice(discrete_zones)
-            return _multi_sysfs_context(
-                profile, device, info, ambilight, power_led, battery, temperature
-            )
         fallback = profile.get("fallback")
         if fallback and HID_AVAILABLE and fallback.get("driver") in HID_DRIVERS:
             fb_profile = dict(fallback)
