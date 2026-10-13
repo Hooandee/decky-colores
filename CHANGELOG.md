@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.32.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.31.0...decky-colores-v0.32.0) (2026-10-13)
+
+
+### Features
+
+* drive ARM LED panels on SoCs other than SM8550 ([21ef8e9](https://github.com/Hooandee/decky-colores/commit/21ef8e947e01d8de13cc936ae94a56c2a1a52238))
+* drive ARM LED panels on SoCs other than SM8550 ([8c8f338](https://github.com/Hooandee/decky-colores/commit/8c8f338862f8f408316b8be8fe7b981c762667dc))
+* drive AYN Odin 3 stick LEDs (8 zones) ([fcd016a](https://github.com/Hooandee/decky-colores/commit/fcd016ab9b135303f41324c78e62d8bdf2f848b3))
+
 ## [0.31.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.30.0...decky-colores-v0.31.0) (2026-10-09)
 
 
