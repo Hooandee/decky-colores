@@ -3,11 +3,30 @@
 ## [0.32.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.31.0...decky-colores-v0.32.0) (2026-10-13)
 
 
-### Features
+### Español
 
-* drive ARM LED panels on SoCs other than SM8550 ([21ef8e9](https://github.com/Hooandee/decky-colores/commit/21ef8e947e01d8de13cc936ae94a56c2a1a52238))
-* drive ARM LED panels on SoCs other than SM8550 ([8c8f338](https://github.com/Hooandee/decky-colores/commit/8c8f338862f8f408316b8be8fe7b981c762667dc))
-* drive AYN Odin 3 stick LEDs (8 zones) ([fcd016a](https://github.com/Hooandee/decky-colores/commit/fcd016ab9b135303f41324c78e62d8bdf2f848b3))
+* **AYN Odin 3 con Armada OS:** Los anillos de los joysticks se encienden con sus ocho zonas, así que degradados, efectos y Ambilight dan la vuelta a cada stick igual que en el Thor.
+* **Otras consolas ARM:** Colores reconoce más tipos de luces en los joysticks y te deja un color para cada stick, aunque todavía no tenga un perfil para tu consola.
+
+### English
+
+* **AYN Odin 3 on Armada OS:** The joystick rings light up with their eight zones, so gradients, effects and Ambilight wrap around each stick just like on the Thor.
+* **Other ARM handhelds:** Colores recognizes more kinds of joystick lights and gives you one color per stick, even before it has a profile for your handheld.
+
+### Italiano
+
+* **AYN Odin 3 con Armada OS:** Gli anelli dei joystick si accendono con le loro otto zone, così sfumature, effetti e Ambilight girano intorno a ogni stick come sul Thor.
+* **Altre console ARM:** Colores riconosce più tipi di luci nei joystick e ti lascia un colore per ogni stick, anche se non ha ancora un profilo per la tua console.
+
+### Deutsch
+
+* **AYN Odin 3 mit Armada OS:** Die Joystick-Ringe leuchten mit ihren acht Zonen, sodass Verläufe, Effekte und Ambilight wie beim Thor um jeden Stick laufen.
+* **Weitere ARM-Handhelds:** Colores erkennt mehr Arten von Joystick-Beleuchtung und gibt dir eine Farbe pro Stick, auch wenn es für dein Gerät noch kein Profil gibt.
+
+### Português (Brasil)
+
+* **AYN Odin 3 com Armada OS:** Os anéis dos joysticks acendem com suas oito zonas, então degradês, efeitos e Ambilight dão a volta em cada analógico como no Thor.
+* **Outros portáteis ARM:** O Colores reconhece mais tipos de luzes nos joysticks e deixa uma cor para cada analógico, mesmo antes de ter um perfil para o seu portátil.
 
 ## [0.31.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.30.0...decky-colores-v0.31.0) (2026-10-09)
 
