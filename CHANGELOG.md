@@ -5,27 +5,27 @@
 
 ### Español
 
-* **AYN Odin 3 con Armada y otras distros Linux (como SteamOS-Ubuntu):** Los anillos de los joysticks se encienden con sus ocho zonas, así que degradados, efectos y Ambilight dan la vuelta a cada stick igual que en el Thor.
+* **AYN Odin 3 con Armada y otras distros Linux (como SteamOS-Ubuntu de MaSieS4Fun):** Los anillos de los joysticks se encienden con sus ocho zonas, así que degradados, efectos y Ambilight dan la vuelta a cada stick igual que en el Thor.
 * **Otras consolas ARM:** Colores reconoce más tipos de luces en los joysticks y te deja un color para cada stick, aunque todavía no tenga un perfil para tu consola.
 
 ### English
 
-* **AYN Odin 3 on Armada and other Linux distros (like SteamOS-Ubuntu):** The joystick rings light up with their eight zones, so gradients, effects and Ambilight wrap around each stick just like on the Thor.
+* **AYN Odin 3 on Armada and other Linux distros (like SteamOS-Ubuntu by MaSieS4Fun):** The joystick rings light up with their eight zones, so gradients, effects and Ambilight wrap around each stick just like on the Thor.
 * **Other ARM handhelds:** Colores recognizes more kinds of joystick lights and gives you one color per stick, even before it has a profile for your handheld.
 
 ### Italiano
 
-* **AYN Odin 3 con Armada e altre distro Linux (come SteamOS-Ubuntu):** Gli anelli dei joystick si accendono con le loro otto zone, così sfumature, effetti e Ambilight girano intorno a ogni stick come sul Thor.
+* **AYN Odin 3 con Armada e altre distro Linux (come SteamOS-Ubuntu di MaSieS4Fun):** Gli anelli dei joystick si accendono con le loro otto zone, così sfumature, effetti e Ambilight girano intorno a ogni stick come sul Thor.
 * **Altre console ARM:** Colores riconosce più tipi di luci nei joystick e ti lascia un colore per ogni stick, anche se non ha ancora un profilo per la tua console.
 
 ### Deutsch
 
-* **AYN Odin 3 mit Armada und anderen Linux-Distributionen (wie SteamOS-Ubuntu):** Die Joystick-Ringe leuchten mit ihren acht Zonen, sodass Verläufe, Effekte und Ambilight wie beim Thor um jeden Stick laufen.
+* **AYN Odin 3 mit Armada und anderen Linux-Distributionen (wie SteamOS-Ubuntu von MaSieS4Fun):** Die Joystick-Ringe leuchten mit ihren acht Zonen, sodass Verläufe, Effekte und Ambilight wie beim Thor um jeden Stick laufen.
 * **Weitere ARM-Handhelds:** Colores erkennt mehr Arten von Joystick-Beleuchtung und gibt dir eine Farbe pro Stick, auch wenn es für dein Gerät noch kein Profil gibt.
 
 ### Português (Brasil)
 
-* **AYN Odin 3 com Armada e outras distros Linux (como SteamOS-Ubuntu):** Os anéis dos joysticks acendem com suas oito zonas, então degradês, efeitos e Ambilight dão a volta em cada analógico como no Thor.
+* **AYN Odin 3 com Armada e outras distros Linux (como SteamOS-Ubuntu do MaSieS4Fun):** Os anéis dos joysticks acendem com suas oito zonas, então degradês, efeitos e Ambilight dão a volta em cada analógico como no Thor.
 * **Outros portáteis ARM:** O Colores reconhece mais tipos de luzes nos joysticks e deixa uma cor para cada analógico, mesmo antes de ter um perfil para o seu portátil.
 
 ## [0.31.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.30.0...decky-colores-v0.31.0) (2026-10-09)
