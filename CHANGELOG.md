@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.32.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.0...decky-colores-v0.32.1) (2026-10-14)
+
+
+### Bug Fixes
+
+* **ambilight:** capture the main gamescope and never stall it ([#193](https://github.com/Hooandee/decky-colores/issues/193)) ([5e626c5](https://github.com/Hooandee/decky-colores/commit/5e626c5d332c99b1a34a233edf55606a44b56483))
+
 ## [0.32.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.31.0...decky-colores-v0.32.0) (2026-10-13)
 
 
