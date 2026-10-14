@@ -23,6 +23,23 @@ android {
         versionName = "0.1.0"
     }
 
+    val releaseStoreFile = providers.gradleProperty("colores.release.storeFile").orNull
+    if (releaseStoreFile != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseStoreFile)
+                storePassword = providers.gradleProperty("colores.release.storePassword").get()
+                keyAlias = providers.gradleProperty("colores.release.keyAlias").get()
+                keyPassword = providers.gradleProperty("colores.release.keyPassword").get()
+            }
+        }
+        buildTypes {
+            getByName("release") {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
+
     buildFeatures {
         compose = true
     }
