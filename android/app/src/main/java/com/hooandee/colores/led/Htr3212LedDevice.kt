@@ -35,7 +35,7 @@ internal class Htr3212LedDevice internal constructor(
 
     private val hardware = descriptor.htr3212
     private val vendorDescriptor = descriptor.copy(driver = "settings_provider", zones = STICKS, htr3212 = null)
-    private val writer = ConflatedLedWriter(scope, WRITE_INTERVAL_MS, write = ::writeState)
+    private val writer = ConflatedLedWriter(scope, label = "htr3212", intervalMs = WRITE_INTERVAL_MS, write = ::writeState)
 
     private val cacheLock = Any()
     private var cacheGeneration = 0L

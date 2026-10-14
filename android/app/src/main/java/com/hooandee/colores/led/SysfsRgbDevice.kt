@@ -1,5 +1,6 @@
 package com.hooandee.colores.led
 
+import com.hooandee.colores.report.ColoresLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,7 +48,10 @@ internal object FileSysfsAccess : SysfsAccess {
     override fun write(
         path: String,
         value: String,
-    ): Boolean = runCatching { File(path).writeText(value); true }.getOrDefault(false)
+    ): Boolean =
+        runCatching { File(path).writeText(value); true }
+            .onFailure { ColoresLog.hardware("write_failed", "sysfs", mapOf("path" to path, "err" to "${it.javaClass.simpleName}: ${it.message.orEmpty()}")) }
+            .getOrDefault(false)
 }
 
 class SysfsRgbDevice internal constructor(
@@ -63,7 +67,7 @@ class SysfsRgbDevice internal constructor(
     private val colorPaths = SysfsRgbFrames.colorPaths(descriptor)
     private val brightnessPath = SysfsRgbFrames.brightnessPaths(descriptor).firstOrNull()
 
-    private val writer = ConflatedLedWriter(scope, WRITE_INTERVAL_MS, write = ::writeState)
+    private val writer = ConflatedLedWriter(scope, label = "sysfs", intervalMs = WRITE_INTERVAL_MS, write = ::writeState)
 
     override val available: Boolean
         get() = descriptor.zones > 0 && colorPaths.all(access::canWrite)

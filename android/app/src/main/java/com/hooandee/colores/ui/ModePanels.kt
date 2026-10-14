@@ -723,13 +723,14 @@ private fun AudioPanel(
             AudioCaptureStatus.REVOKED -> stringResource(R.string.audio_status_revoked)
             AudioCaptureStatus.ERROR -> stringResource(R.string.audio_status_error)
         }
+    val lightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val statusColor =
         when (state.audio.status) {
-            AudioCaptureStatus.CAPTURING -> Color(0xFF8DE8C5)
-            AudioCaptureStatus.STARTING -> Color(0xFFF4F7FA)
-            AudioCaptureStatus.NO_AUDIO -> Color(0xFFFFC978)
+            AudioCaptureStatus.CAPTURING -> if (lightTheme) Color(0xFF0B6B4B) else Color(0xFF8DE8C5)
+            AudioCaptureStatus.STARTING -> if (lightTheme) MaterialTheme.colorScheme.onSurface else Color(0xFFF4F7FA)
+            AudioCaptureStatus.NO_AUDIO -> if (lightTheme) Color(0xFF8A5200) else Color(0xFFFFC978)
             AudioCaptureStatus.AUTHORIZATION_REQUIRED -> MaterialTheme.colorScheme.onSurfaceVariant
-            AudioCaptureStatus.REVOKED, AudioCaptureStatus.ERROR -> Color(0xFFFF9B8F)
+            AudioCaptureStatus.REVOKED, AudioCaptureStatus.ERROR -> if (lightTheme) Color(0xFFB42318) else Color(0xFFFF9B8F)
         }
     if (state.audioNeedsAuthorization) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -1179,7 +1180,7 @@ private fun AmbientSceneWindow(
                         Text(
                             text = status,
                             color = statusColor,
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,

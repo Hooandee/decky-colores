@@ -14,11 +14,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import com.hooandee.colores.R
 import com.hooandee.colores.settings.AppAppearance
@@ -203,3 +206,15 @@ private fun Color.animatedThemeColor(): Color =
         animationSpec = tween(durationMillis = 420),
         label = "theme-atmosphere",
     ).value
+
+@Composable
+internal fun DialogSystemBars() {
+    val window = (LocalView.current.parent as? DialogWindowProvider)?.window ?: return
+    val light = MaterialTheme.colorScheme.background.luminance() > 0.5f
+    SideEffect {
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = light
+            isAppearanceLightNavigationBars = light
+        }
+    }
+}

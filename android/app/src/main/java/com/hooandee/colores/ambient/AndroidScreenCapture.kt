@@ -1,5 +1,6 @@
 package com.hooandee.colores.ambient
 
+import com.hooandee.colores.report.ColoresLog
 import android.content.Context
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
@@ -55,12 +56,15 @@ class AndroidScreenCapture(
     @Volatile
     private var running = false
 
+    @Volatile
+    private var paused = false
+
     private val watchdog =
         object : Runnable {
             override fun run() {
                 if (!running) return
                 val now = SystemClock.elapsedRealtime()
-                if (lastProcessedMs == 0L || now - lastProcessedMs >= NO_FRAME_TIMEOUT_MS) onNoFrames()
+                if (!paused && (lastProcessedMs == 0L || now - lastProcessedMs >= NO_FRAME_TIMEOUT_MS)) onNoFrames()
                 handler?.postDelayed(this, NO_FRAME_TIMEOUT_MS)
             }
         }
@@ -116,12 +120,21 @@ class AndroidScreenCapture(
         this.config = config
     }
 
+    /** Detaching the surface stops the system from compositing the mirror while paused. */
+    fun setPaused(paused: Boolean) {
+        if (!paused) lastProcessedMs = 0L
+        this.paused = paused
+        runCatching { display?.setSurface(if (paused) null else reader?.surface) }
+            .onFailure { ColoresLog.w(TAG, "virtual display surface swap failed paused=$paused", it) }
+    }
+
     private fun consumeLatest(available: ImageReader) {
         val image = runCatching { available.acquireLatestImage() }.getOrElse {
             onError(it)
             return
         } ?: return
         try {
+            if (paused) return
             val now = SystemClock.elapsedRealtime()
             val activeConfig = config
             if (!AmbientCaptureCadence.shouldProcess(lastProcessedMs, now, activeConfig.captureFps)) return
@@ -138,6 +151,7 @@ class AndroidScreenCapture(
                     supportsPerZone = activeConfig.supportsPerZone,
                     mode = activeConfig.samplingMode,
                 )
+            if (paused) return
             lastProcessedMs = now
             onFrame(colors, now)
         } catch (error: Throwable) {
@@ -150,5 +164,6 @@ class AndroidScreenCapture(
     private companion object {
         const val MAX_IMAGES = 2
         const val NO_FRAME_TIMEOUT_MS = 2_000L
+        const val TAG = "ColoresAmbient"
     }
 }

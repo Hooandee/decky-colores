@@ -32,6 +32,8 @@ import com.hooandee.colores.sensor.BatterySource
 import com.hooandee.colores.sensor.PerformanceMetric
 import com.hooandee.colores.sensor.PerformanceSource
 import com.hooandee.colores.sensor.TemperatureSource
+import com.hooandee.colores.report.ColoresLog
+import com.hooandee.colores.report.WriteHealth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -261,6 +263,7 @@ class LightingController(
     private var lastFrame: List<RgbColor> = emptyList()
     private var gradientEditing = false
     private var frozenGradientFrame: List<RgbColor> = emptyList()
+    private var writeHealth = WriteHealth("controller")
 
     private val mutableSnapshot = MutableStateFlow(LightingSnapshot())
     val snapshot: StateFlow<LightingSnapshot> = mutableSnapshot.asStateFlow()
@@ -393,6 +396,8 @@ class LightingController(
         gradientEditing = false
         frozenGradientFrame = emptyList()
         binding = command.binding
+        writeHealth = WriteHealth(command.binding.device.javaClass.simpleName)
+        ColoresLog.state("binding", "${command.binding.deviceId} ${command.binding.device.javaClass.simpleName} zones=${command.binding.zones}")
         sensorBands = command.binding.bands
         intent = command.intent.copy(staticColors = command.intent.staticColors.fit(command.binding.zones)).availableOn(command.binding.device)
         temperatureCelsius = command.binding.temperature?.readCelsius()
@@ -418,6 +423,7 @@ class LightingController(
         watchJob = null
         binding?.device?.close()
         binding = null
+        ColoresLog.state("binding", null)
         serviceGate.stop()
         publishSnapshot()
     }
@@ -470,6 +476,7 @@ class LightingController(
 
     private suspend fun reconcile() {
         val binding = binding ?: run { publishSnapshot(); return }
+        ColoresLog.state("lighting", "mode=${intent.mode} power=${intent.power} effective=${effectivePower()} charger_only=${intent.chargerOnly}")
         updateService()
         applyCurrent(binding, manageRenderJob = true)
         publishSnapshot()
@@ -515,7 +522,7 @@ class LightingController(
             if (effect.colorStops >= 2) listOf(palette.first(), palette.last()) else listOf(intent.solidColor)
         runCatching {
             binding.device.applyHardwareEffect(effect.id, colors, intent.brightness, intent.speed, effective)
-        }.rethrowCancellation()
+        }.rethrowCancellation().also { writeHealth.record(it, mapOf("effect" to effect.id)) }
         lastFrame = if (effective) List(binding.zones) { colors.first() } else List(binding.zones) { RgbColor(0, 0, 0) }
         publishSnapshot()
     }
@@ -531,7 +538,7 @@ class LightingController(
 
     private suspend fun applyOff(binding: LightingBinding) {
         val colors = binding.offFrame()
-        runCatching { binding.device.applyZones(colors, intent.brightness, false) }.rethrowCancellation()
+        runCatching { binding.device.applyZones(colors, intent.brightness, false) }.rethrowCancellation().also { writeHealth.record(it) }
         lastFrame = colors
         publishSnapshot()
     }
@@ -539,7 +546,7 @@ class LightingController(
     private suspend fun applyCaptureUnavailable(binding: LightingBinding) {
         val colors = List(binding.zones) { intent.solidColor }
         val effective = effectivePower()
-        runCatching { binding.device.applyZones(colors, intent.brightness, effective) }.rethrowCancellation()
+        runCatching { binding.device.applyZones(colors, intent.brightness, effective) }.rethrowCancellation().also { writeHealth.record(it) }
         lastFrame = if (effective) colors else binding.offFrame()
         publishSnapshot()
     }
@@ -576,7 +583,7 @@ class LightingController(
                 intent.staticColors.fit(binding.zones)
             }
         val effective = effectivePower()
-        runCatching { binding.device.applyZones(colors, intent.brightness, effective) }.rethrowCancellation()
+        runCatching { binding.device.applyZones(colors, intent.brightness, effective) }.rethrowCancellation().also { writeHealth.record(it) }
         lastFrame = if (effective) colors else List(binding.zones) { RgbColor(0, 0, 0) }
         publishSnapshot()
     }
@@ -607,7 +614,7 @@ class LightingController(
             if (myGeneration != generation) return
             if (!effectivePower()) {
                 if (!offApplied) {
-                    runCatching { binding.device.applyZones(binding.offFrame(), intent.brightness, false) }.rethrowCancellation()
+                    runCatching { binding.device.applyZones(binding.offFrame(), intent.brightness, false) }.rethrowCancellation().also { writeHealth.record(it) }
                     lastFrame = binding.offFrame()
                     publishSnapshot()
                     offApplied = true
@@ -622,7 +629,7 @@ class LightingController(
             }
             val nowSeconds = (clockMs() - startMs) / 1000.0
             val tick = renderer.render(nowSeconds)
-            runCatching { binding.device.applyZones(tick.colors, intent.brightness, true) }.rethrowCancellation()
+            runCatching { binding.device.applyZones(tick.colors, intent.brightness, true) }.rethrowCancellation().also { writeHealth.record(it) }
             lastFrame = tick.colors
             publishSnapshot()
             delay(tick.nextDelayMs.coerceAtLeast(1L))

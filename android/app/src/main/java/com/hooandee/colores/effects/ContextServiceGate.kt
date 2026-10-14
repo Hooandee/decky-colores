@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import com.hooandee.colores.report.ColoresLog
 import com.hooandee.colores.control.ServiceGate
 import com.hooandee.colores.control.ServiceOwner
 
@@ -111,7 +112,7 @@ class ContextServiceGate(
     fun releaseIfUnowned(): Boolean = lease.releaseIfUnowned().also { if (it) Log.d(TAG, "released") }
 
     fun onForegroundRefused() {
-        Log.w(TAG, "foreground refused")
+        ColoresLog.w(TAG, "foreground refused")
         lease.onForegroundRefused()
     }
 
@@ -130,7 +131,7 @@ class ContextServiceGate(
                 context.startService(intent)
             }
             true
-        }.onFailure { Log.w(TAG, "start refused", it) }.getOrDefault(false)
+        }.onFailure { ColoresLog.w(TAG, "start refused", it) }.getOrDefault(false)
     }
 
     private fun stopService() {

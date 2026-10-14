@@ -316,6 +316,7 @@ private fun DashboardBody(
     ) {
         ModeNav(
             modes = state.availableModes(),
+            sensorModes = state.availableSensorModes(),
             selected = state.mode,
             enabled = state.canWrite,
             onModeChange = modeActions.onModeChange,

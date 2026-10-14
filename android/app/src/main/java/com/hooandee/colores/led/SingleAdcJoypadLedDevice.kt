@@ -27,7 +27,7 @@ class SingleAdcJoypadLedDevice internal constructor(
     override val recommendedFrameIntervalMs: Long =
         if (descriptor.vendorEffects) WRITE_INTERVAL_MS else CONSERVATIVE_FRAME_INTERVAL_MS
 
-    private val writer = ConflatedLedWriter(scope, recommendedFrameIntervalMs, write = ::writeFrame)
+    private val writer = ConflatedLedWriter(scope, label = "singleadc", intervalMs = recommendedFrameIntervalMs, write = ::writeFrame)
 
     override val available: Boolean
         get() = access.canWrite(node("custum_rgb_r")) && access.canWrite(node("led_set"))

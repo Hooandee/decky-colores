@@ -1,5 +1,6 @@
 package com.hooandee.colores.ui
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
@@ -8,10 +9,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -249,6 +255,14 @@ internal fun Modifier.prismaticPanel(
             drawOutline(outline, brush = rim, style = Stroke(width = rimWidth))
         }
     }
+}
+
+@Composable
+internal fun Modifier.focusRing(shape: Shape): Modifier {
+    var focused by remember { mutableStateOf(false) }
+    val ring = LocalPrismaticStyle.current.accentFill
+    return onFocusChanged { focused = it.isFocused }
+        .border(3.dp, if (focused) ring else Color.Transparent, shape)
 }
 
 @Composable

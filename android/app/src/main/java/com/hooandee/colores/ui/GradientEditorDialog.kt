@@ -74,6 +74,7 @@ internal fun GradientEditorDialog(
                 decorFitsSystemWindows = false,
             ),
     ) {
+        DialogSystemBars()
         PrismaticBackdrop(modifier = Modifier.fillMaxSize()) {
             Column(
                 Modifier
@@ -110,13 +111,13 @@ internal fun GradientEditorDialog(
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
                             GradientZonesPane(state, actions, Modifier.weight(1.08f).fillMaxHeight())
-                            GradientColorPane(state, actions, Modifier.weight(0.92f).fillMaxHeight())
+                            GradientColorPane(state, actions, compactWheel = true, modifier = Modifier.weight(0.92f).fillMaxHeight())
                         }
                     } else {
                         StackedPanes(
                             maxHeight = maxHeight,
                             first = { GradientZonesPane(state, actions, it) },
-                            second = { GradientColorPane(state, actions, it) },
+                            second = { GradientColorPane(state, actions, compactWheel = false, modifier = it) },
                         )
                     }
                 }
@@ -397,6 +398,7 @@ private fun zoneCellDescription(zone: GradientEditorZone): String {
 private fun GradientColorPane(
     state: ColoresUiState,
     actions: GradientActions,
+    compactWheel: Boolean,
     modifier: Modifier,
 ) {
     var saveName by rememberSaveable { mutableStateOf("") }
@@ -452,7 +454,7 @@ private fun GradientColorPane(
                 }
             }
             Box(
-                modifier = Modifier.fillMaxWidth().height(236.dp),
+                modifier = Modifier.fillMaxWidth().height(if (compactWheel) 160.dp else 236.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 RingColorPicker(

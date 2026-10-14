@@ -1,5 +1,6 @@
 package com.hooandee.colores.audio
 
+import com.hooandee.colores.report.ColoresLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,9 +34,11 @@ class MutableAudioLevelSource(
         status: AudioCaptureStatus,
     ) {
         mutableState.value = AudioLevelState(level.coerceIn(0.0, 1.0), status)
+        ColoresLog.state("audio", status.name)
     }
 
     fun reset(status: AudioCaptureStatus) {
         mutableState.value = AudioLevelState(status = status)
+        ColoresLog.state("audio", status.name)
     }
 }

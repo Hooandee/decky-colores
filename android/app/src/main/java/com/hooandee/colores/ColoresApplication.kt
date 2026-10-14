@@ -1,6 +1,11 @@
 package com.hooandee.colores
 
 import android.app.Application
+import android.os.Build
+import android.os.Process
+import com.hooandee.colores.report.ColoresLog
+import com.hooandee.colores.report.Journal
+import com.hooandee.colores.ambient.AmbientCaptureConfig
 import com.hooandee.colores.ambient.AmbientCaptureSession
 import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.audio.AudioCaptureSession
@@ -52,6 +57,9 @@ class ColoresApplication : Application() {
     val ambientFrameSource by lazy { MutableAmbientFrameSource() }
 
     val ambientCaptureSession by lazy { AmbientCaptureSession(this, ambientFrameSource) }
+
+    @Volatile
+    var lastAmbientConfig: AmbientCaptureConfig? = null
 
     val effectsServiceGate by lazy { ContextServiceGate(this) }
 
@@ -118,7 +126,34 @@ class ColoresApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        installJournal()
         screenState.register()
+    }
+
+    private fun installJournal() {
+        val journal = Journal(File(noBackupFilesDir, "journal"))
+        ColoresLog.journal = journal
+        journal.session(
+            mapOf(
+                "v" to runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull(),
+                "android" to Build.VERSION.RELEASE,
+                "sdk" to Build.VERSION.SDK_INT,
+                "manufacturer" to Build.MANUFACTURER,
+                "model" to Build.MODEL,
+                "device" to Build.DEVICE,
+                "board" to Build.BOARD,
+                "hardware" to Build.HARDWARE,
+                "soc" to if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) "${Build.SOC_MANUFACTURER} ${Build.SOC_MODEL}" else null,
+                "abi" to Build.SUPPORTED_ABIS.firstOrNull(),
+                "build" to Build.FINGERPRINT,
+                "pid" to Process.myPid(),
+            ),
+        )
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+            journal.crash(thread.name, error)
+            previous?.uncaughtException(thread, error)
+        }
     }
 
     val hardwareLearningHandoff: HardwareLearningHandoff by lazy {

@@ -10,7 +10,6 @@ import android.media.projection.MediaProjectionConfig
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -20,6 +19,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
+import com.hooandee.colores.report.ColoresLog
 import com.hooandee.colores.permission.WriteSettingsPermission
 import com.hooandee.colores.ui.ColoresScreen
 import com.hooandee.colores.ui.ColoresTheme
@@ -133,7 +133,7 @@ class MainActivity : AppCompatActivity() {
                     false
                 }
             }
-        if (!launched) Log.w(TAG, "no settings activity for ${intents.firstOrNull()?.action}")
+        if (!launched) ColoresLog.w(TAG, "no settings activity for ${intents.firstOrNull()?.action}")
     }
 
     private fun requestAudioCapture() {

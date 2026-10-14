@@ -82,6 +82,8 @@ import com.hooandee.colores.profiles.ProfilePatch
 import com.hooandee.colores.profiles.ProfileScope
 import com.hooandee.colores.profiles.ProfileScopeState
 import com.hooandee.colores.report.AndroidReportSnapshot
+import com.hooandee.colores.report.ColoresLog
+import com.hooandee.colores.report.ProcessLogcat
 import com.hooandee.colores.report.ReportSender
 import com.hooandee.colores.report.ReportSubmissionState
 import com.hooandee.colores.report.buildReportBundleForSubmission
@@ -265,6 +267,13 @@ data class ColoresUiState(
         }
 }
 
+internal fun ColoresUiState.appModeTarget(mode: AppMode): AppMode? {
+    if (!mode.isSensor) return mode
+    if (this.mode.isSensor) return null
+    val sensors = availableSensorModes()
+    return mode.takeIf { it in sensors } ?: sensors.firstOrNull()
+}
+
 internal fun shouldAutomaticallyOpenHardwareLearning(state: ColoresUiState): Boolean =
     !state.loading &&
         state.detectionOutcome !is DetectionOutcome.Resolved &&
@@ -436,6 +445,7 @@ class ColoresViewModel(
                                 userPermissionGranted = userPermissionGranted,
                             )
                         } ?: ControlAccess.SERVICE_UNAVAILABLE
+                    ColoresLog.state("detection", detectionJournalLine(outcome, detected, controlAccess))
 
                     if (detected == null || device == null || controlAccess != ControlAccess.ENABLED) {
                         handoff.closeIfUnbound()
@@ -1046,6 +1056,8 @@ class ColoresViewModel(
                                     outcome,
                                     inventory,
                                     runCatching { coloresApplication.hardwareLearningStore.loadArchivedRollback()?.summary() }.getOrNull(),
+                                    journal = runCatching { ColoresLog.journal?.export() }.getOrNull(),
+                                    logcat = ProcessLogcat.read(android.os.Process.myPid()),
                                 ),
                         )
                     reportSender.submit(bundle)
@@ -1133,21 +1145,10 @@ class ColoresViewModel(
     fun setAppMode(mode: AppMode) {
         val current = mutableState.value
         if (!current.canWrite) return
-        val target =
-            if (mode.isSensor) {
-                if (current.mode.isSensor) return
-                current.availableSensorModes().firstOrNull() ?: return
-            } else {
-                mode
-            }
+        val target = current.appModeTarget(mode) ?: return
         if (target == current.mode && target == current.profileStoredMode) return
         if (target == AppMode.GRADIENT && !current.gradientAvailable) return
-        if (current.mode == AppMode.AUDIO) {
-            EffectsService.stopAudio(getApplication(), AudioCaptureStatus.AUTHORIZATION_REQUIRED)
-        }
-        if (current.mode == AppMode.AMBIENT) {
-            EffectsService.stopAmbient(getApplication(), AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
-        }
+        if (target == AppMode.AMBIENT) current.ambientCaptureConfig()?.let { coloresApplication.lastAmbientConfig = it }
         if (target == AppMode.GRADIENT) {
             updateGradient(current.gradient.copy(mode = LightingMode.GRADIENT), apply = false)
         } else {
@@ -1205,13 +1206,6 @@ class ColoresViewModel(
     }
 
     fun setPower(power: Boolean) {
-        if (!power) {
-            when (mutableState.value.mode) {
-                AppMode.AUDIO -> EffectsService.stopAudio(getApplication(), AudioCaptureStatus.AUTHORIZATION_REQUIRED)
-                AppMode.AMBIENT -> EffectsService.stopAmbient(getApplication(), AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
-                else -> Unit
-            }
-        }
         controller.setPower(power)
         mutableState.update { it.copy(ledState = it.ledState.copy(power = power)) }
         persistGlobalModifiers()
@@ -1586,7 +1580,10 @@ class ColoresViewModel(
             current.mode == AppMode.AMBIENT &&
             current.ambient.status.keepsCaptureActive
         ) {
-            current.ambientCaptureConfig()?.let { EffectsService.updateAmbient(getApplication(), it) }
+            current.ambientCaptureConfig()?.let {
+                coloresApplication.lastAmbientConfig = it
+                EffectsService.updateAmbient(getApplication(), it)
+            }
         }
     }
 }

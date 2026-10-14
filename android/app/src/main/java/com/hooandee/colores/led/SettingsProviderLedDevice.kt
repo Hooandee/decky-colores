@@ -1,5 +1,6 @@
 package com.hooandee.colores.led
 
+import com.hooandee.colores.report.WriteHealth
 import android.content.Context
 import android.provider.Settings
 import kotlinx.coroutines.CancellationException
@@ -55,7 +56,7 @@ class SettingsProviderLedDevice internal constructor(
     @Volatile
     private var cachedState: LedState? = null
 
-    private val writer = ConflatedLedWriter(scope, WRITE_INTERVAL_MS, write = ::writeState)
+    private val writer = ConflatedLedWriter(scope, WRITE_INTERVAL_MS, label = "settings:${descriptor.driver}", write = ::writeState)
 
     override val available: Boolean
         get() =
@@ -256,11 +257,14 @@ internal object SettingsProviderCodec {
 internal class ConflatedLedWriter<T>(
     scope: CoroutineScope,
     private val intervalMs: Long,
+    label: String = "led",
     private val retryIntervalMs: Long = 500L,
     private val maxRetryIntervalMs: Long = 30_000L,
     write: suspend (T) -> Boolean,
 ) {
     private val channel = Channel<T>(Channel.CONFLATED)
+    private val health = WriteHealth(label)
+
     @Volatile
     private var closed = false
 
@@ -272,13 +276,15 @@ internal class ConflatedLedWriter<T>(
                 while (true) {
                     val succeeded =
                         try {
-                            write(pending)
+                            write(pending).also { if (!it) health.failed("write returned false") }
                         } catch (error: CancellationException) {
                             throw error
-                        } catch (_: Throwable) {
+                        } catch (error: Throwable) {
+                            health.failed("${error.javaClass.simpleName}: ${error.message.orEmpty()}")
                             false
                         }
                     if (succeeded) {
+                        health.succeeded()
                         delay(intervalMs)
                         pending = channel.tryReceive().getOrNull() ?: break
                         failures = 0

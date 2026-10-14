@@ -64,6 +64,7 @@ internal fun AudioScaleDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        DialogSystemBars()
         PrismaticBackdrop(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 22.dp, vertical = 16.dp),
