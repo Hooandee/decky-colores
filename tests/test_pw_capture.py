@@ -78,3 +78,36 @@ def test_a_failing_callback_stops_the_helper_instead_of_spamming(monkeypatch):
     lib.pw_main_loop_quit = type("Q", (), {"__call__": lambda self, *a: quits.append(1)})()
     assert pw_capture.capture("gamescope", 2, 1, 10, out=open("/dev/null", "wb")) == 2
     assert quits == [1]
+
+
+def test_a_reader_that_stops_reading_never_blocks_the_helper():
+    import os
+    import time
+
+    read_end, write_end = os.pipe()
+    os.set_blocking(write_end, False)
+    sink = pw_capture.FrameSink(write_end, stall_s=0.05)
+    frame = b"\x01" * 1728
+    started = time.monotonic()
+    results = [sink.write(frame) for _ in range(200)]
+    assert time.monotonic() - started < 1.0
+    assert results[0] is True
+    assert False in results
+    time.sleep(0.06)
+    assert sink.write(frame) is None
+    os.close(read_end)
+    os.close(write_end)
+
+
+def test_a_reader_that_keeps_up_gets_whole_frames():
+    import os
+
+    read_end, write_end = os.pipe()
+    os.set_blocking(write_end, False)
+    sink = pw_capture.FrameSink(write_end, stall_s=1.0)
+    for value in (1, 2, 3):
+        assert sink.write(bytes([value]) * 1728) is True
+        assert os.read(read_end, 4096) == bytes([value]) * 1728
+    os.close(read_end)
+    assert sink.write(b"\x00" * 1728) is None
+    os.close(write_end)

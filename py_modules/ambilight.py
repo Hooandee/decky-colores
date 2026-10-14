@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 
 import device_tree
@@ -10,6 +11,8 @@ from run_as_user import user_env, user_cred
 logger = logging.getLogger("colores.ambilight")
 
 GAMESCOPE_NODE = "gamescope"
+# Armada 20261010+ adds a bottom-screen gamescope that publishes a "gamescope" node too.
+LEASE_CLIENT_FLAG = b"--drm-lease-client"
 CAP_W = 32
 CAP_H = 18
 
@@ -71,6 +74,44 @@ async def _gst_has_pipewiresrc():
     except asyncio.TimeoutError:
         proc.kill()
         return False
+
+
+def is_lease_companion(pid, proc_root="/proc"):
+    try:
+        with open(os.path.join(proc_root, str(pid), "cmdline"), "rb") as handle:
+            return LEASE_CLIENT_FLAG in handle.read().split(b"\0")
+    except OSError:
+        return False
+
+
+def _is_gamescope_video(props):
+    return props.get("node.name") == GAMESCOPE_NODE and "Video" in str(props.get("media.class", ""))
+
+
+_WPCTL_ID = re.compile(r"(\d+)\.\s")
+_WPCTL_PROP = re.compile(r'^\s*\*?\s*([\w.-]+) = "(.*)"\s*$')
+
+
+def wpctl_video_sources(status):
+    ids = []
+    section = subsection = None
+    for line in status.splitlines():
+        if line and not line[0].isspace():
+            section = line.strip()
+            continue
+        stripped = line.strip(" │├└─\t")
+        if stripped.endswith(":"):
+            subsection = stripped
+            continue
+        if section == "Video" and subsection == "Sources:":
+            match = _WPCTL_ID.search(line)
+            if match:
+                ids.append(match.group(1))
+    return ids
+
+
+def wpctl_props(text):
+    return dict(match.groups() for match in map(_WPCTL_PROP.match, text.splitlines()) if match)
 
 
 def subdivide(region, count):
@@ -173,6 +214,39 @@ class Ambilight:
     def _cred(self):
         return user_cred(self._uid, self._gid)
 
+    async def _output(self, argv):
+        proc = None
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *argv,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+                env=self._env(),
+                **self._cred(),
+            )
+            out, _ = await asyncio.wait_for(proc.communicate(), timeout=5)
+            return out.decode(errors="replace")
+        except (OSError, asyncio.TimeoutError):
+            if proc is not None:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+            return ""
+
+    async def _pipewire_target(self):
+        status = await self._output(["wpctl", "status"])
+        if not status:
+            return GAMESCOPE_NODE
+        for node in wpctl_video_sources(status):
+            props = wpctl_props(await self._output(["wpctl", "inspect", node]))
+            if not _is_gamescope_video(props) or not props.get("object.serial"):
+                continue
+            client = wpctl_props(await self._output(["wpctl", "inspect", props.get("client.id", "")]))
+            if not is_lease_companion(client.get("application.process.id", "")):
+                return props["object.serial"]
+        return None
+
     def _capture_interval(self):
         fps = max(1, int(self._options.get("fps", 10)))
         if self._max_fps is not None:
@@ -203,9 +277,7 @@ class Ambilight:
             return None
         for obj in data:
             props = (obj.get("info") or {}).get("props") or {}
-            if props.get("node.name") == GAMESCOPE_NODE and "Video" in str(
-                props.get("media.class", "")
-            ):
+            if _is_gamescope_video(props):
                 return obj.get("id")
         return None
 
@@ -257,7 +329,13 @@ class Ambilight:
         while True:
             interval = self._capture_interval()
             if backend == "pipewire":
-                node = GAMESCOPE_NODE
+                node = await self._pipewire_target()
+                if node is None:
+                    logger.warning("main gamescope PipeWire node not found; retrying")
+                    self.status = "no_source"
+                    self._apply(self._fallback())
+                    await asyncio.sleep(RETRY_INTERVAL)
+                    continue
                 command = [
                     python, PW_CAPTURE, node,
                     str(CAP_W), str(CAP_H), str(round(1.0 / interval)),

@@ -7,6 +7,7 @@ Exit codes: 0 stdout closed, 2 no source, 3 libpipewire unavailable.
 """
 import ctypes
 import ctypes.util
+import os
 import struct
 import sys
 import threading
@@ -53,6 +54,8 @@ PW_STREAM_STATE_STREAMING = 3
 
 SAMPLES = 3
 CONNECT_TIMEOUT = 5.0
+# gamescope aborts when a consumer holds its buffers, so a stalled reader must never block us.
+READER_STALL_S = 3.0
 
 
 def _pod(type_, body):
@@ -185,11 +188,36 @@ def _load():
     return None
 
 
+class FrameSink:
+    """Frames are smaller than PIPE_BUF, so each non-blocking write is all or nothing."""
+
+    def __init__(self, fd, stall_s=READER_STALL_S):
+        self._fd = fd
+        self._stall_s = stall_s
+        self._blocked_since = None
+
+    def write(self, frame):
+        """True if written, False if dropped, None once the reader is gone."""
+        try:
+            os.write(self._fd, frame)
+        except BlockingIOError:
+            now = time.monotonic()
+            if self._blocked_since is None:
+                self._blocked_since = now
+            return None if now - self._blocked_since >= self._stall_s else False
+        except OSError:
+            return None
+        self._blocked_since = None
+        return True
+
+
 def capture(target, out_w, out_h, fps, out=None):
     pw = _load()
     if pw is None:
         return 3
     out = out or sys.stdout.buffer
+    os.set_blocking(out.fileno(), False)
+    sink = FrameSink(out.fileno())
     vp = ctypes.c_void_p
     pw.pw_main_loop_new.restype = vp
     pw.pw_main_loop_get_loop.restype = vp
@@ -280,10 +308,7 @@ def capture(target, out_w, out_h, fps, out=None):
                 state["plan"] = (key, sample_plan(stride, width, height, out_w, out_h))
             pixels = downsample(memoryview(frame).cast("B"), state["plan"][1], layout)
             state["last"] = now
-            try:
-                out.write(pixels)
-                out.flush()
-            except OSError:
+            if sink.write(bytes(pixels)) is None:
                 quit(0)
         finally:
             pw.pw_stream_queue_buffer(stream, buf)
