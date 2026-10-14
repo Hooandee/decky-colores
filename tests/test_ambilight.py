@@ -285,7 +285,8 @@ def test_run_uses_the_pipewire_helper_without_pw_dump(monkeypatch):
         amb.stop()
 
     asyncio.run(drive())
-    assert commands[0] == (
+    captures = [command for command in commands if command[0] != "wpctl"]
+    assert captures[0] == (
         "/host/python3", ambilight_mod.PW_CAPTURE, "gamescope",
         str(ambilight_mod.CAP_W), str(ambilight_mod.CAP_H), "10",
     )
@@ -322,3 +323,123 @@ def test_a_slow_gst_inspect_does_not_pin_the_gst_backend(monkeypatch):
     monkeypatch.setattr(ambilight_mod.asyncio, "wait_for", fast_wait_for)
     assert asyncio.run(ambilight_mod._gst_has_pipewiresrc()) is False
     assert Slow.killed
+
+
+WPCTL_STATUS = """Video
+ ├─ Devices:
+ │      47. Iris Encoder                        [v4l2]
+ │
+ ├─ Sinks:
+ │
+ ├─ Sources:
+ │  *   64. (null)
+ │      67. (null)
+ │
+ ├─ Filters:
+ │
+ └─ Streams:
+        70. colores-ambilight
+             71. input_1         < gamescope:capture_1	[active]
+
+Settings
+ └─ Default Configured Devices:
+         0. Audio/Sink    alsa_output.platform-sound.HiFi__Speaker__sink
+"""
+
+
+def _wpctl_inspect(fields):
+    lines = [f"id {fields.pop('id')}, type PipeWire:Interface:Node"]
+    lines += [f'  * {key} = "{value}"' for key, value in fields.items()]
+    return "\n".join(lines)
+
+
+def test_wpctl_status_lists_only_the_video_sources():
+    assert ambilight_mod.wpctl_video_sources(WPCTL_STATUS) == ["64", "67"]
+
+
+def test_wpctl_props_reads_both_marked_and_plain_lines():
+    props = ambilight_mod.wpctl_props('id 64, type x\n  * node.name = "gamescope"\n    node.async = "true"\n')
+    assert props == {"node.name": "gamescope", "node.async": "true"}
+
+
+def test_lease_companion_is_recognised_by_its_command_line(tmp_path):
+    (tmp_path / "10").mkdir()
+    (tmp_path / "10/cmdline").write_bytes(b"/usr/bin/gamescope\0--lease-connector\0DSI-1\0")
+    (tmp_path / "20").mkdir()
+    (tmp_path / "20/cmdline").write_bytes(b"gamescope\0--backend\0drm\0--drm-lease-client\0/tmp/gamescope-lease.sock\0")
+    assert not ambilight_mod.is_lease_companion("10", proc_root=str(tmp_path))
+    assert ambilight_mod.is_lease_companion("20", proc_root=str(tmp_path))
+    assert not ambilight_mod.is_lease_companion("30", proc_root=str(tmp_path))
+
+
+def _wpctl_world(monkeypatch, companions):
+    inspect = {
+        "64": _wpctl_inspect({"id": 64, "node.name": "gamescope", "media.class": "Video/Source",
+                              "client.id": "63", "object.serial": "80"}),
+        "67": _wpctl_inspect({"id": 67, "node.name": "gamescope", "media.class": "Video/Source",
+                              "client.id": "66", "object.serial": "115"}),
+        "63": _wpctl_inspect({"id": 63, "application.process.id": "2450"}),
+        "66": _wpctl_inspect({"id": 66, "application.process.id": "6188"}),
+    }
+    calls = []
+
+    async def output(self, argv):
+        calls.append(argv)
+        return WPCTL_STATUS if argv[1] == "status" else inspect[argv[2]]
+
+    monkeypatch.setattr(Ambilight, "_output", output)
+    monkeypatch.setattr(ambilight_mod, "is_lease_companion", lambda pid, proc_root="/proc": pid in companions)
+    return calls
+
+
+def test_two_gamescopes_capture_the_main_screen_not_the_lease_companion(monkeypatch):
+    _wpctl_world(monkeypatch, companions={"6188"})
+    amb = Ambilight(lambda colors: None, zones=2, runtime_dir=None)
+    assert asyncio.run(amb._pipewire_target()) == "80"
+    _wpctl_world(monkeypatch, companions={"2450"})
+    assert asyncio.run(amb._pipewire_target()) == "115"
+
+
+def test_without_wpctl_the_capture_keeps_targeting_by_name(monkeypatch):
+    async def output(self, argv):
+        return ""
+
+    monkeypatch.setattr(Ambilight, "_output", output)
+    amb = Ambilight(lambda colors: None, zones=2, runtime_dir=None)
+    assert asyncio.run(amb._pipewire_target()) == "gamescope"
+
+
+def test_a_lone_lease_companion_is_no_source(monkeypatch):
+    calls = _wpctl_world(monkeypatch, companions={"6188"})
+    status = WPCTL_STATUS.replace(" │  *   64. (null)\n", "")
+
+    async def output(self, argv):
+        calls.append(argv)
+        if argv[1] == "status":
+            return status
+        return {
+            "67": _wpctl_inspect({"id": 67, "node.name": "gamescope", "media.class": "Video/Source",
+                                  "client.id": "66", "object.serial": "115"}),
+            "66": _wpctl_inspect({"id": 66, "application.process.id": "6188"}),
+        }[argv[2]]
+
+    monkeypatch.setattr(Ambilight, "_output", output)
+    amb = Ambilight(lambda colors: None, zones=2, runtime_dir=None)
+    assert asyncio.run(amb._pipewire_target()) is None
+
+
+def test_a_single_main_gamescope_is_targeted_by_serial(monkeypatch):
+    status = WPCTL_STATUS.replace(" │      67. (null)\n", "")
+    inspect = {
+        "64": _wpctl_inspect({"id": 64, "node.name": "gamescope", "media.class": "Video/Source",
+                              "client.id": "63", "object.serial": "80"}),
+        "63": _wpctl_inspect({"id": 63, "application.process.id": "2450"}),
+    }
+
+    async def output(self, argv):
+        return status if argv[1] == "status" else inspect[argv[2]]
+
+    monkeypatch.setattr(Ambilight, "_output", output)
+    monkeypatch.setattr(ambilight_mod, "is_lease_companion", lambda pid, proc_root="/proc": False)
+    amb = Ambilight(lambda colors: None, zones=2, runtime_dir=None)
+    assert asyncio.run(amb._pipewire_target()) == "80"
