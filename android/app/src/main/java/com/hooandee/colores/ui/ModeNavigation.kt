@@ -22,9 +22,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,11 +55,14 @@ import com.hooandee.colores.control.AppMode
 @Composable
 fun ModeNav(
     modes: List<AppMode>,
+    sensorModes: List<AppMode>,
     selected: AppMode,
     enabled: Boolean,
     onModeChange: (AppMode) -> Unit,
 ) {
     if (modes.size <= 1) return
+    var lastSensor by rememberSaveable { mutableStateOf(AppMode.BATTERY) }
+    LaunchedEffect(selected) { if (selected.isSensor) lastSensor = selected }
     val navSelected = if (selected.isSensor) AppMode.BATTERY else selected
     val entries = modes.filterNot { it.isSensor && it != AppMode.BATTERY }
     val outerShape = RoundedCornerShape(999.dp)
@@ -78,12 +83,18 @@ fun ModeNav(
                     mode = mode,
                     selected = mode == navSelected,
                     enabled = enabled,
-                    onClick = { onModeChange(mode) },
+                    onClick = { onModeChange(navTarget(mode, lastSensor, sensorModes)) },
                 )
             }
         }
     }
 }
+
+internal fun navTarget(
+    mode: AppMode,
+    lastSensor: AppMode,
+    sensorModes: List<AppMode>,
+): AppMode = if (mode.isSensor && lastSensor in sensorModes) lastSensor else mode
 
 @Composable
 private fun androidx.compose.foundation.layout.RowScope.ModeNavItem(

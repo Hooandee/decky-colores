@@ -91,6 +91,7 @@ internal fun HardwareLearningDialog(
         onDismissRequest = { if (ui.canDismiss) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        DialogSystemBars()
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp, vertical = 16.dp),
             contentAlignment = Alignment.Center,

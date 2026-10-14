@@ -49,6 +49,22 @@ class AmbientCaptureSession(
         active.start()
     }
 
+    val live: Boolean
+        get() = capture != null
+
+    fun pause(status: AmbientCaptureStatus) {
+        capture?.setPaused(true)
+        source.reset(status)
+    }
+
+    fun resume(config: AmbientCaptureConfig?): Boolean {
+        val active = capture ?: return false
+        config?.let(active::updateConfig)
+        source.reset(AmbientCaptureStatus.STARTING)
+        active.setPaused(false)
+        return true
+    }
+
     fun stop(status: AmbientCaptureStatus) {
         capture?.stop()
         capture = null

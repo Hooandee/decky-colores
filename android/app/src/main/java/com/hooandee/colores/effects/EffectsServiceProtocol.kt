@@ -85,11 +85,40 @@ internal enum class CaptureOwner(
     AMBIENT(AppMode.AMBIENT),
 }
 
-internal fun shouldEndCapture(
-    owner: CaptureOwner,
+internal enum class CaptureHoldAction {
+    KEEP,
+    PAUSE,
+    RESUME_AUDIO,
+    RESUME_AMBIENT,
+    RELEASE,
+}
+
+internal val AppMode.captureOwner: CaptureOwner?
+    get() = CaptureOwner.entries.firstOrNull { it.mode == this }
+
+internal fun captureHoldAction(
+    owner: CaptureOwner?,
+    fullScreen: Boolean,
     mode: AppMode,
     globalMode: AppMode?,
-): Boolean = mode != owner.mode && globalMode != owner.mode
+    power: Boolean,
+): CaptureHoldAction {
+    val wanted = mode.captureOwner
+    if (wanted == null) {
+        return when {
+            owner != null && globalMode == owner.mode -> CaptureHoldAction.KEEP
+            globalMode?.captureOwner != null -> CaptureHoldAction.PAUSE
+            else -> CaptureHoldAction.RELEASE
+        }
+    }
+    return when {
+        !power -> CaptureHoldAction.PAUSE
+        wanted == owner -> CaptureHoldAction.KEEP
+        wanted == CaptureOwner.AMBIENT && !fullScreen -> CaptureHoldAction.RELEASE
+        wanted == CaptureOwner.AMBIENT -> CaptureHoldAction.RESUME_AMBIENT
+        else -> CaptureHoldAction.RESUME_AUDIO
+    }
+}
 
 internal fun shouldDispatchCaptureStop(
     serviceActive: Boolean,

@@ -1,5 +1,6 @@
 package com.hooandee.colores.ambient
 
+import com.hooandee.colores.report.ColoresLog
 import com.hooandee.colores.led.RgbColor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -42,13 +43,16 @@ class MutableAmbientFrameSource(
         timestampMs: Long,
     ) {
         mutableState.value = AmbientFrameState(colors, status, timestampMs)
+        ColoresLog.state("ambient", status.name)
     }
 
     fun reset(status: AmbientCaptureStatus) {
         mutableState.value = AmbientFrameState(status = status)
+        ColoresLog.state("ambient", status.name)
     }
 
     fun setStatus(status: AmbientCaptureStatus) {
         mutableState.value = mutableState.value.copy(status = status)
+        ColoresLog.state("ambient", status.name)
     }
 }

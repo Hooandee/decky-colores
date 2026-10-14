@@ -1,5 +1,6 @@
 package com.hooandee.colores.profiles
 
+import com.hooandee.colores.report.ColoresLog
 import com.hooandee.colores.apps.ForegroundAppObserver
 import com.hooandee.colores.apps.ForegroundAppState
 import com.hooandee.colores.apps.UsageAccess
@@ -200,6 +201,7 @@ class LightingProfileCoordinator(
                 else -> ProfileAutomationStatus.ACTIVE
             }
         serviceGate.setRequired(ServiceOwner.APP_PROFILES, status == ProfileAutomationStatus.ACTIVE)
+        ColoresLog.state("profiles", status.name.lowercase())
         mutableState.value =
             ProfileRuntimeState(
                 automationEnabled = enabled,
@@ -224,6 +226,14 @@ class LightingProfileCoordinator(
                 is ProfileTarget.ForegroundApp -> store.effective(id, target.packageName)
                 is ProfileTarget.Preview -> profile(id, target.scope)
             }
+        ColoresLog.state(
+            "profile_target",
+            when (target) {
+                ProfileTarget.Global -> "global"
+                is ProfileTarget.ForegroundApp -> "app"
+                is ProfileTarget.Preview -> "preview"
+            } + " mode=${profile.mode}",
+        )
         apply(profile)
     }
 

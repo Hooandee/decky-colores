@@ -61,12 +61,16 @@ data class ReportDiagnostics(
     val candidates: List<ProbeCandidate> = emptyList(),
     val inventory: HardwareInventory? = null,
     val archivedRollback: ArchivedRollbackSummary? = null,
+    val journal: JSONObject? = null,
+    val logcat: String? = null,
 )
 
 fun reportDiagnostics(
     outcome: DetectionOutcome?,
     inventory: HardwareInventory?,
     archivedRollback: ArchivedRollbackSummary? = null,
+    journal: JSONObject? = null,
+    logcat: String? = null,
 ): ReportDiagnostics =
     ReportDiagnostics(
         detectionOutcome =
@@ -87,6 +91,8 @@ fun reportDiagnostics(
             },
         inventory = inventory,
         archivedRollback = archivedRollback,
+        journal = journal,
+        logcat = logcat,
     )
 
 data class ReportSubmissionState(
@@ -144,12 +150,20 @@ fun buildReportBundle(
                         .put("sampling_mode", snapshot.ambientSamplingMode),
                 ),
         ).put("stores", JSONObject().put("profiles_configured", snapshot.configuredProfiles))
-        .put("logs", JSONArray())
+        .put("logs", logsJson(diagnostics.logcat))
         .put("kernel", diagnostics.inventory?.kernel ?: JSONObject())
         .put("sysfs", diagnostics.inventory?.sysfs ?: JSONObject())
         .put("hardware", diagnostics.inventory?.hardware ?: JSONObject())
         .put("discovery", discoveryJson(diagnostics))
         .apply { diagnostics.archivedRollback?.let { put("rollback_archive", archivedRollbackJson(it)) } }
+        .apply { diagnostics.journal?.let { put("journal", it) } }
+
+private fun logsJson(logcat: String?): JSONArray =
+    JSONArray(
+        listOfNotNull(
+            logcat?.takeIf(String::isNotBlank)?.let { JSONObject().put("name", "logcat").put("text", redactReportText(it)) },
+        ),
+    )
 
 private fun archivedRollbackJson(archive: ArchivedRollbackSummary): JSONObject =
     JSONObject()

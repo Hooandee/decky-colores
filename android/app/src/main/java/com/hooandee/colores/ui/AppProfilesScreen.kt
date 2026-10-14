@@ -37,6 +37,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,7 +45,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
@@ -117,10 +123,20 @@ fun AppProfilesDialog(
     val configured = remember(state.configuredProfiles) { state.configuredProfiles.associateBy { it.packageName } }
     val configuredApps = remember(state.profileApps, configured) { state.profileApps.filter { it.packageName in configured } }
     val visibleApps = remember(state.profileApps, query) { filterApps(state.profileApps, query) }
+    val initialFocusRequester = remember { FocusRequester() }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        DialogSystemBars()
+        val inputModeManager = LocalInputModeManager.current
+        val windowInfo = LocalWindowInfo.current
+        LaunchedEffect(windowInfo.isWindowFocused) {
+            if (windowInfo.isWindowFocused) {
+                inputModeManager.requestInputMode(InputMode.Keyboard)
+                initialFocusRequester.requestFocus()
+            }
+        }
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 20.dp, vertical = 16.dp),
             contentAlignment = Alignment.Center,
@@ -152,6 +168,7 @@ fun AppProfilesDialog(
                             onApp = onApp,
                             onFollowGlobal = onFollowGlobal,
                             onForget = onForget,
+                            initialFocusRequester = initialFocusRequester,
                             modifier = modifier,
                         )
                     }
@@ -207,6 +224,7 @@ private fun EditingColumn(
     onApp: (String) -> Unit,
     onFollowGlobal: (Boolean) -> Unit,
     onForget: () -> Unit,
+    initialFocusRequester: FocusRequester,
     modifier: Modifier,
 ) {
     val scope = state.profileScope as? ProfileScope.App
@@ -222,6 +240,7 @@ private fun EditingColumn(
                 selected = scope == null,
                 swatch = null,
                 onClick = onGlobal,
+                modifier = Modifier.focusRequester(initialFocusRequester),
             )
         }
         items(listedApps, key = { "listed:${it.packageName}" }) { app ->
@@ -337,7 +356,7 @@ private fun ProfileChoiceButton(
     val shape = RoundedCornerShape(12.dp)
     Surface(
         onClick = onClick,
-        modifier = modifier.heightIn(min = 44.dp).semantics { this.selected = selected },
+        modifier = modifier.heightIn(min = 44.dp).focusRing(shape).semantics { this.selected = selected },
         shape = shape,
         color = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimary else LocalContentColor.current,
@@ -427,7 +446,7 @@ private fun AppTile(
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f),
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         border = if (selected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
-        modifier = Modifier.fillMaxWidth().semantics { this.selected = selected },
+        modifier = Modifier.fillMaxWidth().focusRing(shape).semantics { this.selected = selected },
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
@@ -474,13 +493,14 @@ private fun ProfileRow(
     selected: Boolean,
     swatch: RgbColor?,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     Surface(
         onClick = onClick,
         color = if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
         contentColor = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
         shape = RoundedCornerShape(14.dp),
-        modifier = Modifier.fillMaxWidth().semantics { this.selected = selected },
+        modifier = modifier.fillMaxWidth().focusRing(RoundedCornerShape(14.dp)).semantics { this.selected = selected },
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),

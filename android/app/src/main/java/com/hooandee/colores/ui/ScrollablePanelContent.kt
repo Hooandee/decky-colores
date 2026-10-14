@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.ScrollState
@@ -48,12 +48,14 @@ internal fun ScrollablePanelContent(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val scrollState = rememberScrollState()
-    val showContinuation by remember { derivedStateOf { scrollState.canScrollForward && scrollState.value == 0 } }
+    val overflows by remember { derivedStateOf { scrollState.maxValue > 0 } }
+    val showContinuation by remember { derivedStateOf { scrollState.canScrollForward } }
     val scope = rememberCoroutineScope()
-    Box(modifier = modifier) {
+    Column(modifier = modifier) {
         Column(
             modifier =
                 Modifier
+                    .weight(1f, fill = false)
                     .fillMaxWidth()
                     .scrollFadeEdges(scrollState)
                     .verticalScroll(scrollState)
@@ -61,25 +63,32 @@ internal fun ScrollablePanelContent(
             verticalArrangement = verticalArrangement,
             content = content,
         )
-        if (showContinuation) {
-            val label = stringResource(R.string.more_settings_below)
-            Surface(
-                onClick = { scope.launch { scrollState.animateScrollBy(scrollState.viewportSize * 0.7f) } },
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 10.dp, bottom = 10.dp)
-                        .size(36.dp)
-                        .prismaticPanel(CircleShape, strong = true)
-                        .semantics { contentDescription = label },
-                color = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.primary,
-                shape = CircleShape,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text("↓", fontWeight = FontWeight.Bold)
+        if (overflows) {
+            Box(Modifier.fillMaxWidth().height(54.dp).padding(bottom = 6.dp), contentAlignment = Alignment.Center) {
+                if (showContinuation) {
+                    ContinuationButton(onClick = { scope.launch { scrollState.animateScrollBy(scrollState.viewportSize * 0.7f) } })
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ContinuationButton(onClick: () -> Unit) {
+    val label = stringResource(R.string.more_settings_below)
+    Surface(
+        onClick = onClick,
+        modifier =
+            Modifier
+                .size(36.dp)
+                .prismaticPanel(CircleShape, strong = true)
+                .semantics { contentDescription = label },
+        color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.primary,
+        shape = CircleShape,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text("↓", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -97,7 +106,7 @@ internal fun Modifier.scrollFadeEdges(scrollState: ScrollState): Modifier =
                 )
             }
             if (scrollState.canScrollForward) {
-                val fade = 56.dp.toPx().coerceAtMost(size.height / 3f)
+                val fade = 24.dp.toPx().coerceAtMost(size.height / 4f)
                 drawRect(
                     brush = Brush.verticalGradient(colors = listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height),
                     topLeft = Offset(0f, size.height - fade),

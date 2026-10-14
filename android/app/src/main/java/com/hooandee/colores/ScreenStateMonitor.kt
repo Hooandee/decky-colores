@@ -1,5 +1,6 @@
 package com.hooandee.colores
 
+import com.hooandee.colores.report.ColoresLog
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -37,6 +38,7 @@ class ScreenStateMonitor(
             ) {
                 val action = intent?.action
                 mutableInteractive.value = interactiveAfter(action, mutableInteractive.value)
+                ColoresLog.state("screen", if (mutableInteractive.value) "on" else "off")
                 if (reassertsLighting(action)) onScreenOn()
             }
         }

@@ -65,6 +65,7 @@ internal fun SensorScaleDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
+        DialogSystemBars()
         PrismaticBackdrop(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(horizontal = 22.dp, vertical = 16.dp),
@@ -95,14 +96,14 @@ internal fun SensorScaleDialog(
                     if (shouldUseTwoPaneLayout(maxWidth, maxHeight, 720.dp)) {
                         Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             SensorBandList(model, projection, { model = model.select(it) }, Modifier.weight(1f).fillMaxHeight())
-                            SensorBandEditor(model, projection, { model = it }, Modifier.weight(1f).fillMaxHeight())
+                            SensorBandEditor(model, projection, { model = it }, compactWheel = true, modifier = Modifier.weight(1f).fillMaxHeight())
                         }
                     } else {
                         StackedPanes(
                             maxHeight = maxHeight,
                             firstWeight = 0.9f,
                             first = { SensorBandList(model, projection, { model = model.select(it) }, it) },
-                            second = { SensorBandEditor(model, projection, { model = it }, it) },
+                            second = { SensorBandEditor(model, projection, { model = it }, compactWheel = false, modifier = it) },
                         )
                     }
                 }
@@ -203,6 +204,7 @@ private fun SensorBandEditor(
     model: SensorScaleEditorModel,
     projection: LedColorProjection,
     onChange: (SensorScaleEditorModel) -> Unit,
+    compactWheel: Boolean,
     modifier: Modifier,
 ) {
     val band = model.selectedBand
@@ -218,7 +220,7 @@ private fun SensorBandEditor(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(sensorBandLabel(model.kind, model.selectedIndex), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Box(Modifier.fillMaxWidth().height(210.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().height(if (compactWheel) 160.dp else 210.dp), contentAlignment = Alignment.Center) {
                 RingColorPicker(
                     color = band.color,
                     enabled = true,

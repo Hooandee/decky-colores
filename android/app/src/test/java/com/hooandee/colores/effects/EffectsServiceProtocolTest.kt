@@ -63,11 +63,44 @@ class EffectsServiceProtocolTest {
     }
 
     @Test
-    fun `capture survives a temporary app profile while the global profile uses it`() {
-        assertFalse(shouldEndCapture(CaptureOwner.AUDIO, AppMode.COLOR, globalMode = AppMode.AUDIO))
-        assertTrue(shouldEndCapture(CaptureOwner.AUDIO, AppMode.COLOR, globalMode = AppMode.COLOR))
-        assertTrue(shouldEndCapture(CaptureOwner.AMBIENT, AppMode.EFFECT, globalMode = null))
-        assertFalse(shouldEndCapture(CaptureOwner.AMBIENT, AppMode.AMBIENT, globalMode = AppMode.COLOR))
+    fun `a temporary app profile keeps the running capture`() {
+        assertEquals(CaptureHoldAction.KEEP, captureHoldAction(CaptureOwner.AUDIO, false, AppMode.COLOR, AppMode.AUDIO, power = true))
+        assertEquals(CaptureHoldAction.KEEP, captureHoldAction(CaptureOwner.AMBIENT, true, AppMode.AMBIENT, AppMode.COLOR, power = true))
+    }
+
+    @Test
+    fun `leaving capture modes releases the projection`() {
+        assertEquals(CaptureHoldAction.RELEASE, captureHoldAction(CaptureOwner.AUDIO, true, AppMode.COLOR, AppMode.COLOR, power = true))
+        assertEquals(CaptureHoldAction.RELEASE, captureHoldAction(CaptureOwner.AMBIENT, true, AppMode.EFFECT, null, power = true))
+        assertEquals(CaptureHoldAction.RELEASE, captureHoldAction(null, true, AppMode.CLOCK, AppMode.GRADIENT, power = true))
+    }
+
+    @Test
+    fun `turning the lights off pauses instead of releasing`() {
+        assertEquals(CaptureHoldAction.PAUSE, captureHoldAction(CaptureOwner.AUDIO, false, AppMode.AUDIO, AppMode.AUDIO, power = false))
+        assertEquals(CaptureHoldAction.PAUSE, captureHoldAction(CaptureOwner.AMBIENT, true, AppMode.AMBIENT, null, power = false))
+    }
+
+    @Test
+    fun `turning the lights back on resumes the paused consumer`() {
+        assertEquals(CaptureHoldAction.RESUME_AUDIO, captureHoldAction(null, false, AppMode.AUDIO, AppMode.AUDIO, power = true))
+        assertEquals(CaptureHoldAction.RESUME_AMBIENT, captureHoldAction(null, true, AppMode.AMBIENT, AppMode.AMBIENT, power = true))
+    }
+
+    @Test
+    fun `switching between audio and ambilight reuses the projection`() {
+        assertEquals(CaptureHoldAction.RESUME_AMBIENT, captureHoldAction(CaptureOwner.AUDIO, true, AppMode.AMBIENT, null, power = true))
+        assertEquals(CaptureHoldAction.RESUME_AUDIO, captureHoldAction(CaptureOwner.AMBIENT, true, AppMode.AUDIO, null, power = true))
+    }
+
+    @Test
+    fun `a single app grant cannot feed ambilight`() {
+        assertEquals(CaptureHoldAction.RELEASE, captureHoldAction(CaptureOwner.AUDIO, false, AppMode.AMBIENT, null, power = true))
+    }
+
+    @Test
+    fun `an app profile on a non capture mode pauses when global is a capture mode`() {
+        assertEquals(CaptureHoldAction.PAUSE, captureHoldAction(null, true, AppMode.COLOR, AppMode.AMBIENT, power = true))
     }
 
     @Test
