@@ -3,9 +3,30 @@
 ## [0.32.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.0...decky-colores-v0.32.1) (2026-10-14)
 
 
-### Bug Fixes
+### Español
 
-* **ambilight:** capture the main gamescope and never stall it ([#193](https://github.com/Hooandee/decky-colores/issues/193)) ([5e626c5](https://github.com/Hooandee/decky-colores/commit/5e626c5d332c99b1a34a233edf55606a44b56483))
+* **Ambilight:** En consolas de doble pantalla con Armada, como la AYN Thor, el modo ambiente vuelve a encenderse siempre. A veces se fijaba en la pantalla de abajo, que suele estar apagada, y las luces se quedaban sin color.
+* **Ambilight:** Con Armada, actualizar o desactivar Colores con el modo ambiente puesto podía cerrar Steam de golpe. Ya no pasa.
+
+### English
+
+* **Ambilight:** On dual-screen handhelds with Armada, like the AYN Thor, ambient mode lights up every time again. Sometimes it followed the bottom screen, which is usually off, and the lights stayed dark.
+* **Ambilight:** With Armada, updating or turning off Colores while ambient mode was on could suddenly close Steam. That no longer happens.
+
+### Italiano
+
+* **Ambilight:** Sulle console a doppio schermo con Armada, come la AYN Thor, la modalità ambiente torna ad accendersi sempre. A volte seguiva lo schermo in basso, che di solito è spento, e le luci restavano senza colore.
+* **Ambilight:** Con Armada, aggiornare o disattivare Colores con la modalità ambiente attiva poteva chiudere Steam all'improvviso. Ora non succede più.
+
+### Deutsch
+
+* **Ambilight:** Auf Handhelds mit zwei Bildschirmen und Armada, wie der AYN Thor, geht der Ambient-Modus jetzt wieder jedes Mal an. Manchmal hat er sich am unteren Bildschirm orientiert, der meist aus ist, und die Lichter blieben dunkel.
+* **Ambilight:** Mit Armada konnte ein Update oder Ausschalten von Colores bei aktivem Ambient-Modus Steam plötzlich schließen. Das passiert nicht mehr.
+
+### Português (Brasil)
+
+* **Ambilight:** Em portáteis de duas telas com Armada, como o AYN Thor, o modo ambiente volta a acender sempre. Às vezes ele seguia a tela de baixo, que costuma ficar desligada, e as luzes ficavam apagadas.
+* **Ambilight:** Com Armada, atualizar ou desativar o Colores com o modo ambiente ligado podia fechar o Steam de repente. Isso não acontece mais.
 
 ## [0.32.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.31.0...decky-colores-v0.32.0) (2026-10-13)
 
