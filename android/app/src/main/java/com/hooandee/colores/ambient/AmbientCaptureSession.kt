@@ -17,7 +17,18 @@ object AmbientCaptureCadence {
         lastFrameMs: Long,
         nowMs: Long,
         fps: Int,
-    ): Boolean = lastFrameMs == 0L || nowMs - lastFrameMs >= 1_000L / fps.normalizedAmbientCaptureFps()
+    ): Boolean = delayUntilDueMs(lastFrameMs, nowMs, fps) == 0L
+
+    fun delayUntilDueMs(
+        lastFrameMs: Long,
+        nowMs: Long,
+        fps: Int,
+    ): Long =
+        if (lastFrameMs == 0L) {
+            0L
+        } else {
+            (1_000L / fps.normalizedAmbientCaptureFps() - (nowMs - lastFrameMs)).coerceAtLeast(0L)
+        }
 }
 
 internal fun Int.normalizedAmbientCaptureFps(): Int = ((coerceIn(5, 30) + 2) / 5) * 5

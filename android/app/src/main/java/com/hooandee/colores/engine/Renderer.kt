@@ -7,6 +7,8 @@ import com.hooandee.colores.engine.FrameMath.breatheFactor
 import com.hooandee.colores.engine.FrameMath.clamp8
 import com.hooandee.colores.engine.FrameMath.lerp
 import com.hooandee.colores.led.RgbColor
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
 import kotlin.math.abs
 
 data class RenderTick(
@@ -16,6 +18,10 @@ data class RenderTick(
 
 interface Renderer {
     fun render(nowSeconds: Double): RenderTick
+
+    /** Emits when fresh input must be rendered before the scheduled tick. */
+    val wake: Flow<*>?
+        get() = null
 }
 
 class AmbientRenderer(
@@ -24,9 +30,25 @@ class AmbientRenderer(
     private val vividness: () -> Int,
     private val smoothing: () -> Int,
     private val state: () -> AmbientFrameState,
+    frames: Flow<AmbientFrameState>? = null,
 ) : Renderer {
     private var displayed: List<RgbColor>? = null
     private var lastSeconds: Double? = null
+    private var cutting = BooleanArray(0)
+
+    private var renderedTimestampMs = 0L
+
+    override val wake: Flow<*>? = frames?.filter(::startsSceneCut)
+
+    private fun startsSceneCut(frame: AmbientFrameState): Boolean {
+        val current = displayed ?: return false
+        if (frame.timestampMs <= renderedTimestampMs) return false
+        if (frame.status != AmbientCaptureStatus.CAPTURING || frame.colors.isEmpty()) return false
+        return frame.colors.fit(zones).zip(current).withIndex().any { (zone, pair) ->
+            !cutting.getOrElse(zone) { false } &&
+                AmbientColorMath.distance(AmbientColorMath.vivid(pair.first, vividness()), pair.second) >= SCENE_CUT_JUMP
+        }
+    }
 
     override fun render(nowSeconds: Double): RenderTick {
         val snapshot = state()
@@ -42,16 +64,30 @@ class AmbientRenderer(
             if (previous == null) {
                 target
             } else {
-                previous.zip(target) { current, next -> AmbientColorMath.smooth(current, next, smoothing(), elapsedMs) }
+                if (cutting.size != previous.size) cutting = BooleanArray(previous.size)
+                previous.zip(target).mapIndexed { zone, (current, next) ->
+                    val distance = AmbientColorMath.distance(current, next)
+                    val starts = !cutting[zone] && distance >= SCENE_CUT_JUMP
+                    cutting[zone] = starts || (cutting[zone] && distance > SCENE_CUT_SETTLED)
+                    // The LEDs only change once per device frame, so the first cut step spans a whole one.
+                    val stepMs = if (starts) maxOf(elapsedMs, frameIntervalMs) else elapsedMs
+                    AmbientColorMath.smooth(current, next, smoothing(), stepMs, sceneCut = cutting[zone])
+                }
             }
         displayed = frame
         lastSeconds = nowSeconds
+        renderedTimestampMs = snapshot.timestampMs
         return RenderTick(frame, frameIntervalMs)
     }
 
     private fun List<RgbColor>.fit(count: Int): List<RgbColor> {
         val fallback = firstOrNull() ?: RgbColor(0, 0, 0)
         return List(count.coerceAtLeast(1)) { getOrNull(it) ?: fallback }
+    }
+
+    private companion object {
+        const val SCENE_CUT_JUMP = 80
+        const val SCENE_CUT_SETTLED = 6
     }
 }
 

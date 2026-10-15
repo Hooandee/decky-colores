@@ -5,6 +5,7 @@ import android.content.Context
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.os.Handler
@@ -53,6 +54,14 @@ class AndroidScreenCapture(
     private var reader: ImageReader? = null
     private var display: VirtualDisplay? = null
     private var lastProcessedMs = 0L
+    private var deferred: Image? = null
+    private val processDeferred =
+        Runnable {
+            deferred?.let { image ->
+                deferred = null
+                process(image)
+            }
+        }
     @Volatile
     private var running = false
 
@@ -105,6 +114,7 @@ class AndroidScreenCapture(
         if (!running) return
         running = false
         handler?.removeCallbacksAndMessages(null)
+        handler?.post { dropDeferred() }
         reader?.setOnImageAvailableListener(null, null)
         display?.release()
         reader?.close()
@@ -124,6 +134,7 @@ class AndroidScreenCapture(
     fun setPaused(paused: Boolean) {
         if (!paused) lastProcessedMs = 0L
         this.paused = paused
+        if (paused) handler?.post { dropDeferred() }
         runCatching { display?.setSurface(if (paused) null else reader?.surface) }
             .onFailure { ColoresLog.w(TAG, "virtual display surface swap failed paused=$paused", it) }
     }
@@ -133,11 +144,31 @@ class AndroidScreenCapture(
             onError(it)
             return
         } ?: return
+        if (paused) {
+            image.close()
+            return
+        }
+        dropDeferred()
+        val waitMs = AmbientCaptureCadence.delayUntilDueMs(lastProcessedMs, SystemClock.elapsedRealtime(), config.captureFps)
+        if (waitMs > 0L) {
+            deferred = image
+            handler?.postDelayed(processDeferred, waitMs)
+            return
+        }
+        process(image)
+    }
+
+    private fun dropDeferred() {
+        handler?.removeCallbacks(processDeferred)
+        deferred?.close()
+        deferred = null
+    }
+
+    private fun process(image: Image) {
         try {
-            if (paused) return
+            if (!running || paused) return
             val now = SystemClock.elapsedRealtime()
             val activeConfig = config
-            if (!AmbientCaptureCadence.shouldProcess(lastProcessedMs, now, activeConfig.captureFps)) return
             val plane = image.planes.firstOrNull() ?: return
             val buffer = plane.buffer
             buffer.rewind()
@@ -151,18 +182,18 @@ class AndroidScreenCapture(
                     supportsPerZone = activeConfig.supportsPerZone,
                     mode = activeConfig.samplingMode,
                 )
-            if (paused) return
+            if (!running || paused) return
             lastProcessedMs = now
             onFrame(colors, now)
         } catch (error: Throwable) {
-            onError(error)
+            if (running) onError(error)
         } finally {
             image.close()
         }
     }
 
     private companion object {
-        const val MAX_IMAGES = 2
+        const val MAX_IMAGES = 3
         const val NO_FRAME_TIMEOUT_MS = 2_000L
         const val TAG = "ColoresAmbient"
     }
