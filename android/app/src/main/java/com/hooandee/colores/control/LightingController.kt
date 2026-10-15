@@ -40,6 +40,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlin.math.roundToInt
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -632,7 +634,9 @@ class LightingController(
             runCatching { binding.device.applyZones(tick.colors, intent.brightness, true) }.rethrowCancellation().also { writeHealth.record(it) }
             lastFrame = tick.colors
             publishSnapshot()
-            delay(tick.nextDelayMs.coerceAtLeast(1L))
+            val waitMs = tick.nextDelayMs.coerceAtLeast(1L)
+            val wake = renderer.wake
+            if (wake == null) delay(waitMs) else withTimeoutOrNull(waitMs) { wake.first() }
         }
     }
 
@@ -709,6 +713,7 @@ class LightingController(
                     vividness = { intent.ambientVividness },
                     smoothing = { intent.ambientSmoothing },
                     state = { binding.ambient.state.value },
+                    frames = binding.ambient.state,
                 )
             else ->
                 EffectRenderer(intent.effectId, zones, interval, { intent.speed }, { resolvePalette(binding) })

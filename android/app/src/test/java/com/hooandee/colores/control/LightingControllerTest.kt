@@ -206,6 +206,35 @@ class LightingControllerTest {
         }
 
     @Test
+    fun `ambient renders a scene cut without waiting for the next tick`() =
+        runTest {
+            val device = FakeDevice(recommendedFrameIntervalMs = 80)
+            val ambient = MutableAmbientFrameSource().apply {
+                update(List(8) { RgbColor(0, 0, 0) }, AmbientCaptureStatus.CAPTURING, 1L)
+            }
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(
+                binding(device, zones = 8, ambient = ambient),
+                LightingIntent(mode = AppMode.AMBIENT, ambientSmoothing = 0, ambientVividness = 0),
+            )
+            advanceTimeBy(1_010)
+            runCurrent()
+
+            val writesBefore = device.writes.size
+            ambient.update(List(8) { RgbColor(10, 10, 10) }, AmbientCaptureStatus.CAPTURING, 2L)
+            advanceTimeBy(5)
+            runCurrent()
+            assertEquals(writesBefore, device.writes.size)
+
+            val cut = List(8) { RgbColor(0, 0, 255) }
+            ambient.update(cut, AmbientCaptureStatus.CAPTURING, 3L)
+            advanceTimeBy(5)
+            runCurrent()
+
+            assertEquals(cut, device.writes.last().colors)
+        }
+
+    @Test
     fun `ambient stops writing while the screen is off and resumes when it wakes`() =
         runTest {
             val device = FakeDevice(recommendedFrameIntervalMs = 80)

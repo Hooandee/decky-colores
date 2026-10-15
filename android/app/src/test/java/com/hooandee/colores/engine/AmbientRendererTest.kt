@@ -3,7 +3,12 @@ package com.hooandee.colores.engine
 import com.hooandee.colores.ambient.AmbientCaptureStatus
 import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.led.RgbColor
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -45,4 +50,52 @@ class AmbientRendererTest {
         assertTrue(first in 1..254)
         assertTrue(second > first)
     }
+
+    @Test
+    fun `a scene cut follows quickly until it settles even when the render wakes early`() {
+        val source = MutableAmbientFrameSource()
+        val renderer = AmbientRenderer(1, 80, vividness = { 0 }, smoothing = { 45 }, state = { source.state.value })
+        source.update(listOf(RgbColor(255, 0, 0)), AmbientCaptureStatus.CAPTURING, 1L)
+        renderer.render(0.0)
+        source.update(listOf(RgbColor(0, 0, 255)), AmbientCaptureStatus.CAPTURING, 2L)
+
+        val first = renderer.render(0.01).colors.single()
+        val second = renderer.render(0.09).colors.single()
+
+        assertTrue("first=$first", first.blue >= 0.85 * 255)
+        assertTrue("second=$second", second.blue >= 0.97 * 255 && second.red <= 8)
+    }
+
+    @Test
+    fun `small scene drift keeps the configured smoothing`() {
+        val source = MutableAmbientFrameSource()
+        val renderer = AmbientRenderer(1, 80, vividness = { 0 }, smoothing = { 45 }, state = { source.state.value })
+        source.update(listOf(RgbColor(100, 100, 100)), AmbientCaptureStatus.CAPTURING, 1L)
+        renderer.render(0.0)
+        source.update(listOf(RgbColor(140, 100, 100)), AmbientCaptureStatus.CAPTURING, 2L)
+
+        val next = renderer.render(0.08).colors.single()
+
+        assertEquals(100 + 40 * (1 - Math.pow(0.45, 0.8)), next.red.toDouble(), 1.0)
+    }
+
+    @Test
+    fun `only the start of a scene cut wakes the render early`() =
+        runBlocking {
+            val source = MutableAmbientFrameSource()
+            val renderer =
+                AmbientRenderer(1, 80, vividness = { 0 }, smoothing = { 45 }, state = { source.state.value }, frames = source.state)
+            source.update(listOf(RgbColor(255, 0, 0)), AmbientCaptureStatus.CAPTURING, 1L)
+            renderer.render(0.0)
+            val wake = requireNotNull(renderer.wake)
+
+            assertNull(withTimeoutOrNull(50) { wake.first() })
+
+            source.update(listOf(RgbColor(0, 0, 255)), AmbientCaptureStatus.CAPTURING, 2L)
+            assertNotNull(withTimeoutOrNull(50) { wake.first() })
+
+            renderer.render(0.01)
+            source.update(listOf(RgbColor(0, 255, 0)), AmbientCaptureStatus.CAPTURING, 3L)
+            assertNull(withTimeoutOrNull(50) { wake.first() })
+        }
 }

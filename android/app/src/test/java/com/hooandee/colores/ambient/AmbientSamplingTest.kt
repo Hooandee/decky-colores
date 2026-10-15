@@ -132,8 +132,8 @@ class AmbientSamplingTest {
 
     @Test
     fun `time based smoothing is stable across capture rates`() {
-        val black = RgbColor(0, 0, 0)
-        val white = RgbColor(255, 255, 255)
+        val black = RgbColor(90, 90, 90)
+        val white = RgbColor(140, 140, 140)
 
         val once = AmbientColorMath.smooth(black, white, smoothing = 75, elapsedMs = 100)
         val half = AmbientColorMath.smooth(black, white, smoothing = 75, elapsedMs = 50)
@@ -142,6 +142,51 @@ class AmbientSamplingTest {
         assertTrue(kotlin.math.abs(once.red - twice.red) <= 1)
         assertEquals(once.red, once.green)
         assertEquals(once.green, once.blue)
+    }
+
+    @Test
+    fun `a scene cut reaches most of the new color within one LED frame at default smoothing`() {
+        val red = RgbColor(255, 0, 0)
+        val blue = RgbColor(0, 0, 255)
+
+        val next = AmbientColorMath.smooth(red, blue, smoothing = 45, elapsedMs = 80, sceneCut = true)
+
+        assertTrue("blue=${next.blue}", next.blue >= 0.85 * 255)
+        assertTrue("red=${next.red}", next.red <= 0.15 * 255)
+    }
+
+    @Test
+    fun `small color drift keeps the configured smoothing`() {
+        val current = RgbColor(100, 100, 100)
+        val target = RgbColor(140, 140, 140)
+
+        val next = AmbientColorMath.smooth(current, target, smoothing = 45, elapsedMs = 80)
+
+        val expected = 100 + 40 * (1 - Math.pow(0.45, 0.8))
+        assertEquals(expected, next.red.toDouble(), 1.0)
+    }
+
+    @Test
+    fun `smoothing always settles on the exact target`() {
+        var color = RgbColor(255, 255, 255)
+        repeat(60) { color = AmbientColorMath.smooth(color, RgbColor(0, 0, 0), smoothing = 90, elapsedMs = 80) }
+        assertEquals(RgbColor(0, 0, 0), color)
+
+        repeat(60) { color = AmbientColorMath.smooth(color, RgbColor(255, 128, 0), smoothing = 90, elapsedMs = 80) }
+        assertEquals(RgbColor(255, 128, 0), color)
+    }
+
+    @Test
+    fun `no elapsed time keeps the current color`() {
+        val current = RgbColor(10, 20, 30)
+        assertEquals(current, AmbientColorMath.smooth(current, RgbColor(200, 0, 0), smoothing = 45, elapsedMs = 0))
+    }
+
+    @Test
+    fun `an early frame waits for the rest of the capture interval instead of being dropped`() {
+        assertEquals(40L, AmbientCaptureCadence.delayUntilDueMs(lastFrameMs = 1_000, nowMs = 1_060, fps = 10))
+        assertEquals(0L, AmbientCaptureCadence.delayUntilDueMs(lastFrameMs = 1_000, nowMs = 1_100, fps = 10))
+        assertEquals(0L, AmbientCaptureCadence.delayUntilDueMs(lastFrameMs = 0, nowMs = 5, fps = 30))
     }
 
     @Test

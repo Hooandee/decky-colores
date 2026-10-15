@@ -405,8 +405,8 @@ class DeviceRegistryTest {
         val hardware = (match?.led as? SettingsProviderDescriptor)?.htr3212
         assertTrue(hardware?.explicitInitialization == true)
         assertTrue(hardware?.automaticActivation == true)
-        assertFalse((match?.led as? SettingsProviderDescriptor)?.htr3212?.blockWrite == true)
-        assertFalse((match?.led as? SettingsProviderDescriptor)?.htr3212?.pairedWrite == true)
+        assertTrue(hardware?.blockWrite == true)
+        assertTrue(hardware?.pairedWrite == true)
     }
 
     @Test

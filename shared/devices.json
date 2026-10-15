@@ -23,6 +23,8 @@
           "leftOrder": [0, 1, 3, 2],
           "rightOrder": [1, 2, 3, 0],
           "rgbStartRegister": 13,
+          "blockWrite": true,
+          "pairedWrite": true,
           "explicitInitialization": true,
           "automaticActivation": true
         }

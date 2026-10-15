@@ -2,6 +2,7 @@ package com.hooandee.colores.ambient
 
 import com.hooandee.colores.device.LedGridCell
 import com.hooandee.colores.led.RgbColor
+import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.roundToInt
 
@@ -122,15 +123,22 @@ object AmbientColorMath {
         target: RgbColor,
         smoothing: Int,
         elapsedMs: Long,
+        sceneCut: Boolean = false,
     ): RgbColor {
         val baseAlpha = maxOf(0.04, 1.0 - smoothing.coerceIn(0, 100) / 100.0)
-        val alpha = 1.0 - (1.0 - baseAlpha).pow(elapsedMs.coerceAtLeast(0L) / 100.0)
+        val retainedPer100Ms = (1.0 - baseAlpha) * if (sceneCut) 1.0 - SCENE_CUT_BOOST else 1.0
+        val alpha = 1.0 - retainedPer100Ms.pow(elapsedMs.coerceAtLeast(0L) / 100.0)
         return RgbColor(
-            mixed(current.red, target.red, alpha),
-            mixed(current.green, target.green, alpha),
-            mixed(current.blue, target.blue, alpha),
+            approached(current.red, target.red, alpha),
+            approached(current.green, target.green, alpha),
+            approached(current.blue, target.blue, alpha),
         )
     }
+
+    fun distance(
+        a: RgbColor,
+        b: RgbColor,
+    ): Int = maxOf(abs(a.red - b.red), abs(a.green - b.green), abs(a.blue - b.blue))
 
     private fun boosted(
         gray: Double,
@@ -138,9 +146,17 @@ object AmbientColorMath {
         factor: Double,
     ): Int = (gray + (channel - gray) * factor).roundToInt().coerceIn(0, 255)
 
-    private fun mixed(
+    private fun approached(
         current: Int,
         target: Int,
         alpha: Double,
-    ): Int = (current + (target - current) * alpha).roundToInt().coerceIn(0, 255)
+    ): Int {
+        if (current == target || alpha <= 0.0) return current
+        val mixed = (current + (target - current) * alpha).roundToInt().coerceIn(0, 255)
+        return if (mixed == current) current + sign(target - current) else mixed
+    }
+
+    private fun sign(value: Int): Int = if (value > 0) 1 else -1
+
+    private const val SCENE_CUT_BOOST = 0.85
 }
