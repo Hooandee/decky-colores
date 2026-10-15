@@ -410,6 +410,20 @@ class DeviceRegistryTest {
     }
 
     @Test
+    fun `RP5 maps each logical corner to its physical HTR group`() {
+        val shared = File("../../shared")
+        val registry =
+            DeviceRegistry.parse(
+                devicesJson = shared.resolve("devices.json").readText(),
+                previewProfilesJson = shared.resolve("led-preview-profiles.json").readText(),
+            )
+        val hardware = (registry.match(rp5Identity())?.led as? SettingsProviderDescriptor)?.htr3212
+
+        assertEquals(listOf(1, 0, 2, 3), hardware?.leftOrder)
+        assertEquals(listOf(2, 1, 3, 0), hardware?.rightOrder)
+    }
+
+    @Test
     fun `RP5 model remains known when the device codename differs`() {
         val shared = File("../../shared")
         val registry =
