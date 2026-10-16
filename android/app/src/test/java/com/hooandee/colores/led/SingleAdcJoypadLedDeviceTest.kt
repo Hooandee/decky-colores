@@ -103,6 +103,14 @@ class SingleAdcJoypadLedDeviceTest {
 
             assertEquals("255", access.values["$base/custum_rgb_r"])
             assertEquals("0", access.values["$base/custum_rgb_b"])
+
+            access.values["$base/custum_rgb_r"] = "131"
+            access.values["$base/custum_rgb_b"] = "255"
+            advanceTimeBy(600)
+            runCurrent()
+
+            assertEquals("255", access.values["$base/custum_rgb_r"])
+            assertEquals("0", access.values["$base/custum_rgb_b"])
         }
 
     @Test

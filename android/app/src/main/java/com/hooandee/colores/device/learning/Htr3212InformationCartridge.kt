@@ -105,7 +105,7 @@ class Htr3212InformationCartridge(
     private fun com.hooandee.colores.device.AndroidDeviceIdentity.isValidatedRp5(): Boolean =
         model.equals("Retroid Pocket 5", ignoreCase = true)
 
-    /** Block auto-increment was confirmed by eye, zone by zone, only on these models. */
+    /** Only these models auto-increment across the RGB bank; others keep register writes. */
     private fun com.hooandee.colores.device.AndroidDeviceIdentity.hasValidatedBlockWrite(): Boolean =
         BLOCK_WRITE_MODELS.any { model.equals(it, ignoreCase = true) }
 

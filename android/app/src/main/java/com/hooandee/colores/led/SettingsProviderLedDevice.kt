@@ -276,7 +276,6 @@ internal class ConflatedLedWriter<T>(
                 var pending = value
                 var failures = 0
                 while (true) {
-                    // Skipping a no-op keeps the interval free for the next real change.
                     if (failures == 0 && unchanged(pending)) {
                         health.succeeded()
                         break
@@ -292,7 +291,7 @@ internal class ConflatedLedWriter<T>(
                         }
                     if (succeeded) {
                         health.succeeded()
-                        // A reassert of the same value keeps only a short gap so it cannot hold back the next change.
+                        // A reassert keeps a short gap so it cannot hold back the next change.
                         delay(if (pending != lastWritten) intervalMs else intervalMs / REASSERT_GAP_DIVISOR)
                         lastWritten = pending
                         pending = channel.tryReceive().getOrNull() ?: break

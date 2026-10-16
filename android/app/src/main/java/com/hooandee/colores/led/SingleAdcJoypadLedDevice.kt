@@ -1,6 +1,7 @@
 package com.hooandee.colores.led
 
 import android.os.SystemClock
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -37,8 +38,7 @@ class SingleAdcJoypadLedDevice internal constructor(
     @Volatile
     private var requested: Frame? = null
 
-    @Volatile
-    private var generation = 0L
+    private val generation = AtomicLong()
 
     @Volatile
     private var appliedAtMs = 0L
@@ -132,15 +132,14 @@ class SingleAdcJoypadLedDevice internal constructor(
     override suspend fun close() = writer.close()
 
     override fun invalidate() {
-        forget()
-        val token = generation
+        var token = forget()
         scope.launch {
             // The vendor restores its own color shortly after screen-on, even in modes that write once.
             VENDOR_RESTORE_RESENDS_MS.forEach { waitMs ->
                 delay(waitMs)
-                if (generation != token) return@launch
+                if (generation.get() != token) return@launch
                 val frame = requested ?: return@launch
-                forget()
+                token = forget()
                 writer.submit(frame)
             }
         }
@@ -151,18 +150,17 @@ class SingleAdcJoypadLedDevice internal constructor(
         return writer.submit(frame)
     }
 
-    private fun forget() {
-        generation += 1
+    private fun forget(): Long {
         applied = null
+        return generation.incrementAndGet()
     }
 
-    // A repeated frame is rewritten periodically rather than trusted forever.
     private fun alreadyApplied(frame: Frame): Boolean = frame == applied && nowMs() - appliedAtMs < REASSERT_MS
 
     private fun writeFrame(frame: Frame): Boolean {
-        val token = generation
+        val token = generation.get()
         return writeNodes(frame).also { succeeded ->
-            if (generation != token) return@also
+            if (generation.get() != token) return@also
             applied = frame.takeIf { succeeded }
             appliedAtMs = nowMs()
         }

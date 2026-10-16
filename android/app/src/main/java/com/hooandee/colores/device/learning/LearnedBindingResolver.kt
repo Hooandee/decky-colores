@@ -109,7 +109,7 @@ internal fun learningDescriptorsCompatible(
     ) == observed
 }
 
-/** How to write is the cartridge's current knowledge; the binding only owns the calibrated order. */
+/** The cartridge decides how to write; a binding only keeps its calibrated order. */
 private fun LedDescriptor.withWriteCapabilitiesOf(observed: LedDescriptor): LedDescriptor {
     val learned = this as? SettingsProviderDescriptor ?: return this
     val learnedHtr = learned.htr3212 ?: return this
