@@ -135,6 +135,22 @@ object AmbientColorMath {
         )
     }
 
+    /**
+     * LEDs emit linearly while a screen applies a gamma, so a dark scene would glow pale white.
+     * The display curve is applied to the brightest channel and the others scale with it, which
+     * darkens shadows without shifting the hue of saturated colors.
+     */
+    fun ledIntensity(color: RgbColor): RgbColor {
+        val peak = maxOf(color.red, color.green, color.blue).coerceIn(0, 255)
+        if (peak == 0) return RgbColor(0, 0, 0)
+        val scale = 255.0 * (peak / 255.0).pow(DISPLAY_GAMMA) / peak
+        return RgbColor(
+            (color.red * scale).roundToInt().coerceIn(0, 255),
+            (color.green * scale).roundToInt().coerceIn(0, 255),
+            (color.blue * scale).roundToInt().coerceIn(0, 255),
+        )
+    }
+
     fun distance(
         a: RgbColor,
         b: RgbColor,
@@ -159,4 +175,5 @@ object AmbientColorMath {
     private fun sign(value: Int): Int = if (value > 0) 1 else -1
 
     private const val SCENE_CUT_BOOST = 0.85
+    private const val DISPLAY_GAMMA = 2.2
 }

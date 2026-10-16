@@ -1,6 +1,7 @@
 package com.hooandee.colores.control
 
 import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.AmbientColorMath
 import com.hooandee.colores.ambient.AmbientFrameSource
 import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.audio.AudioCaptureStatus
@@ -201,7 +202,7 @@ class LightingControllerTest {
 
             assertTrue(gate.running)
             assertTrue(device.writes.size in 10..14)
-            assertEquals(ambient.state.value.colors, device.writes.last().colors)
+            assertEquals(ambient.state.value.colors.map(AmbientColorMath::ledIntensity), device.writes.last().colors)
             assertEquals(AmbientCaptureStatus.CAPTURING, controller.snapshot.value.ambient.status)
         }
 

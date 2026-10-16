@@ -77,7 +77,7 @@ class AmbientRenderer(
         displayed = frame
         lastSeconds = nowSeconds
         renderedTimestampMs = snapshot.timestampMs
-        return RenderTick(frame, frameIntervalMs)
+        return RenderTick(frame.map(AmbientColorMath::ledIntensity), frameIntervalMs)
     }
 
     private fun List<RgbColor>.fit(count: Int): List<RgbColor> {

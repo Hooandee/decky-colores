@@ -190,6 +190,15 @@ class AmbientSamplingTest {
     }
 
     @Test
+    fun `LED intensity follows a display curve and keeps the hue`() {
+        assertEquals(RgbColor(2, 2, 2), AmbientColorMath.ledIntensity(RgbColor(30, 30, 30)))
+        assertEquals(RgbColor(56, 56, 56), AmbientColorMath.ledIntensity(RgbColor(128, 128, 128)))
+        assertEquals(RgbColor(255, 128, 0), AmbientColorMath.ledIntensity(RgbColor(255, 128, 0)))
+        assertEquals(RgbColor(33, 0, 0), AmbientColorMath.ledIntensity(RgbColor(100, 0, 0)))
+        assertEquals(RgbColor(0, 0, 0), AmbientColorMath.ledIntensity(RgbColor(0, 0, 0)))
+    }
+
+    @Test
     fun `capture cadence drops excess frames without building a queue`() {
         assertEquals(false, AmbientCaptureCadence.shouldProcess(lastFrameMs = 1_000, nowMs = 1_099, fps = 10))
         assertEquals(true, AmbientCaptureCadence.shouldProcess(lastFrameMs = 1_000, nowMs = 1_100, fps = 10))

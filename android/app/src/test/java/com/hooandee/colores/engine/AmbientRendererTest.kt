@@ -1,6 +1,7 @@
 package com.hooandee.colores.engine
 
 import com.hooandee.colores.ambient.AmbientCaptureStatus
+import com.hooandee.colores.ambient.AmbientColorMath
 import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.led.RgbColor
 import kotlinx.coroutines.flow.first
@@ -22,7 +23,7 @@ class AmbientRendererTest {
         val tick = renderer.render(0.0)
 
         assertEquals(80L, tick.nextDelayMs)
-        assertEquals(source.state.value.colors, tick.colors)
+        assertEquals(source.state.value.colors.map(AmbientColorMath::ledIntensity), tick.colors)
     }
 
     @Test
@@ -33,7 +34,7 @@ class AmbientRendererTest {
         renderer.render(0.0)
         source.reset(AmbientCaptureStatus.NO_FRAMES)
 
-        assertEquals(List(2) { RgbColor(50, 60, 70) }, renderer.render(0.08).colors)
+        assertEquals(List(2) { AmbientColorMath.ledIntensity(RgbColor(50, 60, 70)) }, renderer.render(0.08).colors)
     }
 
     @Test
@@ -62,8 +63,8 @@ class AmbientRendererTest {
         val first = renderer.render(0.01).colors.single()
         val second = renderer.render(0.09).colors.single()
 
-        assertTrue("first=$first", first.blue >= 0.85 * 255)
-        assertTrue("second=$second", second.blue >= 0.97 * 255 && second.red <= 8)
+        assertTrue("first=$first", first.blue >= AmbientColorMath.ledIntensity(RgbColor(0, 0, (0.85 * 255).toInt())).blue)
+        assertTrue("second=$second", second.blue >= AmbientColorMath.ledIntensity(RgbColor(0, 0, (0.97 * 255).toInt())).blue && second.red <= 8)
     }
 
     @Test
@@ -76,7 +77,8 @@ class AmbientRendererTest {
 
         val next = renderer.render(0.08).colors.single()
 
-        assertEquals(100 + 40 * (1 - Math.pow(0.45, 0.8)), next.red.toDouble(), 1.0)
+        val screenRed = (100 + 40 * (1 - Math.pow(0.45, 0.8))).toInt()
+        assertEquals(AmbientColorMath.ledIntensity(RgbColor(screenRed, 100, 100)).red.toDouble(), next.red.toDouble(), 1.0)
     }
 
     @Test
