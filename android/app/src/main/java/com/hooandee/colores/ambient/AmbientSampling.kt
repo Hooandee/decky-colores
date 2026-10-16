@@ -135,6 +135,24 @@ object AmbientColorMath {
         )
     }
 
+    /**
+     * LEDs are linear while screens apply the sRGB curve, so dark scenes would glow pale white.
+     * Curving only the brightest channel and scaling the rest keeps the hue.
+     */
+    fun ledIntensity(color: RgbColor): RgbColor {
+        val peak = maxOf(color.red, color.green, color.blue).coerceIn(0, 255)
+        if (peak == 0) return RgbColor(0, 0, 0)
+        val scale = 255.0 * srgbToLinear(peak / 255.0) / peak
+        return RgbColor(
+            (color.red * scale).roundToInt().coerceIn(0, 255),
+            (color.green * scale).roundToInt().coerceIn(0, 255),
+            (color.blue * scale).roundToInt().coerceIn(0, 255),
+        )
+    }
+
+    private fun srgbToLinear(value: Double): Double =
+        if (value <= SRGB_TOE) value / SRGB_TOE_SLOPE else ((value + SRGB_OFFSET) / (1 + SRGB_OFFSET)).pow(SRGB_GAMMA)
+
     fun distance(
         a: RgbColor,
         b: RgbColor,
@@ -159,4 +177,8 @@ object AmbientColorMath {
     private fun sign(value: Int): Int = if (value > 0) 1 else -1
 
     private const val SCENE_CUT_BOOST = 0.85
+    private const val SRGB_TOE = 0.04045
+    private const val SRGB_TOE_SLOPE = 12.92
+    private const val SRGB_OFFSET = 0.055
+    private const val SRGB_GAMMA = 2.4
 }
