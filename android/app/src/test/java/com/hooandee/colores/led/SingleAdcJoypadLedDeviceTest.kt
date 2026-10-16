@@ -1,6 +1,7 @@
 package com.hooandee.colores.led
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -33,6 +34,83 @@ class SingleAdcJoypadLedDeviceTest {
             assertEquals("1", access.values["$base/led_mode"])
             assertEquals("1", access.values["$base/led_switch"])
             assertEquals("1", access.values["$base/led_set"])
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a repeated color is skipped but reasserted against the vendor restoring its own`() =
+        runTest {
+            val access = FakeSysfsAccess(nodes)
+            val device =
+                SingleAdcJoypadLedDevice(
+                    SingleAdcJoypadDescriptor(base),
+                    access,
+                    backgroundScope,
+                    nowMs = { testScheduler.currentTime },
+                )
+            val latches = { access.writes.count { it.first == "$base/led_set" } }
+
+            device.applySolid(RgbColor(255, 0, 0), brightness = 80, power = true)
+            runCurrent()
+            repeat(2) {
+                advanceTimeBy(100)
+                device.applySolid(RgbColor(255, 0, 0), brightness = 80, power = true)
+                runCurrent()
+            }
+            assertEquals(1, latches())
+
+            device.applySolid(RgbColor(0, 0, 255), brightness = 80, power = true)
+            runCurrent()
+            assertEquals(2, latches())
+
+            advanceTimeBy(600)
+            device.applySolid(RgbColor(0, 0, 255), brightness = 80, power = true)
+            runCurrent()
+            assertEquals(3, latches())
+
+            device.invalidate()
+            device.applySolid(RgbColor(0, 0, 255), brightness = 80, power = true)
+            advanceTimeBy(250)
+            runCurrent()
+            assertEquals(4, latches())
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a static color is resent after invalidate so the vendor restore cannot stick`() =
+        runTest {
+            val access = FakeSysfsAccess(nodes)
+            val device =
+                SingleAdcJoypadLedDevice(
+                    SingleAdcJoypadDescriptor(base),
+                    access,
+                    backgroundScope,
+                    nowMs = { testScheduler.currentTime },
+                )
+            device.applySolid(RgbColor(255, 0, 0), brightness = 80, power = true)
+            runCurrent()
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            device.invalidate()
+            device.applySolid(RgbColor(255, 0, 0), brightness = 80, power = true)
+            advanceTimeBy(150)
+            runCurrent()
+            access.values["$base/custum_rgb_r"] = "131"
+            access.values["$base/custum_rgb_b"] = "255"
+            advanceTimeBy(400)
+            runCurrent()
+
+            assertEquals("255", access.values["$base/custum_rgb_r"])
+            assertEquals("0", access.values["$base/custum_rgb_b"])
+
+            access.values["$base/custum_rgb_r"] = "131"
+            access.values["$base/custum_rgb_b"] = "255"
+            advanceTimeBy(600)
+            runCurrent()
+
+            assertEquals("255", access.values["$base/custum_rgb_r"])
+            assertEquals("0", access.values["$base/custum_rgb_b"])
         }
 
     @Test

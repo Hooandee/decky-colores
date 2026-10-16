@@ -86,6 +86,8 @@ class Htr3212InformationCartridge(
                                     leftOrder = DEFAULT_ORDER,
                                     rightOrder = DEFAULT_ORDER,
                                     rgbStartRegister = AYN_RGB_START_REGISTER,
+                                    blockWrite = context.identity.hasValidatedBlockWrite(),
+                                    pairedWrite = context.identity.hasValidatedBlockWrite(),
                                     explicitInitialization = context.identity.isValidatedRp5(),
                                 ),
                         ),
@@ -103,10 +105,24 @@ class Htr3212InformationCartridge(
     private fun com.hooandee.colores.device.AndroidDeviceIdentity.isValidatedRp5(): Boolean =
         model.equals("Retroid Pocket 5", ignoreCase = true)
 
+    /** Only these models auto-increment across the RGB bank; others keep register writes. */
+    private fun com.hooandee.colores.device.AndroidDeviceIdentity.hasValidatedBlockWrite(): Boolean =
+        BLOCK_WRITE_MODELS.any { model.equals(it, ignoreCase = true) }
+
     private companion object {
         const val STICKS = 2
         const val TOTAL_ZONES = 8
         const val AYN_RGB_START_REGISTER = 0x0d
         val DEFAULT_ORDER = listOf(0, 1, 2, 3)
+        val BLOCK_WRITE_MODELS =
+            listOf(
+                "Odin3",
+                "Retroid Pocket 5",
+                "Retroid Pocket Nova",
+                "Retroid_Pocket_Nova",
+                "Odin2 Portal",
+                "AYN Thor",
+                "AYN_Thor",
+            )
     }
 }

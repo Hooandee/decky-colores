@@ -1,8 +1,12 @@
 package com.hooandee.colores.led
 
+import android.os.SystemClock
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 data class SingleAdcJoypadDescriptor(
@@ -17,7 +21,8 @@ data class SingleAdcJoypadDescriptor(
 class SingleAdcJoypadLedDevice internal constructor(
     private val descriptor: SingleAdcJoypadDescriptor,
     private val access: SysfsAccess,
-    scope: CoroutineScope,
+    private val scope: CoroutineScope,
+    private val nowMs: () -> Long = SystemClock::elapsedRealtime,
 ) : LedDevice {
     constructor(
         descriptor: SingleAdcJoypadDescriptor,
@@ -27,7 +32,25 @@ class SingleAdcJoypadLedDevice internal constructor(
     override val recommendedFrameIntervalMs: Long =
         if (descriptor.vendorEffects) WRITE_INTERVAL_MS else CONSERVATIVE_FRAME_INTERVAL_MS
 
-    private val writer = ConflatedLedWriter(scope, label = "singleadc", intervalMs = recommendedFrameIntervalMs, write = ::writeFrame)
+    @Volatile
+    private var applied: Frame? = null
+
+    @Volatile
+    private var requested: Frame? = null
+
+    private val generation = AtomicLong()
+
+    @Volatile
+    private var appliedAtMs = 0L
+
+    private val writer =
+        ConflatedLedWriter(
+            scope,
+            label = "singleadc",
+            intervalMs = recommendedFrameIntervalMs,
+            unchanged = ::alreadyApplied,
+            write = ::writeFrame,
+        )
 
     override val available: Boolean
         get() = access.canWrite(node("custum_rgb_r")) && access.canWrite(node("led_set"))
@@ -63,7 +86,7 @@ class SingleAdcJoypadLedDevice internal constructor(
         power: Boolean,
     ): Boolean =
         (colors.firstOrNull() ?: RgbColor(255, 255, 255)).let { c ->
-            writer.submit(
+            submit(
                 Frame(
                     color = c,
                     secondColor = c,
@@ -93,7 +116,7 @@ class SingleAdcJoypadLedDevice internal constructor(
         val spec = EFFECTS.firstOrNull { it.id == effectId } ?: return false
         val first = colors.firstOrNull() ?: RgbColor(255, 255, 255)
         val second = colors.getOrNull(1) ?: first
-        return writer.submit(
+        return submit(
             Frame(
                 color = first,
                 secondColor = second,
@@ -108,9 +131,42 @@ class SingleAdcJoypadLedDevice internal constructor(
 
     override suspend fun close() = writer.close()
 
-    override fun invalidate() = Unit
+    override fun invalidate() {
+        var token = forget()
+        scope.launch {
+            // The vendor restores its own color shortly after screen-on, even in modes that write once.
+            VENDOR_RESTORE_RESENDS_MS.forEach { waitMs ->
+                delay(waitMs)
+                if (generation.get() != token) return@launch
+                val frame = requested ?: return@launch
+                token = forget()
+                writer.submit(frame)
+            }
+        }
+    }
+
+    private fun submit(frame: Frame): Boolean {
+        requested = frame
+        return writer.submit(frame)
+    }
+
+    private fun forget(): Long {
+        applied = null
+        return generation.incrementAndGet()
+    }
+
+    private fun alreadyApplied(frame: Frame): Boolean = frame == applied && nowMs() - appliedAtMs < REASSERT_MS
 
     private fun writeFrame(frame: Frame): Boolean {
+        val token = generation.get()
+        return writeNodes(frame).also { succeeded ->
+            if (generation.get() != token) return@also
+            applied = frame.takeIf { succeeded }
+            appliedAtMs = nowMs()
+        }
+    }
+
+    private fun writeNodes(frame: Frame): Boolean {
         var succeeded = true
         fun put(
             name: String,
@@ -180,6 +236,8 @@ class SingleAdcJoypadLedDevice internal constructor(
     private companion object {
         const val WRITE_INTERVAL_MS = 80L
         const val CONSERVATIVE_FRAME_INTERVAL_MS = 200L
+        const val REASSERT_MS = 250L
+        val VENDOR_RESTORE_RESENDS_MS = listOf(300L, 700L)
         const val STATIC_MODE = 1
         const val MAX_SPEED = 8
 

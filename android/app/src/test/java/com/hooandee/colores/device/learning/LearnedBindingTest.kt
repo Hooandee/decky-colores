@@ -8,6 +8,7 @@ import com.hooandee.colores.led.SingleAdcJoypadDescriptor
 import com.hooandee.colores.device.GenericVendorLed
 import com.hooandee.colores.led.Htr3212Descriptor
 import org.junit.Assert.assertEquals
+import com.hooandee.colores.led.SettingsProviderDescriptor
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -199,6 +200,54 @@ class LearnedBindingTest {
             ),
             resolved.gridLayout,
         )
+    }
+
+    @Test
+    fun `a learned HTR binding adopts the current write capabilities and keeps its order`() {
+        val legacyDescriptor =
+            GenericVendorLed.descriptor(8).copy(
+                driver = "htr3212",
+                htr3212 =
+                    Htr3212Descriptor(
+                        leftBus = 11,
+                        rightBus = 10,
+                        address = 0x3c,
+                        leftOrder = listOf(3, 0, 1, 2),
+                        rightOrder = listOf(0, 1, 2, 3),
+                        rgbStartRegister = 0x0d,
+                    ),
+            )
+        val observedDescriptor =
+            legacyDescriptor.copy(
+                htr3212 =
+                    legacyDescriptor.htr3212?.copy(
+                        leftOrder = listOf(0, 1, 2, 3),
+                        blockWrite = true,
+                        pairedWrite = true,
+                    ),
+            )
+        val htrCandidate =
+            ProbeCandidate(
+                cartridgeId = HTR3212_PROBE_ID,
+                cartridgeVersion = HTR3212_PROBE_VERSION,
+                surface = ProbeSurface.HTR3212,
+                descriptor = observedDescriptor,
+                signalKeys = setOf("htr3212_pair"),
+            )
+        val htrBinding =
+            binding.copy(
+                cartridgeId = HTR3212_PROBE_ID,
+                cartridgeVersion = HTR3212_PROBE_VERSION,
+                descriptorJson = encodeLearningDescriptor(legacyDescriptor),
+                capabilities = DeviceCapabilities(color = true, brightness = false, perZone = true, zones = 8),
+            )
+
+        val resolved = requireNotNull(resolveLearnedDevice(identity, htrBinding, listOf(htrCandidate)))
+        val hardware = (resolved.led as SettingsProviderDescriptor).htr3212
+
+        assertEquals(listOf(3, 0, 1, 2), hardware?.leftOrder)
+        assertTrue(hardware?.blockWrite == true)
+        assertTrue(hardware?.pairedWrite == true)
     }
 
     @Test

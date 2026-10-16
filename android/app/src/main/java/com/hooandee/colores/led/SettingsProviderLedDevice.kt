@@ -260,6 +260,7 @@ internal class ConflatedLedWriter<T>(
     label: String = "led",
     private val retryIntervalMs: Long = 500L,
     private val maxRetryIntervalMs: Long = 30_000L,
+    private val unchanged: (T) -> Boolean = { false },
     write: suspend (T) -> Boolean,
 ) {
     private val channel = Channel<T>(Channel.CONFLATED)
@@ -270,10 +271,15 @@ internal class ConflatedLedWriter<T>(
 
     private val worker =
         scope.launch {
+            var lastWritten: T? = null
             for (value in channel) {
                 var pending = value
                 var failures = 0
                 while (true) {
+                    if (failures == 0 && unchanged(pending)) {
+                        health.succeeded()
+                        break
+                    }
                     val succeeded =
                         try {
                             write(pending).also { if (!it) health.failed("write returned false") }
@@ -285,7 +291,9 @@ internal class ConflatedLedWriter<T>(
                         }
                     if (succeeded) {
                         health.succeeded()
-                        delay(intervalMs)
+                        // A reassert keeps a short gap so it cannot hold back the next change.
+                        delay(if (pending != lastWritten) intervalMs else intervalMs / REASSERT_GAP_DIVISOR)
+                        lastWritten = pending
                         pending = channel.tryReceive().getOrNull() ?: break
                         failures = 0
                         continue
@@ -319,6 +327,8 @@ internal class ConflatedLedWriter<T>(
         return null
     }
 }
+
+private const val REASSERT_GAP_DIVISOR = 4
 
 internal fun ledRetryDelayMs(
     baseMs: Long,

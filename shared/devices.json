@@ -71,10 +71,12 @@
           "leftBus": 3,
           "rightBus": 6,
           "address": 60,
-          "leftOrder": [0, 1, 2, 3],
-          "rightOrder": [0, 1, 2, 3],
+          "leftOrder": [1, 2, 3, 0],
+          "rightOrder": [1, 0, 3, 2],
           "rgbStartRegister": 13,
-          "automaticActivation": true
+          "automaticActivation": true,
+          "blockWrite": true,
+          "pairedWrite": true
         }
       },
       "gridLayout": [
@@ -121,7 +123,9 @@
           "address": 60,
           "leftOrder": [0, 3, 2, 1],
           "rightOrder": [2, 3, 0, 1],
-          "rgbStartRegister": 13
+          "rgbStartRegister": 13,
+          "blockWrite": true,
+          "pairedWrite": true
         }
       },
       "gridLayout": [

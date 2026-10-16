@@ -5,6 +5,7 @@ import com.hooandee.colores.device.GenericVendorLed
 import com.hooandee.colores.led.SettingsProviderDescriptor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import com.hooandee.colores.led.Htr3212Descriptor
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -83,6 +84,30 @@ class Htr3212InformationCartridgeTest {
         val descriptor = route.candidates.single { it.cartridgeId == HTR3212_PROBE_ID }.descriptor as SettingsProviderDescriptor
 
         assertTrue(descriptor.htr3212?.explicitInitialization == true)
+    }
+
+    @Test
+    fun `block and paired writes are proposed only for physically validated models`() {
+        val cartridge =
+            Htr3212InformationCartridge(
+                topologyReader =
+                    I2cTopologyReader {
+                        listOf(
+                            I2cController(bus = 11, address = 0x3c, driver = "htr3212l"),
+                            I2cController(bus = 10, address = 0x3c, driver = "htr3212r"),
+                        )
+                    },
+            )
+        fun routeFor(model: String): Htr3212Descriptor? {
+            val identity = AndroidDeviceIdentity(model, "sun", "AYN", emptyMap())
+            val route = HardwareLearningGraph(listOf(cartridge)).resolve(identity, listOf(settingsCandidate()))
+            return (route.candidates.single { it.cartridgeId == HTR3212_PROBE_ID }.descriptor as SettingsProviderDescriptor).htr3212
+        }
+
+        assertTrue(routeFor("Odin3")?.blockWrite == true)
+        assertTrue(routeFor("Odin3")?.pairedWrite == true)
+        assertFalse(routeFor("Unknown Handheld")?.blockWrite == true)
+        assertFalse(routeFor("Unknown Handheld")?.pairedWrite == true)
     }
 
     @Test
