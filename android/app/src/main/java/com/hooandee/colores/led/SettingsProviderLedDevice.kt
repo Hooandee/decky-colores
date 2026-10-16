@@ -260,6 +260,7 @@ internal class ConflatedLedWriter<T>(
     label: String = "led",
     private val retryIntervalMs: Long = 500L,
     private val maxRetryIntervalMs: Long = 30_000L,
+    private val unchanged: (T) -> Boolean = { false },
     write: suspend (T) -> Boolean,
 ) {
     private val channel = Channel<T>(Channel.CONFLATED)
@@ -274,6 +275,11 @@ internal class ConflatedLedWriter<T>(
                 var pending = value
                 var failures = 0
                 while (true) {
+                    // Skipping a no-op keeps the interval free for the next real change.
+                    if (failures == 0 && unchanged(pending)) {
+                        health.succeeded()
+                        break
+                    }
                     val succeeded =
                         try {
                             write(pending).also { if (!it) health.failed("write returned false") }

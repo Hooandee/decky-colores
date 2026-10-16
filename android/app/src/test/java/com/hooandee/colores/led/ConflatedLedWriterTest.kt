@@ -40,6 +40,29 @@ class ConflatedLedWriterTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `a frame that changes nothing does not hold the next change back`() =
+        runTest {
+            val written = mutableListOf<Int>()
+            val writer =
+                ConflatedLedWriter<Int>(backgroundScope, 80, unchanged = { it == written.lastOrNull() }) {
+                    written += it
+                    true
+                }
+
+            writer.submit(1)
+            runCurrent()
+            advanceTimeBy(100)
+            writer.submit(1)
+            runCurrent()
+            advanceTimeBy(10)
+            writer.submit(2)
+            runCurrent()
+
+            assertEquals(listOf(1, 2), written)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `retries a failed latest value after a longer delay`() =
         runTest {
             var failuresRemaining = 1

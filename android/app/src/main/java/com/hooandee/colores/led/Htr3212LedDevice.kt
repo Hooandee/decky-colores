@@ -35,7 +35,14 @@ internal class Htr3212LedDevice internal constructor(
 
     private val hardware = descriptor.htr3212
     private val vendorDescriptor = descriptor.copy(driver = "settings_provider", zones = STICKS, htr3212 = null)
-    private val writer = ConflatedLedWriter(scope, label = "htr3212", intervalMs = WRITE_INTERVAL_MS, write = ::writeState)
+    private val writer =
+        ConflatedLedWriter(
+            scope,
+            label = "htr3212",
+            intervalMs = WRITE_INTERVAL_MS,
+            unchanged = ::alreadyApplied,
+            write = ::writeState,
+        )
 
     private val cacheLock = Any()
     private var cacheGeneration = 0L
@@ -44,6 +51,7 @@ internal class Htr3212LedDevice internal constructor(
     private var cachedRight: List<RgbColor>? = null
     private var latestRequestedState: LedState? = null
     private var directReassertToken = 0L
+    private var directEpoch = 0L
     private var vendorSeeded = false
 
     override val available: Boolean
@@ -122,11 +130,15 @@ internal class Htr3212LedDevice internal constructor(
         val vendorState = state.toVendorState()
         val seedVendorColor = synchronized(cacheLock) { !vendorSeeded }
         val vendorResult = writeVendorState(vendorState, cache.vendorState, seedVendorColor)
-        if (!vendorResult.succeeded) return false
+        if (!vendorResult.succeeded) {
+            // A partial vendor write leaves unknown values behind, so the next frame rewrites them all.
+            synchronized(cacheLock) { if (cacheGeneration == cache.generation) cachedVendorState = null }
+            return false
+        }
         synchronized(cacheLock) { if (cacheGeneration == cache.generation) vendorSeeded = true }
         publishVendorState(cache.generation, vendorState)
         if (!state.power) {
-            publishDirectState(cache.generation, null, null)
+            publishDirectState(cache.generation, cache.directEpoch, null, null)
             return true
         }
         if (vendorResult.changed) settleVendor()
@@ -145,6 +157,7 @@ internal class Htr3212LedDevice internal constructor(
             }
         publishDirectState(
             generation = cache.generation,
+            epoch = cache.directEpoch,
             left = left.takeIf { leftSucceeded },
             right = right.takeIf { rightSucceeded },
         )
@@ -153,6 +166,14 @@ internal class Htr3212LedDevice internal constructor(
         return succeeded
     }
 
+    private fun alreadyApplied(state: LedState): Boolean =
+        synchronized(cacheLock) {
+            if (!vendorSeeded || cachedVendorState != state.toVendorState()) return@synchronized false
+            if (!state.power) return@synchronized true
+            val direct = state.zoneColors.map { it.scaleBrightness(state.brightness) }
+            cachedLeft == direct.take(ZONES_PER_STICK) && cachedRight == direct.drop(ZONES_PER_STICK).take(ZONES_PER_STICK)
+        }
+
     private fun scheduleDirectReassert(generation: Long) {
         val token = synchronized(cacheLock) { ++directReassertToken }
         scope.launch {
@@ -160,6 +181,7 @@ internal class Htr3212LedDevice internal constructor(
             val latest =
                 synchronized(cacheLock) {
                     if (cacheGeneration != generation || directReassertToken != token) return@synchronized null
+                    directEpoch += 1
                     cachedLeft = null
                     cachedRight = null
                     latestRequestedState
@@ -203,6 +225,7 @@ internal class Htr3212LedDevice internal constructor(
         synchronized(cacheLock) {
             CacheSnapshot(
                 generation = cacheGeneration,
+                directEpoch = directEpoch,
                 vendorState = cachedVendorState,
                 left = cachedLeft,
                 right = cachedRight,
@@ -220,11 +243,13 @@ internal class Htr3212LedDevice internal constructor(
 
     private fun publishDirectState(
         generation: Long,
+        epoch: Long,
         left: List<RgbColor>?,
         right: List<RgbColor>?,
     ) {
         synchronized(cacheLock) {
-            if (cacheGeneration != generation) return
+            // A reassert that cleared the caches mid-write must still force the next frame out.
+            if (cacheGeneration != generation || directEpoch != epoch) return
             cachedLeft = left
             cachedRight = right
         }
@@ -259,9 +284,11 @@ internal class Htr3212LedDevice internal constructor(
         when {
             left == null -> right
             right == null -> left
+            // The sticks sit on separate I2C buses, so both run at once and latch together.
             else ->
-                "$left; colores_left_status=\$?; " +
-                    "$right; colores_right_status=\$?; " +
+                "{ $left; } & colores_left_pid=\$!; " +
+                    "{ $right; }; colores_right_status=\$?; " +
+                    "wait \$colores_left_pid; colores_left_status=\$?; " +
                     "if [ \"\$colores_left_status\" -eq 0 ] && [ \"\$colores_right_status\" -eq 0 ]; then true; " +
                     "else log -t ColoresI2C \"left=\$colores_left_status right=\$colores_right_status\"; false; fi"
         }
@@ -294,6 +321,7 @@ internal class Htr3212LedDevice internal constructor(
 
     private data class CacheSnapshot(
         val generation: Long,
+        val directEpoch: Long,
         val vendorState: LedState?,
         val left: List<RgbColor>?,
         val right: List<RgbColor>?,

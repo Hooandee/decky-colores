@@ -27,7 +27,7 @@ internal fun resolveLearnedDevice(
         id = learnedDeviceId(binding),
         friendlyName = identity.model.ifBlank { identity.manufacturer }.ifBlank { identity.device }.ifBlank { "RGB" },
         capabilities = binding.capabilities,
-        led = boundDescriptor,
+        led = boundDescriptor.withWriteCapabilitiesOf(candidate.descriptor),
         previewProfileId = null,
         previewCalibration = null,
         gridLayout = candidate.learnedGridLayout(binding.capabilities.perZone, binding.capabilities.zones),
@@ -103,8 +103,18 @@ internal fun learningDescriptorsCompatible(
             learnedHtr.copy(
                 leftOrder = observedHtr.leftOrder,
                 rightOrder = observedHtr.rightOrder,
+                blockWrite = observedHtr.blockWrite,
+                pairedWrite = observedHtr.pairedWrite,
             ),
     ) == observed
+}
+
+/** How to write is the cartridge's current knowledge; the binding only owns the calibrated order. */
+private fun LedDescriptor.withWriteCapabilitiesOf(observed: LedDescriptor): LedDescriptor {
+    val learned = this as? SettingsProviderDescriptor ?: return this
+    val learnedHtr = learned.htr3212 ?: return this
+    val observedHtr = (observed as? SettingsProviderDescriptor)?.htr3212 ?: return this
+    return learned.copy(htr3212 = learnedHtr.copy(blockWrite = observedHtr.blockWrite, pairedWrite = observedHtr.pairedWrite))
 }
 
 private fun learnedDeviceId(binding: LearnedDeviceBinding): String =

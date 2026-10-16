@@ -90,6 +90,67 @@ class Htr3212LedDeviceTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `an already applied frame is skipped and the next change goes out at once`() =
+        runTest {
+            val executor = FakePServerExecutor()
+            val device = device(FakeHtrSettingsStore(), executor, pairedWrite = true)
+            val red = List(8) { RgbColor(200, 0, 0) }
+
+            device.applyZones(red, brightness = 100, power = true)
+            runCurrent()
+            advanceTimeBy(100)
+            device.applyZones(red, brightness = 100, power = true)
+            runCurrent()
+            advanceTimeBy(10)
+            device.applyZones(List(8) { RgbColor(0, 0, 200) }, brightness = 100, power = true)
+            runCurrent()
+
+            assertEquals(2, executor.commands.size)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a half failed vendor write is redone when the earlier state comes back`() =
+        runTest {
+            val store = FakeHtrSettingsStore()
+            val device = device(store, FakePServerExecutor(), pairedWrite = true)
+            val colors = List(8) { RgbColor(20, 30, 40) }
+            device.applyZones(colors, brightness = 60, power = true)
+            runCurrent()
+            advanceTimeBy(2_000)
+
+            store.failingKeys += "enabled"
+            device.applyZones(colors, brightness = 70, power = false)
+            runCurrent()
+            store.failingKeys.clear()
+            device.applyZones(colors, brightness = 60, power = true)
+            advanceTimeBy(2_000)
+            runCurrent()
+
+            assertEquals("0.6", store.values["brightness"])
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `paired sticks are written concurrently and either failure fails the frame`() =
+        runTest {
+            val executor = FakePServerExecutor()
+            val device = device(FakeHtrSettingsStore(), executor, pairedWrite = true)
+            device.applyZones(List(8) { RgbColor(20, 30, 40) }, brightness = 70, power = true)
+            runCurrent()
+            val command = executor.commands.single()
+
+            val sequentialMs = Regex("i2cset ").findAll(command).count() * FAKE_I2C_MS
+            val (status, elapsedMs) = runWithFakeI2c(command, failingBus = null)
+            assertEquals(0, status)
+            assertTrue("elapsed=$elapsedMs sequential=$sequentialMs", elapsedMs < sequentialMs * 0.75)
+
+            assertTrue(runWithFakeI2c(command, failingBus = 1).first != 0)
+            assertTrue(runWithFakeI2c(command, failingBus = 0).first != 0)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `power off uses vendor gate and does not relight direct zones`() =
         runTest {
             val store = FakeHtrSettingsStore()
@@ -383,6 +444,7 @@ private class FakeHtrSettingsStore(
 ) : SystemSettingsStore {
     val values = mutableMapOf<String, String>()
     val writes = mutableListOf<Pair<String, String>>()
+    val failingKeys = mutableSetOf<String>()
 
     init {
         if (existingVendorSettings) {
@@ -398,6 +460,7 @@ private class FakeHtrSettingsStore(
 
     override fun put(key: String, value: String): Boolean {
         writes += key to value
+        if (key in failingKeys) return false
         values[key] = value
         return true
     }
@@ -417,4 +480,20 @@ private class FakePServerExecutor(
         failuresRemaining -= 1
         return false
     }
+}
+
+private const val FAKE_I2C_MS = 40
+
+/** Runs a generated command with i2cset replaced by a timed stub; returns exit status and wall time. */
+private fun runWithFakeI2c(
+    command: String,
+    failingBus: Int?,
+): Pair<Int, Long> {
+    val stub =
+        "i2cset() { sleep 0.04; [ \"\$3\" != \"${failingBus ?: -1}\" ]; }; log() { :; }; "
+    val started = System.nanoTime()
+    val process = ProcessBuilder("/bin/sh", "-c", stub + command).redirectErrorStream(true).start()
+    process.inputStream.readBytes()
+    val status = process.waitFor()
+    return status to (System.nanoTime() - started) / 1_000_000
 }
