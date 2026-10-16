@@ -632,7 +632,7 @@ class LightingController(
             val nowSeconds = (clockMs() - startMs) / 1000.0
             val tick = renderer.render(nowSeconds)
             runCatching { binding.device.applyZones(tick.colors, intent.brightness, true) }.rethrowCancellation().also { writeHealth.record(it) }
-            lastFrame = tick.colors
+            lastFrame = tick.previewColors
             publishSnapshot()
             val waitMs = tick.nextDelayMs.coerceAtLeast(1L)
             val wake = renderer.wake

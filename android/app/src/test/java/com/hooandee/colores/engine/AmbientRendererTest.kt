@@ -24,6 +24,7 @@ class AmbientRendererTest {
 
         assertEquals(80L, tick.nextDelayMs)
         assertEquals(source.state.value.colors.map(AmbientColorMath::ledIntensity), tick.colors)
+        assertEquals(source.state.value.colors, tick.previewColors)
     }
 
     @Test
@@ -60,11 +61,11 @@ class AmbientRendererTest {
         renderer.render(0.0)
         source.update(listOf(RgbColor(0, 0, 255)), AmbientCaptureStatus.CAPTURING, 2L)
 
-        val first = renderer.render(0.01).colors.single()
-        val second = renderer.render(0.09).colors.single()
+        val first = renderer.render(0.01).previewColors.single()
+        val second = renderer.render(0.09).previewColors.single()
 
-        assertTrue("first=$first", first.blue >= AmbientColorMath.ledIntensity(RgbColor(0, 0, (0.85 * 255).toInt())).blue)
-        assertTrue("second=$second", second.blue >= AmbientColorMath.ledIntensity(RgbColor(0, 0, (0.97 * 255).toInt())).blue && second.red <= 8)
+        assertTrue("first=$first", first.blue >= 0.85 * 255)
+        assertTrue("second=$second", second.blue >= 0.97 * 255 && second.red <= 8)
     }
 
     @Test
@@ -75,10 +76,9 @@ class AmbientRendererTest {
         renderer.render(0.0)
         source.update(listOf(RgbColor(140, 100, 100)), AmbientCaptureStatus.CAPTURING, 2L)
 
-        val next = renderer.render(0.08).colors.single()
+        val next = renderer.render(0.08).previewColors.single()
 
-        val screenRed = (100 + 40 * (1 - Math.pow(0.45, 0.8))).toInt()
-        assertEquals(AmbientColorMath.ledIntensity(RgbColor(screenRed, 100, 100)).red.toDouble(), next.red.toDouble(), 1.0)
+        assertEquals(100 + 40 * (1 - Math.pow(0.45, 0.8)), next.red.toDouble(), 1.0)
     }
 
     @Test

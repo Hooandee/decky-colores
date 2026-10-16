@@ -203,6 +203,7 @@ class LightingControllerTest {
             assertTrue(gate.running)
             assertTrue(device.writes.size in 10..14)
             assertEquals(ambient.state.value.colors.map(AmbientColorMath::ledIntensity), device.writes.last().colors)
+            assertEquals(ambient.state.value.colors, controller.snapshot.value.currentFrame)
             assertEquals(AmbientCaptureStatus.CAPTURING, controller.snapshot.value.ambient.status)
         }
 

@@ -14,6 +14,8 @@ import kotlin.math.abs
 data class RenderTick(
     val colors: List<RgbColor>,
     val nextDelayMs: Long,
+    /** What the app shows; differs from [colors] only when the LED output is reshaped. */
+    val previewColors: List<RgbColor> = colors,
 )
 
 interface Renderer {
@@ -77,7 +79,7 @@ class AmbientRenderer(
         displayed = frame
         lastSeconds = nowSeconds
         renderedTimestampMs = snapshot.timestampMs
-        return RenderTick(frame.map(AmbientColorMath::ledIntensity), frameIntervalMs)
+        return RenderTick(frame.map(AmbientColorMath::ledIntensity), frameIntervalMs, previewColors = frame)
     }
 
     private fun List<RgbColor>.fit(count: Int): List<RgbColor> {
