@@ -75,6 +75,36 @@ class SingleAdcJoypadLedDeviceTest {
             assertEquals(4, latches())
         }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `a static color is resent after invalidate so the vendor restore cannot stick`() =
+        runTest {
+            val access = FakeSysfsAccess(nodes)
+            val device =
+                SingleAdcJoypadLedDevice(
+                    SingleAdcJoypadDescriptor(base),
+                    access,
+                    backgroundScope,
+                    nowMs = { testScheduler.currentTime },
+                )
+            device.applySolid(RgbColor(255, 0, 0), brightness = 80, power = true)
+            runCurrent()
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            device.invalidate()
+            device.applySolid(RgbColor(255, 0, 0), brightness = 80, power = true)
+            advanceTimeBy(150)
+            runCurrent()
+            access.values["$base/custum_rgb_r"] = "131"
+            access.values["$base/custum_rgb_b"] = "255"
+            advanceTimeBy(400)
+            runCurrent()
+
+            assertEquals("255", access.values["$base/custum_rgb_r"])
+            assertEquals("0", access.values["$base/custum_rgb_b"])
+        }
+
     @Test
     fun `power off drops the switch and still latches`() =
         runTest {

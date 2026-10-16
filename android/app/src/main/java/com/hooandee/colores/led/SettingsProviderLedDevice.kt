@@ -292,8 +292,8 @@ internal class ConflatedLedWriter<T>(
                         }
                     if (succeeded) {
                         health.succeeded()
-                        // Only a new value is paced; a reassert of the same one must not delay the next change.
-                        if (pending != lastWritten) delay(intervalMs)
+                        // A reassert of the same value keeps only a short gap so it cannot hold back the next change.
+                        delay(if (pending != lastWritten) intervalMs else intervalMs / REASSERT_GAP_DIVISOR)
                         lastWritten = pending
                         pending = channel.tryReceive().getOrNull() ?: break
                         failures = 0
@@ -328,6 +328,8 @@ internal class ConflatedLedWriter<T>(
         return null
     }
 }
+
+private const val REASSERT_GAP_DIVISOR = 4
 
 internal fun ledRetryDelayMs(
     baseMs: Long,

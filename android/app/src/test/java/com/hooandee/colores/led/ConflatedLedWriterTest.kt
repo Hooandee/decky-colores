@@ -63,7 +63,7 @@ class ConflatedLedWriterTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun `rewriting the same value does not hold the next change back`() =
+    fun `rewriting the same value holds the next change back only briefly`() =
         runTest {
             val written = mutableListOf<Int>()
             val writer = ConflatedLedWriter<Int>(backgroundScope, 80) {
@@ -79,7 +79,10 @@ class ConflatedLedWriterTest {
             advanceTimeBy(5)
             writer.submit(2)
             runCurrent()
+            assertEquals(listOf(1, 1), written)
 
+            advanceTimeBy(20)
+            runCurrent()
             assertEquals(listOf(1, 1, 2), written)
         }
 
