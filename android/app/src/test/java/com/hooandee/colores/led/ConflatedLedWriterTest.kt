@@ -63,6 +63,28 @@ class ConflatedLedWriterTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
+    fun `rewriting the same value does not hold the next change back`() =
+        runTest {
+            val written = mutableListOf<Int>()
+            val writer = ConflatedLedWriter<Int>(backgroundScope, 80) {
+                written += it
+                true
+            }
+
+            writer.submit(1)
+            runCurrent()
+            advanceTimeBy(100)
+            writer.submit(1)
+            runCurrent()
+            advanceTimeBy(5)
+            writer.submit(2)
+            runCurrent()
+
+            assertEquals(listOf(1, 1, 2), written)
+        }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
     fun `retries a failed latest value after a longer delay`() =
         runTest {
             var failuresRemaining = 1

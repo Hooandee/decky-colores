@@ -1,5 +1,6 @@
 package com.hooandee.colores.led
 
+import android.os.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,6 +19,7 @@ class SingleAdcJoypadLedDevice internal constructor(
     private val descriptor: SingleAdcJoypadDescriptor,
     private val access: SysfsAccess,
     scope: CoroutineScope,
+    private val nowMs: () -> Long = SystemClock::elapsedRealtime,
 ) : LedDevice {
     constructor(
         descriptor: SingleAdcJoypadDescriptor,
@@ -27,7 +29,20 @@ class SingleAdcJoypadLedDevice internal constructor(
     override val recommendedFrameIntervalMs: Long =
         if (descriptor.vendorEffects) WRITE_INTERVAL_MS else CONSERVATIVE_FRAME_INTERVAL_MS
 
-    private val writer = ConflatedLedWriter(scope, label = "singleadc", intervalMs = recommendedFrameIntervalMs, write = ::writeFrame)
+    @Volatile
+    private var applied: Frame? = null
+
+    @Volatile
+    private var appliedAtMs = 0L
+
+    private val writer =
+        ConflatedLedWriter(
+            scope,
+            label = "singleadc",
+            intervalMs = recommendedFrameIntervalMs,
+            unchanged = ::alreadyApplied,
+            write = ::writeFrame,
+        )
 
     override val available: Boolean
         get() = access.canWrite(node("custum_rgb_r")) && access.canWrite(node("led_set"))
@@ -108,9 +123,21 @@ class SingleAdcJoypadLedDevice internal constructor(
 
     override suspend fun close() = writer.close()
 
-    override fun invalidate() = Unit
+    override fun invalidate() {
+        applied = null
+    }
 
-    private fun writeFrame(frame: Frame): Boolean {
+    // The vendor service restores its own color about 0.1 s after every screen-on, so a repeated
+    // frame is still rewritten periodically rather than trusted forever.
+    private fun alreadyApplied(frame: Frame): Boolean = frame == applied && nowMs() - appliedAtMs < REASSERT_MS
+
+    private fun writeFrame(frame: Frame): Boolean =
+        writeNodes(frame).also { succeeded ->
+            applied = frame.takeIf { succeeded }
+            appliedAtMs = nowMs()
+        }
+
+    private fun writeNodes(frame: Frame): Boolean {
         var succeeded = true
         fun put(
             name: String,
@@ -180,6 +207,7 @@ class SingleAdcJoypadLedDevice internal constructor(
     private companion object {
         const val WRITE_INTERVAL_MS = 80L
         const val CONSERVATIVE_FRAME_INTERVAL_MS = 200L
+        const val REASSERT_MS = 250L
         const val STATIC_MODE = 1
         const val MAX_SPEED = 8
 

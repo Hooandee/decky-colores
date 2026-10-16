@@ -271,6 +271,7 @@ internal class ConflatedLedWriter<T>(
 
     private val worker =
         scope.launch {
+            var lastWritten: T? = null
             for (value in channel) {
                 var pending = value
                 var failures = 0
@@ -291,7 +292,9 @@ internal class ConflatedLedWriter<T>(
                         }
                     if (succeeded) {
                         health.succeeded()
-                        delay(intervalMs)
+                        // Only a new value is paced; a reassert of the same one must not delay the next change.
+                        if (pending != lastWritten) delay(intervalMs)
+                        lastWritten = pending
                         pending = channel.tryReceive().getOrNull() ?: break
                         failures = 0
                         continue
