@@ -136,9 +136,8 @@ object AmbientColorMath {
     }
 
     /**
-     * LEDs emit linearly while a screen applies the sRGB curve, so a dark scene would glow pale
-     * white. The curve is applied to the brightest channel and the others scale with it, which
-     * darkens shadows without shifting the hue of saturated colors.
+     * LEDs are linear while screens apply the sRGB curve, so dark scenes would glow pale white.
+     * Curving only the brightest channel and scaling the rest keeps the hue.
      */
     fun ledIntensity(color: RgbColor): RgbColor {
         val peak = maxOf(color.red, color.green, color.blue).coerceIn(0, 255)
