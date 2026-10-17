@@ -2,6 +2,7 @@ package com.hooandee.colores.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,54 +53,68 @@ fun ColoresScreen(
                 viewModel.openHardwareLearning()
             },
             onForgetLearnedHardware = viewModel::forgetLearnedHardware,
+            onColorCalibrationPreview = viewModel::previewColorCalibration,
+            onColorCalibrationSave = viewModel::setColorCalibration,
+            styleActions =
+                StyleActions(
+                    onOpen = viewModel::loadStyles,
+                    onSave = viewModel::saveStyle,
+                    onApply = viewModel::applyStyle,
+                    onDelete = viewModel::deleteStyle,
+                    onExport = viewModel::exportStyles,
+                    onImport = viewModel::importStyles,
+                ),
         )
     } else {
-        DashboardScreen(
-            state = state,
-            onGrantPermission = onGrantPermission,
-            onPowerChange = viewModel::setPower,
-            onTargetChange = viewModel::selectTarget,
-            onColorChange = viewModel::setEditingColor,
-            onSaturationChange = viewModel::setSaturation,
-            onBrightnessChange = viewModel::setBrightness,
-            onOpenProfiles = viewModel::openProfilePicker,
-            onOpenSettings = { settingsOpen = true },
-            onOpenHardwareLearning = viewModel::openHardwareLearning,
-            onOpenHardwareLearningReport = viewModel::openHardwareLearningReport,
-            onOpenCompatibilityReport = { compatibilityReportOpen = true },
-            gradientActions =
-                GradientActions(
-                    onStopChange = viewModel::selectGradientStop,
-                    onPresetChange = viewModel::selectGradientPreset,
-                    onSavedChange = viewModel::selectSavedGradient,
-                    onRestore = viewModel::restoreGradientPreset,
-                    onSave = viewModel::saveGradient,
-                    onDelete = viewModel::deleteGradient,
-                    onColorChange = viewModel::setEditingColor,
-                    onSaturationChange = viewModel::setSaturation,
-                    onSpeedChange = viewModel::setGradientSpeed,
-                    onEditingChange = viewModel::setGradientEditing,
-                ),
-            modeActions =
-                ModeActions(
-                    onModeChange = viewModel::setAppMode,
-                    onSensorModeChange = viewModel::selectSensorMode,
-                    onEffectSelect = viewModel::selectEffect,
-                    onSpeedChange = viewModel::setSpeed,
-                    onEffectGradientChange = viewModel::setEffectUsesGradient,
-                    onBatteryBreatheChange = viewModel::setBatteryBreathe,
-                    onTemperatureBreatheChange = viewModel::setTemperatureBreathe,
-                    onSensorBandsChange = viewModel::setSensorBands,
-                    onAudioScaleChange = viewModel::setAudioScale,
-                    onAudioSensitivityChange = viewModel::setAudioSensitivity,
-                    onAudioCaptureRequest = onAudioCaptureRequest,
-                    onAmbientCaptureRequest = onAmbientCaptureRequest,
-                    onAmbientCaptureFpsChange = viewModel::setAmbientCaptureFps,
-                    onAmbientSamplingModeChange = viewModel::setAmbientSamplingMode,
-                    onAmbientVividnessChange = viewModel::setAmbientVividness,
-                    onAmbientSmoothingChange = viewModel::setAmbientSmoothing,
-                ),
-        )
+        CompositionLocalProvider(LocalSmartBrightnessChange provides viewModel::setSmartBrightness) {
+            DashboardScreen(
+                state = state,
+                onGrantPermission = onGrantPermission,
+                onPowerChange = viewModel::setPower,
+                onTargetChange = viewModel::selectTarget,
+                onColorChange = viewModel::setEditingColor,
+                onSaturationChange = viewModel::setSaturation,
+                onBrightnessChange = viewModel::setBrightness,
+                onOpenProfiles = viewModel::openProfilePicker,
+                onOpenSettings = { settingsOpen = true },
+                onOpenHardwareLearning = viewModel::openHardwareLearning,
+                onOpenHardwareLearningReport = viewModel::openHardwareLearningReport,
+                onOpenCompatibilityReport = { compatibilityReportOpen = true },
+                gradientActions =
+                    GradientActions(
+                        onStopChange = viewModel::selectGradientStop,
+                        onPresetChange = viewModel::selectGradientPreset,
+                        onSavedChange = viewModel::selectSavedGradient,
+                        onRestore = viewModel::restoreGradientPreset,
+                        onSave = viewModel::saveGradient,
+                        onDelete = viewModel::deleteGradient,
+                        onColorChange = viewModel::setEditingColor,
+                        onSaturationChange = viewModel::setSaturation,
+                        onSpeedChange = viewModel::setGradientSpeed,
+                        onEditingChange = viewModel::setGradientEditing,
+                    ),
+                modeActions =
+                    ModeActions(
+                        onModeChange = viewModel::setAppMode,
+                        onSensorModeChange = viewModel::selectSensorMode,
+                        onEffectSelect = viewModel::selectEffect,
+                        onSpeedChange = viewModel::setSpeed,
+                        onEffectGradientChange = viewModel::setEffectUsesGradient,
+                        onBatteryBreatheChange = viewModel::setBatteryBreathe,
+                        onTemperatureBreatheChange = viewModel::setTemperatureBreathe,
+                        onSensorBandsChange = viewModel::setSensorBands,
+                        onAudioScaleChange = viewModel::setAudioScale,
+                        onAudioSensitivityChange = viewModel::setAudioSensitivity,
+                        onAudioCaptureRequest = onAudioCaptureRequest,
+                        onAmbientCaptureRequest = onAmbientCaptureRequest,
+                        onAmbientCaptureFpsChange = viewModel::setAmbientCaptureFps,
+                        onAmbientSamplingModeChange = viewModel::setAmbientSamplingMode,
+                        onAmbientVividnessChange = viewModel::setAmbientVividness,
+                        onAmbientSmoothingChange = viewModel::setAmbientSmoothing,
+                        onAmbientAudioChange = viewModel::setAmbientAudio,
+                    ),
+            )
+        }
     }
     if (state.profilePickerOpen) {
         AppProfilesDialog(

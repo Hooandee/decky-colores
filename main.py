@@ -1,7 +1,9 @@
 import asyncio
 import json
+import math
 import os
 import pwd
+import stat
 import time
 
 import decky
@@ -22,8 +24,17 @@ from power_supply import charger_online, battery_level
 from thermal import apu_temperature
 from performance import gpu_busy_percent, CpuSampler
 from saved_gradients import upsert_gradient, remove_gradient
+import styles as saved_styles
 from hhd_rgb_control import HhdRgbControl
 from suspend_monitor import SuspendMonitor
+from screen_brightness import (
+    FactorRamp,
+    has_backlight,
+    led_brightness,
+    perceived_level,
+    read_backlight,
+)
+from color_calibration import NEUTRAL as NEUTRAL_CALIBRATION, Calibration, parse_steps
 import self_updater
 import device_tree
 import journal
@@ -50,8 +61,9 @@ DEFAULTS = {
     "gradient": [[0, 196, 255], [136, 86, 255]],
     "gradient_speed": 30,
     "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
-    "ambilight": {"vividness": 27, "smoothing": 75, "fps": 10, "sampling": "columns"},
+    "ambilight": {"vividness": 27, "smoothing": 75, "fps": 10, "sampling": "columns", "audio": False},
     "saved_gradients": [],
+    "styles": [],
     "enabled_experiments": [],
     "power_led_off": False,
     "power_led_awake_off": None,
@@ -65,6 +77,8 @@ DEFAULTS = {
     "sensor_bands": dict(SENSOR_BAND_DEFAULTS),
     "remember_startup": True,
     "startup_factory": None,
+    "smart_brightness": False,
+    "color_calibration": dict(NEUTRAL_CALIBRATION),
 }
 
 PROFILE_KEYS = (
@@ -82,6 +96,17 @@ PROFILE_DEFAULTS = {key: DEFAULTS[key] for key in PROFILE_KEYS}
 GLOBAL_KEYS = tuple(key for key in DEFAULTS if key not in PROFILE_KEYS)
 
 CHARGER_POLL_INTERVAL = 3.0
+
+SCREEN_POLL_INTERVAL = 0.2
+SCREEN_IDLE_INTERVAL = 1.0
+SCREEN_RAMP_SECONDS = 0.4
+SCREEN_CHANGE_EPS = 0.005
+SCREEN_MAX_RAMP_FPS = 30
+CALIBRATION_PREVIEW_TIMEOUT = 90.0
+AURORA_FLOOR = 0.25
+STYLES_FILE_LIMIT = 256 * 1024
+STYLES_FILE_NAME = "colores-estilos.json"
+STYLES_EXPORT_FOLDERS = ("Documents", "Colores")
 
 STARTUP_PERSIST_DELAY = 1.0
 
@@ -103,6 +128,12 @@ STOCK_HOSTNAMES = frozenset({"localhost", "steamdeck", "armada"})
 
 def _rgb(values):
     return {"r": values[0], "g": values[1], "b": values[2]}
+
+
+def _clamp_channel(value) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError("invalid calibration sample")
+    return max(0, min(255, int(value)))
 
 
 def _saved(entry):
@@ -195,6 +226,75 @@ def _normalize_ambilight_settings(settings: dict | None) -> dict:
     return normalized
 
 
+def _read_power_state():
+    return battery_level(), apu_temperature(), charger_online()
+
+
+def _styles_export_path() -> str:
+    return os.path.join(_user_home(), *STYLES_EXPORT_FOLDERS, STYLES_FILE_NAME)
+
+
+def _user_home() -> str:
+    return getattr(decky, "DECKY_USER_HOME", None) or os.path.expanduser(f"~{decky.DECKY_USER}")
+
+
+def _write_user_file(path: str, payload: str) -> None:
+    # Root writes into a user-owned tree: walk it with directory fds and O_NOFOLLOW so a
+    # planted symlink or hard link can't redirect the write elsewhere.
+    _, uid, gid = _user_creds()
+    folders = os.path.relpath(os.path.dirname(path), _user_home()).split(os.sep)
+    if any(part in ("", ".", "..") for part in folders):
+        raise ValueError("styles path outside the user home")
+    directory = os.open(_user_home(), os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in folders:
+            try:
+                os.mkdir(part, 0o755, dir_fd=directory)
+                if uid is not None and gid is not None:
+                    os.chown(part, uid, gid, dir_fd=directory, follow_symlinks=False)
+            except FileExistsError:
+                pass
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        name = os.path.basename(path)
+        temporary = f".{name}.{os.getpid()}.tmp"
+        handle = os.open(
+            temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644, dir_fd=directory
+        )
+        try:
+            data = memoryview(payload.encode("utf-8"))
+            while data:
+                data = data[os.write(handle, data):]
+            os.fsync(handle)
+            if uid is not None and gid is not None:
+                os.fchown(handle, uid, gid)
+        except BaseException:
+            os.close(handle)
+            os.unlink(temporary, dir_fd=directory)
+            raise
+        os.close(handle)
+        os.replace(temporary, name, src_dir_fd=directory, dst_dir_fd=directory)
+    finally:
+        os.close(directory)
+
+
+def _read_styles_file(path: str) -> str:
+    if not path.lower().endswith(".json"):
+        raise ValueError("not a Colores styles file")
+    try:
+        handle = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except OSError as error:
+        raise ValueError("not a Colores styles file") from error
+    with os.fdopen(handle, "rb") as stream:
+        if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+            raise ValueError("not a Colores styles file")
+        data = stream.read(STYLES_FILE_LIMIT + 1)
+    if len(data) > STYLES_FILE_LIMIT:
+        raise ValueError("styles file too big")
+    return data.decode("utf-8")
+
+
 def _user_creds():
     try:
         entry = pwd.getpwnam(decky.DECKY_USER)
@@ -204,6 +304,7 @@ def _user_creds():
 
 
 class Plugin:
+
     def _init(self) -> None:
         if getattr(self, "_ready", False):
             return
@@ -231,6 +332,10 @@ class Plugin:
         legacy["sensor_bands"] = _normalize_sensor_settings(
             legacy.get("sensor_bands")
         )
+        try:
+            legacy["color_calibration"] = parse_steps(legacy.get("color_calibration"))
+        except ValueError:
+            legacy["color_calibration"] = dict(NEUTRAL_CALIBRATION)
         self._base_settings = dict(legacy)
         self._profiles = LightingProfileStore(
             os.path.join(decky.DECKY_PLUGIN_SETTINGS_DIR, "profiles.json"),
@@ -244,6 +349,11 @@ class Plugin:
         level = battery_level()
         self._battery_level = 100 if level is None else level
         self._apu_temp = apu_temperature()
+        self._screen_ramp = FactorRamp(SCREEN_RAMP_SECONDS)
+        self._screen_level = (
+            read_backlight() if self._capabilities.get("screenBrightness") else None
+        )
+        self._screen_ramp.snap(self._screen_target())
         self._apply_power_led()
         self._apply_sleep_charging_indicator()
         self._capture_startup_factory()
@@ -264,7 +374,7 @@ class Plugin:
 
     def _setup_device(self, ctx: dict) -> None:
         self._device = ctx["info"]
-        self._capabilities = ctx["capabilities"]
+        self._capabilities = {**ctx["capabilities"], "screenBrightness": has_backlight()}
         self._zones = self._capabilities.get("zones", 1) or 1
         self._controller = ctx["device"]
         self._power_led = ctx.get("power_led")
@@ -764,6 +874,10 @@ class Plugin:
                 for sensor in SENSOR_BAND_DEFAULTS
             },
             "rememberStartup": s.get("remember_startup", True),
+            "smartBrightness": bool(s.get("smart_brightness", False)),
+            "colorCalibration": dict(self._calibration().steps),
+            "styles": self._styles(),
+            "stylesFolder": os.path.dirname(_styles_export_path()),
             "profileContext": self._profile_state(
                 "game" if self._current_app_key else "global",
                 self._current_app_key,
@@ -781,6 +895,125 @@ class Plugin:
         if on:
             self._ac_online = charger_online()
         self._save_and_apply()
+
+    async def set_smart_brightness(self, on: bool) -> None:
+        self._init()
+        if not self._capabilities.get("screenBrightness"):
+            return
+        self._settings["smart_brightness"] = bool(on)
+        self._persist_settings()
+        if on:
+            self._screen_level = await asyncio.to_thread(read_backlight)
+        self._retarget_screen()
+
+    async def preview_color_calibration(self, steps=None, color=None) -> None:
+        self._init()
+        self._cancel_calibration_expiry()
+        if steps is None:
+            self._calibration_preview = None
+            self._apply()
+            self._maybe_persist_startup()
+            return
+        sample = (255, 255, 255) if color is None else tuple(color)
+        if len(sample) != 3:
+            raise ValueError("invalid calibration sample")
+        self._calibration_preview = (
+            Calibration(steps),
+            tuple(_clamp_channel(channel) for channel in sample),
+        )
+        self._calibration_expiry_task = asyncio.get_running_loop().create_task(
+            self._expire_calibration_preview()
+        )
+        self._show_calibration_preview()
+
+    def _cancel_calibration_expiry(self) -> None:
+        task = getattr(self, "_calibration_expiry_task", None)
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+        self._calibration_expiry_task = None
+
+    async def _expire_calibration_preview(self) -> None:
+        await asyncio.sleep(CALIBRATION_PREVIEW_TIMEOUT)
+        self._calibration_expiry_task = None
+        self._calibration_preview = None
+        self._apply()
+
+    async def set_color_calibration(self, steps) -> dict:
+        self._init()
+        parsed = parse_steps(steps)
+        self._settings["color_calibration"] = parsed
+        self._persist_settings()
+        self._calibration_preview = None
+        self._cancel_calibration_expiry()
+        self._journal_state("color_calibration", **parsed)
+        self._apply()
+        self._maybe_persist_startup()
+        return dict(parsed)
+
+    def _styles(self) -> list:
+        valid = []
+        for entry in self._settings.get("styles", []):
+            try:
+                valid.append(saved_styles.parse_style(entry))
+            except ValueError:
+                continue
+        return valid
+
+    def _store_styles(self, styles: list) -> list:
+        self._settings["styles"] = styles
+        self._persist_settings()
+        return styles
+
+    async def save_style(self, scope: str, app_key, name: str) -> list:
+        self._init()
+        profile = (
+            self._profiles.editable(scope, app_key) if hasattr(self, "_profiles") else self._settings
+        )
+        style = saved_styles.from_profile(name, profile)
+        merged, added, replaced = saved_styles.merge_styles(self._styles(), [style])
+        if not added and not replaced:
+            raise ValueError("styles full")
+        return self._store_styles(merged)
+
+    async def apply_style(self, scope: str, app_key, name: str) -> dict:
+        self._init()
+        style = next(
+            (entry for entry in self._styles() if entry["name"].casefold() == str(name).casefold()),
+            None,
+        )
+        if style is None:
+            raise ValueError("unknown style")
+        return await self.patch_profile(scope, app_key, saved_styles.to_profile_changes(style))
+
+    async def delete_style(self, name: str) -> list:
+        self._init()
+        return self._store_styles(saved_styles.remove_style(self._styles(), str(name)))
+
+    async def export_styles(self) -> dict:
+        self._init()
+        styles = self._styles()
+        path = _styles_export_path()
+        payload = json.dumps(saved_styles.export_document(styles), ensure_ascii=False, indent=2)
+        await asyncio.to_thread(_write_user_file, path, payload)
+        return {"path": path, "count": len(styles)}
+
+    async def import_styles(self, path: str) -> dict:
+        self._init()
+        text = await asyncio.to_thread(_read_styles_file, str(path))
+        try:
+            document = json.loads(text)
+        except (ValueError, RecursionError) as error:
+            raise ValueError("not a Colores styles file") from error
+        incoming, skipped = saved_styles.import_document(document)
+        merged, added, replaced = saved_styles.merge_styles(self._styles(), incoming)
+        self._store_styles(merged)
+        return {
+            "styles": merged,
+            "imported": [style["name"] for style in incoming],
+            "added": added,
+            "replaced": replaced,
+            "skipped": skipped,
+        }
 
     async def set_force_control(self, on: bool) -> None:
         self._init()
@@ -987,6 +1220,7 @@ class Plugin:
             self._journal_state("suspend", changed_only=False, mode=mode)
             if mode == "ambient":
                 await self._ambilight.stop_and_wait()
+                self._audio.stop()
                 decky.logger.info("Colores: ambilight capture stopped for suspend")
                 return
             if mode != "vu" and self._wants_render_loop():
@@ -1111,6 +1345,10 @@ class Plugin:
             return
         if self._settings.get("mode") not in ("solid", "gradient"):
             return
+        if self._screen_target() < 1.0:
+            return
+        if getattr(self, "_calibration_preview", None) is not None:
+            return
         if not hasattr(self._controller, "save_startup"):
             return
         task = getattr(self, "_startup_task", None)
@@ -1127,11 +1365,156 @@ class Plugin:
         except Exception as error:
             decky.logger.warning("Colores: startup persist failed: %s", error)
 
+    def _screen_target(self) -> float:
+        level = getattr(self, "_screen_level", None)
+        if not self._settings.get("smart_brightness") or level is None:
+            return 1.0
+        return perceived_level(level)
+
+    def _led_brightness(self) -> int:
+        ramp = getattr(self, "_screen_ramp", None)
+        factor = 1.0 if ramp is None else ramp.value(time.monotonic())
+        return led_brightness(self._settings["brightness"], factor)
+
+    def _on_screen_level(self, level) -> None:
+        if level is None:
+            self._journal_state("screen_brightness", available=False)
+            return
+        self._screen_level = level
+        self._retarget_screen()
+        self._journal_state(
+            "screen_brightness",
+            available=True,
+            pct=round(perceived_level(level) * 10) * 10,
+            led=round(led_brightness(self._settings["brightness"], self._screen_target()), -1),
+        )
+
+    def _retarget_screen(self) -> None:
+        ramp = getattr(self, "_screen_ramp", None)
+        if ramp is None:
+            return
+        target = self._screen_target()
+        if abs(target - ramp.target) < SCREEN_CHANGE_EPS:
+            return
+        ramp.set_target(target, time.monotonic())
+        task = getattr(self, "_screen_ramp_task", None)
+        if task is None or task.done():
+            self._screen_ramp_task = asyncio.get_running_loop().create_task(
+                self._run_screen_ramp()
+            )
+
+    def _screen_ramp_interval(self) -> float:
+        fps = self._capabilities.get("maxRenderFps", SCREEN_MAX_RAMP_FPS) or 1
+        return 1.0 / max(1, min(SCREEN_MAX_RAMP_FPS, fps))
+
+    async def _run_screen_ramp(self) -> None:
+        interval = self._screen_ramp_interval()
+        try:
+            while True:
+                settled = self._screen_ramp.settled(time.monotonic())
+                self._refresh_led_brightness(final=settled)
+                if settled:
+                    return
+                await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            decky.logger.warning("Colores: smart brightness ramp failed: %s", error)
+
+    def _refresh_led_brightness(self, final: bool) -> None:
+        if getattr(self, "_calibration_preview", None) is not None:
+            self._show_calibration_preview()
+            return
+        if self._suspend_prepared or self._stopping or not self._effective_power():
+            return
+        if self._controller.supports_hardware_effects() and not self._wants_render_loop():
+            if self._settings["mode"] == "effect" and not final:
+                return
+            self._apply_hardware()
+            return
+        frame = getattr(self, "_last_frame", None)
+        if frame is None:
+            return
+        since = time.monotonic() - getattr(self, "_last_render_at", 0.0)
+        if not final and since < self._screen_ramp_interval() * 0.75:
+            return
+        self._render(frame)
+
+    async def _screen_brightness_watch(self) -> None:
+        failed = False
+        while True:
+            try:
+                if self._settings.get("smart_brightness") and not self._suspend_prepared:
+                    self._on_screen_level(await asyncio.to_thread(read_backlight))
+                    failed = False
+                    await asyncio.sleep(SCREEN_POLL_INTERVAL)
+                else:
+                    await asyncio.sleep(SCREEN_IDLE_INTERVAL)
+            except asyncio.CancelledError:
+                raise
+            except Exception as error:
+                if not failed:
+                    decky.logger.warning("Colores: screen brightness read failed: %s", error)
+                    failed = True
+                await asyncio.sleep(SCREEN_IDLE_INTERVAL)
+
+    def _calibration(self) -> Calibration:
+        try:
+            steps = parse_steps(self._settings.get("color_calibration", NEUTRAL_CALIBRATION))
+        except ValueError:
+            steps = dict(NEUTRAL_CALIBRATION)
+        cached = getattr(self, "_calibration_cache", None)
+        if cached is None or cached.steps != steps:
+            cached = Calibration(steps)
+            self._calibration_cache = cached
+        return cached
+
+    def _calibrated(self, zone_colors) -> list:
+        return self._calibration().apply_all(zone_colors)
+
+    def _show_calibration_preview(self) -> None:
+        if getattr(self, "_suspend_prepared", False):
+            return
+        calibration, sample = self._calibration_preview
+        self._ambilight.stop()
+        self._audio.stop()
+        self._engine.stop()
+        self._controller.apply_zones(
+            [calibration.apply(sample)] * self._zones, max(1, self._led_brightness()), True
+        )
+
+    def _aurora_active(self) -> bool:
+        s = self._settings
+        return s["mode"] == "ambient" and bool(s.get("ambilight", {}).get("audio"))
+
+    def _on_aurora_level(self, _level) -> None:
+        frame = getattr(self, "_aurora_frame", None)
+        if frame is None or not self._aurora_active():
+            return
+        fps = max(1, self._capabilities.get("maxRenderFps", 30) or 1)
+        if time.monotonic() - getattr(self, "_last_render_at", 0.0) < 1.0 / fps:
+            return
+        self._render(frame)
+
     def _render(self, zone_colors) -> None:
         if getattr(self, "_suspend_prepared", False):
             return
+        if getattr(self, "_calibration_preview", None) is not None:
+            return
+        self._last_frame = zone_colors
+        self._last_render_at = time.monotonic()
+        aurora = self._aurora_active()
+        if aurora:
+            self._aurora_frame = zone_colors
+        zone_colors = self._calibrated(zone_colors)
+        if aurora and self._audio.status == "running":
+            factor = AURORA_FLOOR + (1.0 - AURORA_FLOOR) * self._audio.level
+            zone_colors = [
+                tuple(math.floor(channel * factor + 0.5) for channel in color)
+                for color in zone_colors
+            ]
         self._controller.apply_zones(
-            zone_colors, self._settings["brightness"], self._effective_power()
+            zone_colors, self._led_brightness(), self._effective_power()
         )
         self._journal_hw(zone_colors)
 
@@ -1163,7 +1546,12 @@ class Plugin:
     def _apply(self) -> None:
         if getattr(self, "_suspend_prepared", False):
             return
+        self._last_frame = None
+        if getattr(self, "_calibration_preview", None) is not None:
+            self._show_calibration_preview()
+            return
         self._journal_mode()
+        self._aurora_frame = None
         if self._controller.supports_hardware_effects() and not self._wants_render_loop():
             self._apply_hardware()
             return
@@ -1174,7 +1562,7 @@ class Plugin:
         self._ambilight.stop()
         self._audio.stop()
         self._engine.stop()
-        brightness = s["brightness"]
+        brightness = self._led_brightness()
         power = self._effective_power()
         if not power:
             self._controller.apply_solid((0, 0, 0), 0, False)
@@ -1183,17 +1571,21 @@ class Plugin:
             effect = s["effect"]
             self._controller.apply_hardware_effect(
                 effect["id"],
-                tuple(s["color"]),
+                self._calibration().apply(tuple(s["color"])),
                 effect["speed"],
                 brightness,
                 power,
             )
         elif s["mode"] == "gradient":
             self._controller.apply_zones(
-                interpolate_gradient([tuple(c) for c in s["gradient"]], self._zones), brightness, power
+                self._calibrated(interpolate_gradient([tuple(c) for c in s["gradient"]], self._zones)),
+                brightness,
+                power,
             )
         else:
-            self._controller.apply_solid(tuple(s["color"]), brightness, power)
+            self._controller.apply_solid(
+                self._calibration().apply(tuple(s["color"])), brightness, power
+            )
         self._journal_hw(s["mode"])
 
     def _apply_per_zone(self) -> None:
@@ -1205,9 +1597,12 @@ class Plugin:
             return
 
         if s["mode"] == "ambient":
-            self._audio.stop()
             self._engine.stop()
             amb = s["ambilight"]
+            if amb.get("audio"):
+                self._audio.start({"on_level": self._on_aurora_level})
+            else:
+                self._audio.stop()
             self._ambilight.start(
                 {
                     "saturation": 1.0 + (amb["vividness"] / 100) * 1.5,
@@ -1291,6 +1686,8 @@ class Plugin:
         self._apply()
         self._reassert_task = asyncio.create_task(self._acquire_and_reassert())
         self._charger_task = asyncio.create_task(self._charger_watch())
+        if self._capabilities.get("screenBrightness"):
+            self._screen_task = asyncio.create_task(self._screen_brightness_watch())
         self._resume_task = asyncio.create_task(self._resume_watch())
         if self._capabilities.get("conflictsWithSystemRgb"):
             self._force_control_task = asyncio.create_task(self._force_control_watch())
@@ -1306,13 +1703,11 @@ class Plugin:
         try:
             while True:
                 await asyncio.sleep(CHARGER_POLL_INTERVAL)
-                level = battery_level()
+                level, temp, online = await asyncio.to_thread(_read_power_state)
                 if level is not None:
                     self._battery_level = level
-                temp = apu_temperature()
                 if temp is not None:
                     self._apu_temp = temp
-                online = charger_online()
                 self._journal_runtime()
                 if online != getattr(self, "_ac_online", True):
                     self._ac_online = online
@@ -1435,6 +1830,9 @@ class Plugin:
             "_force_control_task",
             "_startup_task",
             "_journal_context_task",
+            "_screen_task",
+            "_screen_ramp_task",
+            "_calibration_expiry_task",
         ):
             task = getattr(self, attr, None)
             if task:

@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.hooandee.colores.R
 import com.hooandee.colores.control.AppMode
+import com.hooandee.colores.engine.ColorCalibration
 import com.hooandee.colores.led.RgbColor
 import com.hooandee.colores.profiles.ConfiguredProfile
 import com.hooandee.colores.profiles.ProfileAutomationStatus
@@ -90,8 +91,13 @@ fun SettingsScreen(
     onReportOpen: () -> Unit = {},
     onOpenHardwareLearning: () -> Unit,
     onForgetLearnedHardware: () -> Unit,
+    onColorCalibrationPreview: (ColorCalibration?, RgbColor) -> Unit = { _, _ -> },
+    onColorCalibrationSave: (ColorCalibration) -> Unit = {},
+    styleActions: StyleActions = StyleActions(),
 ) {
     var reportOpen by remember { mutableStateOf(false) }
+    var calibrationOpen by remember { mutableStateOf(false) }
+    var stylesOpen by remember { mutableStateOf(false) }
     var usageDisclosureOpen by remember { mutableStateOf(false) }
     var legalOpen by remember { mutableStateOf(false) }
     PrismaticBackdrop(modifier = Modifier.fillMaxSize()) {
@@ -124,6 +130,8 @@ fun SettingsScreen(
                                     selected = AppLanguage.fromLanguageTag(currentLanguageTag),
                                     onSelected = onLanguageChange,
                                     onChargerOnlyChange = onChargerOnlyChange,
+                                    onCalibrateColor = { calibrationOpen = true },
+                                    onOpenStyles = { stylesOpen = true },
                                     onProfileAutomationChange = onProfileAutomationChange,
                                     onGrantUsage = { usageDisclosureOpen = true },
                                 )
@@ -183,6 +191,8 @@ fun SettingsScreen(
                             selected = AppLanguage.fromLanguageTag(currentLanguageTag),
                             onSelected = onLanguageChange,
                             onChargerOnlyChange = onChargerOnlyChange,
+                            onCalibrateColor = { calibrationOpen = true },
+                            onOpenStyles = { stylesOpen = true },
                             onProfileAutomationChange = onProfileAutomationChange,
                             onGrantUsage = { usageDisclosureOpen = true },
                         )
@@ -252,6 +262,23 @@ fun SettingsScreen(
     }
     if (legalOpen) {
         LegalDialog(onDismiss = { legalOpen = false })
+    }
+    if (calibrationOpen) {
+        ColorCalibrationDialog(
+            initial = state.colorCalibration,
+            onPreview = onColorCalibrationPreview,
+            onSave = onColorCalibrationSave,
+            onDismiss = { calibrationOpen = false },
+        )
+    }
+    if (stylesOpen) {
+        StylesDialog(
+            styles = state.styles,
+            notice = state.styleNotice,
+            enabled = state.canWrite,
+            actions = styleActions,
+            onDismiss = { stylesOpen = false },
+        )
     }
 }
 
@@ -483,6 +510,8 @@ private fun ApplicationCard(
     selected: AppLanguage,
     onSelected: (AppLanguage) -> Unit,
     onChargerOnlyChange: (Boolean) -> Unit,
+    onCalibrateColor: () -> Unit,
+    onOpenStyles: () -> Unit,
     onProfileAutomationChange: (Boolean) -> Unit,
     onGrantUsage: () -> Unit,
 ) {
@@ -513,6 +542,18 @@ private fun ApplicationCard(
             enabled = state.canWrite,
             onCheckedChange = onChargerOnlyChange,
         )
+        if (state.canWrite) {
+            SettingsLinkRow(
+                title = stringResource(R.string.color_calibration_title),
+                description = stringResource(R.string.color_calibration_description),
+                onClick = onCalibrateColor,
+            )
+            SettingsLinkRow(
+                title = stringResource(R.string.styles_title),
+                description = stringResource(R.string.styles_description),
+                onClick = onOpenStyles,
+            )
+        }
         SettingsToggleRow(
             title = stringResource(R.string.profile_auto_title),
             description = automationStatusLabel(state.automationStatus),
@@ -622,6 +663,27 @@ private fun SettingsToggleRow(
             }
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled, colors = glassSwitchColors())
+    }
+}
+
+@Composable
+private fun SettingsLinkRow(
+    title: String,
+    description: String,
+    onClick: () -> Unit,
+) {
+    Surface(onClick = onClick, color = Color.Transparent, shape = RoundedCornerShape(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.SemiBold)
+                Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("›", style = MaterialTheme.typography.titleLarge)
+        }
     }
 }
 

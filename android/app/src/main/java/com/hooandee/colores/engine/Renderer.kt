@@ -16,7 +16,17 @@ data class RenderTick(
     val nextDelayMs: Long,
     /** What the app shows; differs from [colors] only when the LED output is reshaped. */
     val previewColors: List<RgbColor> = colors,
+    val intensity: Double = 1.0,
 )
+
+internal fun List<RgbColor>.scaled(factor: Double): List<RgbColor> =
+    if (factor >= 1.0) {
+        this
+    } else {
+        map { RgbColor(it.red.scaledBy(factor), it.green.scaledBy(factor), it.blue.scaledBy(factor)) }
+    }
+
+private fun Int.scaledBy(factor: Double): Int = kotlin.math.floor(this * factor + 0.5).toInt()
 
 interface Renderer {
     fun render(nowSeconds: Double): RenderTick
@@ -33,6 +43,7 @@ class AmbientRenderer(
     private val smoothing: () -> Int,
     private val state: () -> AmbientFrameState,
     frames: Flow<AmbientFrameState>? = null,
+    private val audioLevel: () -> Double? = { null },
 ) : Renderer {
     private var displayed: List<RgbColor>? = null
     private var lastSeconds: Double? = null
@@ -79,7 +90,13 @@ class AmbientRenderer(
         displayed = frame
         lastSeconds = nowSeconds
         renderedTimestampMs = snapshot.timestampMs
-        return RenderTick(frame.map(AmbientColorMath::ledIntensity), frameIntervalMs, previewColors = frame)
+        val factor = audioLevel()?.let { AURORA_FLOOR + (1.0 - AURORA_FLOOR) * it.coerceIn(0.0, 1.0) } ?: 1.0
+        return RenderTick(
+            frame.map(AmbientColorMath::ledIntensity),
+            frameIntervalMs,
+            previewColors = frame.scaled(factor),
+            intensity = factor,
+        )
     }
 
     private fun List<RgbColor>.fit(count: Int): List<RgbColor> {
@@ -88,6 +105,7 @@ class AmbientRenderer(
     }
 
     private companion object {
+        const val AURORA_FLOOR = 0.25
         const val SCENE_CUT_JUMP = 80
         const val SCENE_CUT_SETTLED = 6
     }

@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 
+from ambient_sampling import ContentBoxTracker, content_box, region_color, region_pixels
 import device_tree
 from run_as_user import user_env, user_cred
 
@@ -13,6 +14,7 @@ logger = logging.getLogger("colores.ambilight")
 GAMESCOPE_NODE = "gamescope"
 # Armada 20261010+ adds a bottom-screen gamescope that publishes a "gamescope" node too.
 LEASE_CLIENT_FLAG = b"--drm-lease-client"
+
 CAP_W = 32
 CAP_H = 18
 
@@ -196,6 +198,7 @@ class Ambilight:
         self.status = "idle"
         self._current = [(0, 0, 0)] * self._zones
         self._targets = [(0, 0, 0)] * self._zones
+        self._box_tracker = ContentBoxTracker()
 
     @property
     def running(self):
@@ -294,6 +297,7 @@ class Ambilight:
         if self.running:
             return
         self.stop()
+        self._box_tracker = ContentBoxTracker()
         self._task = asyncio.get_event_loop().create_task(self._run())
 
     def stop(self):
@@ -408,10 +412,14 @@ class Ambilight:
             err.decode(errors="replace")[:300],
         )
 
+    def _sample(self, frame, box, region):
+        return region_color(frame, CAP_W, *region_pixels(box, region))
+
     def _update_targets(self, frame):
         sat = float(self._options.get("saturation", 1.4))
+        box = self._box_tracker.update(content_box(frame, CAP_W, CAP_H))
         if self._options.get("global_color"):
-            target = boost_saturation(avg_region(frame, CAP_W, CAP_H, _FULL_REGION), sat)
+            target = boost_saturation(self._sample(frame, box, _FULL_REGION), sat)
             self._targets = [target] * self._zones
             return
         bottom_edge = self._options.get("sampling") == "bottom_edge"
@@ -423,7 +431,7 @@ class Ambilight:
                 region = (x0, y1 - (y1 - y0) * 0.28, x1, y1)
             for sub, zone in zip(subdivide(region, len(indices)), indices):
                 if 0 <= zone < self._zones:
-                    self._targets[zone] = boost_saturation(avg_region(frame, CAP_W, CAP_H, sub), sat)
+                    self._targets[zone] = boost_saturation(self._sample(frame, box, sub), sat)
 
     def _tick(self):
         alpha = alpha_for(self._options.get("smoothing", 75))

@@ -443,3 +443,18 @@ def test_a_single_main_gamescope_is_targeted_by_serial(monkeypatch):
     monkeypatch.setattr(ambilight_mod, "is_lease_companion", lambda pid, proc_root="/proc": False)
     amb = Ambilight(lambda colors: None, zones=2, runtime_dir=None)
     assert asyncio.run(amb._pipewire_target()) == "80"
+
+
+def test_letterbox_bars_are_left_out_of_the_sample():
+    width, height = ambilight_mod.CAP_W, ambilight_mod.CAP_H
+    frame = bytearray(width * height * 3)
+    for y in range(3, height - 3):
+        for x in range(width):
+            i = (y * width + x) * 3
+            frame[i : i + 3] = bytes((200, 40, 20))
+    layout = [{"name": "Bottom", "region": [0.0, 0.72, 1.0, 1.0], "zones": [0]}]
+    amb = Ambilight(lambda c: None, zones=1, runtime_dir=None, layout=layout)
+    amb._options = {"saturation": 1.0}
+
+    amb._update_targets(bytes(frame))
+    assert amb._targets[0] == (200, 40, 20)
