@@ -5,23 +5,23 @@
 
 ### Español
 
-* **Temas:** Colores ya está listo para vestirse con Duo, el nuevo tema que está al caer.
+* **Temas:** Colores ahora se adapta automáticamente al estilo del tema que tengas activo. Duo, el nuevo tema que está al caer, será el primero en aprovecharlo.
 
 ### English
 
-* **Themes:** Colores is ready to take on the look of Duo, the new theme coming soon.
+* **Themes:** Colores now adapts automatically to the style of your active theme. Duo, the new theme coming soon, will be the first to make use of it.
 
 ### Italiano
 
-* **Temi:** Colores è pronto a vestirsi con Duo, il nuovo tema in arrivo a breve.
+* **Temi:** Colores ora si adatta da solo allo stile del tema attivo. Duo, il nuovo tema in arrivo a breve, sarà il primo a sfruttarlo.
 
 ### Deutsch
 
-* **Themes:** Colores ist bereit für den Look von Duo, dem neuen Theme, das bald erscheint.
+* **Themes:** Colores passt sich jetzt automatisch an den Stil deines aktiven Themes an. Duo, das neue Theme, das bald erscheint, nutzt das als Erstes.
 
 ### Português (Brasil)
 
-* **Temas:** O Colores está pronto para vestir o visual do Duo, o novo tema que vem aí.
+* **Temas:** O Colores agora se adapta sozinho ao visual do tema ativo. O Duo, o novo tema que vem aí, será o primeiro a aproveitar isso.
 
 ## [0.32.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.0...decky-colores-v0.32.1) (2026-10-14)
 
