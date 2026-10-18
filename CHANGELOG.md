@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.33.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.1...decky-colores-v0.33.0) (2026-10-18)
+
+
+### Español
+
+* **Temas:** Colores ahora se adapta automáticamente al estilo del tema que tengas activo. Duo, el nuevo tema que está al caer, será el primero en aprovecharlo.
+
+### English
+
+* **Themes:** Colores now adapts automatically to the style of your active theme. Duo, the new theme coming soon, will be the first to make use of it.
+
+### Italiano
+
+* **Temi:** Colores ora si adatta da solo allo stile del tema attivo. Duo, il nuovo tema in arrivo a breve, sarà il primo a sfruttarlo.
+
+### Deutsch
+
+* **Themes:** Colores passt sich jetzt automatisch an den Stil deines aktiven Themes an. Duo, das neue Theme, das bald erscheint, nutzt das als Erstes.
+
+### Português (Brasil)
+
+* **Temas:** O Colores agora se adapta sozinho ao visual do tema ativo. O Duo, o novo tema que vem aí, será o primeiro a aproveitar isso.
+
 ## [0.32.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.0...decky-colores-v0.32.1) (2026-10-14)
 
 
