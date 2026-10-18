@@ -73,7 +73,9 @@ function SectionIcon({ item }: { item: TabItem }) {
   return (
     <span
       aria-hidden="true"
+      data-colores-part="section-icon"
       style={{
+        ["--colores-section-accent" as string]: item.accent,
         width: 28,
         height: 28,
         borderRadius: 8,
