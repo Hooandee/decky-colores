@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.33.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.1...decky-colores-v0.33.0) (2026-10-18)
+
+
+### Features
+
+* let CSS Loader themes restyle Colores ([#203](https://github.com/Hooandee/decky-colores/issues/203)) ([2d855c4](https://github.com/Hooandee/decky-colores/commit/2d855c4aac632e2a345c22f4caaaa5a3fc6020b6))
+
 ## [0.32.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.0...decky-colores-v0.32.1) (2026-10-14)
 
 
