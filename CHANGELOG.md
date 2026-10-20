@@ -23,6 +23,10 @@
 
 * **Temas:** O Colores agora se adapta sozinho ao visual do tema ativo. O Duo, o novo tema que vem aí, será o primeiro a aproveitar isso.
 
+### Français
+
+* **Thèmes :** Colores s'adapte désormais tout seul au style du thème actif. Duo, le nouveau thème qui arrive bientôt, sera le premier à en profiter.
+
 ## [0.32.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.0...decky-colores-v0.32.1) (2026-10-14)
 
 
@@ -50,6 +54,11 @@
 
 * **Ambilight:** Em portáteis de duas telas com Armada, como o AYN Thor, o modo ambiente volta a acender sempre. Às vezes ele seguia a tela de baixo, que costuma ficar desligada, e as luzes ficavam apagadas.
 * **Ambilight:** Com Armada, atualizar ou desativar o Colores com o modo ambiente ligado podia fechar o Steam de repente. Isso não acontece mais.
+
+### Français
+
+* **Ambilight :** Sur les consoles à double écran avec Armada, comme l'AYN Thor, le mode Ambilight s'allume de nouveau systématiquement. Il se calait parfois sur l'écran du bas, souvent éteint, et l'éclairage restait sans couleur.
+* **Ambilight :** Avec Armada, mettre à jour ou désactiver Colores pendant que le mode Ambilight était actif pouvait fermer Steam brutalement. Ce n'est plus le cas.
 
 ## [0.32.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.31.0...decky-colores-v0.32.0) (2026-10-13)
 

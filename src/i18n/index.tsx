@@ -3,6 +3,7 @@ import { Dropdown } from "@decky/ui";
 import { it } from "./it";
 import { de } from "./de";
 import { ptBR } from "./ptBR";
+import { fr } from "./fr";
 
 const LANGUAGE_OPTIONS = [
   { data: "es", label: "Español" },
@@ -10,6 +11,7 @@ const LANGUAGE_OPTIONS = [
   { data: "it", label: "Italiano" },
   { data: "de", label: "Deutsch" },
   { data: "pt-BR", label: "Português (Brasil)" },
+  { data: "fr", label: "Français" },
 ] as const;
 
 export type Lang = (typeof LANGUAGE_OPTIONS)[number]["data"];
@@ -509,7 +511,7 @@ const en: Record<string, string> = {
   "report.retry": "Retry",
 };
 
-export const DICTS: Record<Lang, Record<string, string>> = { es, en, it, de, "pt-BR": ptBR };
+export const DICTS: Record<Lang, Record<string, string>> = { es, en, it, de, "pt-BR": ptBR, fr };
 
 type Params = Record<string, string | number>;
 
@@ -579,6 +581,7 @@ const FLAG_SVGS: Record<Lang, string> = {
   it: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path fill="#009246" d="M0 0h8v16H0z"/><path fill="#fff" d="M8 0h8v16H8z"/><path fill="#ce2b37" d="M16 0h8v16h-8z"/></svg>',
   de: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path d="M0 0h24v5.33H0z"/><path fill="#d00" d="M0 5.33h24v5.34H0z"/><path fill="#ffce00" d="M0 10.67h24V16H0z"/></svg>',
   "pt-BR": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path fill="#009739" d="M0 0h24v16H0z"/><path fill="#fedd00" d="m12 2 9 6-9 6-9-6z"/><circle cx="12" cy="8" r="3.5" fill="#012169"/><path fill="none" stroke="#fff" stroke-width=".7" d="M8.8 7.2c2.2-.7 4.4-.3 6.5 1"/></svg>',
+  fr: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 16"><path fill="#002395" d="M0 0h8v16H0z"/><path fill="#fff" d="M8 0h8v16H8z"/><path fill="#ed2939" d="M16 0h8v16h-8z"/></svg>',
 };
 
 const LanguageFlag: FC<{ lang: Lang }> = ({ lang }) => (

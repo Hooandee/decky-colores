@@ -190,11 +190,38 @@ describe("Brazilian Portuguese catalog", () => {
   });
 });
 
+describe("French catalog", () => {
+  it("keeps product terms and key journeys natural in French", () => {
+    const french = i18n.DICTS.fr;
+
+    expect(french).toMatchObject({
+      "settings.language": "Langue",
+      "forceControl.label": "Prioriser Colores",
+      "forceControl.hint": "Colores reprend le contrôle de l'éclairage à chaque ouverture.",
+      "performance.hint": "Les LED se remplissent comme une jauge selon la charge du GPU, du vert au rouge.",
+    });
+    expect(french["forceControl.notice"]).toContain("RGB");
+    expect(french["startup.remember.hint"]).toContain("SteamOS");
+    expect(i18n.translate("fr", "profiles.game", { name: "Hades" })).toBe("Jeu\u00a0: Hades");
+  });
+
+  it("uses no-break spaces in French punctuation and avoids em dashes", () => {
+    for (const [key, value] of Object.entries(i18n.DICTS.fr)) {
+      expect(value, key).not.toMatch(/ [:;?!%»]|« |—/);
+    }
+  });
+
+  it("calls the LEDs « l'éclairage » rather than the literal « lumières »", () => {
+    expect(Object.values(i18n.DICTS.fr).join("\n")).not.toMatch(/lumière/i);
+  });
+});
+
 describe("Language persistence", () => {
   it.each([
     ["Italian", "it"],
     ["German", "de"],
     ["Brazilian Portuguese", "pt-BR"],
+    ["French", "fr"],
   ] as const)("restores a persisted %s selection", (_name, lang) => {
     vi.stubGlobal("localStorage", {
       getItem: vi.fn(() => lang),
@@ -243,6 +270,7 @@ describe("Language selector", () => {
       "it",
       "de",
       "pt-BR",
+      "fr",
     ]);
     const renderedLabels = selector.rgOptions.map((option) =>
       renderToStaticMarkup(option.label),
@@ -253,6 +281,7 @@ describe("Language selector", () => {
       expect.stringContaining("Italiano"),
       expect.stringContaining("Deutsch"),
       expect.stringContaining("Português (Brasil)"),
+      expect.stringContaining("Français"),
     ]);
     expect(
       renderedLabels.every((label, index) =>
@@ -268,6 +297,7 @@ describe("Language selector", () => {
       ["colores-lang", "it"],
       ["colores-lang", "de"],
       ["colores-lang", "pt-BR"],
+      ["colores-lang", "fr"],
     ]);
   });
 });

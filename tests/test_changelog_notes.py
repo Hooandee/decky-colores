@@ -42,12 +42,16 @@ def test_check_accepts_all_languages_with_an_unlinked_version_heading(tmp_path):
 ### Português (Brasil)
 
 * Melhora a iluminação.
+
+### Français
+
+* Améliore l'éclairage.
 """
 
     result = _run(tmp_path, "--check", changelog)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "five languages" in result.stdout
+    assert "six languages" in result.stdout
 
 
 def test_check_requires_german_for_every_new_english_entry(tmp_path):
@@ -59,6 +63,7 @@ def test_check_requires_german_for_every_new_english_entry(tmp_path):
 * **EN:** Improves lighting.
 * **IT:** Migliora l'illuminazione.
 * **PT-BR:** Melhora a iluminação.
+* **FR:** Améliore l'éclairage.
 """
 
     result = _run(tmp_path, "--check", changelog)
@@ -76,6 +81,7 @@ def test_check_requires_italian_for_every_new_english_entry(tmp_path):
 * **EN:** Improves lighting.
 * **DE:** Verbessert die Beleuchtung.
 * **PT-BR:** Melhora a iluminação.
+* **FR:** Améliore l'éclairage.
 """
 
     result = _run(tmp_path, "--check", changelog)
@@ -101,7 +107,25 @@ def test_check_requires_brazilian_portuguese_for_every_new_english_entry(tmp_pat
     assert "Brazilian Portuguese (**PT-BR:**)" in result.stdout
 
 
-def test_release_body_emits_five_sections_and_strips_links(tmp_path):
+def test_check_requires_french_for_every_new_english_entry(tmp_path):
+    changelog = """# Changelog
+
+## [0.24.0](https://example.test/0.24.0)
+
+* **ES:** Mejora la iluminación.
+* **EN:** Improves lighting.
+* **IT:** Migliora l'illuminazione.
+* **DE:** Verbessert die Beleuchtung.
+* **PT-BR:** Melhora a iluminação.
+"""
+
+    result = _run(tmp_path, "--check", changelog)
+
+    assert result.returncode == 1
+    assert "French (**FR:**)" in result.stdout
+
+
+def test_release_body_emits_six_sections_and_strips_links(tmp_path):
     changelog = """# Changelog
 
 ## [0.24.0](https://example.test/0.24.0)
@@ -111,6 +135,7 @@ def test_release_body_emits_five_sections_and_strips_links(tmp_path):
 * **IT:** Migliora l'illuminazione. ([#123](https://example.test/123))
 * **DE:** Verbessert die Beleuchtung. ([#123](https://example.test/123))
 * **PT-BR:** Melhora a iluminação. ([#123](https://example.test/123))
+* **FR:** Améliore l'éclairage. ([#123](https://example.test/123))
 """
 
     result = _run(tmp_path, "--release-body", changelog)
@@ -135,6 +160,10 @@ def test_release_body_emits_five_sections_and_strips_links(tmp_path):
 ### Novidades em português (Brasil)
 
 - Melhora a iluminação.
+
+### Nouveautés
+
+- Améliore l'éclairage.
 """
 
 
@@ -147,6 +176,7 @@ def test_release_body_rejects_incomplete_translations(tmp_path):
 * **EN:** Improves lighting.
 * **IT:** Migliora l'illuminazione.
 * **PT-BR:** Melhora a iluminação.
+* **FR:** Améliore l'éclairage.
 """
 
     result = _run(tmp_path, "--release-body", changelog)
@@ -165,6 +195,7 @@ def test_check_ignores_older_sections_that_predate_german(tmp_path):
 * **IT:** Migliora l'illuminazione.
 * **DE:** Verbessert die Beleuchtung.
 * **PT-BR:** Melhora a iluminação.
+* **FR:** Améliore l'éclairage.
 
 ## 0.23.0 (2026-08-09)
 
@@ -188,9 +219,10 @@ def test_check_rejects_unknown_language_labels(tmp_path):
 * **DE:** Verbessert die Beleuchtung.
 * **PT-BR:** Melhora a iluminação.
 * **FR:** Améliore l'éclairage.
+* **JA:** 照明を改善します。
 """
 
     result = _run(tmp_path, "--check", changelog)
 
     assert result.returncode == 1
-    assert "unsupported language label: FR" in result.stdout
+    assert "unsupported language label: JA" in result.stdout
