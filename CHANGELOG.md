@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.34.0...decky-colores-v0.34.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* stop Decky's socket loop from hanging Colores on reinstall or loader death ([#207](https://github.com/Hooandee/decky-colores/issues/207)) ([6d5bb0d](https://github.com/Hooandee/decky-colores/commit/6d5bb0dcfb0a1eb30430b51c4741c4484988f493))
+
 ## [0.34.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.33.0...decky-colores-v0.34.0) (2026-10-21)
 
 
