@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.34.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.33.0...decky-colores-v0.34.0) (2026-10-21)
+
+
+### Español
+
+* **Idiomas:** Colores ya está en francés. Puedes elegirlo desde el selector de idioma en Ajustes.
+
+### English
+
+* **Languages:** Colores is now available in French. You can pick it from the language selector in Settings.
+
+### Italiano
+
+* **Lingue:** Colores ora è disponibile in francese. Puoi sceglierlo dal selettore della lingua nelle Impostazioni.
+
+### Deutsch
+
+* **Sprachen:** Colores gibt es jetzt auch auf Französisch. Du kannst es in den Einstellungen über die Sprachauswahl einstellen.
+
+### Português (Brasil)
+
+* **Idiomas:** O Colores agora está disponível em francês. Você pode escolhê-lo no seletor de idioma em Configurações.
+
+### Français
+
+* **Langues :** Colores est désormais disponible en français. Vous pouvez le choisir dans le sélecteur de langue, dans les Réglages.
+
 ## [0.33.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.1...decky-colores-v0.33.0) (2026-10-18)
 
 
