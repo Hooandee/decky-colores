@@ -9,6 +9,8 @@ _KNOWN_NAMES = frozenset({
     "_read_single_line", "active", "add_done_callback", "asyncio", "create_task",
     "on_new_message", "server_writer",
 })
+# Python 3.11 evaluates the callback's asyncio.Task[str|None] annotation eagerly.
+_ANNOTATION_NAMES = frozenset({"Task", "str"})
 _KNOWN_VARNAMES = ("self", "reader", "writer", "_", "line")
 
 
@@ -25,7 +27,7 @@ def install(kill=os.kill, getppid=os.getppid, log=None) -> str:
     code = getattr(original, "__code__", None)
     if (
         code is None
-        or frozenset(code.co_names) != _KNOWN_NAMES
+        or frozenset(code.co_names) - _ANNOTATION_NAMES != _KNOWN_NAMES
         or code.co_varnames[: len(_KNOWN_VARNAMES)] != _KNOWN_VARNAMES
     ):
         if log is not None and code is not None:

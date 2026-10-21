@@ -78,6 +78,26 @@ def test_listener_leaves_at_eof_instead_of_spinning(decky_module):
     assert kills == []
 
 
+def test_guard_installs_over_the_listener_as_compiled_by_decky_python_3_11(decky_module):
+    async def eager_listener(self, reader, writer):
+        self.server_writer = writer
+        while self.active and self.on_new_message:
+
+            def _(task, hint=asyncio.Task[str | None]):
+                res = task.result()
+                if res is not None:
+                    asyncio.create_task(self._write_single_line(writer, res))
+
+            line = await self._read_single_line(reader)
+            asyncio.create_task(self.on_new_message(line)).add_done_callback(_)
+
+    assert {"Task", "str"} <= set(eager_listener.__code__.co_names)
+    decky_module.UnixSocket._listen_for_method_call = eager_listener
+
+    assert decky_socket_guard.install(getppid=lambda: 1) == "installed"
+    assert decky_module.UnixSocket._listen_for_method_call is not eager_listener
+
+
 def test_orphaned_plugin_shuts_itself_down(decky_module, monkeypatch):
     kills = []
     warnings = []
