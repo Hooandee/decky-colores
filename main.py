@@ -25,12 +25,14 @@ from saved_gradients import upsert_gradient, remove_gradient
 from hhd_rgb_control import HhdRgbControl
 from suspend_monitor import SuspendMonitor
 import self_updater
+import decky_socket_guard
 import device_tree
 import journal
 import journal_context
 from colores_report import collector as report_collector
 from colores_report import client as report_client
 
+_DECKY_SOCKET_GUARD = decky_socket_guard.install(log=getattr(decky, "logger", None))
 _REPORT_APP = "colores"
 _REPORT_SERVICE_URL = os.environ.get(
     "COLORES_REPORT_URL", "https://bug-collector-khaki.vercel.app/api/report"
@@ -1272,7 +1274,7 @@ class Plugin:
         else:
             await self._restore_hhd_rgb()
         decky.logger.info(
-            "Colores v%s on %s (product=%s board=%s euid=%s driver=%s route=%s color=%s zones=%s ambilight=%s available=%s ledPath=%s lastError=%s)",
+            "Colores v%s on %s (product=%s board=%s euid=%s driver=%s route=%s color=%s zones=%s ambilight=%s available=%s ledPath=%s lastError=%s socket_guard=%s)",
             read_version(),
             self._device["name"],
             self._device.get("product"),
@@ -1286,6 +1288,7 @@ class Plugin:
             self._controller.available,
             self._controller.led_path,
             self._controller.last_error,
+            _DECKY_SOCKET_GUARD,
         )
         self._suspend_monitor.start()
         self._apply()
@@ -1444,14 +1447,26 @@ class Plugin:
             await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _unload(self):
+        started = time.monotonic()
+
+        def stage(name):
+            decky.logger.info(
+                "Colores unload:%s at=%dms", name, (time.monotonic() - started) * 1000
+            )
+
         try:
+            stage("begin")
             await self._stop_background_tasks()
+            stage("tasks")
             if getattr(self, "_ready", False):
                 await self._restore_hhd_rgb()
+                stage("hhd")
             if getattr(self, "_ambilight", None):
                 self._ambilight.stop()
+                stage("ambilight")
             if getattr(self, "_engine", None):
                 self._engine.stop()
+                stage("engine")
             decky.logger.info("Colores unloaded")
         finally:
             self._stop_journal("unload")
