@@ -176,9 +176,30 @@ def tail_error_logs(
     return out
 
 
+# Decky stopping, killing and reloading plugins, and earlyoom kills: a reinstall that hangs
+# a plugin's unload ends in SIGKILL, a reload burst and possibly a frozen, force-rebooted device.
+_LOADER_LIFECYCLE_GREP = (
+    "(?i)still alive|SIGKILL|has been stopped in|already loaded|Shutting down|"
+    "Loaded Colores|Colores unload|Failed to (start|unload)|Loop exited|socket_guard"
+)
+
 _KERNEL_CMDS = {
     "dmesg": ["/usr/bin/dmesg", "--ctime", "--level=err,warn"],
     "journal": ["/usr/bin/journalctl", "-b", "-u", "plugin_loader", "-n", "400", "--no-pager"],
+    "loader_lifecycle": [
+        "/usr/bin/journalctl", "-b", "-u", "plugin_loader",
+        "--grep", _LOADER_LIFECYCLE_GREP,
+        "-n", "80", "--no-pager",
+    ],
+    "previous_boot_loader": [
+        "/usr/bin/journalctl", "-b", "-1", "-u", "plugin_loader",
+        "--grep", _LOADER_LIFECYCLE_GREP,
+        "-n", "80", "--no-pager",
+    ],
+    "earlyoom": ["/usr/bin/journalctl", "-b", "-t", "earlyoom", "-n", "30", "--no-pager"],
+    "previous_boot_earlyoom": [
+        "/usr/bin/journalctl", "-b", "-1", "-t", "earlyoom", "-n", "30", "--no-pager",
+    ],
 }
 
 
