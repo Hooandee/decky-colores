@@ -3,9 +3,29 @@
 ## [0.34.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.34.0...decky-colores-v0.34.1) (2026-10-21)
 
 
-### Bug Fixes
+### Español
 
-* stop Decky's socket loop from hanging Colores on reinstall or loader death ([#207](https://github.com/Hooandee/decky-colores/issues/207)) ([6d5bb0d](https://github.com/Hooandee/decky-colores/commit/6d5bb0dcfb0a1eb30430b51c4741c4484988f493))
+* **Estabilidad:** Actualizar o reinstalar Colores ya no se queda colgado unos segundos. Y si Decky se cierra de golpe, Colores se cierra con él en vez de quedarse abierto en segundo plano gastando memoria hasta congelar la consola.
+
+### English
+
+* **Stability:** Updating or reinstalling Colores no longer hangs for a few seconds. And if Decky crashes, Colores now closes with it instead of staying open in the background eating memory until the handheld freezes.
+
+### Italiano
+
+* **Stabilità:** Aggiornare o reinstallare Colores non si blocca più per qualche secondo. E se Decky si chiude all'improvviso, Colores si chiude con lui invece di restare aperto in background a consumare memoria fino a bloccare la console.
+
+### Deutsch
+
+* **Stabilität:** Colores zu aktualisieren oder neu zu installieren hängt nicht mehr ein paar Sekunden. Und wenn Decky abstürzt, beendet sich Colores mit, statt im Hintergrund weiterzulaufen und Speicher zu fressen, bis der Handheld einfriert.
+
+### Português (Brasil)
+
+* **Estabilidade:** Atualizar ou reinstalar o Colores não trava mais por alguns segundos. E se o Decky fechar de repente, o Colores fecha junto, em vez de continuar aberto em segundo plano consumindo memória até travar o portátil.
+
+### Français
+
+* **Stabilité :** Mettre à jour ou réinstaller Colores ne bloque plus pendant quelques secondes. Et si Decky plante, Colores se ferme avec lui au lieu de rester ouvert en arrière-plan à consommer de la mémoire jusqu'à figer la console.
 
 ## [0.34.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.33.0...decky-colores-v0.34.0) (2026-10-21)
 
