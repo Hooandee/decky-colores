@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.33.0...decky-colores-v0.34.0) (2026-10-21)
+
+
+### Features
+
+* add French localization ([#205](https://github.com/Hooandee/decky-colores/issues/205)) ([f721290](https://github.com/Hooandee/decky-colores/commit/f7212907e1e9e7a2c876755b8aace1f7d8dece62))
+
 ## [0.33.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.1...decky-colores-v0.33.0) (2026-10-18)
 
 
