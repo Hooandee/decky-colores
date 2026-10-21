@@ -11,7 +11,8 @@ internal fun shouldRestoreRuntimeAtBoot(
     lightingRequired: Boolean,
     automationEnabled: Boolean,
     usageAccessGranted: Boolean,
-): Boolean = lightingRequired || automationEnabled && usageAccessGranted
+    captureAwaitingConsent: Boolean = false,
+): Boolean = lightingRequired || captureAwaitingConsent || automationEnabled && usageAccessGranted
 
 class EffectsBootReceiver : BroadcastReceiver() {
     override fun onReceive(
@@ -19,14 +20,18 @@ class EffectsBootReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED && intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+        val preferences = LightingPreferences(context)
+        val captureMode = preferences.captureModeAwaitingConsent()
         if (
             shouldRestoreRuntimeAtBoot(
-                lightingRequired = LightingPreferences(context).shouldRestoreInBackground(),
+                lightingRequired = preferences.shouldRestoreInBackground(),
                 automationEnabled = LightingProfileStore(context).isAutomationEnabled(),
                 usageAccessGranted = UsageAccess(context).isGranted(),
+                captureAwaitingConsent = captureMode != null,
             )
         ) {
             EffectsService.restore(context)
         }
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) captureMode?.let { CaptureReminder.post(context, it) }
     }
 }

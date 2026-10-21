@@ -6,8 +6,12 @@ import { useI18n, LanguageSelector, type Lang } from "../i18n";
 import { UpdatePanel } from "../updater/UpdatePanel";
 import { openCustomizeModal } from "./CustomizeModal";
 import { openReportModal } from "./ReportModal";
+import { openColorCalibrationModal } from "./ColorCalibrationModal";
+import { openStylesModal, StyleActions } from "./StylesModal";
+import type { SavedStyle } from "../styles";
 import { Divider } from "./Divider";
 import { Capabilities, DeviceInfo, PowerLedState } from "../types";
+import type { CalibrationSteps } from "../calibration";
 
 const AUTHOR = "Hooandee";
 const YOUTUBE_URL = "https://www.youtube.com/@Hooandee";
@@ -38,6 +42,12 @@ interface SettingsSectionProps {
   powerLedAwakeOff: boolean;
   powerLedSuspendOff: boolean;
   sleepChargingIndicator: boolean;
+  colorCalibration: CalibrationSteps;
+  onColorCalibration: (steps: CalibrationSteps) => void;
+  styles?: SavedStyle[];
+  stylesFolder?: string;
+  styleActions?: StyleActions;
+  onStyleApplied?: (style: SavedStyle) => void;
   onForceControl: (v: boolean) => void;
   onPowerLed: (v: boolean) => void;
   onPowerLedState: (state: PowerLedState, value: boolean) => void;
@@ -56,6 +66,12 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
   powerLedAwakeOff,
   powerLedSuspendOff,
   sleepChargingIndicator,
+  colorCalibration,
+  onColorCalibration,
+  styles,
+  stylesFolder,
+  styleActions,
+  onStyleApplied,
   onForceControl,
   onPowerLed,
   onPowerLedState,
@@ -113,6 +129,32 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
         </PanelSectionRow>
         {hint(t("forceControl.notice"))}
       </>
+    ) : null,
+
+    caps.color ? (
+      <PanelSectionRow>
+        <ButtonItem
+          layout="below"
+          bottomSeparator="none"
+          description={t("calibration.button.desc")}
+          onClick={() => openColorCalibrationModal(colorCalibration, onColorCalibration)}
+        >
+          {t("calibration.button")}
+        </ButtonItem>
+      </PanelSectionRow>
+    ) : null,
+
+    caps.color && styleActions ? (
+      <PanelSectionRow>
+        <ButtonItem
+          layout="below"
+          bottomSeparator="none"
+          description={t("styles.button.desc")}
+          onClick={() => openStylesModal(styles ?? [], styleActions, stylesFolder, onStyleApplied)}
+        >
+          {t("styles.button")}
+        </ButtonItem>
+      </PanelSectionRow>
     ) : null,
 
     caps.reconnectable ? (

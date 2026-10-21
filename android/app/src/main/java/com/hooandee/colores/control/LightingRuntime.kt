@@ -80,6 +80,7 @@ class LightingRuntime(
     private val controller: LightingController,
     private val audio: MutableAudioLevelSource,
     private val ambient: MutableAmbientFrameSource,
+    private val ambientAudio: MutableAudioLevelSource = MutableAudioLevelSource(),
 ) {
     suspend fun restoreSaved(): RestoredLightingBinding? =
         withContext(Dispatchers.IO) {
@@ -148,6 +149,7 @@ class LightingRuntime(
                     temperature = SysfsThermalSource().takeIf { it.available },
                     performance = PerformanceSources.detect(),
                     audio = audio,
+                    ambientAudio = ambientAudio,
                     ambient = ambient,
                 ),
                 LightingIntent(
@@ -163,12 +165,15 @@ class LightingRuntime(
                     brightness = stored.brightness ?: liveState?.brightness ?: 100,
                     power = stored.power ?: liveState?.power ?: true,
                     chargerOnly = stored.chargerOnly,
+                    smartBrightness = stored.smartBrightness,
+                    colorCalibration = stored.colorCalibration,
                     batteryBreathe = stored.batteryBreathe,
                     temperatureBreathe = stored.temperatureBreathe,
                     audioScale = stored.audioScale,
                     audioSensitivityDb = stored.audioSensitivityDb,
                     ambientVividness = stored.ambientVividness,
                     ambientSmoothing = stored.ambientSmoothing,
+                    ambientAudio = stored.ambientAudio,
                 ),
             )
             RestoredLightingBinding(

@@ -136,14 +136,7 @@ fun ColorControlPanel(
                 }
                 if (brightnessEnabled) {
                     if (colorEnabled) Spacer(Modifier.height(4.dp))
-                    DeferredIntSlider(
-                        label = stringResource(R.string.brightness_title),
-                        committedValue = state.ledState.brightness,
-                        valueLabel = { stringResource(R.string.brightness_value, it) },
-                        onValueCommit = onBrightnessChange,
-                        valueRange = 0..100,
-                        enabled = state.canWrite,
-                    )
+                    LedBrightnessSlider(state, onBrightnessChange)
                 }
             }
         }

@@ -81,6 +81,7 @@ class AndroidScreenCapture(
     fun start() {
         check(!running)
         running = true
+        contentBoxStale = true
         val captureThread = HandlerThread("ColoresAmbientCapture").apply { start() }
         val captureHandler = Handler(captureThread.looper)
         val displayBounds = context.getSystemService(WindowManager::class.java).currentWindowMetrics.bounds
@@ -132,7 +133,10 @@ class AndroidScreenCapture(
 
     /** Detaching the surface stops the system from compositing the mirror while paused. */
     fun setPaused(paused: Boolean) {
-        if (!paused) lastProcessedMs = 0L
+        if (!paused) {
+            lastProcessedMs = 0L
+            contentBoxStale = true
+        }
         this.paused = paused
         if (paused) handler?.post { dropDeferred() }
         runCatching { display?.setSurface(if (paused) null else reader?.surface) }
@@ -164,6 +168,22 @@ class AndroidScreenCapture(
         deferred = null
     }
 
+    private val contentBoxes = ContentBoxTracker()
+    private var contentBoxSize = 0 to 0
+
+    @Volatile
+    private var contentBoxStale = true
+
+    private fun contentBoxFor(frame: AmbientPixelFrame): ContentBox? {
+        val size = frame.width to frame.height
+        if (contentBoxStale || size != contentBoxSize) {
+            contentBoxStale = false
+            contentBoxes.reset()
+            contentBoxSize = size
+        }
+        return AmbientSampler.contentBox(frame)?.let(contentBoxes::update)
+    }
+
     private fun process(image: Image) {
         try {
             if (!running || paused) return
@@ -174,13 +194,15 @@ class AndroidScreenCapture(
             buffer.rewind()
             val bytes = ByteArray(buffer.remaining())
             buffer.get(bytes)
+            val frame = AmbientPixelFrame(image.width, image.height, plane.pixelStride, plane.rowStride, bytes)
             val colors =
                 AmbientSampler.sample(
-                    frame = AmbientPixelFrame(image.width, image.height, plane.pixelStride, plane.rowStride, bytes),
+                    frame = frame,
                     zones = activeConfig.zones,
                     gridLayout = activeConfig.gridLayout,
                     supportsPerZone = activeConfig.supportsPerZone,
                     mode = activeConfig.samplingMode,
+                    contentBox = contentBoxFor(frame),
                 )
             if (!running || paused) return
             lastProcessedMs = now

@@ -1,6 +1,8 @@
+import json
 import asyncio
 import sys
 import threading
+import time
 import types
 
 import pytest
@@ -141,6 +143,7 @@ class FakeAudio:
     def __init__(self):
         self.events = []
         self.status = "idle"
+        self.level = 0.0
 
     def stop(self):
         self.events.append(("stop",))
@@ -476,7 +479,10 @@ def test_charger_watch_reapplies_only_on_edge(main_module, monkeypatch):
 
     async def drive():
         task = asyncio.create_task(p._charger_watch())
-        await asyncio.sleep(0.02)
+        for _ in range(200):
+            await asyncio.sleep(0.005)
+            if p._ac_online and any(e[0] == "static" for e in p._engine.events):
+                break
         task.cancel()
         try:
             await task
@@ -486,6 +492,46 @@ def test_charger_watch_reapplies_only_on_edge(main_module, monkeypatch):
     asyncio.run(drive())
     assert p._ac_online is True
     assert any(e[0] == "static" for e in p._engine.events)
+
+
+def test_charger_watch_reads_power_supply_off_the_event_loop(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "CHARGER_POLL_INTERVAL", 0.001)
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p._ac_online = True
+    main_thread = threading.get_ident()
+    readers = []
+
+    def slow_battery():
+        readers.append(threading.get_ident())
+        time.sleep(0.2)
+        return 55
+
+    monkeypatch.setattr(main_module, "battery_level", slow_battery)
+    monkeypatch.setattr(main_module, "apu_temperature", lambda: 61.0)
+    monkeypatch.setattr(main_module, "charger_online", lambda: True)
+
+    async def drive():
+        ticks = 0
+
+        async def heartbeat():
+            nonlocal ticks
+            while True:
+                await asyncio.sleep(0.01)
+                ticks += 1
+
+        beat = asyncio.create_task(heartbeat())
+        task = asyncio.create_task(p._charger_watch())
+        await asyncio.sleep(0.25)
+        task.cancel()
+        beat.cancel()
+        await asyncio.gather(task, beat, return_exceptions=True)
+        return ticks
+
+    ticks = asyncio.run(drive())
+    assert readers and all(reader != main_thread for reader in readers)
+    assert ticks >= 10
+    assert p._battery_level == 55
+    assert p._apu_temp == 61.0
 
 
 def test_wave_on_single_color_device_uses_hardware_effect(main_module):
@@ -724,6 +770,7 @@ def test_prepare_suspend_stops_capture_without_changing_user_intent(main_module)
     asyncio.run(p.prepare_suspend())
 
     assert p._ambilight.events == [("stop_and_wait",)]
+    assert p._audio.events == [("stop",)]
     assert p._settings["mode"] == "ambient"
     assert p._settings["power"] is True
 
@@ -1539,3 +1586,502 @@ def test_unload_before_main_still_finishes(main_module):
     asyncio.run(main_module.Plugin()._unload())
 
 
+
+
+def _in_loop(action):
+    async def run():
+        action()
+        for task in asyncio.all_tasks():
+            if task is not asyncio.current_task():
+                task.cancel()
+
+    asyncio.run(run())
+
+
+def _smart(main_module, mode="solid", level=None, **options):
+    p = _plugin(main_module, mode, **options)
+    p._settings["smart_brightness"] = True
+    p._screen_level = level
+    p._screen_ramp = main_module.FactorRamp(duration=0)
+    p._screen_ramp.snap(p._screen_target())
+    return p
+
+
+def test_led_brightness_without_smart_brightness_is_user_brightness(main_module):
+    p = _plugin(main_module, "solid")
+    p._apply()
+    assert ("solid", (255, 0, 0), 80, True) in p._controller.calls
+
+
+def test_smart_brightness_scales_static_color(main_module):
+    p = _smart(main_module, level=19483 / 65535)
+    p._apply()
+    expected = main_module.led_brightness(80, main_module.perceived_level(19483 / 65535))
+    assert expected < 80
+    assert ("solid", (255, 0, 0), expected, True) in p._controller.calls
+
+
+def test_smart_brightness_without_reading_keeps_user_brightness(main_module):
+    p = _smart(main_module, level=None)
+    p._apply()
+    assert ("solid", (255, 0, 0), 80, True) in p._controller.calls
+
+
+def test_smart_brightness_scales_render_loop_frames(main_module):
+    p = _smart(main_module, mode="ambient", level=0.3, hw=False)
+    p._render([(10, 20, 30), (40, 50, 60)])
+    expected = main_module.led_brightness(80, main_module.perceived_level(0.3))
+    assert p._controller.calls[-1] == ("zones", [(10, 20, 30), (40, 50, 60)], expected, True)
+
+
+def test_screen_change_rerenders_last_frame_on_software_path(main_module):
+    p = _smart(main_module, mode="solid", level=1.0, hw=False)
+    p._render([(1, 2, 3), (4, 5, 6)])
+    p._last_render_at = 0.0
+    _in_loop(lambda: p._on_screen_level(0.3))
+    p._refresh_led_brightness(final=True)
+    expected = main_module.led_brightness(80, main_module.perceived_level(0.3))
+    assert p._controller.calls[-1] == ("zones", [(1, 2, 3), (4, 5, 6)], expected, True)
+
+
+def test_screen_change_reapplies_hardware_solid(main_module):
+    p = _smart(main_module, mode="solid", level=1.0)
+    _in_loop(lambda: p._on_screen_level(0.3))
+    p._refresh_led_brightness(final=False)
+    expected = main_module.led_brightness(80, main_module.perceived_level(0.3))
+    assert p._controller.calls[-1] == ("solid", (255, 0, 0), expected, True)
+
+
+def test_hardware_effect_only_rewritten_when_ramp_settles(main_module):
+    p = _smart(
+        main_module,
+        mode="effect",
+        effect={"id": "breathing", "speed": 50, "use_gradient": False},
+        level=1.0,
+    )
+    _in_loop(lambda: p._on_screen_level(0.3))
+    p._refresh_led_brightness(final=False)
+    assert p._controller.calls == []
+    p._refresh_led_brightness(final=True)
+    assert p._controller.calls[-1][0] == "hw_effect"
+
+
+def test_screen_refresh_skips_when_lights_are_off(main_module):
+    p = _smart(main_module, mode="solid", level=1.0, power=False)
+    _in_loop(lambda: p._on_screen_level(0.3))
+    p._refresh_led_brightness(final=True)
+    assert p._controller.calls == []
+
+
+def test_unreadable_screen_holds_last_level(main_module):
+    p = _smart(main_module, level=0.3)
+    p._on_screen_level(None)
+    assert p._screen_level == 0.3
+
+
+def test_disabling_smart_brightness_ramps_back_to_full(main_module):
+    p = _smart(main_module, level=0.3)
+    p._settings["smart_brightness"] = False
+    _in_loop(p._retarget_screen)
+    assert p._screen_ramp.target == 1.0
+
+
+def test_set_smart_brightness_persists_and_retargets(main_module, monkeypatch):
+    p = _plugin(main_module, "solid")
+    p._capabilities["screenBrightness"] = True
+    p._screen_ramp = main_module.FactorRamp(duration=0)
+    saved = []
+    p._store = types.SimpleNamespace(save=lambda state: saved.append(dict(state)))
+    monkeypatch.setattr(main_module, "read_backlight", lambda *a, **k: 0.3)
+
+    asyncio.run(p.set_smart_brightness(True))
+
+    assert p._settings["smart_brightness"] is True
+    assert saved and saved[-1]["smart_brightness"] is True
+    assert p._screen_ramp.target == pytest.approx(main_module.perceived_level(0.3))
+
+
+def test_set_smart_brightness_ignored_without_backlight(main_module):
+    p = _plugin(main_module, "solid")
+    p._capabilities["screenBrightness"] = False
+    asyncio.run(p.set_smart_brightness(True))
+    assert not p._settings.get("smart_brightness")
+
+
+def test_screen_ramp_steps_down_smoothly_and_lands_on_target(main_module):
+    p = _smart(main_module, mode="solid", level=1.0, hw=False)
+    p._capabilities["maxRenderFps"] = 30
+    p._screen_ramp = main_module.FactorRamp(duration=0.15)
+    p._screen_ramp.snap(1.0)
+    p._render([(9, 9, 9), (9, 9, 9)])
+
+    async def run():
+        p._on_screen_level(0.05)
+        await p._screen_ramp_task
+
+    asyncio.run(run())
+
+    levels = [call[2] for call in p._controller.calls]
+    expected = main_module.led_brightness(80, main_module.perceived_level(0.05))
+    assert levels[0] == 80
+    assert levels[-1] == expected
+    assert len(set(levels)) >= 3
+    assert levels == sorted(levels, reverse=True)
+
+
+def test_screen_level_is_journaled_in_coarse_steps(main_module, monkeypatch):
+    p = _smart(main_module, level=1.0)
+    written = []
+    monkeypatch.setattr(
+        main_module.journal,
+        "active",
+        types.SimpleNamespace(write=lambda *args, **fields: written.append((args, fields))),
+    )
+    _in_loop(lambda: p._on_screen_level(0.3))
+    _in_loop(lambda: p._on_screen_level(0.301))
+    assert written == [
+        (("INFO", "state", "screen_brightness"), {"available": True, "pct": 60, "led": 50})
+    ]
+
+
+def test_mode_change_forgets_previous_frame_for_the_ramp(main_module):
+    p = _smart(main_module, mode="ambient", level=1.0, hw=False)
+    p._render([(1, 1, 1), (1, 1, 1)])
+    p._apply()
+    p._controller.calls.clear()
+    p._refresh_led_brightness(final=True)
+    assert p._controller.calls == []
+
+
+def test_startup_is_not_saved_while_screen_dims_the_leds(main_module):
+    p = _smart(main_module, level=0.2, hw=False)
+    p._settings["remember_startup"] = True
+    p._current_app_key = None
+    p._maybe_persist_startup()
+    assert getattr(p, "_startup_task", None) is None
+
+
+def test_stop_background_tasks_cancels_smart_brightness_tasks(main_module):
+    p = _plugin(main_module, "solid")
+    p._suspend_monitor = FakeSuspendMonitor()
+
+    async def run():
+        p._screen_task = asyncio.create_task(asyncio.sleep(60))
+        p._screen_ramp_task = asyncio.create_task(asyncio.sleep(60))
+        await p._stop_background_tasks()
+        await asyncio.sleep(0)
+        return p._screen_task.cancelled(), p._screen_ramp_task.cancelled()
+
+    assert asyncio.run(run()) == (True, True)
+
+THOR = {"yellow": 37, "orange": -56, "white": 0}
+
+
+def test_color_calibration_scales_hardware_solid(main_module):
+    p = _plugin(main_module, "solid")
+    p._settings["color"] = [255, 255, 0]
+    p._settings["color_calibration"] = THOR
+    p._apply()
+    assert ("solid", (161, 255, 0), 80, True) in p._controller.calls
+
+
+def test_color_calibration_scales_rendered_frames(main_module):
+    p = _plugin(main_module, "ambient", hw=False)
+    p._settings["color_calibration"] = THOR
+    p._render([(255, 128, 0), (0, 0, 0)])
+    assert p._controller.calls[-1] == ("zones", [(161, 81, 0), (0, 0, 0)], 80, True)
+
+
+def test_color_calibration_scales_hardware_effect_color(main_module):
+    p = _plugin(main_module, "effect", {"id": "breathing", "speed": 50, "use_gradient": False})
+    p._settings["color_calibration"] = THOR
+    p._apply()
+    assert ("hw_effect", "breathing", (161, 0, 0), 50, 80, True) in p._controller.calls
+
+
+def test_neutral_calibration_keeps_frames_untouched(main_module):
+    p = _plugin(main_module, "ambient", hw=False)
+    frame = [(1, 2, 3), (4, 5, 6)]
+    p._render(frame)
+    assert p._controller.calls[-1] == ("zones", frame, 80, True)
+
+
+def test_calibration_preview_shows_key_color_and_pauses_effects(main_module):
+    p = _plugin(main_module, "ambient", hw=False)
+    asyncio.run(p.preview_color_calibration(THOR, [255, 255, 0]))
+    assert ("stop",) in p._ambilight.events
+    assert p._controller.calls[-1] == ("zones", [(161, 255, 0)] * 2, 80, True)
+
+    p._controller.calls.clear()
+    p._render([(9, 9, 9), (9, 9, 9)])
+    assert p._controller.calls == []
+
+    asyncio.run(p.preview_color_calibration(None))
+    assert p._ambilight.events[-1][0] == "start"
+
+
+def test_calibration_preview_lights_up_even_when_power_is_off(main_module):
+    p = _plugin(main_module, "solid", power=False)
+    asyncio.run(p.preview_color_calibration(THOR))
+    assert p._controller.calls[-1] == ("zones", [(161, 255, 255)] * 2, 80, True)
+
+
+def test_set_color_calibration_persists_and_ends_preview(main_module):
+    p = _plugin(main_module, "solid")
+    saved = []
+    p._store = types.SimpleNamespace(save=lambda state: saved.append(dict(state)))
+    asyncio.run(p.preview_color_calibration(THOR))
+
+    result = asyncio.run(p.set_color_calibration({"yellow": 99, "orange": 0, "white": -10}))
+
+    assert result == {"yellow": 60, "orange": 0, "white": -10}
+    assert saved[-1]["color_calibration"] == result
+    assert p._calibration_preview is None
+    assert p._controller.calls[-1] == ("solid", (102, 0, 0), 80, True)
+
+
+def test_saving_calibration_refreshes_the_startup_color(main_module):
+    p = _plugin(main_module, "solid")
+    p._store = types.SimpleNamespace(save=lambda state: None)
+    p._settings["remember_startup"] = True
+    p._current_app_key = None
+
+    async def run():
+        await p.set_color_calibration(THOR)
+        return p._startup_task
+
+    assert asyncio.run(run()) is not None
+
+
+def test_startup_is_not_saved_during_calibration_preview(main_module):
+    p = _plugin(main_module, "solid")
+    p._settings["remember_startup"] = True
+    p._current_app_key = None
+
+    async def run():
+        await p.preview_color_calibration(THOR)
+        p._startup_task = None
+        p._maybe_persist_startup()
+        return p._startup_task
+
+    assert asyncio.run(run()) is None
+
+
+def test_calibration_preview_expires_on_its_own(main_module, monkeypatch):
+    p = _plugin(main_module, "solid")
+    monkeypatch.setattr(main_module, "CALIBRATION_PREVIEW_TIMEOUT", 0.01)
+
+    async def run():
+        await p.preview_color_calibration(THOR)
+        await p._calibration_expiry_task
+
+    asyncio.run(run())
+
+    assert p._calibration_preview is None
+    assert p._controller.calls[-1] == ("solid", (255, 0, 0), 80, True)
+def _aurora(main_module, audio=True):
+    p = _plugin(main_module, "ambient", hw=False)
+    p._settings["ambilight"] = {**p._settings["ambilight"], "audio": audio}
+    p._audio.status = "running"
+    return p
+
+
+def test_aurora_meters_audio_alongside_ambilight(main_module):
+    p = _aurora(main_module)
+    p._apply()
+    assert p._ambilight.events[-1][0] == "start"
+    kind, options = p._audio.events[-1]
+    assert kind == "start" and callable(options["on_level"])
+
+
+def test_plain_ambilight_keeps_audio_stopped(main_module):
+    p = _aurora(main_module, audio=False)
+    p._apply()
+    assert p._audio.events[-1] == ("stop",)
+
+
+def test_aurora_scales_the_screen_colors_with_the_sound(main_module):
+    p = _aurora(main_module)
+    p._audio.level = 0.0
+    p._render([(200, 100, 0), (0, 0, 40)])
+    assert p._controller.calls[-1][1] == [(50, 25, 0), (0, 0, 10)]
+    p._audio.level = 1.0
+    p._render([(200, 100, 0), (0, 0, 40)])
+    assert p._controller.calls[-1][1] == [(200, 100, 0), (0, 0, 40)]
+
+
+def test_aurora_level_repaints_the_last_screen_frame(main_module):
+    p = _aurora(main_module)
+    p._capabilities["maxRenderFps"] = 30
+    p._audio.level = 1.0
+    p._render([(200, 100, 0), (0, 0, 40)])
+    p._last_render_at = 0.0
+    p._audio.level = 0.5
+    p._on_aurora_level(0.5)
+    assert p._controller.calls[-1][1] == [(125, 63, 0), (0, 0, 25)]
+
+
+def test_aurora_level_respects_device_cadence(main_module):
+    p = _aurora(main_module)
+    p._capabilities["maxRenderFps"] = 2
+    p._render([(200, 100, 0), (0, 0, 40)])
+    calls = len(p._controller.calls)
+    p._on_aurora_level(0.5)
+    assert len(p._controller.calls) == calls
+
+
+def test_aurora_does_not_touch_other_modes(main_module):
+    p = _plugin(main_module, "effect", hw=False)
+    p._settings["ambilight"] = {**p._settings["ambilight"], "audio": True}
+    p._render([(200, 100, 0), (0, 0, 40)])
+    assert p._controller.calls[-1][1] == [(200, 100, 0), (0, 0, 40)]
+
+
+def test_ambilight_audio_is_a_profile_setting(main_module):
+    p = _aurora(main_module, audio=False)
+    p._store = types.SimpleNamespace(save=lambda state: None)
+    asyncio.run(p.patch_profile("global", None, {"ambilight": {"audio": True}}))
+    assert p._settings["ambilight"]["audio"] is True
+    assert p._audio.events[-1][0] == "start"
+
+
+def test_aurora_waits_for_the_meter_before_dimming(main_module):
+    p = _aurora(main_module)
+    p._audio.status = "idle"
+    p._render([(200, 100, 0), (0, 0, 40)])
+    assert p._controller.calls[-1][1] == [(200, 100, 0), (0, 0, 40)]
+
+
+def test_settings_change_forgets_the_aurora_frame(main_module):
+    p = _aurora(main_module)
+    p._render([(200, 100, 0), (0, 0, 40)])
+    p._apply()
+    p._controller.calls.clear()
+    p._last_render_at = 0.0
+    p._on_aurora_level(0.5)
+    assert p._controller.calls == []
+
+
+def test_aurora_without_audio_falls_back_to_plain_ambilight(main_module):
+    p = _aurora(main_module)
+    p._audio.status = "no_source"
+    p._render([(200, 100, 0), (0, 0, 40)])
+    assert p._controller.calls[-1][1] == [(200, 100, 0), (0, 0, 40)]
+def _styles_plugin(main_module, tmp_path):
+    p = _plugin(main_module, "solid")
+    p._settings.update(
+        styles=[],
+        brightness=70,
+        battery_breathe=True,
+        temperature_breathe=True,
+    )
+    p._settings["ambilight"] = {**p._settings["ambilight"], "sampling": "columns"}
+    saved = []
+    p._store = types.SimpleNamespace(save=lambda state: saved.append(dict(state)))
+    return p, saved
+
+
+def test_save_style_captures_the_edited_profile(main_module, tmp_path):
+    p, saved = _styles_plugin(main_module, tmp_path)
+    styles = asyncio.run(p.save_style("global", None, "  Rojo  "))
+    assert [style["name"] for style in styles] == ["Rojo"]
+    assert styles[0]["mode"] == "color"
+    assert styles[0]["colors"] == [{"r": 255, "g": 0, "b": 0}]
+    assert saved[-1]["styles"] == styles
+
+
+def test_apply_style_patches_the_profile(main_module, tmp_path):
+    p, _ = _styles_plugin(main_module, tmp_path)
+    p._settings["styles"] = [{"name": "Azul", "mode": "effect", "colors": [{"r": 0, "g": 0, "b": 255}]}]
+    asyncio.run(p.apply_style("global", None, "azul"))
+    assert p._settings["mode"] == "effect"
+    assert p._settings["color"] == [0, 0, 255]
+
+
+def test_apply_unknown_style_fails(main_module, tmp_path):
+    p, _ = _styles_plugin(main_module, tmp_path)
+    with pytest.raises(ValueError):
+        asyncio.run(p.apply_style("global", None, "nada"))
+
+
+def test_delete_style(main_module, tmp_path):
+    p, saved = _styles_plugin(main_module, tmp_path)
+    p._settings["styles"] = [{"name": "Azul"}, {"name": "Rojo"}]
+    assert [s["name"] for s in asyncio.run(p.delete_style("AZUL"))] == ["Rojo"]
+    assert saved[-1]["styles"] == [{"name": "Rojo"}]
+
+
+def test_export_and_import_styles_through_a_file(main_module, tmp_path, monkeypatch):
+    p, _ = _styles_plugin(main_module, tmp_path)
+    monkeypatch.setattr(main_module, "_user_home", lambda: str(tmp_path))
+    monkeypatch.setattr(main_module, "_user_creds", lambda: ("/run/user/1000", None, None))
+    p._settings["styles"] = [{"name": "Azul", "mode": "color"}]
+
+    exported = asyncio.run(p.export_styles())
+    assert exported["count"] == 1
+    path = exported["path"]
+
+    p._settings["styles"] = [{"name": "Rojo", "mode": "color"}]
+    result = asyncio.run(p.import_styles(path))
+    assert [s["name"] for s in result["styles"]] == ["Rojo", "Azul"]
+    assert (result["added"], result["replaced"], result["skipped"]) == (1, 0, 0)
+    assert result["imported"] == ["Azul"]
+
+
+def test_import_rejects_files_that_are_not_json_or_too_big(main_module, tmp_path):
+    p, _ = _styles_plugin(main_module, tmp_path)
+    big = tmp_path / "big.json"
+    big.write_text(" " * (main_module.STYLES_FILE_LIMIT + 1))
+    with pytest.raises(ValueError):
+        asyncio.run(p.import_styles(str(big)))
+    other = tmp_path / "notes.txt"
+    other.write_text("{}")
+    with pytest.raises(ValueError):
+        asyncio.run(p.import_styles(str(other)))
+
+
+def test_export_replaces_a_planted_symlink_without_following_it(main_module, tmp_path, monkeypatch):
+    p, _ = _styles_plugin(main_module, tmp_path)
+    monkeypatch.setattr(main_module, "_user_home", lambda: str(tmp_path))
+    monkeypatch.setattr(main_module, "_user_creds", lambda: ("/run/user/1000", None, None))
+    target = tmp_path / "victim.txt"
+    target.write_text("keep")
+    (tmp_path / "Documents").mkdir()
+    (tmp_path / "Documents" / "Colores").mkdir()
+    planted = tmp_path / "Documents" / "Colores" / "colores-estilos.json"
+    planted.symlink_to(target)
+    p._settings["styles"] = [{"name": "Azul"}]
+
+    asyncio.run(p.export_styles())
+
+    assert target.read_text() == "keep"
+    assert not planted.is_symlink()
+    assert json.loads(planted.read_text())["styles"] == [{"name": "Azul"}]
+
+
+def test_export_refuses_a_symlinked_folder(main_module, tmp_path, monkeypatch):
+    p, _ = _styles_plugin(main_module, tmp_path)
+    monkeypatch.setattr(main_module, "_user_home", lambda: str(tmp_path))
+    monkeypatch.setattr(main_module, "_user_creds", lambda: ("/run/user/1000", None, None))
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (tmp_path / "Documents").symlink_to(elsewhere)
+
+    with pytest.raises(OSError):
+        asyncio.run(p.export_styles())
+    assert list(elsewhere.iterdir()) == []
+
+
+def test_save_style_fails_when_the_list_is_full(main_module, tmp_path):
+    p, _ = _styles_plugin(main_module, tmp_path)
+    p._settings["styles"] = [{"name": f"Estilo {i}"} for i in range(50)]
+    with pytest.raises(ValueError):
+        asyncio.run(p.save_style("global", None, "Uno más"))
+
+
+def test_import_rejects_deeply_nested_json(main_module, tmp_path):
+    p, _ = _styles_plugin(main_module, tmp_path)
+    bomb = tmp_path / "bomb.json"
+    bomb.write_text("[" * 100000)
+    with pytest.raises(ValueError):
+        asyncio.run(p.import_styles(str(bomb)))

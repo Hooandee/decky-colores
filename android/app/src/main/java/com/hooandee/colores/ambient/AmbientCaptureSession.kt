@@ -10,6 +10,7 @@ data class AmbientCaptureConfig(
     val supportsPerZone: Boolean,
     val captureFps: Int,
     val samplingMode: AmbientSamplingMode,
+    val audio: Boolean = false,
 )
 
 object AmbientCaptureCadence {

@@ -4,6 +4,7 @@ import os
 
 
 _NESTED_FIELDS = {"effect", "ambilight"}
+AMBILIGHT_SAMPLING_MODES = ("columns", "bottom_edge")
 
 
 def _integer(value, fallback, minimum=0, maximum=100):
@@ -214,7 +215,8 @@ class LightingProfileStore:
             "vividness": _integer(raw_ambient.get("vividness"), base_ambient["vividness"]),
             "smoothing": _integer(raw_ambient.get("smoothing"), base_ambient["smoothing"]),
             "fps": _integer(raw_ambient.get("fps"), base_ambient["fps"], 1, 60),
-            "sampling": sampling if sampling in ("columns", "average") else base_ambient["sampling"],
+            "sampling": sampling if sampling in AMBILIGHT_SAMPLING_MODES else base_ambient["sampling"],
+            "audio": _boolean(raw_ambient.get("audio"), base_ambient.get("audio", False)),
         }
         result["battery_breathe"] = _boolean(
             source.get("battery_breathe"), base["battery_breathe"]

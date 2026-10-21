@@ -39,6 +39,7 @@ class AudioReactive:
         self._task = None
         self._proc = None
         self._level = 0.0
+        self._on_level = None
         self.status = "idle"
 
     @property
@@ -56,9 +57,12 @@ class AudioReactive:
         return user_cred(self._uid, self._gid)
 
     def start(self, options=None):
-        if self.running:
+        on_level = (options or {}).get("on_level")
+        if self.running and (on_level is None) == (self._on_level is None):
+            self._on_level = on_level
             return
         self.stop()
+        self._on_level = on_level
         self._task = asyncio.get_event_loop().create_task(self._run())
 
     def stop(self):
@@ -76,6 +80,13 @@ class AudioReactive:
             except ProcessLookupError:
                 pass
             self._proc = None
+
+    def _emit(self, target):
+        level = self._ease(target)
+        if self._on_level is not None:
+            self._on_level(level)
+        else:
+            self._apply(frame_vu(level, self._zones))
 
     def _ease(self, target):
         alpha = 0.6 if target > self._level else 0.2
@@ -101,7 +112,7 @@ class AudioReactive:
                 self.status = "running"
                 while True:
                     data = await proc.stdout.readexactly(CHUNK * 2)
-                    self._apply(frame_vu(self._ease(_level_from_pcm(data)), self._zones))
+                    self._emit(_level_from_pcm(data))
             except asyncio.IncompleteReadError:
                 self.status = "no_source"
             except asyncio.CancelledError:

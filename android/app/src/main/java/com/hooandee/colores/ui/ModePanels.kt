@@ -102,6 +102,7 @@ data class ModeActions(
     val onAmbientSamplingModeChange: (AmbientSamplingMode) -> Unit,
     val onAmbientVividnessChange: (Int) -> Unit,
     val onAmbientSmoothingChange: (Int) -> Unit,
+    val onAmbientAudioChange: (Boolean) -> Unit = {},
 )
 
 @Composable
@@ -991,6 +992,7 @@ private fun AmbientPanel(
             )
         },
     )
+    AmbientAudioRow(state.ambientAudio, state.canWrite, actions.onAmbientAudioChange)
     BrightnessRow(state, onBrightnessChange)
 }
 
@@ -1584,14 +1586,7 @@ private fun BrightnessRow(
     onBrightnessChange: (Int) -> Unit,
 ) {
     if (!state.brightnessEnabled) return
-    DeferredIntSlider(
-        label = stringResource(R.string.brightness_title),
-        committedValue = state.ledState.brightness,
-        valueLabel = { stringResource(R.string.brightness_value, it) },
-        onValueCommit = onBrightnessChange,
-        valueRange = 0..100,
-        enabled = state.canWrite,
-    )
+    LedBrightnessSlider(state, onBrightnessChange)
 }
 
 @Composable
@@ -1659,6 +1654,7 @@ internal fun ValueSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
     enabled: Boolean,
+    labelAccessory: (@Composable () -> Unit)? = null,
 ) {
     Column {
         Row(
@@ -1666,7 +1662,10 @@ internal fun ValueSlider(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
+                labelAccessory?.invoke()
+            }
             Spacer(Modifier.width(12.dp))
             Text(valueLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }

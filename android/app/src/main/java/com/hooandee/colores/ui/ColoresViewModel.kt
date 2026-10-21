@@ -50,6 +50,7 @@ import com.hooandee.colores.device.learning.learnedBindingNeedsRevalidation
 import com.hooandee.colores.device.learning.learnedDeviceIdForPromotion
 import com.hooandee.colores.device.learning.resultsFor
 import com.hooandee.colores.device.learning.summary
+import com.hooandee.colores.engine.ColorCalibration
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.AudioSensitivity
@@ -58,6 +59,7 @@ import com.hooandee.colores.engine.EffectNeed
 import com.hooandee.colores.engine.EffectPreset
 import com.hooandee.colores.engine.SensorBand
 import com.hooandee.colores.engine.SensorKind
+import com.hooandee.colores.effects.CaptureReminder
 import com.hooandee.colores.effects.EffectsService
 import com.hooandee.colores.gradient.DeviceGradientPreferences
 import com.hooandee.colores.gradient.GradientInterpolator
@@ -81,6 +83,9 @@ import com.hooandee.colores.profiles.ProfileAutomationStatus
 import com.hooandee.colores.profiles.ProfilePatch
 import com.hooandee.colores.profiles.ProfileScope
 import com.hooandee.colores.profiles.ProfileScopeState
+import com.hooandee.colores.profiles.SavedStyle
+import com.hooandee.colores.profiles.SavedStyles
+import com.hooandee.colores.profiles.StyleStore
 import com.hooandee.colores.report.AndroidReportSnapshot
 import com.hooandee.colores.report.ColoresLog
 import com.hooandee.colores.report.ProcessLogcat
@@ -102,6 +107,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 data class ColoresUiState(
@@ -115,6 +122,8 @@ data class ColoresUiState(
     val controlAccess: ControlAccess = ControlAccess.SERVICE_UNAVAILABLE,
     val mode: AppMode = AppMode.COLOR,
     val profileStoredMode: AppMode = AppMode.COLOR,
+    val styles: List<SavedStyle> = emptyList(),
+    val styleNotice: StyleNotice? = null,
     val effects: List<EffectPreset> = emptyList(),
     val effectId: String = "breathing",
     val speed: Int = 50,
@@ -135,6 +144,9 @@ data class ColoresUiState(
     val gradientPresentation: GradientPresentation? = null,
     val gradient: GradientUiState = GradientUiState(),
     val chargerOnly: Boolean = false,
+    val smartBrightness: Boolean = false,
+    val ledBrightness: Int = 100,
+    val colorCalibration: ColorCalibration = ColorCalibration.NEUTRAL,
     val batteryBreathe: Boolean = true,
     val temperatureBreathe: Boolean = true,
     val sensorBandDefaults: BandSet = BandSet.FALLBACK,
@@ -154,6 +166,7 @@ data class ColoresUiState(
     val ambientSamplingMode: AmbientSamplingMode = AmbientSamplingMode.FULL_SCENE,
     val ambientVividness: Int = 35,
     val ambientSmoothing: Int = 45,
+    val ambientAudio: Boolean = false,
     val profileScope: ProfileScope = ProfileScope.Global,
     val profileApps: List<LaunchableApp> = emptyList(),
     val configuredProfiles: List<ConfiguredProfile> = emptyList(),
@@ -301,6 +314,11 @@ class ColoresViewModel(
     private val ledPreviewPreferences = LedPreviewPreferences(application)
     private val gradientPreferences = GradientPreferences(application)
     private val lightingPreferences = LightingPreferences(application)
+    private val styleStore = StyleStore(application)
+    private val styleWrites = Mutex()
+
+    @Volatile
+    private var stylesLoaded = false
     private val deviceIdentityCatalog =
         AndroidDeviceIdentityCatalog.parse(runCatching { application.readAsset("android-device-identities.json") }.getOrDefault(""))
     private val gradientPresets = GradientPresetRepository(application).load()
@@ -327,6 +345,9 @@ class ColoresViewModel(
                         effectivePower = snap.effectivePower,
                         currentFrame = snap.currentFrame,
                         chargerOnly = snap.chargerOnly,
+                        smartBrightness = snap.smartBrightness,
+                        ledBrightness = snap.ledBrightness,
+                        colorCalibration = snap.colorCalibration,
                         batteryBreathe = snap.batteryBreathe,
                         temperatureBreathe = snap.temperatureBreathe,
                         charging = snap.charging,
@@ -342,6 +363,7 @@ class ColoresViewModel(
                         ambient = snap.ambient,
                         ambientVividness = snap.ambientVividness,
                         ambientSmoothing = snap.ambientSmoothing,
+                        ambientAudio = snap.ambientAudio,
                         ledState = current.ledState.copy(power = snap.powerRequested, brightness = snap.brightness),
                     )
                 }
@@ -558,6 +580,7 @@ class ColoresViewModel(
                                         temperature = SysfsThermalSource().takeIf { it.available },
                                         performance = PerformanceSources.detect(),
                                         audio = coloresApplication.audioLevelSource,
+                                        ambientAudio = coloresApplication.ambientAudioSource,
                                         ambient = coloresApplication.ambientFrameSource,
                                     ),
                                     LightingIntent(
@@ -576,12 +599,15 @@ class ColoresViewModel(
                                         brightness = selectedProfile.brightness,
                                         power = power,
                                         chargerOnly = storedLighting.chargerOnly,
+                                        smartBrightness = storedLighting.smartBrightness,
+                                        colorCalibration = storedLighting.colorCalibration,
                                         batteryBreathe = selectedProfile.batteryBreathe,
                                         temperatureBreathe = selectedProfile.temperatureBreathe,
                                         audioScale = storedLighting.audioScale,
                                         audioSensitivityDb = storedLighting.audioSensitivityDb,
                                         ambientVividness = storedLighting.ambientVividness,
                                         ambientSmoothing = storedLighting.ambientSmoothing,
+                                        ambientAudio = storedLighting.ambientAudio,
                                     ),
                                 )
                                 handoff.markBound()
@@ -637,6 +663,7 @@ class ColoresViewModel(
                             ambientSamplingMode = storedLighting.ambientSamplingMode,
                             ambientVividness = storedLighting.ambientVividness,
                             ambientSmoothing = storedLighting.ambientSmoothing,
+                            ambientAudio = storedLighting.ambientAudio,
                             profileApps = apps,
                             configuredProfiles = configuredProfiles,
                             profileScopeState = scopeState,
@@ -921,6 +948,98 @@ class ColoresViewModel(
         super.onCleared()
     }
 
+    fun loadStyles() {
+        if (stylesLoaded) {
+            mutableState.update { it.copy(styleNotice = null) }
+            return
+        }
+        viewModelScope.launch {
+            val styles = withContext(Dispatchers.IO) { styleWrites.withLock { styleStore.load() } }
+            if (stylesLoaded) return@launch
+            stylesLoaded = true
+            mutableState.update { it.copy(styles = styles, styleNotice = null) }
+        }
+    }
+
+    fun saveStyle(name: String) {
+        val current = mutableState.value
+        val profile = profileCoordinator.selectedProfile(current.profileScope) ?: return
+        val style = SavedStyles.fromProfile(name, profile, current.ambientVividness, current.ambientSmoothing)
+        if (style == null) {
+            mutableState.update { it.copy(styleNotice = StyleNotice.Failed) }
+            return
+        }
+        val merge = SavedStyles.merge(current.styles, listOf(style))
+        if (merge.added == 0 && merge.replaced == 0) {
+            mutableState.update { it.copy(styleNotice = StyleNotice.Full) }
+            return
+        }
+        storeStyles(merge.styles, StyleNotice.Saved)
+    }
+
+    fun deleteStyle(name: String) = storeStyles(SavedStyles.remove(mutableState.value.styles, name), null)
+
+    fun applyStyle(name: String) {
+        val current = mutableState.value
+        if (!current.canWrite) return
+        val style = current.styles.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: return
+        val scope = current.profileScope
+        val base = profileCoordinator.selectedProfile(scope) ?: return
+        val profile = style.applyTo(base)
+        profileCoordinator.edit(scope, profile.toPatch())
+        val scopeState = if (scope is ProfileScope.App) ProfileScopeState(true, false) else current.profileScopeState
+        applyProfileToState(scope, profile, scopeState)
+        style.ambientVividness?.let(::setAmbientVividness)
+        style.ambientSmoothing?.let(::setAmbientSmoothing)
+        if (scope == ProfileScope.Global) persistGlobalModifiers() else refreshConfiguredProfiles()
+        ColoresLog.action("apply_style")
+        mutableState.update { it.copy(styleNotice = StyleNotice.Applied(style.name)) }
+    }
+
+    fun exportStyles(uri: android.net.Uri) {
+        val styles = mutableState.value.styles
+        viewModelScope.launch {
+            val written =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        getApplication<Application>().contentResolver.openOutputStream(uri, "wt")!!.use {
+                            it.write(SavedStyles.document(styles).toByteArray())
+                        }
+                    }
+                }
+            mutableState.update { it.copy(styleNotice = if (written.isSuccess) StyleNotice.Exported(styles.size) else StyleNotice.Failed) }
+        }
+    }
+
+    fun importStyles(uri: android.net.Uri) {
+        viewModelScope.launch {
+            val imported =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                        val text =
+                            getApplication<Application>().contentResolver.openInputStream(uri)!!.use { it.readLimited(STYLES_FILE_LIMIT) }
+                        SavedStyles.importDocument(String(text))
+                    }
+                }
+            val (styles, _) = imported.getOrElse {
+                ColoresLog.w("ColoresStyles", "styles import failed", it)
+                mutableState.update { state -> state.copy(styleNotice = StyleNotice.Failed) }
+                return@launch
+            }
+            val merge = SavedStyles.merge(mutableState.value.styles, styles)
+            storeStyles(merge.styles, StyleNotice.Imported(merge.added, merge.replaced))
+        }
+    }
+
+    private fun storeStyles(
+        styles: List<SavedStyle>,
+        notice: StyleNotice?,
+    ) {
+        stylesLoaded = true
+        mutableState.update { it.copy(styles = styles, styleNotice = notice) }
+        viewModelScope.launch(Dispatchers.IO) { styleWrites.withLock { styleStore.save(mutableState.value.styles) } }
+    }
+
     fun forgetLearnedHardware() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) { coloresApplication.hardwareLearningStore.clearBinding() }
@@ -1145,6 +1264,7 @@ class ColoresViewModel(
     fun setAppMode(mode: AppMode) {
         val current = mutableState.value
         if (!current.canWrite) return
+        CaptureReminder.cancel(getApplication())
         val target = current.appModeTarget(mode) ?: return
         if (target == current.mode && target == current.profileStoredMode) return
         if (target == AppMode.GRADIENT && !current.gradientAvailable) return
@@ -1206,6 +1326,7 @@ class ColoresViewModel(
     }
 
     fun setPower(power: Boolean) {
+        if (!power) CaptureReminder.cancel(getApplication())
         controller.setPower(power)
         mutableState.update { it.copy(ledState = it.ledState.copy(power = power)) }
         persistGlobalModifiers()
@@ -1292,6 +1413,13 @@ class ColoresViewModel(
         persistGlobalModifiers()
     }
 
+    fun setAmbientAudio(enabled: Boolean) {
+        controller.setAmbientAudio(enabled)
+        mutableState.update { it.copy(ambientAudio = enabled) }
+        persistGlobalModifiers()
+        updateActiveAmbientConfig()
+    }
+
     fun setBrightness(brightness: Int) {
         val clamped = brightness.coerceIn(0, 100)
         controller.setBrightness(clamped)
@@ -1302,6 +1430,25 @@ class ColoresViewModel(
     fun setChargerOnly(enabled: Boolean) {
         controller.setChargerOnly(enabled)
         mutableState.update { it.copy(chargerOnly = enabled) }
+        persistGlobalModifiers()
+    }
+
+    fun setSmartBrightness(enabled: Boolean) {
+        controller.setSmartBrightness(enabled)
+        mutableState.update { it.copy(smartBrightness = enabled) }
+        persistGlobalModifiers()
+    }
+
+    fun previewColorCalibration(
+        calibration: ColorCalibration?,
+        sample: RgbColor,
+    ) {
+        controller.previewColorCalibration(calibration, sample)
+    }
+
+    fun setColorCalibration(calibration: ColorCalibration) {
+        controller.setColorCalibration(calibration)
+        mutableState.update { it.copy(colorCalibration = calibration) }
         persistGlobalModifiers()
     }
 
@@ -1561,6 +1708,8 @@ class ColoresViewModel(
                 brightness = global.brightness,
                 power = current.ledState.power,
                 chargerOnly = current.chargerOnly,
+                smartBrightness = current.smartBrightness,
+                colorCalibration = current.colorCalibration,
                 batteryBreathe = global.batteryBreathe,
                 temperatureBreathe = global.temperatureBreathe,
                 audioScale = current.audioScale,
@@ -1569,6 +1718,7 @@ class ColoresViewModel(
                 ambientSamplingMode = current.ambientSamplingMode,
                 ambientVividness = current.ambientVividness,
                 ambientSmoothing = current.ambientSmoothing,
+                ambientAudio = current.ambientAudio,
                 sensorBands = current.sensorBands,
             ),
         )
@@ -1576,6 +1726,7 @@ class ColoresViewModel(
 
     private fun updateActiveAmbientConfig() {
         val current = mutableState.value
+        if (current.mode == AppMode.AMBIENT) current.ambientCaptureConfig()?.let { coloresApplication.lastAmbientConfig = it }
         if (
             current.mode == AppMode.AMBIENT &&
             current.ambient.status.keepsCaptureActive
@@ -1611,6 +1762,7 @@ private fun ColoresUiState.ambientCaptureConfig(): AmbientCaptureConfig? {
         supportsPerZone = device.capabilities.perZone,
         captureFps = ambientCaptureFps,
         samplingMode = ambientSamplingMode,
+        audio = ambientAudio,
     )
 }
 
@@ -1645,3 +1797,45 @@ private fun LedDevice.effectPresets(catalog: EffectCatalog): List<EffectPreset> 
 
 private fun HardwareLearningUiState.withRollback(rollback: HardwareRollbackState): HardwareLearningUiState =
     copy(journalPending = rollback.pending, recoveryAttempts = rollback.attempts)
+
+sealed interface StyleNotice {
+    data object Saved : StyleNotice
+
+    data class Applied(val name: String) : StyleNotice
+
+    data class Exported(val count: Int) : StyleNotice
+
+    data class Imported(val added: Int, val replaced: Int) : StyleNotice
+
+    data object Full : StyleNotice
+
+    data object Failed : StyleNotice
+}
+
+private const val STYLES_FILE_LIMIT = 256 * 1024
+
+private fun java.io.InputStream.readLimited(limit: Int): ByteArray {
+    val output = java.io.ByteArrayOutputStream()
+    val buffer = ByteArray(8 * 1024)
+    while (true) {
+        val count = read(buffer)
+        if (count < 0) return output.toByteArray()
+        output.write(buffer, 0, count)
+        require(output.size() <= limit) { "styles file too big" }
+    }
+}
+
+private fun LightingProfile.toPatch(): ProfilePatch =
+    ProfilePatch(
+        mode = mode,
+        effectId = effectId,
+        speed = speed,
+        gradientSpeed = gradientSpeed,
+        effectUsesGradient = effectUsesGradient,
+        solidColor = solidColor,
+        staticColors = staticColors,
+        gradientStops = gradientStops,
+        brightness = brightness,
+        batteryBreathe = batteryBreathe,
+        temperatureBreathe = temperatureBreathe,
+    )
