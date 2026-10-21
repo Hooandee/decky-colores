@@ -383,6 +383,10 @@ const NAME_PARTS: Record<Lang, { adjectives: string[]; nouns: string[] }> = {
     adjectives: ["elétrico", "cósmico", "disco", "pastel", "neon", "selvagem", "turbo", "místico", "picante", "radiante"],
     nouns: ["Pôr do sol", "Unicórnio", "Oceano", "Polvo", "Trovão", "Gato", "Dragão", "Flamingo", "Tucano", "Cacto"],
   },
+  fr: {
+    adjectives: ["électrique", "cosmique", "disco", "pastel", "néon", "sauvage", "turbo", "mystique", "épicé", "rêveur"],
+    nouns: ["Crépuscule", "Orage", "Océan", "Poulpe", "Tonnerre", "Chat", "Dragon", "Flamant rose", "Toucan", "Cactus"],
+  },
 };
 
 export function suggestGradientName(lang: Lang): string {
