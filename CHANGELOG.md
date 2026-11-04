@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.34.1...decky-colores-v0.35.0) (2026-11-04)
+
+
+### Features
+
+* smart brightness, color calibration, Ambi Aurora, smarter Ambilight and saved presets ([#202](https://github.com/Hooandee/decky-colores/issues/202)) ([e5171fa](https://github.com/Hooandee/decky-colores/commit/e5171fa43f177e701bc37aa051d8df6784bc67c2))
+
 ## [0.34.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.34.0...decky-colores-v0.34.1) (2026-10-21)
 
 
