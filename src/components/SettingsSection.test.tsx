@@ -13,6 +13,7 @@ vi.mock("@decky/ui", () => ({
 }));
 
 vi.mock("../api", () => ({ getVersion: vi.fn() }));
+vi.mock("./StylesModal", () => ({ openStylesModal: vi.fn() }));
 vi.mock("../i18n", () => ({
   LanguageSelector: () => null,
   useI18n: () => ({ t: (key: string) => key }),
@@ -52,7 +53,16 @@ const capabilities = {
   layoutKind: "rings",
 } as Capabilities;
 
-const renderSettings = (caps: Capabilities) =>
+
+const styleActions = {
+  save: vi.fn(),
+  apply: vi.fn(),
+  remove: vi.fn(),
+  exportAll: vi.fn(),
+  importFrom: vi.fn(),
+};
+
+const renderSettings = (caps: Capabilities, withStyles = false) =>
   renderToStaticMarkup(
     <SettingsSection
       caps={caps}
@@ -64,6 +74,9 @@ const renderSettings = (caps: Capabilities) =>
       powerLedAwakeOff={false}
       powerLedSuspendOff={true}
       sleepChargingIndicator={false}
+      colorCalibration={{ yellow: 0, orange: 0, white: 0 }}
+      onColorCalibration={() => {}}
+      styleActions={withStyles ? styleActions : undefined}
       onForceControl={() => {}}
       onPowerLed={() => {}}
       onPowerLedState={() => {}}
@@ -104,5 +117,19 @@ describe("SettingsSection sleep charging indicator", () => {
 
     expect(supported).toContain("sleepCharging.label");
     expect(unsupported).not.toContain("sleepCharging.label");
+  });
+});
+
+describe("SettingsSection color calibration", () => {
+  it("offers calibration only when the LEDs take color", () => {
+    expect(renderSettings({ ...capabilities, color: true })).toContain("calibration.button");
+    expect(renderSettings({ ...capabilities, color: false })).not.toContain("calibration.button");
+  });
+});
+
+describe("SettingsSection saved presets", () => {
+  it("lists saved presets in settings when the LEDs take color", () => {
+    expect(renderSettings({ ...capabilities, color: true }, true)).toContain("styles.button");
+    expect(renderSettings({ ...capabilities, color: false }, true)).not.toContain("styles.button");
   });
 });

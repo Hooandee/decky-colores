@@ -6,8 +6,10 @@ import com.hooandee.colores.ambient.AmbientFrameSource
 import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.audio.AudioLevelSource
+import com.hooandee.colores.audio.AudioLevelState
 import com.hooandee.colores.audio.MutableAudioLevelSource
 import com.hooandee.colores.engine.BandSet
+import com.hooandee.colores.engine.ColorCalibration
 import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.EffectCatalog
 import com.hooandee.colores.engine.SensorBand
@@ -143,7 +145,8 @@ class LightingControllerTest {
         zones: Int = 2,
         audio: AudioLevelSource = MutableAudioLevelSource(),
         ambient: AmbientFrameSource = MutableAmbientFrameSource(),
-    ) = LightingBinding("dev", device, zones, catalog, bands, battery, temperature, performance, audio, ambient)
+        ambientAudio: AudioLevelSource = MutableAudioLevelSource(),
+    ) = LightingBinding("dev", device, zones, catalog, bands, battery, temperature, performance, audio, ambient, ambientAudio)
 
     @Test
     fun `effect mode falls back to color when the device offers no effects`() =
@@ -956,5 +959,242 @@ class LightingControllerTest {
 
             assertTrue(controller.snapshot.value.temperatureAvailable)
             assertEquals(0, probes)
+        }
+    @Test
+    fun `smart brightness off keeps the user brightness`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(device), LightingIntent(brightness = 80))
+            controller.setScreenLevel(0.2f)
+            advanceTimeBy(1_000)
+            runCurrent()
+            assertEquals(80, device.writes.last().brightness)
+        }
+
+    @Test
+    fun `smart brightness eases a static color down to the screen level`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(device), LightingIntent(brightness = 80, smartBrightness = true))
+            controller.setScreenLevel(1f)
+            advanceTimeBy(1_000)
+            runCurrent()
+            val before = device.writes.size
+            assertEquals(80, device.writes.last().brightness)
+
+            controller.setScreenLevel(0.5f)
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            val ramp = device.writes.drop(before).map { it.brightness }
+            assertTrue(ramp.size >= 3)
+            assertEquals(ramp.sortedDescending(), ramp)
+            assertEquals(40, ramp.last())
+            assertEquals(40, controller.snapshot.value.ledBrightness)
+        }
+
+    @Test
+    fun `smart brightness applies at once when the screen level is already known`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.setScreenLevel(0.25f)
+            controller.bind(binding(device), LightingIntent(brightness = 80, smartBrightness = true))
+            advanceTimeBy(20)
+            runCurrent()
+            assertEquals(20, device.writes.first().brightness)
+        }
+
+    @Test
+    fun `smart brightness rewrites a hardware effect only once the ramp settles`() =
+        runTest {
+            val device = FakeDevice(hardwareEffects = listOf(HardwareEffect("breathing", 1, 50, emptyList())), softwareEffects = false)
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.setScreenLevel(1f)
+            controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT, effectId = "breathing", smartBrightness = true))
+            advanceTimeBy(1_000)
+            runCurrent()
+            val before = device.hardwareEffectWrites
+
+            controller.setScreenLevel(0.3f)
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            assertEquals(before + 1, device.hardwareEffectWrites)
+        }
+
+    @Test
+    fun `software effects pick up the screen level on their next frames`() =
+        runTest {
+            val device = FakeDevice(recommendedFrameIntervalMs = 80)
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.setScreenLevel(1f)
+            controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT, effectId = "rainbow", brightness = 60, smartBrightness = true))
+            advanceTimeBy(500)
+            runCurrent()
+
+            controller.setScreenLevel(0.5f)
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            assertEquals(30, device.writes.last().brightness)
+        }
+
+    @Test
+    fun `turning smart brightness off eases back to the user brightness`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.setScreenLevel(0.5f)
+            controller.bind(binding(device), LightingIntent(brightness = 80, smartBrightness = true))
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            controller.setSmartBrightness(false)
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            assertEquals(80, device.writes.last().brightness)
+            assertFalse(controller.snapshot.value.smartBrightness)
+        }
+
+    @Test
+    fun `unknown screen level holds the last applied brightness`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.setScreenLevel(0.5f)
+            controller.bind(binding(device), LightingIntent(brightness = 80, smartBrightness = true))
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            controller.setScreenLevel(null)
+            advanceTimeBy(1_000)
+            runCurrent()
+
+            assertEquals(40, device.writes.last().brightness)
+        }
+
+    @Test
+    fun `slow indicator loops are woken for the final ramp value`() =
+        runTest {
+            val device = FakeDevice(recommendedFrameIntervalMs = 80)
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.setScreenLevel(1f)
+            controller.bind(binding(device), LightingIntent(mode = AppMode.BATTERY, brightness = 80, smartBrightness = true))
+            advanceTimeBy(3_000)
+            runCurrent()
+
+            controller.setScreenLevel(0.5f)
+            advanceTimeBy(460)
+            runCurrent()
+
+            assertEquals(40, device.writes.last().brightness)
+        }
+
+    @Test
+    fun `color calibration scales static writes`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(
+                binding(device),
+                LightingIntent(staticColors = List(2) { RgbColor(255, 255, 0) }, colorCalibration = ColorCalibration(yellow = 37, orange = -56)),
+            )
+            advanceTimeBy(20)
+            runCurrent()
+            assertEquals(List(2) { RgbColor(161, 255, 0) }, device.writes.last().colors)
+        }
+
+    @Test
+    fun `color calibration scales rendered frames`() =
+        runTest {
+            val device = FakeDevice(recommendedFrameIntervalMs = 80)
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(
+                binding(device),
+                LightingIntent(mode = AppMode.EFFECT, effectId = "rainbow", colorCalibration = ColorCalibration(white = 50)),
+            )
+            advanceTimeBy(500)
+            runCurrent()
+            assertTrue(device.writes.last().colors.all { it.red <= 128 && it.green <= 128 })
+        }
+
+    @Test
+    fun `calibration preview shows the key color, pauses the render loop and lights up when off`() =
+        runTest {
+            val device = FakeDevice(recommendedFrameIntervalMs = 80)
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(device), LightingIntent(mode = AppMode.EFFECT, effectId = "rainbow", power = false))
+            advanceTimeBy(300)
+            runCurrent()
+
+            controller.previewColorCalibration(ColorCalibration(yellow = 37, orange = -56), RgbColor(255, 128, 0))
+            advanceTimeBy(20)
+            runCurrent()
+            val previewWrites = device.writes.size
+            assertEquals(FakeDevice.Write(List(2) { RgbColor(161, 81, 0) }, 100, true), device.writes.last())
+            advanceTimeBy(500)
+            runCurrent()
+            assertEquals(previewWrites, device.writes.size)
+            assertTrue(controller.snapshot.value.calibrationPreview)
+
+            controller.previewColorCalibration(null)
+            advanceTimeBy(20)
+            runCurrent()
+            assertFalse(device.writes.last().power)
+        }
+
+    @Test
+    fun `calibration preview expires on its own`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(device), LightingIntent(staticColors = List(2) { RgbColor(10, 20, 30) }))
+            controller.previewColorCalibration(ColorCalibration(white = 20))
+            advanceTimeBy(LightingController.CALIBRATION_PREVIEW_TIMEOUT_MS + 100)
+            runCurrent()
+            assertFalse(controller.snapshot.value.calibrationPreview)
+            assertEquals(List(2) { RgbColor(10, 20, 30) }, device.writes.last().colors)
+        }
+
+    @Test
+    fun `saving a calibration ends the preview`() =
+        runTest {
+            val device = FakeDevice()
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(binding(device), LightingIntent(staticColors = List(2) { RgbColor(255, 255, 255) }))
+            controller.previewColorCalibration(ColorCalibration(white = 20))
+            controller.setColorCalibration(ColorCalibration(white = -20))
+            advanceTimeBy(20)
+            runCurrent()
+            assertEquals(List(2) { RgbColor(255, 255, 204) }, device.writes.last().colors)
+            assertEquals(ColorCalibration(white = -20), controller.snapshot.value.colorCalibration)
+            assertFalse(controller.snapshot.value.calibrationPreview)
+        }
+
+    @Test
+    fun `aurora dims ambilight with its own audio source`() =
+        runTest {
+            val device = FakeDevice(recommendedFrameIntervalMs = 80)
+            val ambient = MutableAmbientFrameSource().apply { update(List(2) { RgbColor(255, 255, 255) }, AmbientCaptureStatus.CAPTURING, 1L) }
+            val vu = MutableAudioLevelSource(AudioLevelState(1.0, AudioCaptureStatus.CAPTURING))
+            val aurora = MutableAudioLevelSource(AudioLevelState(0.0, AudioCaptureStatus.CAPTURING))
+            val controller = LightingController(backgroundScope, RecordingGate(), clockMs = { testScheduler.currentTime })
+            controller.bind(
+                binding(device, ambient = ambient, audio = vu, ambientAudio = aurora),
+                LightingIntent(mode = AppMode.AMBIENT, ambientSmoothing = 0, ambientVividness = 0, ambientAudio = true),
+            )
+            advanceTimeBy(200)
+            runCurrent()
+            val full = AmbientColorMath.ledIntensity(RgbColor(255, 255, 255))
+            assertTrue(device.writes.last().colors.all { it.red < full.red })
+
+            aurora.update(1.0, AudioCaptureStatus.CAPTURING)
+            advanceTimeBy(200)
+            runCurrent()
+            assertEquals(List(2) { full }, device.writes.last().colors)
         }
 }

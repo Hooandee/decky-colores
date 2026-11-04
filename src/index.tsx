@@ -62,6 +62,8 @@ import { readActiveTab, writeActiveTab, readSensorMode, writeSensorMode } from "
 import { startGameWatcher } from "./apps/gameWatcher";
 import { startSuspendPreparation } from "./lifecycle/suspend";
 import { ProfileScopeSelector } from "./components/ProfileScopeSelector";
+import { openSaveStyleModal } from "./components/StylesModal";
+import { deckyModeOf, SavedStyle } from "./styles";
 import { DeviceHeader } from "./components/DeviceHeader";
 import { theme } from "./theme";
 
@@ -558,6 +560,9 @@ function Content() {
     setBrightness,
     setPower,
     setChargerOnly,
+    setSmartBrightness,
+    setColorCalibration,
+    styleActions,
     setMode,
     setColor,
     setGradient,
@@ -567,6 +572,7 @@ function Content() {
     setEffectGradient,
     setAmbilight,
     setAmbilightSampling,
+    setAmbilightAudio,
     saveGradient,
     deleteGradient,
     setExperiment,
@@ -770,12 +776,14 @@ function Content() {
     powerLedSuspendOff,
     sleepChargingIndicator,
     chargerOnly,
+    smartBrightness,
     forceControl,
     batteryBreathe,
     batteryLevel,
     temperatureBreathe,
     sensorBands,
     rememberStartup,
+    colorCalibration,
   } = state;
   const currentTemp = tempReading ?? state.temperature;
   const hasLeds = capabilities.color || capabilities.brightness;
@@ -849,6 +857,13 @@ function Content() {
       badge: id === PINNED_TAB ? <AlertDot show={hasUpdate} /> : undefined,
     };
   });
+
+  const showStyleTab = (style: SavedStyle) => {
+    const mode = deckyModeOf(style);
+    if (!mode) return;
+    setViewingSettings(false);
+    writeActiveTab(tabForMode(mode as Mode));
+  };
 
   const renderModeContent = () => {
     switch (contentMode) {
@@ -953,6 +968,18 @@ function Content() {
                     }
                   />
                 </div>
+              </PanelSectionRow>
+            )}
+            {capabilities.audioMode && (
+              <PanelSectionRow>
+                <ToggleField
+                  label={t("ambient.audio")}
+                  description={t("ambient.audio.hint")}
+                  checked={!!ambilight.audio}
+                  onChange={setAmbilightAudio}
+                  disabled={!power}
+                  bottomSeparator="none"
+                />
               </PanelSectionRow>
             )}
             <PanelSectionRow>
@@ -1173,7 +1200,7 @@ function Content() {
           <Divider margin="18px 0 12px" />
           <PanelSectionRow>
             <SliderField
-              label={t("brightness.label")}
+              label={t(smartBrightness ? "brightness.max" : "brightness.label")}
               value={brightness}
               min={0}
               max={100}
@@ -1184,7 +1211,32 @@ function Content() {
               onChange={setBrightness}
             />
           </PanelSectionRow>
+          {capabilities.screenBrightness && (
+            <PanelSectionRow>
+              <ToggleField
+                label={t("brightness.smart")}
+                description={t("brightness.smart.hint")}
+                checked={smartBrightness}
+                onChange={setSmartBrightness}
+                disabled={!power}
+                bottomSeparator="none"
+              />
+            </PanelSectionRow>
+          )}
         </>
+      )}
+
+      {showDeviceControls && contentMode && capabilities.color && (
+        <PanelSectionRow>
+          <ButtonItem
+            layout="below"
+            bottomSeparator="none"
+            description={t("styles.saveButton.desc")}
+            onClick={() => openSaveStyleModal(state.styles ?? [], contentMode, styleActions)}
+          >
+            {t("styles.saveButton")}
+          </ButtonItem>
+        </PanelSectionRow>
       )}
 
       {!contentMode && (
@@ -1206,6 +1258,12 @@ function Content() {
             powerLedAwakeOff={powerLedAwakeOff}
             powerLedSuspendOff={powerLedSuspendOff}
             sleepChargingIndicator={sleepChargingIndicator}
+            colorCalibration={colorCalibration}
+            onColorCalibration={setColorCalibration}
+            styles={state.styles}
+            stylesFolder={state.stylesFolder}
+            styleActions={styleActions}
+            onStyleApplied={showStyleTab}
             onForceControl={setForceControl}
             onPowerLed={setPowerLed}
             onPowerLedState={setPowerLedState}
@@ -1225,7 +1283,7 @@ export default definePlugin(() => {
   const stopSuspendPreparation = startSuspendPreparation(prepareSuspend);
   return {
     name: "Colores",
-    titleView: <div className={staticClasses.Title}>Colores</div>,
+    titleView: <div className={staticClasses?.Title}>Colores</div>,
     content: (
       <ErrorBoundary>
         <I18nProvider>

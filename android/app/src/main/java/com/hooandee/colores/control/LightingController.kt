@@ -5,6 +5,7 @@ import com.hooandee.colores.ambient.AmbientFrameSource
 import com.hooandee.colores.ambient.AmbientFrameState
 import com.hooandee.colores.ambient.MutableAmbientFrameSource
 import com.hooandee.colores.ambient.keepsCaptureActive
+import com.hooandee.colores.audio.AudioCaptureStatus
 import com.hooandee.colores.audio.AudioLevelSource
 import com.hooandee.colores.audio.AudioLevelState
 import com.hooandee.colores.audio.MutableAudioLevelSource
@@ -14,14 +15,18 @@ import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.AudioSensitivity
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.ClockRenderer
+import com.hooandee.colores.engine.ColorCalibration
 import com.hooandee.colores.engine.EffectCatalog
 import com.hooandee.colores.engine.EffectNeed
 import com.hooandee.colores.engine.EffectPalette
 import com.hooandee.colores.engine.EffectRenderer
+import com.hooandee.colores.engine.FactorRamp
 import com.hooandee.colores.engine.IndicatorRenderer
 import com.hooandee.colores.engine.PerformanceRenderer
 import com.hooandee.colores.engine.Renderer
+import com.hooandee.colores.engine.ScreenBrightness
 import com.hooandee.colores.engine.StatusTargets
+import com.hooandee.colores.engine.scaled
 import com.hooandee.colores.gradient.GradientInterpolator
 import com.hooandee.colores.gradient.GradientPresentation
 import com.hooandee.colores.led.HardwareEffect
@@ -38,6 +43,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
@@ -45,8 +51,11 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -82,12 +91,20 @@ data class LightingIntent(
     val brightness: Int = 100,
     val power: Boolean = true,
     val chargerOnly: Boolean = false,
+    val smartBrightness: Boolean = false,
     val batteryBreathe: Boolean = true,
     val temperatureBreathe: Boolean = true,
     val audioScale: AudioScale = AudioScale.DEFAULT,
     val audioSensitivityDb: Int = AudioSensitivity.NORMAL_DB,
     val ambientVividness: Int = 35,
     val ambientSmoothing: Int = 45,
+    val colorCalibration: ColorCalibration = ColorCalibration.NEUTRAL,
+    val ambientAudio: Boolean = false,
+)
+
+data class CalibrationPreview(
+    val calibration: ColorCalibration,
+    val sample: RgbColor,
 )
 
 data class LightingBinding(
@@ -101,6 +118,7 @@ data class LightingBinding(
     val performance: PerformanceSource?,
     val audio: AudioLevelSource = MutableAudioLevelSource(),
     val ambient: AmbientFrameSource = MutableAmbientFrameSource(),
+    val ambientAudio: AudioLevelSource = MutableAudioLevelSource(),
 )
 
 data class ProfileApplication(
@@ -184,6 +202,8 @@ data class LightingSnapshot(
     val powerRequested: Boolean = true,
     val effectivePower: Boolean = true,
     val chargerOnly: Boolean = false,
+    val smartBrightness: Boolean = false,
+    val ledBrightness: Int = 100,
     val batteryBreathe: Boolean = true,
     val temperatureBreathe: Boolean = true,
     val charging: Boolean = true,
@@ -199,7 +219,10 @@ data class LightingSnapshot(
     val ambient: AmbientFrameState = AmbientFrameState(),
     val ambientVividness: Int = 35,
     val ambientSmoothing: Int = 45,
+    val ambientAudio: Boolean = false,
     val currentFrame: List<RgbColor> = emptyList(),
+    val colorCalibration: ColorCalibration = ColorCalibration.NEUTRAL,
+    val calibrationPreview: Boolean = false,
 )
 
 enum class ServiceOwner {
@@ -266,6 +289,16 @@ class LightingController(
     private var gradientEditing = false
     private var frozenGradientFrame: List<RgbColor> = emptyList()
     private var writeHealth = WriteHealth("controller")
+    private val screenRamp = FactorRamp(SCREEN_RAMP_MS)
+    private var screenLevel: Float? = null
+    private var rampJob: Job? = null
+    private var rampSettledHandled = true
+    private val brightnessTicks = MutableStateFlow(0L)
+
+    @Volatile
+    private var loopDelayMs = 0L
+    private var calibrationPreview: CalibrationPreview? = null
+    private var calibrationExpiry: Job? = null
 
     private val mutableSnapshot = MutableStateFlow(LightingSnapshot())
     val snapshot: StateFlow<LightingSnapshot> = mutableSnapshot.asStateFlow()
@@ -326,6 +359,17 @@ class LightingController(
 
     fun setPower(power: Boolean) = send(Command.SetPower(power))
 
+    fun setSmartBrightness(enabled: Boolean) = send(Command.SetSmartBrightness(enabled))
+
+    fun setScreenLevel(level: Float?) = send(Command.ScreenLevel(level))
+
+    fun previewColorCalibration(
+        calibration: ColorCalibration?,
+        sample: RgbColor = RgbColor(255, 255, 255),
+    ) = send(Command.PreviewCalibration(calibration?.let { CalibrationPreview(it, sample) }))
+
+    fun setColorCalibration(calibration: ColorCalibration) = send(Command.SetCalibration(calibration))
+
     fun setChargerOnly(chargerOnly: Boolean) = send(Command.SetChargerOnly(chargerOnly))
 
     fun setBatteryBreathe(enabled: Boolean) = send(Command.SetBatteryBreathe(enabled))
@@ -343,6 +387,8 @@ class LightingController(
     fun setAmbientVividness(value: Int) = send(Command.SetAmbientVividness(value))
 
     fun setAmbientSmoothing(value: Int) = send(Command.SetAmbientSmoothing(value))
+
+    fun setAmbientAudio(enabled: Boolean) = send(Command.SetAmbientAudio(enabled))
 
     fun onAmbientStateChanged() = send(Command.AmbientStateChanged)
 
@@ -371,6 +417,24 @@ class LightingController(
             is Command.SetPalette -> mutateIntent { it.copy(solidColor = command.solid, gradientStops = command.stops) }
             is Command.SetBrightness -> mutateIntent { it.copy(brightness = command.brightness.coerceIn(0, 100)) }
             is Command.SetPower -> mutateIntent { it.copy(power = command.power) }
+            is Command.SetSmartBrightness -> {
+                mutateIntent { it.copy(smartBrightness = command.enabled) }
+                retargetScreen()
+            }
+            is Command.ScreenLevel -> onScreenLevel(command.level)
+            is Command.BrightnessTick -> onBrightnessTick()
+            is Command.PreviewCalibration -> onCalibrationPreview(command.preview)
+            is Command.SetCalibration -> {
+                endCalibrationPreview()
+                ColoresLog.state("color_calibration", "${command.calibration.yellow},${command.calibration.orange},${command.calibration.white}")
+                mutateIntent { it.copy(colorCalibration = command.calibration) }
+            }
+            Command.CalibrationPreviewExpired -> {
+                if (calibrationPreview != null) {
+                    endCalibrationPreview()
+                    reconcile()
+                }
+            }
             is Command.SetChargerOnly -> mutateIntent { it.copy(chargerOnly = command.chargerOnly) }
             is Command.SetBatteryBreathe -> mutateIntent { it.copy(batteryBreathe = command.enabled) }
             is Command.SetTemperatureBreathe -> mutateIntent { it.copy(temperatureBreathe = command.enabled) }
@@ -383,6 +447,7 @@ class LightingController(
             is Command.SetAmbientVividness -> mutateIntent { it.copy(ambientVividness = command.value.coerceIn(0, 100)) }
             is Command.SetAmbientSmoothing -> mutateIntent { it.copy(ambientSmoothing = command.value.coerceIn(0, 100)) }
             Command.AmbientStateChanged -> reconcile()
+            is Command.SetAmbientAudio -> mutateIntent { it.copy(ambientAudio = command.enabled) }
             is Command.SetSensorBands -> {
                 sensorBands = command.bands
                 publishSnapshot()
@@ -406,6 +471,7 @@ class LightingController(
         temperatureAvailable =
             temperatureAvailability.onBind(temperatureCelsius != null || command.binding.temperature?.available == true)
         rendererSignature = null
+        screenRamp.snap(screenTarget())
         val level = runCatching { command.binding.battery.read() }.getOrNull()
         if (level != null) {
             charging = level.charging
@@ -417,6 +483,8 @@ class LightingController(
     }
 
     private suspend fun onUnbind() {
+        rampJob?.cancel()
+        rampJob = null
         stopRenderJobAndJoin()
         gradientEditing = false
         frozenGradientFrame = emptyList()
@@ -478,7 +546,7 @@ class LightingController(
 
     private suspend fun reconcile() {
         val binding = binding ?: run { publishSnapshot(); return }
-        ColoresLog.state("lighting", "mode=${intent.mode} power=${intent.power} effective=${effectivePower()} charger_only=${intent.chargerOnly}")
+        ColoresLog.state("lighting", "mode=${intent.mode} power=${intent.power} effective=${effectivePower()} charger_only=${intent.chargerOnly} smart_brightness=${intent.smartBrightness}")
         updateService()
         applyCurrent(binding, manageRenderJob = true)
         publishSnapshot()
@@ -488,6 +556,12 @@ class LightingController(
         binding: LightingBinding,
         manageRenderJob: Boolean,
     ) {
+        val preview = calibrationPreview
+        if (preview != null) {
+            if (manageRenderJob) stopRenderJob()
+            applyCalibrationPreview(binding, preview)
+            return
+        }
         val hwEffect = hardwareEffect(binding)
         when {
             !intent.power -> {
@@ -514,6 +588,40 @@ class LightingController(
         }
     }
 
+    private suspend fun onCalibrationPreview(preview: CalibrationPreview?) {
+        calibrationExpiry?.cancel()
+        calibrationExpiry = null
+        if (preview == null) {
+            endCalibrationPreview()
+        } else {
+            if (calibrationPreview == null) ColoresLog.state("calibration_preview", true)
+            calibrationPreview = preview
+            calibrationExpiry =
+                scope.launch {
+                    delay(CALIBRATION_PREVIEW_TIMEOUT_MS)
+                    commands.trySend(Command.CalibrationPreviewExpired)
+                }
+        }
+        reconcile()
+    }
+
+    private fun endCalibrationPreview() {
+        calibrationExpiry?.cancel()
+        calibrationExpiry = null
+        if (calibrationPreview != null) ColoresLog.state("calibration_preview", null)
+        calibrationPreview = null
+    }
+
+    private suspend fun applyCalibrationPreview(
+        binding: LightingBinding,
+        preview: CalibrationPreview,
+    ) {
+        val colors = List(binding.zones) { preview.calibration.apply(preview.sample) }
+        runCatching { binding.device.applyZones(colors, ledBrightness().coerceAtLeast(1), true) }.rethrowCancellation().also { writeHealth.record(it) }
+        lastFrame = List(binding.zones) { preview.sample }
+        publishSnapshot()
+    }
+
     private suspend fun applyHardwareEffect(
         binding: LightingBinding,
         effect: HardwareEffect,
@@ -523,7 +631,7 @@ class LightingController(
         val colors =
             if (effect.colorStops >= 2) listOf(palette.first(), palette.last()) else listOf(intent.solidColor)
         runCatching {
-            binding.device.applyHardwareEffect(effect.id, colors, intent.brightness, intent.speed, effective)
+            binding.device.applyHardwareEffect(effect.id, intent.colorCalibration.apply(colors), ledBrightness(), intent.speed, effective)
         }.rethrowCancellation().also { writeHealth.record(it, mapOf("effect" to effect.id)) }
         lastFrame = if (effective) List(binding.zones) { colors.first() } else List(binding.zones) { RgbColor(0, 0, 0) }
         publishSnapshot()
@@ -534,13 +642,13 @@ class LightingController(
         val needsService =
             activeBinding != null &&
                 intent.power &&
-                (needsRenderLoop(activeBinding) || intent.chargerOnly)
+                (needsRenderLoop(activeBinding) || intent.chargerOnly || intent.smartBrightness)
         serviceGate.setRequired(ServiceOwner.EFFECTS, needsService)
     }
 
     private suspend fun applyOff(binding: LightingBinding) {
         val colors = binding.offFrame()
-        runCatching { binding.device.applyZones(colors, intent.brightness, false) }.rethrowCancellation().also { writeHealth.record(it) }
+        runCatching { binding.device.applyZones(colors, ledBrightness(), false) }.rethrowCancellation().also { writeHealth.record(it) }
         lastFrame = colors
         publishSnapshot()
     }
@@ -548,7 +656,7 @@ class LightingController(
     private suspend fun applyCaptureUnavailable(binding: LightingBinding) {
         val colors = List(binding.zones) { intent.solidColor }
         val effective = effectivePower()
-        runCatching { binding.device.applyZones(colors, intent.brightness, effective) }.rethrowCancellation().also { writeHealth.record(it) }
+        runCatching { binding.device.applyZones(intent.colorCalibration.apply(colors), ledBrightness(), effective) }.rethrowCancellation().also { writeHealth.record(it) }
         lastFrame = if (effective) colors else binding.offFrame()
         publishSnapshot()
     }
@@ -585,7 +693,7 @@ class LightingController(
                 intent.staticColors.fit(binding.zones)
             }
         val effective = effectivePower()
-        runCatching { binding.device.applyZones(colors, intent.brightness, effective) }.rethrowCancellation().also { writeHealth.record(it) }
+        runCatching { binding.device.applyZones(intent.colorCalibration.apply(colors), ledBrightness(), effective) }.rethrowCancellation().also { writeHealth.record(it) }
         lastFrame = if (effective) colors else List(binding.zones) { RgbColor(0, 0, 0) }
         publishSnapshot()
     }
@@ -602,6 +710,7 @@ class LightingController(
         val binding = binding ?: return
         if (!gradientEditing || (intent.mode != AppMode.GRADIENT && intent.mode != AppMode.EFFECT)) return
         frozenGradientFrame = List(binding.zones) { color }
+        if (calibrationPreview != null) return
         applyStatic()
     }
 
@@ -616,7 +725,7 @@ class LightingController(
             if (myGeneration != generation) return
             if (!effectivePower()) {
                 if (!offApplied) {
-                    runCatching { binding.device.applyZones(binding.offFrame(), intent.brightness, false) }.rethrowCancellation().also { writeHealth.record(it) }
+                    runCatching { binding.device.applyZones(binding.offFrame(), ledBrightness(), false) }.rethrowCancellation().also { writeHealth.record(it) }
                     lastFrame = binding.offFrame()
                     publishSnapshot()
                     offApplied = true
@@ -629,14 +738,17 @@ class LightingController(
                 delay(SCREEN_OFF_IDLE_MS)
                 continue
             }
+            val seenBrightnessTick = brightnessTicks.value
             val nowSeconds = (clockMs() - startMs) / 1000.0
             val tick = renderer.render(nowSeconds)
-            runCatching { binding.device.applyZones(tick.colors, intent.brightness, true) }.rethrowCancellation().also { writeHealth.record(it) }
+            runCatching { binding.device.applyZones(intent.colorCalibration.apply(tick.colors).scaled(tick.intensity), ledBrightness(), true) }.rethrowCancellation().also { writeHealth.record(it) }
             lastFrame = tick.previewColors
             publishSnapshot()
             val waitMs = tick.nextDelayMs.coerceAtLeast(1L)
-            val wake = renderer.wake
-            if (wake == null) delay(waitMs) else withTimeoutOrNull(waitMs) { wake.first() }
+            loopDelayMs = waitMs
+            val brightnessChanged = brightnessTicks.filter { it != seenBrightnessTick }
+            val wake = renderer.wake?.let { merge(it, brightnessChanged) } ?: brightnessChanged
+            withTimeoutOrNull(waitMs) { wake.first() }
         }
     }
 
@@ -714,10 +826,17 @@ class LightingController(
                     smoothing = { intent.ambientSmoothing },
                     state = { binding.ambient.state.value },
                     frames = binding.ambient.state,
+                    audioLevel = { auroraLevel(binding) },
                 )
             else ->
                 EffectRenderer(intent.effectId, zones, interval, { intent.speed }, { resolvePalette(binding) })
         }
+    }
+
+    private fun auroraLevel(binding: LightingBinding): Double? {
+        if (!intent.ambientAudio) return null
+        val audio = binding.ambientAudio.state.value
+        return audio.level.takeIf { audio.status == AudioCaptureStatus.CAPTURING || audio.status == AudioCaptureStatus.NO_AUDIO }
     }
 
     private fun resolvePalette(binding: LightingBinding): EffectPalette {
@@ -749,6 +868,67 @@ class LightingController(
         }
     }
 
+    private fun ledBrightness(): Int = ScreenBrightness.ledBrightness(intent.brightness, screenRamp.value(clockMs()))
+
+    private fun screenTarget(): Float = screenLevel?.takeIf { intent.smartBrightness } ?: 1f
+
+    private fun onScreenLevel(level: Float?) {
+        if (level == null) {
+            ColoresLog.state("screen_brightness", "unavailable")
+            return
+        }
+        screenLevel = level
+        retargetScreen()
+        if (!intent.smartBrightness) return
+        ColoresLog.state(
+            "screen_brightness",
+            "pct=${(level * 10).roundToInt() * 10} led=${ScreenBrightness.ledBrightness(intent.brightness, screenTarget()) / 10 * 10}",
+        )
+    }
+
+    private fun retargetScreen() {
+        val target = screenTarget()
+        if (abs(target - screenRamp.target) < SCREEN_CHANGE_EPS) return
+        val binding = binding
+        if (binding == null) {
+            screenRamp.snap(target)
+            return
+        }
+        screenRamp.setTarget(target, clockMs())
+        rampSettledHandled = false
+        if (rampJob?.isActive == true) return
+        val interval =
+            binding.device.recommendedFrameIntervalMs.coerceIn(SCREEN_RAMP_MIN_INTERVAL_MS, SCREEN_RAMP_MAX_INTERVAL_MS)
+        rampJob =
+            scope.launch {
+                while (isActive) {
+                    commands.trySend(Command.BrightnessTick)
+                    delay(interval)
+                }
+            }
+    }
+
+    private suspend fun onBrightnessTick() {
+        val binding = binding ?: return
+        val settled = screenRamp.settled(clockMs())
+        if (settled) {
+            if (rampSettledHandled) return
+            rampSettledHandled = true
+            rampJob?.cancel()
+            rampJob = null
+        }
+        if (effectivePower()) {
+            val hwEffect = hardwareEffect(binding)
+            when {
+                calibrationPreview != null -> applyCurrent(binding, manageRenderJob = false)
+                hwEffect != null -> if (settled) applyHardwareEffect(binding, hwEffect)
+                renderJob?.isActive == true -> if (settled || loopDelayMs > binding.device.recommendedFrameIntervalMs) brightnessTicks.update { it + 1 }
+                else -> applyCurrent(binding, manageRenderJob = false)
+            }
+        }
+        publishSnapshot()
+    }
+
     private fun publishSnapshot() {
         val binding = binding
         mutableSnapshot.value =
@@ -764,6 +944,8 @@ class LightingController(
                 powerRequested = intent.power,
                 effectivePower = effectivePower(),
                 chargerOnly = intent.chargerOnly,
+                smartBrightness = intent.smartBrightness,
+                ledBrightness = ledBrightness(),
                 batteryBreathe = intent.batteryBreathe,
                 temperatureBreathe = intent.temperatureBreathe,
                 charging = charging,
@@ -779,7 +961,10 @@ class LightingController(
                 ambient = binding?.ambient?.state?.value ?: AmbientFrameState(),
                 ambientVividness = intent.ambientVividness,
                 ambientSmoothing = intent.ambientSmoothing,
+                ambientAudio = intent.ambientAudio,
                 currentFrame = lastFrame,
+                colorCalibration = intent.colorCalibration,
+                calibrationPreview = calibrationPreview != null,
             )
     }
 
@@ -831,6 +1016,18 @@ class LightingController(
 
         data class SetChargerOnly(val chargerOnly: Boolean) : Command
 
+        data class SetSmartBrightness(val enabled: Boolean) : Command
+
+        data class ScreenLevel(val level: Float?) : Command
+
+        data object BrightnessTick : Command
+
+        data class PreviewCalibration(val preview: CalibrationPreview?) : Command
+
+        data object CalibrationPreviewExpired : Command
+
+        data class SetCalibration(val calibration: ColorCalibration) : Command
+
         data class SetBatteryBreathe(val enabled: Boolean) : Command
 
         data class SetTemperatureBreathe(val enabled: Boolean) : Command
@@ -846,6 +1043,8 @@ class LightingController(
         data class SetAmbientSmoothing(val value: Int) : Command
 
         data object AmbientStateChanged : Command
+
+        data class SetAmbientAudio(val enabled: Boolean) : Command
 
         data class SetSensorBands(val bands: BandSet) : Command
 
@@ -863,6 +1062,11 @@ class LightingController(
         const val INDICATOR_IDLE_MS = 500L
         const val CLOCK_INTERVAL_MS = 30_000L
         const val WATCH_INTERVAL_MS = 3_000L
+        const val SCREEN_RAMP_MS = 400L
+        const val SCREEN_RAMP_MIN_INTERVAL_MS = 33L
+        const val SCREEN_RAMP_MAX_INTERVAL_MS = 200L
+        private const val SCREEN_CHANGE_EPS = 0.005f
+        const val CALIBRATION_PREVIEW_TIMEOUT_MS = 90_000L
 
         private fun defaultLocalHour(): Double {
             val calendar = java.util.Calendar.getInstance()

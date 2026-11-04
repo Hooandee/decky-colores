@@ -1,9 +1,14 @@
 import { callable } from "@decky/api";
+import { CalibrationSteps } from "./calibration";
+import type { SavedStyle, StylesImport } from "./styles";
 import { ColoresState, GradientPreset, PowerLedState, ProfileState, SensorBand, SensorKind } from "./types";
 
 export const getState = callable<[], ColoresState>("get_state");
 export const setPower = callable<[on: boolean], void>("set_power");
 export const setChargerOnly = callable<[on: boolean], void>("set_charger_only");
+export const setSmartBrightness = callable<[on: boolean], void>("set_smart_brightness");
+export const previewColorCalibration = callable<[steps: CalibrationSteps | null, sample: number[] | null], void>("preview_color_calibration");
+export const setColorCalibration = callable<[steps: CalibrationSteps], CalibrationSteps>("set_color_calibration");
 export const setBrightness = callable<[value: number], void>("set_brightness");
 export const setMode = callable<[mode: string], void>("set_mode");
 export const setSolid = callable<[r: number, g: number, b: number], void>("set_solid");
@@ -36,6 +41,11 @@ export const getPerformance = callable<[], number | null>("get_performance");
 export const setCurrentApp = callable<[appKey: string | null], ProfileState>("set_current_app");
 export const getProfileState = callable<[scope: "global" | "game", appKey: string | null], ProfileState>("get_profile_state");
 export const patchProfile = callable<[scope: "global" | "game", appKey: string | null, changes: Record<string, unknown>], ProfileState>("patch_profile");
+export const saveStyle = callable<[scope: "global" | "game", appKey: string | null, name: string], SavedStyle[]>("save_style");
+export const applyStyle = callable<[scope: "global" | "game", appKey: string | null, name: string], ProfileState>("apply_style");
+export const deleteStyle = callable<[name: string], SavedStyle[]>("delete_style");
+export const exportStyles = callable<[], { path: string; count: number }>("export_styles");
+export const importStyles = callable<[path: string], StylesImport>("import_styles");
 export const setProfileFollowGlobal = callable<[appKey: string, follow: boolean], ProfileState>("set_profile_follow_global");
 export const forgetProfile = callable<[appKey: string], ProfileState>("forget_profile");
 

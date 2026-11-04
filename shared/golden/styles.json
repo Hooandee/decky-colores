@@ -1,0 +1,29 @@
+{
+  "format": "colores-styles",
+  "version": 1,
+  "styles": [
+    {
+      "name": "Atardecer",
+      "mode": "gradient",
+      "colors": [{"r": 255, "g": 128, "b": 0}],
+      "gradient": [{"r": 255, "g": 94, "b": 58}, {"r": 255, "g": 42, "b": 104}],
+      "gradientSpeed": 30,
+      "brightness": 70,
+      "effect": {"id": "breathing", "speed": 40, "useGradient": false},
+      "ambilight": {"vividness": 27, "smoothing": 75, "audio": false},
+      "batteryBreathe": true,
+      "temperatureBreathe": true
+    },
+    {
+      "name": "Cine con sonido",
+      "mode": "ambilight",
+      "brightness": 60,
+      "ambilight": {"vividness": 40, "smoothing": 60, "audio": true}
+    },
+    {
+      "name": "Sticks distintos",
+      "mode": "color",
+      "colors": [{"r": 0, "g": 196, "b": 255}, {"r": 136, "g": 86, "b": 255}]
+    }
+  ]
+}

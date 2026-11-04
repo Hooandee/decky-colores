@@ -1,6 +1,7 @@
 package com.hooandee.colores.control
 
 import com.hooandee.colores.ambient.AmbientSamplingMode
+import com.hooandee.colores.engine.ColorCalibration
 import com.hooandee.colores.engine.BandSet
 import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.SensorBand
@@ -28,6 +29,7 @@ class LightingPreferencesTest {
                 brightness = 64,
                 power = false,
                 chargerOnly = true,
+                smartBrightness = true,
                 batteryBreathe = false,
                 audioScale =
                     AudioScale(
@@ -42,6 +44,8 @@ class LightingPreferencesTest {
                 ambientSamplingMode = AmbientSamplingMode.BOTTOM_EDGE,
                 ambientVividness = 72,
                 ambientSmoothing = 18,
+                colorCalibration = ColorCalibration(yellow = 37, orange = -56, white = 5),
+                ambientAudio = true,
             )
         prefs.save("rp5", stored)
         assertEquals(stored, prefs.load("rp5"))
@@ -122,6 +126,9 @@ class LightingPreferencesTest {
         assertEquals(true, prefs.shouldRestoreInBackground())
 
         prefs.save("thor", StoredLighting(mode = AppMode.COLOR, power = true, chargerOnly = true))
+        assertEquals(true, prefs.shouldRestoreInBackground())
+
+        prefs.save("thor", StoredLighting(mode = AppMode.COLOR, power = true, smartBrightness = true))
         assertEquals(true, prefs.shouldRestoreInBackground())
     }
 
@@ -237,5 +244,13 @@ class LightingPreferencesTest {
         assertEquals(AppMode.AUDIO, restored.mode)
         assertEquals(71, restored.speed)
         assertEquals(12, restored.audioSensitivityDb)
+    }
+
+    @Test
+    fun `capture modes are reported as waiting for consent after a reboot`() {
+        assertEquals(AppMode.AMBIENT, captureModeAwaitingConsent(StoredLighting(mode = AppMode.AMBIENT, power = true)))
+        assertEquals(AppMode.AUDIO, captureModeAwaitingConsent(StoredLighting(mode = AppMode.AUDIO)))
+        assertEquals(null, captureModeAwaitingConsent(StoredLighting(mode = AppMode.AMBIENT, power = false)))
+        assertEquals(null, captureModeAwaitingConsent(StoredLighting(mode = AppMode.COLOR)))
     }
 }

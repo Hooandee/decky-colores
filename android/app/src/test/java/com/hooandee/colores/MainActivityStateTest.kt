@@ -24,4 +24,12 @@ class MainActivityStateTest {
         assertEquals(listOf("package", "generic"), tried)
         assertFalse(launchFirstAvailable(listOf("a")) { false })
     }
+
+    @Test
+    fun `reminder extras resume the right capture`() {
+        assertEquals(ProjectionRequest.AMBIENT, resumedCaptureRequest("AMBIENT"))
+        assertEquals(ProjectionRequest.AUDIO, resumedCaptureRequest("AUDIO"))
+        assertEquals(ProjectionRequest.NONE, resumedCaptureRequest("COLOR"))
+        assertEquals(ProjectionRequest.NONE, resumedCaptureRequest(null))
+    }
 }

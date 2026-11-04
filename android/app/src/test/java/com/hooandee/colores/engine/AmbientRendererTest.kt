@@ -100,4 +100,25 @@ class AmbientRendererTest {
             source.update(listOf(RgbColor(0, 255, 0)), AmbientCaptureStatus.CAPTURING, 3L)
             assertNull(withTimeoutOrNull(50) { wake.first() })
         }
+
+    @Test
+    fun `aurora scales the screen colors with the sound level`() {
+        val source = MutableAmbientFrameSource()
+        var level: Double? = 0.0
+        val renderer =
+            AmbientRenderer(1, 80, vividness = { 0 }, smoothing = { 0 }, state = { source.state.value }, audioLevel = { level })
+        source.update(listOf(RgbColor(200, 100, 40)), AmbientCaptureStatus.CAPTURING, 1L)
+        val full = AmbientColorMath.ledIntensity(RgbColor(200, 100, 40))
+
+        val quiet = renderer.render(0.0)
+        assertEquals(full, quiet.colors.single())
+        assertEquals(0.25, quiet.intensity, 0.0)
+        assertEquals(RgbColor(50, 25, 10), quiet.previewColors.single())
+
+        level = 1.0
+        assertEquals(1.0, renderer.render(0.08).intensity, 0.0)
+
+        level = null
+        assertEquals(1.0, renderer.render(0.16).intensity, 0.0)
+    }
 }

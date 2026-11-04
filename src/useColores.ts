@@ -1,3 +1,5 @@
+import type { CalibrationSteps } from "./calibration";
+import type { SavedStyle } from "./styles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ColoresState,
@@ -179,10 +181,8 @@ export function useColores() {
   };
 
   const profileWriteQueue = useRef<Promise<void>>(Promise.resolve());
-  const pushProfile = useCallback((target: ProfileTarget, changes: Record<string, unknown>) => {
-    const request = profileWriteQueue.current.then(() =>
-      api.patchProfile(target.scope, target.appKey, changes),
-    );
+  const queueProfile = useCallback((target: ProfileTarget, write: () => Promise<ProfileState>) => {
+    const request = profileWriteQueue.current.then(write);
     const settled = request
       .then((profileState) => {
         const visible = profileTarget.current;
@@ -192,10 +192,50 @@ export function useColores() {
           );
         }
       })
-      .catch((error) => console.error("Colores: patchProfile failed", error));
+      .catch((error) => console.error("Colores: profile write failed", error));
     profileWriteQueue.current = settled;
     return settled;
   }, []);
+
+  const pushProfile = useCallback(
+    (target: ProfileTarget, changes: Record<string, unknown>) =>
+      queueProfile(target, () => api.patchProfile(target.scope, target.appKey, changes)),
+    [queueProfile],
+  );
+
+  const setStyles = (styles: SavedStyle[]) => setState((s) => (s ? { ...s, styles } : s));
+
+  const styleActions = {
+    save: async (name: string) => {
+      const target = snapshotProfileTarget(profileTarget.current);
+      await profileWriteQueue.current;
+      const styles = await api.saveStyle(target.scope, target.appKey, name);
+      setStyles(styles);
+      return styles;
+    },
+    apply: async (name: string) => {
+      const target = snapshotProfileTarget(profileTarget.current);
+      let failure: unknown = null;
+      await queueProfile(target, () =>
+        api.applyStyle(target.scope, target.appKey, name).catch((error) => {
+          failure = error;
+          throw error;
+        }),
+      );
+      if (failure) throw failure;
+    },
+    remove: async (name: string) => {
+      const styles = await api.deleteStyle(name);
+      setStyles(styles);
+      return styles;
+    },
+    exportAll: () => api.exportStyles(),
+    importFrom: async (path: string) => {
+      const result = await api.importStyles(path);
+      setStyles(result.styles);
+      return result;
+    },
+  };
 
   const noLeds = !!state && !state.capabilities.color && !state.capabilities.brightness;
   const acquireDeadline = useRef<number | null>(null);
@@ -265,6 +305,13 @@ export function useColores() {
     );
   };
 
+  const setSmartBrightness = (smartBrightness: boolean) => {
+    setState((s) => (s ? { ...s, smartBrightness } : s));
+    api.setSmartBrightness(smartBrightness).catch((e) =>
+      console.error("Colores: setSmartBrightness failed", e),
+    );
+  };
+
   const setMode = (mode: Mode) => {
     setState((s) => (s ? { ...s, mode } : s));
     void pushProfile(snapshotProfileTarget(profileTarget.current), { mode });
@@ -321,6 +368,13 @@ export function useColores() {
     });
   };
 
+  const setAmbilightAudio = (audio: boolean) => {
+    setState((s) => (s ? { ...s, ambilight: { ...s.ambilight, audio } } : s));
+    void pushProfile(snapshotProfileTarget(profileTarget.current), {
+      ambilight: { audio },
+    });
+  };
+
   const saveGradient = (name: string, stops: RGB[]) => {
     api
       .saveGradient(name, stops.map((c) => [c.r, c.g, c.b]))
@@ -370,6 +424,10 @@ export function useColores() {
     api.setRememberStartup(rememberStartup).catch((e) =>
       console.error("Colores: setRememberStartup failed", e),
     );
+  };
+
+  const setColorCalibration = (colorCalibration: CalibrationSteps) => {
+    setState((s) => (s ? { ...s, colorCalibration } : s));
   };
 
   const setBatteryBreathe = (batteryBreathe: boolean) => {
@@ -425,6 +483,9 @@ export function useColores() {
     setBrightness,
     setPower,
     setChargerOnly,
+    setSmartBrightness,
+    setColorCalibration,
+    styleActions,
     setMode,
     setColor,
     setGradient,
@@ -434,6 +495,7 @@ export function useColores() {
     setEffectGradient,
     setAmbilight,
     setAmbilightSampling,
+    setAmbilightAudio,
     saveGradient,
     deleteGradient,
     setExperiment,

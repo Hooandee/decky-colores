@@ -34,3 +34,19 @@ def test_ease_fast_attack_slow_release():
     amb._level = 1.0
     down = amb._ease(0.0)
     assert 0.5 < down < 1.0
+
+
+def test_meter_mode_reports_levels_instead_of_painting():
+    painted, levels = [], []
+    amb = AudioReactive(painted.append, zones=2, runtime_dir=None)
+    amb._on_level = levels.append
+    amb._emit(1.0)
+    assert painted == []
+    assert len(levels) == 1 and levels[0] > 0.5
+
+
+def test_vu_mode_paints_frames():
+    painted = []
+    amb = AudioReactive(painted.append, zones=2, runtime_dir=None)
+    amb._emit(1.0)
+    assert len(painted) == 1

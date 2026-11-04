@@ -1,3 +1,4 @@
+import { ReactNode } from "react";
 import { Focusable } from "@decky/ui";
 import { LuGamepad2 } from "react-icons/lu";
 
@@ -11,6 +12,7 @@ interface Props {
   runningApp: RunningApp | null;
   disabled?: boolean;
   onSelect: (scope: ProfileScope) => void;
+  trailing?: ReactNode;
 }
 
 export function ProfileScopeSelector({
@@ -18,6 +20,7 @@ export function ProfileScopeSelector({
   runningApp,
   disabled = false,
   onSelect,
+  trailing,
 }: Props) {
   const { t } = useI18n();
   const option = (selected: boolean): React.CSSProperties => ({
@@ -33,12 +36,12 @@ export function ProfileScopeSelector({
   };
 
   return (
-    <div style={{ padding: "0 0 4px" }}>
+    <div style={{ padding: "0 0 4px", display: "flex", gap: 6 }}>
       <Focusable
         role="radiogroup"
         aria-label={`${t("profiles.global")} / ${t("profiles.gameShort")}`}
         aria-busy={disabled || undefined}
-        style={segmentGroupStyle}
+        style={{ ...segmentGroupStyle, flex: 1, minWidth: 0 }}
       >
         <Focusable
           role="radio"
@@ -76,6 +79,7 @@ export function ProfileScopeSelector({
           </Focusable>
         )}
       </Focusable>
+      {trailing}
     </div>
   );
 }

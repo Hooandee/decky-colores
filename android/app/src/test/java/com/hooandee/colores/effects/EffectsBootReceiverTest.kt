@@ -12,4 +12,9 @@ class EffectsBootReceiverTest {
         assertFalse(shouldRestoreRuntimeAtBoot(false, false, true))
         assertFalse(shouldRestoreRuntimeAtBoot(false, true, false))
     }
+
+    @Test
+    fun `a capture mode waiting for consent still restores the fallback color`() {
+        assertTrue(shouldRestoreRuntimeAtBoot(false, false, false, captureAwaitingConsent = true))
+    }
 }

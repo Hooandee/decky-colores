@@ -1,5 +1,7 @@
 package com.hooandee.colores.effects
 
+import android.content.pm.PackageManager
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -95,6 +97,7 @@ class EffectsService : Service() {
                 intent?.ambientConfig()?.let {
                     application.lastAmbientConfig = it
                     application.ambientCaptureSession.updateConfig(it)
+                    syncAmbientAudio()
                 }
                 settle()
             }
@@ -310,6 +313,7 @@ class EffectsService : Service() {
             postOnMain { if (hold === held && projectionOwner == CaptureOwner.AUDIO) stopAudioCapture(AudioCaptureStatus.ERROR) }
         }
         ColoresLog.i(TAG, "audio capture started reused=${held.used}")
+        CaptureReminder.cancel(this)
         held.used = true
         application.lightingController.onAudioStateChanged()
     }
@@ -338,9 +342,36 @@ class EffectsService : Service() {
         }
         projectionOwner = CaptureOwner.AMBIENT
         refreshNotification()
-        ColoresLog.i(TAG, "ambient capture started reused=${held.used} fps=${config?.captureFps} mode=${config?.samplingMode}")
+        ColoresLog.i(TAG, "ambient capture started reused=${held.used} fps=${config?.captureFps} mode=${config?.samplingMode} audio=${config?.audio}")
+        CaptureReminder.cancel(this)
         held.used = true
+        syncAmbientAudio()
         application.lightingController.onAmbientStateChanged()
+    }
+
+    private fun syncAmbientAudio() {
+        val held = hold ?: return
+        if (projectionOwner != CaptureOwner.AMBIENT) return
+        val session = application.ambientAudioSession
+        val wanted =
+            application.lastAmbientConfig?.audio == true &&
+                checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        when {
+            wanted && !session.running ->
+                runCatching { AndroidPlaybackCapture(this, held.projection) }
+                    .onSuccess { capture ->
+                        session.start(capture) { error ->
+                            ColoresLog.w(TAG, "ambient audio failed", error)
+                            postOnMain { if (hold === held) application.ambientAudioSession.stop(AudioCaptureStatus.ERROR) }
+                        }
+                        ColoresLog.i(TAG, "ambient audio started")
+                    }.onFailure { ColoresLog.w(TAG, "ambient audio unavailable", it) }
+            !wanted && session.running -> {
+                session.stop(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+                ColoresLog.i(TAG, "ambient audio stopped")
+            }
+        }
+        refreshNotification()
     }
 
     private fun pauseHold() {
@@ -364,7 +395,10 @@ class EffectsService : Service() {
     ) {
         when (projectionOwner) {
             CaptureOwner.AUDIO -> application.audioCaptureSession.stop(audioStatus)
-            CaptureOwner.AMBIENT -> application.ambientCaptureSession.pause(ambientStatus)
+            CaptureOwner.AMBIENT -> {
+                application.ambientCaptureSession.pause(ambientStatus)
+                application.ambientAudioSession.stop(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
+            }
             null -> Unit
         }
         projectionOwner = null
@@ -375,6 +409,7 @@ class EffectsService : Service() {
         projectionOwner = null
         application.audioCaptureSession.stop(if (owner == CaptureOwner.AUDIO) AudioCaptureStatus.REVOKED else AudioCaptureStatus.AUTHORIZATION_REQUIRED)
         application.ambientCaptureSession.stop(if (owner == CaptureOwner.AMBIENT) AmbientCaptureStatus.REVOKED else AmbientCaptureStatus.AUTHORIZATION_REQUIRED)
+        application.ambientAudioSession.stop(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
         releaseHold(stopProjection = false, reconcile = true)
     }
 
@@ -424,6 +459,7 @@ class EffectsService : Service() {
     ) {
         val owner = projectionOwner
         application.ambientCaptureSession.stop(status)
+        application.ambientAudioSession.stop(AudioCaptureStatus.AUTHORIZATION_REQUIRED)
         if (owner == CaptureOwner.AMBIENT || owner == null) {
             if (owner == CaptureOwner.AMBIENT) projectionOwner = null
             releaseHold(reconcile = false, releaseLease = releaseLease)
@@ -459,6 +495,8 @@ class EffectsService : Service() {
             .setContentText(
                 getString(
                     when {
+                        projectionOwner == CaptureOwner.AMBIENT && application.ambientAudioSession.running ->
+                            R.string.service_notification_ambient_audio
                         projectionOwner == CaptureOwner.AMBIENT -> R.string.service_notification_ambient
                         projectionOwner == CaptureOwner.AUDIO -> R.string.service_notification_audio
                         hold != null -> R.string.service_notification_paused
@@ -488,6 +526,7 @@ class EffectsService : Service() {
         private const val EXTRA_STOP_STATUS = "stop_status"
         private const val EXTRA_CAPTURE_FPS = "capture_fps"
         private const val EXTRA_SAMPLING_MODE = "sampling_mode"
+        private const val EXTRA_AMBIENT_AUDIO = "ambient_audio"
         private const val EXTRA_ZONES = "zones"
         private const val EXTRA_PER_ZONE = "per_zone"
         private const val EXTRA_GRID_STICKS = "grid_sticks"
@@ -589,6 +628,7 @@ class EffectsService : Service() {
                 .setAction(action)
                 .putExtra(EXTRA_CAPTURE_FPS, config.captureFps)
                 .putExtra(EXTRA_SAMPLING_MODE, config.samplingMode.name)
+                .putExtra(EXTRA_AMBIENT_AUDIO, config.audio)
                 .putExtra(EXTRA_ZONES, config.zones)
                 .putExtra(EXTRA_PER_ZONE, config.supportsPerZone)
                 .putExtra(EXTRA_GRID_STICKS, grid?.map { it.stick ?: -1 }?.toIntArray())
@@ -645,6 +685,7 @@ class EffectsService : Service() {
             samplingMode =
                 runCatching { AmbientSamplingMode.valueOf(getStringExtra(EXTRA_SAMPLING_MODE).orEmpty()) }
                     .getOrDefault(AmbientSamplingMode.FULL_SCENE),
+            audio = getBooleanExtra(EXTRA_AMBIENT_AUDIO, false),
         )
     }
 }

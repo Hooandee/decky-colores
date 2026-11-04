@@ -20,6 +20,8 @@ import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import com.hooandee.colores.report.ColoresLog
+import com.hooandee.colores.control.LightingPreferences
+import com.hooandee.colores.effects.CaptureReminder
 import com.hooandee.colores.permission.WriteSettingsPermission
 import com.hooandee.colores.ui.ColoresScreen
 import com.hooandee.colores.ui.ColoresTheme
@@ -105,6 +107,27 @@ class MainActivity : AppCompatActivity() {
                 )
             }
         }
+        if (savedInstanceState == null) resumeCaptureFrom(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        resumeCaptureFrom(intent)
+    }
+
+    private fun resumeCaptureFrom(intent: Intent?) {
+        val requested = intent?.getStringExtra(CaptureReminder.EXTRA_RESUME_CAPTURE) ?: return
+        intent.removeExtra(CaptureReminder.EXTRA_RESUME_CAPTURE)
+        val stored = LightingPreferences(this).captureModeAwaitingConsent()?.name
+        if (stored != requested) {
+            CaptureReminder.cancel(this)
+            return
+        }
+        when (resumedCaptureRequest(requested)) {
+            ProjectionRequest.AUDIO -> requestAudioCapture()
+            ProjectionRequest.AMBIENT -> requestNotificationPermissionIfNeeded(ProjectionRequest.AMBIENT)
+            ProjectionRequest.NONE -> Unit
+        }
     }
 
     override fun onResume() {
@@ -189,6 +212,13 @@ internal enum class ProjectionRequest {
     AUDIO,
     AMBIENT,
 }
+
+internal fun resumedCaptureRequest(mode: String?): ProjectionRequest =
+    when (mode) {
+        "AUDIO" -> ProjectionRequest.AUDIO
+        "AMBIENT" -> ProjectionRequest.AMBIENT
+        else -> ProjectionRequest.NONE
+    }
 
 internal fun restoredProjectionRequest(saved: String?): ProjectionRequest =
     ProjectionRequest.entries.firstOrNull { it.name == saved } ?: ProjectionRequest.NONE

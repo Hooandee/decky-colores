@@ -53,6 +53,7 @@ internal fun DeferredIntSlider(
     enabled: Boolean,
     resetKey: Any? = null,
     steps: Int = 0,
+    labelAccessory: (@Composable () -> Unit)? = null,
 ) {
     var slider by remember(resetKey, committedValue) {
         mutableStateOf(DeferredIntSliderState(committedValue))
@@ -72,5 +73,6 @@ internal fun DeferredIntSlider(
         valueRange = valueRange.first.toFloat()..valueRange.last.toFloat(),
         steps = steps,
         enabled = enabled,
+        labelAccessory = labelAccessory,
     )
 }

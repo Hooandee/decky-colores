@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.hooandee.colores.ambient.AmbientSamplingMode
 import com.hooandee.colores.ambient.normalizedAmbientCaptureFps
 import com.hooandee.colores.engine.BandSet
+import com.hooandee.colores.engine.ColorCalibration
 import com.hooandee.colores.engine.AudioScale
 import com.hooandee.colores.engine.AudioSensitivity
 import com.hooandee.colores.engine.SensorBand
@@ -23,6 +24,7 @@ data class StoredLighting(
     val brightness: Int? = null,
     val power: Boolean? = null,
     val chargerOnly: Boolean = false,
+    val smartBrightness: Boolean = false,
     val batteryBreathe: Boolean = true,
     val temperatureBreathe: Boolean = true,
     val audioScale: AudioScale = AudioScale.DEFAULT,
@@ -31,7 +33,9 @@ data class StoredLighting(
     val ambientSamplingMode: AmbientSamplingMode = AmbientSamplingMode.FULL_SCENE,
     val ambientVividness: Int = 35,
     val ambientSmoothing: Int = 45,
+    val ambientAudio: Boolean = false,
     val sensorBands: BandSet = BandSet.FALLBACK,
+    val colorCalibration: ColorCalibration = ColorCalibration.NEUTRAL,
 )
 
 class LightingPreferences(
@@ -70,6 +74,11 @@ class LightingPreferences(
         if (activeDeviceId() == sourceDeviceId) write(ACTIVE_DEVICE_KEY, targetDeviceId)
     }
 
+    fun captureModeAwaitingConsent(): AppMode? {
+        val deviceId = activeDeviceId() ?: return null
+        return captureModeAwaitingConsent(load(deviceId))
+    }
+
     fun shouldRestoreInBackground(): Boolean {
         val deviceId = activeDeviceId() ?: return false
         val stored = load(deviceId)
@@ -95,6 +104,7 @@ class LightingPreferences(
                 brightness = root.optNullableInt("brightness")?.coerceIn(0, 100),
                 power = root.optNullableBoolean("power"),
                 chargerOnly = root.optBoolean("chargerOnly", false),
+                smartBrightness = root.optBoolean("smartBrightness", false),
                 batteryBreathe = root.optBoolean("batteryBreathe", true),
                 temperatureBreathe = root.optBoolean("temperatureBreathe", true),
                 audioScale = decodeAudioScale(root.optJSONObject("audioScale")),
@@ -110,7 +120,12 @@ class LightingPreferences(
                     }.getOrDefault(AmbientSamplingMode.FULL_SCENE),
                 ambientVividness = root.optInt("ambientVividness", 35).coerceIn(0, 100),
                 ambientSmoothing = root.optInt("ambientSmoothing", 45).coerceIn(0, 100),
+                ambientAudio = root.optBoolean("ambientAudio", false),
                 sensorBands = decodeBands(root.optJSONObject("sensorBands"), defaults),
+                colorCalibration =
+                    root.optJSONObject("colorCalibration")?.let {
+                        ColorCalibration.of(it.optInt("yellow", 0), it.optInt("orange", 0), it.optInt("white", 0))
+                    } ?: ColorCalibration.NEUTRAL,
             )
         }.getOrDefault(StoredLighting(sensorBands = defaults))
 
@@ -133,6 +148,15 @@ class LightingPreferences(
                 value.power?.let { put("power", it) }
             }
             .put("chargerOnly", value.chargerOnly)
+            .put("smartBrightness", value.smartBrightness)
+            .put(
+                "colorCalibration",
+                JSONObject()
+                    .put("yellow", value.colorCalibration.yellow)
+                    .put("orange", value.colorCalibration.orange)
+                    .put("white", value.colorCalibration.white),
+            )
+            .put("ambientAudio", value.ambientAudio)
             .put("batteryBreathe", value.batteryBreathe)
             .put("temperatureBreathe", value.temperatureBreathe)
             .put("audioScale", encodeAudioScale(value.audioScale))
@@ -239,7 +263,10 @@ class LightingPreferences(
     }
 }
 
+internal fun captureModeAwaitingConsent(stored: StoredLighting): AppMode? =
+    stored.mode.takeIf { stored.power != false && (it == AppMode.AUDIO || it == AppMode.AMBIENT) }
+
 internal fun restoresInBackground(stored: StoredLighting): Boolean =
-    stored.power != false && (stored.chargerOnly || stored.mode !in MODES_WITHOUT_BACKGROUND_WORK)
+    stored.power != false && (stored.chargerOnly || stored.smartBrightness || stored.mode !in MODES_WITHOUT_BACKGROUND_WORK)
 
 private val MODES_WITHOUT_BACKGROUND_WORK = setOf(AppMode.COLOR, AppMode.AUDIO, AppMode.AMBIENT)

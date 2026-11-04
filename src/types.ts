@@ -1,3 +1,6 @@
+import type { CalibrationSteps } from "./calibration";
+
+import type { SavedStyle } from "./styles";
 export interface RGB {
   r: number;
   g: number;
@@ -36,6 +39,7 @@ export interface Capabilities {
   ambilight: boolean;
   zones: number;
   maxBrightness: number;
+  screenBrightness?: boolean;
   layout: ZoneGroup[];
   perZone: boolean;
   hardwareEffects: boolean;
@@ -76,6 +80,7 @@ export interface AmbilightState {
   smoothing: number;
   fps: number;
   sampling: string;
+  audio?: boolean;
 }
 
 export type EffectId =
@@ -135,6 +140,7 @@ export interface ColoresState {
   powerLedSuspendOff: boolean;
   sleepChargingIndicator: boolean;
   chargerOnly: boolean;
+  smartBrightness: boolean;
   forceControl: boolean;
   batteryBreathe: boolean;
   batteryLevel: number;
@@ -142,6 +148,9 @@ export interface ColoresState {
   temperature: number | null;
   sensorBands: SensorBands;
   rememberStartup: boolean;
+  colorCalibration: CalibrationSteps;
+  styles?: SavedStyle[];
+  stylesFolder?: string;
   profileContext: ProfileState;
 }
 

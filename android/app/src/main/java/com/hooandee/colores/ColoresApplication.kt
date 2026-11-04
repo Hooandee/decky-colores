@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Process
 import com.hooandee.colores.report.ColoresLog
 import com.hooandee.colores.report.Journal
+import com.hooandee.colores.sensor.ScreenBrightnessSource
 import com.hooandee.colores.ambient.AmbientCaptureConfig
 import com.hooandee.colores.ambient.AmbientCaptureSession
 import com.hooandee.colores.ambient.MutableAmbientFrameSource
@@ -53,6 +54,10 @@ class ColoresApplication : Application() {
     val audioLevelSource by lazy { MutableAudioLevelSource() }
 
     val audioCaptureSession by lazy { AudioCaptureSession(applicationScope, audioLevelSource) }
+
+    val ambientAudioSource by lazy { MutableAudioLevelSource() }
+
+    val ambientAudioSession by lazy { AudioCaptureSession(applicationScope, ambientAudioSource) }
 
     val ambientFrameSource by lazy { MutableAmbientFrameSource() }
 
@@ -104,7 +109,7 @@ class ColoresApplication : Application() {
     }
 
     val lightingRuntime: LightingRuntime by lazy {
-        LightingRuntime(this, applicationScope, lightingController, audioLevelSource, ambientFrameSource)
+        LightingRuntime(this, applicationScope, lightingController, audioLevelSource, ambientFrameSource, ambientAudioSource)
     }
 
     val profileCoordinator: LightingProfileCoordinator by lazy {
@@ -128,6 +133,7 @@ class ColoresApplication : Application() {
         super.onCreate()
         installJournal()
         screenState.register()
+        ScreenBrightnessSource(this) { lightingController.setScreenLevel(it) }.register()
     }
 
     private fun installJournal() {

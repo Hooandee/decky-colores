@@ -25,6 +25,10 @@ describe("buildFocusCss", () => {
     expect(css).toContain("border-radius");
   });
 
+  it("keeps text light on focused buttons that paint their own background", () => {
+    expect(css).toContain(`.${COLORES_ROOT} .DialogButton.gpfocus[style*="background"] { color: #fff !important; }`);
+  });
+
   it("uses !important so it wins over the elements' inline box-shadow", () => {
     expect(css).toContain("!important");
   });

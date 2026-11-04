@@ -10,7 +10,7 @@ DEFAULT_PROFILE = {
     "gradient": [[0, 196, 255], [136, 86, 255]],
     "gradient_speed": 30,
     "effect": {"id": "breathing", "speed": 50, "use_gradient": False},
-    "ambilight": {"vividness": 27, "smoothing": 75, "fps": 10, "sampling": "columns"},
+    "ambilight": {"vividness": 27, "smoothing": 75, "fps": 10, "sampling": "columns", "audio": False},
     "battery_breathe": True,
     "temperature_breathe": True,
 }
@@ -62,7 +62,11 @@ def test_nested_effect_and_ambilight_updates_are_merged(tmp_path):
         "smoothing": 75,
         "fps": 30,
         "sampling": "columns",
+        "audio": False,
     }
+
+    store.patch("global", None, {"ambilight": {"audio": True}})
+    assert store.editable("global", None)["ambilight"]["audio"] is True
 
 
 def test_numeric_and_rgb_values_are_bounded(tmp_path):
@@ -129,3 +133,19 @@ def test_forget_removes_game_profile_and_restores_inheritance(tmp_path):
         "follows_global": True,
     }
     assert store.effective("42") == DEFAULT_PROFILE
+
+
+def test_bottom_edge_sampling_survives_profile_normalization(tmp_path):
+    store = LightingProfileStore(tmp_path / "profiles.json", DEFAULT_PROFILE)
+
+    store.patch("global", None, {"ambilight": {"sampling": "bottom_edge"}})
+    assert store.editable("global", None)["ambilight"]["sampling"] == "bottom_edge"
+
+    reloaded = LightingProfileStore(tmp_path / "profiles.json", DEFAULT_PROFILE)
+    assert reloaded.editable("global", None)["ambilight"]["sampling"] == "bottom_edge"
+
+
+def test_unknown_sampling_falls_back_to_the_default(tmp_path):
+    store = LightingProfileStore(tmp_path / "profiles.json", DEFAULT_PROFILE)
+    store.patch("global", None, {"ambilight": {"sampling": "sideways"}})
+    assert store.editable("global", None)["ambilight"]["sampling"] == "columns"
