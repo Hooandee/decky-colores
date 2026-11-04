@@ -31,6 +31,7 @@ export function buildFocusCss(): string {
   position: relative;
   z-index: 1;
 }
+.${COLORES_ROOT} .DialogButton.gpfocus[style*="background"] { color: #fff !important; }
 .${COLORES_TABSTRIP} { scrollbar-width: none; -ms-overflow-style: none; }
 .${COLORES_TABSTRIP}::-webkit-scrollbar { display: none; width: 0; height: 0; }`.trim();
 }

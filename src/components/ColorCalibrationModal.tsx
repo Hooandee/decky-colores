@@ -92,13 +92,26 @@ export const ColorCalibrationModal: FC<Props> = ({ initial, closeModal, onSaved 
             max={step.limit}
             step={1}
             notchCount={3}
-            notchLabels={[
-              { notchIndex: 0, label: t(`calibration.${step.id}.less`) },
-              { notchIndex: 2, label: t(`calibration.${step.id}.more`) },
-            ]}
             disabled={saving}
             onChange={(value) => setSteps({ ...steps, [step.id]: value })}
           />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 12,
+              marginTop: -6,
+              padding: "0 4px",
+              fontSize: 10,
+              fontWeight: 700,
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              color: "rgba(255,255,255,0.6)",
+            }}
+          >
+            <span>{t(`calibration.${step.id}.less`)}</span>
+            <span style={{ textAlign: "right" }}>{t(`calibration.${step.id}.more`)}</span>
+          </div>
           <Focusable style={{ display: "flex", gap: 10 }}>
             <DialogButton
               disabled={saving}
