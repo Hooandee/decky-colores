@@ -3,9 +3,59 @@
 ## [0.35.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.34.1...decky-colores-v0.35.0) (2026-11-04)
 
 
-### Features
+### Español
 
-* smart brightness, color calibration, Ambi Aurora, smarter Ambilight and saved presets ([#202](https://github.com/Hooandee/decky-colores/issues/202)) ([e5171fa](https://github.com/Hooandee/decky-colores/commit/e5171fa43f177e701bc37aa051d8df6784bc67c2))
+* **Brillo inteligente:** Actívalo debajo del brillo y las luces seguirán el brillo de la pantalla. El control pasa a ser el «Brillo máximo». El cambio es suave, funciona en todos los modos y nunca baja tanto como para que parezcan apagadas.
+* **Calibrar color:** En Ajustes, tres pasos (amarillo, naranja y blanco) para que los colores salgan fieles en los LED de tu consola. Por ejemplo, arregla un amarillo que tiraba a naranja sin estropear el naranja.
+* **Ambilight con sonido:** Con «Reaccionar al sonido», las luces siguen tomando los colores de la pantalla y además laten con lo que suena.
+* **Ambilight más fino:** Ignora las bandas negras de las películas y de los juegos en 4:3, y da más peso a los colores vivos sin aclarar las escenas oscuras.
+* **Ajustes guardados:** Usa «Guardar ajuste» al final de cada modo para guardar tu luz con un nombre, o sobrescribe una que ya tengas. Desde Ajustes los aplicas, los exportas y los importas, y el archivo también sirve en la app de Android.
+* **Arreglos:** Las luces ya no se quedan congeladas unos segundos al leer la batería, el muestreo «Borde inferior» se guarda en los perfiles y Colores carga aunque una beta de Steam cambie los títulos de los plugins.
+
+### English
+
+* **Smart brightness:** Turn it on under brightness and the lights follow your screen brightness. The control becomes your "Max brightness". It changes smoothly, works in every mode and never drops so low that the lights look off.
+* **Calibrate color:** Three quick steps in Settings (yellow, orange and white) so colors come out true on your handheld's LEDs. For example, it fixes a yellow that looked orange without breaking orange.
+* **Ambilight with sound:** With "React to sound", the lights keep taking their colors from the screen and also pulse with whatever is playing.
+* **Sharper Ambilight:** It ignores the black bars of movies and 4:3 games, and favors vivid colors without brightening dark scenes.
+* **Saved presets:** Use "Save preset" at the end of every mode to keep your lighting under a name, or overwrite one you already have. From Settings you can apply, export and import them, and the file also works in the Android app.
+* **Fixes:** The lights no longer freeze for a few seconds while the battery is read, "Bottom edge" sampling is kept in profiles, and Colores loads even when a Steam beta changes plugin titles.
+
+### Italiano
+
+* **Luminosità intelligente:** Attivala sotto la luminosità e le luci seguiranno la luminosità dello schermo. Il controllo diventa la «Luminosità massima». Il cambio è graduale, funziona in tutte le modalità e non scende mai così tanto da far sembrare le luci spente.
+* **Calibra colore:** Nelle Impostazioni, tre passaggi (giallo, arancione e bianco) perché i colori escano fedeli sui LED della tua console. Per esempio, sistema un giallo che tendeva all'arancione senza rovinare l'arancione.
+* **Ambilight con il suono:** Con «Reagisci al suono», le luci continuano a prendere i colori dallo schermo e in più pulsano con quello che stai ascoltando.
+* **Ambilight più preciso:** Ignora le bande nere dei film e dei giochi in 4:3, e dà più peso ai colori vivaci senza schiarire le scene scure.
+* **Preset salvati:** Usa «Salva preset» in fondo a ogni modalità per salvare la tua luce con un nome, o sovrascrivine una che hai già. Dalle Impostazioni puoi applicarli, esportarli e importarli, e il file funziona anche nell'app Android.
+* **Correzioni:** Le luci non si bloccano più per qualche secondo durante la lettura della batteria, il campionamento «Bordo inferiore» viene salvato nei profili e Colores si carica anche quando una beta di Steam cambia i titoli dei plugin.
+
+### Deutsch
+
+* **Intelligente Helligkeit:** Schalte sie unter der Helligkeit ein, und die Beleuchtung folgt der Bildschirmhelligkeit. Der Regler wird dann zur „Maximalen Helligkeit". Der Wechsel ist sanft, funktioniert in jedem Modus und geht nie so weit runter, dass die Beleuchtung aus wirkt.
+* **Farbe kalibrieren:** In den Einstellungen sorgen drei Schritte (Gelb, Orange und Weiß) dafür, dass die Farben auf den LEDs deines Handhelds stimmen. Zum Beispiel wird ein Gelb, das orange wirkte, korrigiert, ohne das Orange zu verderben.
+* **Ambilight mit Ton:** Mit „Auf Ton reagieren" übernimmt die Beleuchtung weiter die Farben vom Bildschirm und pulsiert zusätzlich mit dem, was gerade läuft.
+* **Genaueres Ambilight:** Es ignoriert die schwarzen Balken von Filmen und 4:3-Spielen und bevorzugt kräftige Farben, ohne dunkle Szenen aufzuhellen.
+* **Gespeicherte Voreinstellungen:** Mit „Voreinstellung speichern" am Ende jedes Modus sicherst du deine Beleuchtung unter einem Namen oder überschreibst eine vorhandene. In den Einstellungen kannst du sie anwenden, exportieren und importieren, und die Datei funktioniert auch in der Android-App.
+* **Korrekturen:** Die Beleuchtung friert nicht mehr ein paar Sekunden ein, während der Akku gelesen wird, die Abtastung „Unterer Rand" bleibt in Profilen erhalten, und Colores lädt auch dann, wenn eine Steam-Beta die Plugin-Titel ändert.
+
+### Português (Brasil)
+
+* **Brilho inteligente:** Ative abaixo do brilho e as luzes acompanham o brilho da tela. O controle passa a ser o "Brilho máximo". A mudança é suave, funciona em todos os modos e nunca baixa tanto a ponto de as luzes parecerem apagadas.
+* **Calibrar cor:** Em Configurações, três passos (amarelo, laranja e branco) para que as cores saiam fiéis nos LEDs do seu portátil. Por exemplo, corrige um amarelo que puxava para o laranja sem estragar o laranja.
+* **Ambilight com som:** Com "Reagir ao som", as luzes continuam pegando as cores da tela e ainda pulsam com o que está tocando.
+* **Ambilight mais preciso:** Ignora as faixas pretas de filmes e de jogos em 4:3, e dá mais peso às cores vivas sem clarear as cenas escuras.
+* **Ajustes salvos:** Use "Salvar ajuste" no fim de cada modo para guardar sua luz com um nome, ou sobrescreva uma que você já tem. Em Configurações você aplica, exporta e importa, e o arquivo também funciona no app Android.
+* **Correções:** As luzes não congelam mais por alguns segundos durante a leitura da bateria, a amostragem "Borda inferior" é salva nos perfis e o Colores carrega mesmo quando uma beta do Steam muda os títulos dos plugins.
+
+### Français
+
+* **Luminosité intelligente :** Activez-la sous la luminosité et l'éclairage suit la luminosité de l'écran. Le réglage devient la « Luminosité maximale ». Le changement est progressif, fonctionne dans tous les modes et ne descend jamais au point de donner l'impression que l'éclairage est éteint.
+* **Calibrer la couleur :** Dans les Réglages, trois étapes (jaune, orange et blanc) pour des couleurs fidèles sur les LED de votre console. Par exemple, un jaune qui tirait vers l'orange est corrigé sans abîmer l'orange.
+* **Ambilight avec le son :** Avec « Réagir au son », l'éclairage reprend toujours les couleurs de l'écran et pulse en plus au rythme de ce que vous écoutez.
+* **Ambilight plus précis :** Il ignore les bandes noires des films et des jeux en 4:3, et privilégie les couleurs vives sans éclaircir les scènes sombres.
+* **Réglages enregistrés :** Utilisez « Enregistrer le réglage » en bas de chaque mode pour garder votre éclairage sous un nom, ou remplacer un réglage existant. Depuis les Réglages, vous pouvez les appliquer, les exporter et les importer, et le fichier fonctionne aussi dans l'application Android.
+* **Corrections :** L'éclairage ne se fige plus pendant quelques secondes lors de la lecture de la batterie, l'échantillonnage « Bord inférieur » est conservé dans les profils et Colores se charge même quand une bêta de Steam modifie les titres des plugins.
 
 ## [0.34.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.34.0...decky-colores-v0.34.1) (2026-10-21)
 
