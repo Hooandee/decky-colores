@@ -133,9 +133,16 @@ fun GradientControls(
     }
 }
 
+internal fun List<RgbColor>.previewStops(empty: RgbColor): List<RgbColor> =
+    when (size) {
+        0 -> listOf(empty, empty)
+        1 -> this + this
+        else -> this
+    }
+
 @Composable
 internal fun GradientPreviewBar(colors: List<RgbColor>) {
-    val shown = colors.ifEmpty { listOf(RgbColor(34, 35, 43), RgbColor(34, 35, 43)) }
+    val shown = colors.previewStops(RgbColor(34, 35, 43))
     val ribbonColors = shown.map(RgbColor::toComposeColor)
     val lightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val outline = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (lightTheme) 0.48f else 0.5f)
@@ -235,7 +242,7 @@ private fun GradientTile(
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shown = colors.ifEmpty { listOf(RgbColor(40, 40, 48), RgbColor(40, 40, 48)) }
+    val shown = colors.previewStops(RgbColor(40, 40, 48))
     val lightTheme = MaterialTheme.colorScheme.background.luminance() > 0.5f
     val outline = MaterialTheme.colorScheme.outlineVariant
     Surface(

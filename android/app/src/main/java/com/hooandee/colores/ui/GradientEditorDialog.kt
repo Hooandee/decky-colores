@@ -178,7 +178,7 @@ private fun GradientZonesPane(
 
 @Composable
 private fun AnimatedGradientJourney(colors: List<RgbColor>) {
-    val shown = colors.ifEmpty { listOf(RgbColor(34, 35, 43), RgbColor(34, 35, 43)) }
+    val shown = colors.previewStops(RgbColor(34, 35, 43))
     val first = shown.first().toComposeColor()
     val last = shown.last().toComposeColor()
     Column(

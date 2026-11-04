@@ -1,5 +1,86 @@
 # Changelog
 
+## [0.34.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.34.0...decky-colores-v0.34.1) (2026-10-21)
+
+
+### Español
+
+* **Estabilidad:** Actualizar o reinstalar Colores ya no se queda colgado unos segundos. Y si Decky se cierra de golpe, Colores se cierra con él en vez de quedarse abierto en segundo plano gastando memoria hasta congelar la consola.
+
+### English
+
+* **Stability:** Updating or reinstalling Colores no longer hangs for a few seconds. And if Decky crashes, Colores now closes with it instead of staying open in the background eating memory until the handheld freezes.
+
+### Italiano
+
+* **Stabilità:** Aggiornare o reinstallare Colores non si blocca più per qualche secondo. E se Decky si chiude all'improvviso, Colores si chiude con lui invece di restare aperto in background a consumare memoria fino a bloccare la console.
+
+### Deutsch
+
+* **Stabilität:** Colores zu aktualisieren oder neu zu installieren hängt nicht mehr ein paar Sekunden. Und wenn Decky abstürzt, beendet sich Colores mit, statt im Hintergrund weiterzulaufen und Speicher zu fressen, bis der Handheld einfriert.
+
+### Português (Brasil)
+
+* **Estabilidade:** Atualizar ou reinstalar o Colores não trava mais por alguns segundos. E se o Decky fechar de repente, o Colores fecha junto, em vez de continuar aberto em segundo plano consumindo memória até travar o portátil.
+
+### Français
+
+* **Stabilité :** Mettre à jour ou réinstaller Colores ne bloque plus pendant quelques secondes. Et si Decky plante, Colores se ferme avec lui au lieu de rester ouvert en arrière-plan à consommer de la mémoire jusqu'à figer la console.
+
+## [0.34.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.33.0...decky-colores-v0.34.0) (2026-10-21)
+
+
+### Español
+
+* **Idiomas:** Colores ya está en francés. Puedes elegirlo desde el selector de idioma en Ajustes.
+
+### English
+
+* **Languages:** Colores is now available in French. You can pick it from the language selector in Settings.
+
+### Italiano
+
+* **Lingue:** Colores ora è disponibile in francese. Puoi sceglierlo dal selettore della lingua nelle Impostazioni.
+
+### Deutsch
+
+* **Sprachen:** Colores gibt es jetzt auch auf Französisch. Du kannst es in den Einstellungen über die Sprachauswahl einstellen.
+
+### Português (Brasil)
+
+* **Idiomas:** O Colores agora está disponível em francês. Você pode escolhê-lo no seletor de idioma em Configurações.
+
+### Français
+
+* **Langues :** Colores est désormais disponible en français. Vous pouvez le choisir dans le sélecteur de langue, dans les Réglages.
+
+## [0.33.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.1...decky-colores-v0.33.0) (2026-10-18)
+
+
+### Español
+
+* **Temas:** Colores ahora se adapta automáticamente al estilo del tema que tengas activo. Duo, el nuevo tema que está al caer, será el primero en aprovecharlo.
+
+### English
+
+* **Themes:** Colores now adapts automatically to the style of your active theme. Duo, the new theme coming soon, will be the first to make use of it.
+
+### Italiano
+
+* **Temi:** Colores ora si adatta da solo allo stile del tema attivo. Duo, il nuovo tema in arrivo a breve, sarà il primo a sfruttarlo.
+
+### Deutsch
+
+* **Themes:** Colores passt sich jetzt automatisch an den Stil deines aktiven Themes an. Duo, das neue Theme, das bald erscheint, nutzt das als Erstes.
+
+### Português (Brasil)
+
+* **Temas:** O Colores agora se adapta sozinho ao visual do tema ativo. O Duo, o novo tema que vem aí, será o primeiro a aproveitar isso.
+
+### Français
+
+* **Thèmes :** Colores s'adapte désormais tout seul au style du thème actif. Duo, le nouveau thème qui arrive bientôt, sera le premier à en profiter.
+
 ## [0.32.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.32.0...decky-colores-v0.32.1) (2026-10-14)
 
 
@@ -27,6 +108,11 @@
 
 * **Ambilight:** Em portáteis de duas telas com Armada, como o AYN Thor, o modo ambiente volta a acender sempre. Às vezes ele seguia a tela de baixo, que costuma ficar desligada, e as luzes ficavam apagadas.
 * **Ambilight:** Com Armada, atualizar ou desativar o Colores com o modo ambiente ligado podia fechar o Steam de repente. Isso não acontece mais.
+
+### Français
+
+* **Ambilight :** Sur les consoles à double écran avec Armada, comme l'AYN Thor, le mode Ambilight s'allume de nouveau systématiquement. Il se calait parfois sur l'écran du bas, souvent éteint, et l'éclairage restait sans couleur.
+* **Ambilight :** Avec Armada, mettre à jour ou désactiver Colores pendant que le mode Ambilight était actif pouvait fermer Steam brutalement. Ce n'est plus le cas.
 
 ## [0.32.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.31.0...decky-colores-v0.32.0) (2026-10-13)
 

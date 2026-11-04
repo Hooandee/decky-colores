@@ -22,6 +22,7 @@ jobs:
           printf '%s' "$BODY" | grep -qF "### Novità" || missing="$missing '### Novità' (italiano)"
           printf '%s' "$BODY" | grep -qF "### Neuigkeiten" || missing="$missing '### Neuigkeiten' (Deutsch)"
           printf '%s' "$BODY" | grep -qF "### Novidades em português (Brasil)" || missing="$missing '### Novidades em português (Brasil)' (Português do Brasil)"
+          printf '%s' "$BODY" | grep -qF "### Nouveautés" || missing="$missing '### Nouveautés' (français)"
           if [ -n "$missing" ]; then
             echo "::error::Release notes are missing:$missing"
             exit 1

@@ -21,6 +21,17 @@ class AndroidDeviceIdentityCatalogTest {
     }
 
     @Test
+    fun `production catalog presents the Retroid Pocket Duo but not the Lite`() {
+        val duo = catalog.resolve(AndroidDeviceIdentity("Retroid Pocket Duo", "sun", "Moorechip", emptyMap()), exact = null)
+        val lite = catalog.resolve(AndroidDeviceIdentity("Retroid Pocket Duo Lite", "sun", "Moorechip", emptyMap()), exact = null)
+
+        assertEquals("retroid-pocket-duo", duo.id)
+        assertEquals("Retroid Pocket Duo", duo.friendlyName)
+        assertEquals(DevicePresentationSource.KNOWN_IDENTITY, duo.source)
+        assertEquals(DevicePresentationSource.BUILD_MODEL, lite.source)
+    }
+
+    @Test
     fun `matching ignores separators and case but still requires the manufacturer`() {
         val presentationCatalog =
             AndroidDeviceIdentityCatalog.parse(

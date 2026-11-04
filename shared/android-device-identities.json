@@ -1,4 +1,11 @@
 {
   "schemaVersion": 1,
-  "devices": []
+  "devices": [
+    {
+      "id": "retroid-pocket-duo",
+      "friendlyName": "Retroid Pocket Duo",
+      "manufacturers": ["Moorechip"],
+      "models": ["Retroid Pocket Duo"]
+    }
+  ]
 }

@@ -17,6 +17,7 @@ export const DeviceHeader: FC<{
     <div
       role="status"
       aria-label={device.name}
+      data-colores-part="device-pill"
       style={{
         display: "inline-flex",
         alignItems: "center",
