@@ -3,9 +3,53 @@
 ## [0.35.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.0...decky-colores-v0.35.1) (2026-11-10)
 
 
-### Bug Fixes
+### Español
 
-* stop Ambilight from crashing gamescope and harden LED ownership ([#223](https://github.com/Hooandee/decky-colores/issues/223)) ([6adfeb3](https://github.com/Hooandee/decky-colores/commit/6adfeb3bbf0e1b4c259fab1cbfb2cbaa0f8fade1))
+* **Ambilight sin cuelgues:** Abrir o cerrar un juego, o suspender la consola con Ambilight activo, ya no tira la interfaz de Steam. Además gasta mucho menos, así que el juego va más desahogado.
+* **Luces que no se pierden:** Si el mando se reconecta o algo pisa las luces poco después de encender la consola, Colores las vuelve a poner solo, sin tener que entrar en el plugin.
+* **Steam Machine:** Mientras Steam descarga algo, la barra muestra su progreso y, al terminar, vuelve tu luz. Después de suspender recupera siempre tu brillo.
+* **ROG Ally:** El efecto Arcoíris vuelve a mezclar colores en los aros en lugar de verse igual que Ciclo.
+* **ROG Ally nuevas:** Modelos que Colores aún no conoce, como la ROG Xbox Ally X RC74XA, se intentan controlar en modo experimental en vez de quedarse sin luces.
+
+### English
+
+* **Ambilight without crashes:** Opening or closing a game, or suspending with Ambilight on, no longer brings down the Steam interface. It also uses far less power, so games run with more headroom.
+* **Lights that stay put:** If the controller reconnects or something overrides the lights shortly after boot, Colores puts them back on its own, without you opening the plugin.
+* **Steam Machine:** While Steam downloads something, the bar shows its progress and your lighting comes back when it finishes. After suspend, your brightness is always restored.
+* **ROG Ally:** The Rainbow effect mixes colors on the rings again instead of looking the same as Cycle.
+* **Newer ROG Ally models:** Models Colores doesn't know yet, such as the ROG Xbox Ally X RC74XA, are now tried in experimental mode instead of being left without lights.
+
+### Italiano
+
+* **Ambilight senza blocchi:** Aprire o chiudere un gioco, o sospendere la console con Ambilight attivo, non fa più cadere l'interfaccia di Steam. In più consuma molto meno, così il gioco ha più respiro.
+* **Luci che non si perdono:** Se il controller si riconnette o qualcosa sovrascrive le luci poco dopo l'accensione, Colores le rimette da solo, senza dover aprire il plugin.
+* **Steam Machine:** Mentre Steam scarica qualcosa, la barra mostra l'avanzamento e, alla fine, torna la tua luce. Dopo la sospensione recupera sempre la tua luminosità.
+* **ROG Ally:** L'effetto Arcobaleno torna a mescolare i colori sugli anelli invece di sembrare uguale a Ciclo.
+* **Nuove ROG Ally:** I modelli che Colores non conosce ancora, come la ROG Xbox Ally X RC74XA, vengono provati in modalità sperimentale invece di restare senza luci.
+
+### Deutsch
+
+* **Ambilight ohne Abstürze:** Ein Spiel zu öffnen oder zu schließen oder den Handheld mit aktivem Ambilight in den Ruhemodus zu schicken, reißt die Steam-Oberfläche nicht mehr mit. Außerdem braucht es deutlich weniger Leistung, sodass dem Spiel mehr Luft bleibt.
+* **Beleuchtung, die bleibt:** Wenn sich der Controller neu verbindet oder kurz nach dem Start etwas die Beleuchtung überschreibt, stellt Colores sie von selbst wieder her, ohne dass du das Plugin öffnen musst.
+* **Steam Machine:** Während Steam etwas herunterlädt, zeigt die Leiste den Fortschritt, und danach kommt deine Beleuchtung zurück. Nach dem Ruhemodus wird deine Helligkeit immer wiederhergestellt.
+* **ROG Ally:** Der Effekt Regenbogen mischt die Farben auf den Ringen wieder, statt genauso auszusehen wie Farbwechsel.
+* **Neuere ROG Ally:** Modelle, die Colores noch nicht kennt, etwa die ROG Xbox Ally X RC74XA, werden jetzt im experimentellen Modus angesteuert, statt ohne Beleuchtung zu bleiben.
+
+### Português (Brasil)
+
+* **Ambilight sem travamentos:** Abrir ou fechar um jogo, ou suspender o portátil com o Ambilight ativo, não derruba mais a interface do Steam. Além disso, ele gasta muito menos, então o jogo roda com mais folga.
+* **Luzes que não se perdem:** Se o controle se reconectar ou algo sobrescrever as luzes logo depois de ligar o portátil, o Colores as recoloca sozinho, sem precisar abrir o plugin.
+* **Steam Machine:** Enquanto o Steam baixa algo, a barra mostra o progresso e, ao terminar, sua luz volta. Depois da suspensão, o seu brilho é sempre recuperado.
+* **ROG Ally:** O efeito Arco-íris volta a misturar cores nos anéis em vez de ficar igual ao Ciclo.
+* **ROG Ally novos:** Modelos que o Colores ainda não conhece, como o ROG Xbox Ally X RC74XA, agora são testados em modo experimental em vez de ficarem sem luzes.
+
+### Français
+
+* **Ambilight sans plantage :** Ouvrir ou fermer un jeu, ou mettre la console en veille avec Ambilight actif, ne fait plus tomber l'interface de Steam. En plus, il consomme beaucoup moins, ce qui laisse plus de marge au jeu.
+* **Un éclairage qui tient :** Si la manette se reconnecte ou si quelque chose écrase l'éclairage peu après le démarrage, Colores le remet tout seul, sans que vous ayez à ouvrir le plugin.
+* **Steam Machine :** Pendant qu'un téléchargement Steam est en cours, la barre affiche sa progression, puis votre éclairage revient à la fin. Après la veille, votre luminosité est toujours rétablie.
+* **ROG Ally :** L'effet Arc-en-ciel mélange de nouveau les couleurs sur les anneaux au lieu de ressembler à Cycle.
+* **Nouvelles ROG Ally :** Les modèles que Colores ne connaît pas encore, comme la ROG Xbox Ally X RC74XA, sont maintenant pris en charge en mode expérimental au lieu de rester sans éclairage.
 
 ## [0.35.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.34.1...decky-colores-v0.35.0) (2026-11-04)
 
