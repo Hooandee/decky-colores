@@ -266,13 +266,9 @@ def test_run_uses_the_pipewire_helper_without_pw_dump(monkeypatch):
         commands.append(command)
         raise OSError("stop here")
 
-    async def no_pipewiresrc():
-        return False
-
     async def must_not_run():
         raise AssertionError("pw-dump used")
 
-    monkeypatch.setattr(ambilight_mod, "_gst_has_pipewiresrc", no_pipewiresrc)
     monkeypatch.setattr(ambilight_mod, "_helper_python", lambda: "/host/python3")
     monkeypatch.setattr(ambilight_mod.asyncio, "create_subprocess_exec", fake_exec)
     monkeypatch.setattr(ambilight_mod, "_backend", None)
@@ -288,41 +284,101 @@ def test_run_uses_the_pipewire_helper_without_pw_dump(monkeypatch):
     captures = [command for command in commands if command[0] != "wpctl"]
     assert captures[0] == (
         "/host/python3", ambilight_mod.PW_CAPTURE, "gamescope",
-        str(ambilight_mod.CAP_W), str(ambilight_mod.CAP_H), "10",
+        str(ambilight_mod.CAP_W), str(ambilight_mod.CAP_H), str(ambilight_mod.HELPER_FPS),
     )
 
 
-def test_the_capture_helper_is_only_offered_on_arm(monkeypatch):
-    monkeypatch.setattr(ambilight_mod, "host_capture_python", lambda root="/": "/host/python3")
+def test_the_capture_helper_is_offered_on_every_architecture(monkeypatch):
     monkeypatch.setattr(ambilight_mod.shutil, "which", lambda name: None)
-    monkeypatch.setattr(ambilight_mod.device_tree, "is_arm", lambda root="/": False)
+    monkeypatch.setattr(ambilight_mod, "host_capture_python", lambda root="/": None)
     assert ambilight_mod.capture_available() is False
-    monkeypatch.setattr(ambilight_mod.device_tree, "is_arm", lambda root="/": True)
+    monkeypatch.setattr(ambilight_mod, "host_capture_python", lambda root="/": "/host/python3")
     assert ambilight_mod.capture_available() is True
 
 
-def test_a_slow_gst_inspect_does_not_pin_the_gst_backend(monkeypatch):
-    class Slow:
-        killed = False
+def test_the_helper_is_preferred_over_gstreamer(monkeypatch):
+    monkeypatch.setattr(ambilight_mod, "_backend", None)
+    monkeypatch.setattr(ambilight_mod, "_helper_python", lambda: "/host/python3")
+    amb = Ambilight(lambda colors: None, zones=1, runtime_dir=None)
+    assert asyncio.run(amb._select_backend()) == ("pipewire", "/host/python3")
+
+
+def test_without_host_libpipewire_capture_uses_gstreamer(monkeypatch):
+    monkeypatch.setattr(ambilight_mod, "_backend", None)
+    monkeypatch.setattr(ambilight_mod, "_helper_python", lambda: None)
+    amb = Ambilight(lambda colors: None, zones=1, runtime_dir=None)
+    assert asyncio.run(amb._select_backend()) == ("gst", None)
+
+
+def test_helper_fps_is_fixed_so_option_changes_never_reconnect():
+    amb = Ambilight(lambda colors: None, zones=1, runtime_dir=None)
+    amb._options = {"fps": 5}
+    first = amb._helper_fps()
+    amb._options = {"fps": 30}
+    assert amb._helper_fps() == first == ambilight_mod.HELPER_FPS
+    limited = Ambilight(lambda colors: None, zones=1, runtime_dir=None, max_fps=10)
+    assert limited._helper_fps() == 10
+
+
+def test_repeated_drops_back_off_up_to_a_ceiling():
+    delays = [ambilight_mod.retry_delay(n) for n in range(0, 8)]
+    assert delays[0] == delays[1] == ambilight_mod.RETRY_INTERVAL
+    assert delays == sorted(delays)
+    assert delays[-1] == ambilight_mod.MAX_RETRY_INTERVAL
+
+
+def test_start_while_running_only_updates_options():
+    async def drive():
+        amb = Ambilight(lambda colors: None, zones=1, runtime_dir=None)
+        task = asyncio.create_task(asyncio.sleep(60))
+        amb._task = task
+        amb.start({"fps": 20})
+        assert amb._task is task
+        assert amb._options == {"fps": 20}
+        task.cancel()
+
+    asyncio.run(drive())
+
+
+def test_a_helper_without_libpipewire_switches_to_gstreamer(monkeypatch):
+    monkeypatch.setattr(ambilight_mod, "RETRY_INTERVAL", 0.001)
+    monkeypatch.setattr(ambilight_mod, "_backend", ("pipewire", "/host/python3"))
+    commands = []
+
+    class Exited:
+        returncode = ambilight_mod.HELPER_NO_LIBPIPEWIRE
+
+        def __init__(self):
+            self.stdout = asyncio.StreamReader()
+            self.stdout.feed_eof()
+            self.stderr = asyncio.StreamReader()
+            self.stderr.feed_eof()
 
         async def wait(self):
-            await asyncio.sleep(60)
+            return self.returncode
 
         def kill(self):
-            Slow.killed = True
+            pass
 
     async def fake_exec(*command, **kwargs):
-        return Slow()
+        commands.append(command)
+        if command[0] == "wpctl":
+            raise OSError("no wpctl")
+        if command[0] == "pw-dump":
+            raise OSError("stop")
+        return Exited()
 
-    async def fast_wait_for(awaitable, timeout):
-        awaitable.close()
-        raise asyncio.TimeoutError
-
-    monkeypatch.setattr(ambilight_mod.shutil, "which", lambda name: "/usr/bin/" + name)
     monkeypatch.setattr(ambilight_mod.asyncio, "create_subprocess_exec", fake_exec)
-    monkeypatch.setattr(ambilight_mod.asyncio, "wait_for", fast_wait_for)
-    assert asyncio.run(ambilight_mod._gst_has_pipewiresrc()) is False
-    assert Slow.killed
+    amb = Ambilight(lambda colors: None, zones=1, runtime_dir=None)
+
+    async def drive():
+        amb.start({"fps": 10})
+        await asyncio.sleep(0.05)
+        amb.stop()
+
+    asyncio.run(drive())
+    assert ambilight_mod._backend == ("gst", None)
+    assert any(command[0] == "pw-dump" for command in commands)
 
 
 WPCTL_STATUS = """Video

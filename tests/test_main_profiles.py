@@ -103,6 +103,19 @@ def test_set_current_app_deduplicates_apply(profile_plugin):
     assert len(applies) == 1
 
 
+def test_switching_games_never_disconnects_the_ambient_capture(profile_plugin):
+    stops = []
+    profile_plugin._ambilight.stop = lambda: stops.append(True)
+
+    async def drive():
+        await profile_plugin.set_current_app("42")
+        await profile_plugin.set_current_app(None)
+
+    asyncio.run(drive())
+
+    assert stops == []
+
+
 def test_unsupported_mode_falls_back_without_overwriting_profile(profile_plugin):
     profile_plugin._profiles.patch("game", "42", {"mode": "ambient"})
     profile_plugin._profiles.set_follow_global("42", False)

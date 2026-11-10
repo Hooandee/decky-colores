@@ -29,6 +29,10 @@ SPA_FORMAT_MEDIA_SUBTYPE = 2
 SPA_FORMAT_VIDEO_FORMAT = 0x20001
 SPA_FORMAT_VIDEO_SIZE = 0x20003
 SPA_FORMAT_VIDEO_FRAMERATE = 0x20004
+# gamescope's own key: it scales the capture on the GPU before handing it over.
+SPA_FORMAT_VIDEO_REQUESTED_SIZE = 0x70000
+REQUESTED_SIZE = (128, 72)
+SPA_CHUNK_FLAG_CORRUPTED = 1
 SPA_MEDIA_TYPE_VIDEO = 2
 SPA_MEDIA_SUBTYPE_RAW = 1
 
@@ -72,7 +76,7 @@ def _prop(key, value):
     return struct.pack("<II", key, 0) + value
 
 
-def enum_format_pod():
+def enum_format_pod(requested=REQUESTED_SIZE):
     formats = (8, 7, 12, 11, 9, 10, 13, 14)
     ids = [struct.pack("<I", fmt) for fmt in (formats[0],) + formats]
     rect = [struct.pack("<II", *size) for size in ((64, 36), (1, 1), (8192, 8192))]
@@ -83,6 +87,7 @@ def enum_format_pod():
         _prop(SPA_FORMAT_VIDEO_FORMAT, _choice(SPA_CHOICE_ENUM, SPA_TYPE_ID, 4, ids)),
         _prop(SPA_FORMAT_VIDEO_SIZE, _choice(SPA_CHOICE_RANGE, SPA_TYPE_RECTANGLE, 8, rect)),
         _prop(SPA_FORMAT_VIDEO_FRAMERATE, _choice(SPA_CHOICE_RANGE, SPA_TYPE_FRACTION, 8, frac)),
+        _prop(SPA_FORMAT_VIDEO_REQUESTED_SIZE, _pod(SPA_TYPE_RECTANGLE, struct.pack("<II", *requested))),
     ))
     return _pod(SPA_TYPE_OBJECT, struct.pack("<II", SPA_TYPE_OBJECT_FORMAT, SPA_PARAM_ENUM_FORMAT) + props)
 
@@ -297,6 +302,8 @@ def capture(target, out_w, out_h, fps, out=None):
             if not data.data or not data.chunk:
                 return
             chunk = data.chunk.contents
+            if chunk.flags & SPA_CHUNK_FLAG_CORRUPTED:
+                return
             _, width, height = fmt
             stride = chunk.stride or width * 4
             needed = stride * height

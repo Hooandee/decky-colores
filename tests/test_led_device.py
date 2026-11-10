@@ -568,3 +568,17 @@ def test_multi_sysfs_stick_groups_color_each_ring_independently(tmp_path):
     assert all(_read(os.path.join(node, "multi_intensity")) == "0 0 255" for node in nodes[:4])
     assert all(_read(os.path.join(node, "multi_intensity")) == "255 0 0" for node in nodes[4:])
 
+
+
+def test_valve_reconnect_restores_a_scale_changed_behind_our_back(tmp_path):
+    leds = _make_valve_bar(tmp_path, count=2)
+    nodes = discover_valve_leds(leds)
+    device = ValveLedsDevice(nodes, max_brightness=255)
+    device.apply_zones([(255, 0, 0)], 100, True)
+    scale = os.path.join(nodes[0], "brightness_scale")
+    open(scale, "w").write("20")
+    open(os.path.join(nodes[0], "effect"), "w").write("breath")
+    assert device.reconnect() is True
+    device.apply_zones([(255, 0, 0)], 100, True)
+    assert _read(scale) == "255"
+    assert _read(os.path.join(nodes[0], "effect")) == "manual"

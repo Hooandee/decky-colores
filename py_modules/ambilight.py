@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import shutil
+import time
 
 from ambient_sampling import ContentBoxTracker, content_box, region_color, region_pixels
 import device_tree
@@ -23,11 +24,17 @@ CAP_H = 18
 # the (root) plugin loads, so the capture must keep retrying instead of giving up —
 # otherwise ambient mode stays dark until the user manually re-selects it.
 RETRY_INTERVAL = 3.0
+# Each connect and disconnect makes gamescope reallocate its capture buffers, which some
+# drivers crash on, so repeated drops back off.
+MAX_RETRY_INTERVAL = 30.0
+STABLE_STREAM_S = 60.0
+HELPER_FPS = 30
+HELPER_NO_LIBPIPEWIRE = 3
 
 _FULL_REGION = [0.0, 0.0, 1.0, 1.0]
 
-# Armada's GStreamer (host and FEX guest) lacks pipewiresrc, so capture can also run
-# pw_capture.py on the host Python.
+# pw_capture.py on the host Python asks gamescope for a small GPU-scaled frame; GStreamer is
+# the fallback when the host has no libpipewire.
 PW_CAPTURE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pw_capture.py")
 _PIPEWIRE_LIBS = (
     "usr/lib64/libpipewire-0.3.so.0",
@@ -48,7 +55,7 @@ def host_capture_python(root="/"):
 
 
 def _helper_python():
-    return host_capture_python() if device_tree.is_arm() else None
+    return host_capture_python()
 
 
 def capture_available():
@@ -56,26 +63,6 @@ def capture_available():
 
 
 _backend = None
-
-
-async def _gst_has_pipewiresrc():
-    if shutil.which("gst-launch-1.0") is None:
-        return False
-    inspect = shutil.which("gst-inspect-1.0")
-    if inspect is None:
-        return True
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            inspect, "--exists", "pipewiresrc",
-            stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
-        )
-    except OSError:
-        return True
-    try:
-        return await asyncio.wait_for(proc.wait(), timeout=20) == 0
-    except asyncio.TimeoutError:
-        proc.kill()
-        return False
 
 
 def is_lease_companion(pid, proc_root="/proc"):
@@ -166,6 +153,17 @@ def _gst_command(node, width, height):
         "!", "queue", "leaky=downstream", "max-size-buffers=2",
         "!", "videoconvert", "!", "videoscale", "!", caps, "!", "fdsink", "fd=1",
     ]
+
+
+def _fall_back_to_gst():
+    global _backend
+    _backend = ("gst", None)
+    logger.warning("ambilight capture helper cannot load libpipewire; using gst")
+    return _backend
+
+
+def retry_delay(drops):
+    return min(MAX_RETRY_INTERVAL, RETRY_INTERVAL * (2 ** max(0, drops - 1)))
 
 
 def _replace_with_latest(queue, item):
@@ -287,7 +285,7 @@ class Ambilight:
     async def _select_backend(self):
         global _backend
         if _backend is None:
-            python = None if await _gst_has_pipewiresrc() else _helper_python()
+            python = _helper_python()
             _backend = ("pipewire", python) if python else ("gst", None)
             logger.info("ambilight capture backend: %s", _backend[0])
         return _backend
@@ -330,8 +328,8 @@ class Ambilight:
         # or vanish (leaving Game Mode) and reappear — we recover from both automatically.
         frame_bytes = CAP_W * CAP_H * 3
         backend, python = await self._select_backend()
+        drops = 0
         while True:
-            interval = self._capture_interval()
             if backend == "pipewire":
                 node = await self._pipewire_target()
                 if node is None:
@@ -342,7 +340,7 @@ class Ambilight:
                     continue
                 command = [
                     python, PW_CAPTURE, node,
-                    str(CAP_W), str(CAP_H), str(round(1.0 / interval)),
+                    str(CAP_W), str(CAP_H), str(self._helper_fps()),
                 ]
             else:
                 node = await self._find_node()
@@ -355,7 +353,8 @@ class Ambilight:
                 command = _gst_command(node, CAP_W, CAP_H)
             proc = None
             reader_task = None
-            logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / interval)
+            started = time.monotonic()
+            logger.info("ambilight start: node=%s fps=%.0f", node, 1.0 / self._capture_interval())
             try:
                 proc = await asyncio.create_subprocess_exec(
                     *command,
@@ -376,10 +375,12 @@ class Ambilight:
                         raise frame
                     self._update_targets(frame)
                     self._tick()
-                    await asyncio.sleep(interval)
+                    await asyncio.sleep(self._capture_interval())
             except asyncio.IncompleteReadError:
                 self.status = "no_source"
                 await self._log_exit(proc)
+                if backend == "pipewire" and proc.returncode == HELPER_NO_LIBPIPEWIRE:
+                    backend, python = _fall_back_to_gst()
                 self._apply(self._fallback())
             except asyncio.CancelledError:
                 raise
@@ -396,7 +397,8 @@ class Ambilight:
                         pass
                 if self._proc is proc:
                     self._proc = None
-            await asyncio.sleep(RETRY_INTERVAL)
+            drops = 0 if time.monotonic() - started >= STABLE_STREAM_S else drops + 1
+            await asyncio.sleep(retry_delay(drops))
 
     async def _log_exit(self, proc):
         if proc is None:
@@ -404,7 +406,8 @@ class Ambilight:
         err = b""
         try:
             err = await proc.stderr.read()
-        except (OSError, ValueError):
+            await asyncio.wait_for(proc.wait(), timeout=2)
+        except (OSError, ValueError, asyncio.TimeoutError):
             pass
         logger.warning(
             "ambilight stream ended (rc=%s): %s",
@@ -432,6 +435,11 @@ class Ambilight:
             for sub, zone in zip(subdivide(region, len(indices)), indices):
                 if 0 <= zone < self._zones:
                     self._targets[zone] = boost_saturation(self._sample(frame, box, sub), sat)
+
+    def _helper_fps(self):
+        # Fixed so option changes never reconnect; the loop throttles to the chosen fps.
+        cap = HELPER_FPS if self._max_fps is None else min(HELPER_FPS, int(self._max_fps))
+        return max(1, cap)
 
     def _tick(self):
         alpha = alpha_for(self._options.get("smoothing", 75))

@@ -559,6 +559,11 @@ class ValveLedsDevice(LedDevice):
         self._manual_set = False
         self._last_level = None
 
+    def reconnect(self):
+        # Suspend and Steam's LEDManager change effect and brightness_scale behind our back.
+        self.invalidate()
+        return self.available
+
     @staticmethod
     def _write(path, value):
         with open(path, "w") as handle:

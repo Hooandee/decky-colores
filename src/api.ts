@@ -19,6 +19,7 @@ export const setAmbilight = callable<[vividness: number, smoothing: number, fps:
 export const setAmbilightSampling = callable<[mode: string], void>("set_ambilight_sampling");
 export const getAmbilightStatus = callable<[], string>("get_ambilight_status");
 export const prepareSuspend = callable<[], void>("prepare_suspend");
+export const setSteamDownloadActive = callable<[active: boolean], void>("set_steam_download_active");
 export const getAudioStatus = callable<[], string>("get_audio_status");
 export const saveGradient = callable<[name: string, stops: number[][]], GradientPreset[]>("save_gradient");
 export const deleteGradient = callable<[name: string], GradientPreset[]>("delete_gradient");
