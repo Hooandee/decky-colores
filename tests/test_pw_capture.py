@@ -111,3 +111,12 @@ def test_a_reader_that_keeps_up_gets_whole_frames():
     os.close(read_end)
     assert sink.write(b"\x00" * 1728) is None
     os.close(write_end)
+
+
+def test_enum_format_asks_gamescope_for_a_small_gpu_scaled_frame():
+    pod = pw_capture.enum_format_pod((128, 72))
+    key = struct.pack("<II", pw_capture.SPA_FORMAT_VIDEO_REQUESTED_SIZE, 0)
+    at = pod.index(key) + len(key)
+    size, type_ = struct.unpack_from("<II", pod, at)
+    assert (size, type_) == (8, pw_capture.SPA_TYPE_RECTANGLE)
+    assert struct.unpack_from("<II", pod, at + 8) == (128, 72)

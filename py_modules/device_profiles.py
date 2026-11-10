@@ -74,6 +74,8 @@ VALVE_LEDS = {
     "supported_effects": ["breathing", "rainbow", "wave", "cycle", "comet", "sparkle", "ripple", "aurora"],
     "conflicts_with_system_rgb": True,
     "persistent_startup": True,
+    # Steam's LEDManager paints download progress on this bar.
+    "yields_to_steam_downloads": True,
     "experimental": [],
 }
 
@@ -219,6 +221,10 @@ PROFILES = [
     ("product", "ONEXPLAYER APEX", _profile(OXP_APEX, "OneXPlayer OneXFly Apex")),
     ("product", "ONEXPLAYER F1Pro", _profile(OXP_SYSFS, "OneXPlayer OneXFly F1 Pro")),
     ("product_contains", "ONEXPLAYER", _profile(OXP_SYSFS, "")),
+    # Unlisted Ally boards try the same sysfs then Aura probe and claim nothing without one.
+    ("board_prefix", "RC7", _profile(
+        {**ASUS_SYSFS_SLEEP, "experimental": ["color", "brightness", "effects", "ambilight"]}, ""
+    )),
 ]
 
 
@@ -228,7 +234,10 @@ def resolve_profile_match(board, product):
             return _copy_profile(profile), True
         if field == "product" and value == product:
             return _copy_profile(profile), True
-        if field == "product_contains" and value in (product or ""):
+        if (
+            (field == "product_contains" and value in (product or ""))
+            or (field == "board_prefix" and (board or "").startswith(value))
+        ):
             resolved = _copy_profile(profile)
             if not resolved.get("name"):
                 resolved["name"] = product or board or "Unknown device"

@@ -777,3 +777,26 @@ def test_generic_rgb_nodes_ignore_invalid_and_single_color_leds(tmp_path):
     assert [open(os.path.join(leds, n, "multi_intensity")).read() for n in ("rgb:a", "rgb:b", "rgb:broken")] == [
         "0 255 0", "0 255 0", "0 0 0",
     ]
+
+
+def test_newer_ally_board_uses_the_ally_rings_when_the_kernel_exposes_them(tmp_path):
+    _make_dmi(str(tmp_path), "RC74XA", "ROG XBOX Ally X RC74XA RC74XA")
+    _make_led(str(tmp_path), "ally:rgb:joystick_rings",
+              {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb",
+               "max_brightness": "255", "brightness": "0"})
+    ctx = build_device(str(tmp_path))
+    assert ctx["info"]["name"] == "ROG XBOX Ally X RC74XA RC74XA"
+    assert isinstance(ctx["device"], SysfsRgbDevice)
+    assert ctx["capabilities"]["zones"] == 4
+    assert ctx["capabilities"]["states"]["color"] == "experimental"
+
+
+def test_newer_ally_board_without_any_led_endpoint_claims_nothing(tmp_path, monkeypatch):
+    import py_modules.device as device_module
+
+    _make_dmi(str(tmp_path), "RC74XA", "ROG XBOX Ally X RC74XA RC74XA")
+    os.makedirs(os.path.join(str(tmp_path), "sys/class/leds"))
+    monkeypatch.setattr(device_module, "HID_AVAILABLE", False)
+    ctx = build_device(str(tmp_path))
+    assert isinstance(ctx["device"], NullDevice)
+    assert ctx["capabilities"]["states"]["color"] == "unsupported"

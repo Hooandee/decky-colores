@@ -775,7 +775,7 @@ def test_ally_hardware_effect_uses_mode_and_speed(hid_env):
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
     dev = adapters.AsusAllyHidDevice.create()
     writes.clear()
-    assert dev.apply_hardware_effect("rainbow", (0, 255, 0), 90, 20, True) is True
+    assert dev.apply_hardware_effect("cycle", (0, 255, 0), 90, 20, True) is True
     brightness_packets = [p for p in writes if p[:4] == bytes.fromhex("5abac5c4")]
     zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
     assert brightness_packets[0][4] == 1

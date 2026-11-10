@@ -177,6 +177,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
         "conflictsWithSystemRgb": bool(profile.get("conflicts_with_system_rgb", False)),
         "hhdRgbTakeover": bool(profile.get("hhd_rgb_takeover", False)),
         "persistentStartup": bool(profile.get("persistent_startup", False)),
+        "yieldsToSteamDownloads": bool(profile.get("yields_to_steam_downloads", False)),
         "maxRenderFps": int(profile.get("max_render_fps", 30)),
         "layoutKind": profile.get("layout_kind", "rings"),
         "layout": build_layout(zones, profile.get("swap_sticks", False), profile.get("layout_kind", "rings")),

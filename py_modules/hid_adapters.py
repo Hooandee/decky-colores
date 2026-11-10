@@ -473,6 +473,9 @@ class LegionGoSHidDevice(_LegionHidDevice):
 
 
 class AsusAllyHidDevice(_BaseHidDevice):
+    # Aura mode 0x03 leaves the RC71L rings dark, so the multi-hue rainbow is rendered.
+    renders_rainbow_in_software = True
+
     # Green is toned down to match the Ally calibration; the gain comes from the
     # profile's color_correction via set_color_correction (see _build_hid_context).
 

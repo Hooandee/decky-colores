@@ -14,7 +14,7 @@ import { definePlugin } from "@decky/api";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useColores } from "./useColores";
-import { getAmbilightStatus, getAudioStatus, getTemperature, getPerformance, prepareSuspend, reconnect as apiReconnect } from "./api";
+import { getAmbilightStatus, getAudioStatus, getTemperature, getPerformance, prepareSuspend, reconnect as apiReconnect, setSteamDownloadActive } from "./api";
 import { rgbToCss, gradientCss, unifyColors } from "./color";
 import { Mode, RGB, ZoneGroup, GradientPreset, EffectColorNeed, Capabilities, SensorBand, SensorBands, SensorKind } from "./types";
 import { DevicePreview } from "./components/DevicePreview";
@@ -61,6 +61,7 @@ import { useShoulderNav } from "./nav/useShoulderNav";
 import { readActiveTab, writeActiveTab, readSensorMode, writeSensorMode } from "./nav/activeTab";
 import { startGameWatcher } from "./apps/gameWatcher";
 import { startSuspendPreparation } from "./lifecycle/suspend";
+import { watchSteamDownloads } from "./lifecycle/steamDownloads";
 import { ProfileScopeSelector } from "./components/ProfileScopeSelector";
 import { openSaveStyleModal } from "./components/StylesModal";
 import { deckyModeOf, SavedStyle } from "./styles";
@@ -1281,6 +1282,7 @@ function Content() {
 export default definePlugin(() => {
   const stopGameWatcher = startGameWatcher();
   const stopSuspendPreparation = startSuspendPreparation(prepareSuspend);
+  const stopSteamDownloads = watchSteamDownloads(setSteamDownloadActive);
   return {
     name: "Colores",
     titleView: <div className={staticClasses?.Title}>Colores</div>,
@@ -1296,6 +1298,7 @@ export default definePlugin(() => {
     icon: <ColorWheelIcon />,
     onDismount() {
       stopSuspendPreparation();
+      stopSteamDownloads();
       stopGameWatcher();
     },
   };

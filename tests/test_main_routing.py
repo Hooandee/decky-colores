@@ -1,3 +1,4 @@
+import os
 import json
 import asyncio
 import sys
@@ -756,12 +757,12 @@ def test_reconnect_reasserts_sleep_charging_policy(main_module):
     assert ("sleep_charging", True) in p._controller.calls
 
 
-def test_reconnect_restarts_ambient_capture(main_module):
+def test_reconnect_keeps_the_ambient_capture_connected(main_module):
     p = _plugin(main_module, "ambient", hw=False, per_zone=True)
     p._ambilight.events.clear()
     ok = asyncio.run(p.reconnect())
     assert ok is True
-    assert [event[0] for event in p._ambilight.events] == ["stop", "start"]
+    assert [event[0] for event in p._ambilight.events] == ["start"]
 
 
 def test_prepare_suspend_stops_capture_without_changing_user_intent(main_module):
@@ -1058,7 +1059,7 @@ def test_reprobe_is_noop_when_already_available(main_module, monkeypatch):
 
 def test_acquire_applies_when_led_appears_late(main_module, monkeypatch):
     monkeypatch.setattr(main_module, "ACQUIRE_INTERVAL", 0.001)
-    monkeypatch.setattr(main_module, "REASSERT_DELAY", 0.001)
+    monkeypatch.setattr(main_module, "REASSERT_DELAYS", (0.001,))
     p = _plugin(main_module, "solid")
     p._controller.available = False
     new_ctrl = FakeController(hw=False, per_zone=True)
@@ -1071,7 +1072,7 @@ def test_acquire_applies_when_led_appears_late(main_module, monkeypatch):
 def test_reassert_reapplies_static_mode(main_module, monkeypatch):
     # Static mode (solid): a single write can be lost to a late default, so re-assert.
     monkeypatch.setattr(main_module, "ACQUIRE_INTERVAL", 0.001)
-    monkeypatch.setattr(main_module, "REASSERT_DELAY", 0.001)
+    monkeypatch.setattr(main_module, "REASSERT_DELAYS", (0.001,))
     p = _plugin(main_module, "solid", hw=False, per_zone=True)
     asyncio.run(p._acquire_and_reassert())
     assert any(e[0] == "static" for e in p._engine.events)
@@ -1082,7 +1083,7 @@ def test_reassert_does_not_restart_running_effect(main_module, monkeypatch):
     # the deferred re-assert must NOT reapply (which would restart the effect at frame 0)
     # and must not rebuild/swap anything on a healthy machine.
     monkeypatch.setattr(main_module, "ACQUIRE_INTERVAL", 0.001)
-    monkeypatch.setattr(main_module, "REASSERT_DELAY", 0.001)
+    monkeypatch.setattr(main_module, "REASSERT_DELAYS", (0.001,))
     monkeypatch.setattr(
         main_module, "build_device",
         lambda **k: (_ for _ in ()).throw(AssertionError("must not reprobe")),
@@ -2085,3 +2086,174 @@ def test_import_rejects_deeply_nested_json(main_module, tmp_path):
     bomb.write_text("[" * 100000)
     with pytest.raises(ValueError):
         asyncio.run(p.import_styles(str(bomb)))
+
+
+def test_ally_aura_rainbow_is_rendered_per_zone_not_by_firmware(main_module):
+    p = _plugin(main_module, "effect", effect={"id": "rainbow", "speed": 50}, hw=True, per_zone=True)
+    p._controller.renders_rainbow_in_software = True
+    assert p._wants_render_loop() is True
+    p._settings["effect"] = {"id": "cycle", "speed": 50}
+    assert p._wants_render_loop() is False
+
+
+def test_rainbow_stays_on_firmware_where_it_mixes_hues(main_module):
+    p = _plugin(main_module, "effect", effect={"id": "rainbow", "speed": 50}, hw=True, per_zone=True)
+    assert p._wants_render_loop() is False
+
+
+def _steam_machine(main_module, mode="solid"):
+    p = _plugin(main_module, mode, hw=False, per_zone=True)
+    p._capabilities["yieldsToSteamDownloads"] = True
+    p._steam_download_active = False
+    p._steam_download_task = None
+    return p
+
+
+def test_steam_download_leaves_the_bar_to_steam(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "STEAM_DOWNLOAD_REASSERT_DELAY", 0)
+
+    async def drive():
+        p = _steam_machine(main_module)
+        await p.set_steam_download_active(True)
+        p._controller.calls.clear()
+        p._render([(1, 2, 3), (1, 2, 3)])
+        p._apply()
+        assert p._controller.calls == []
+
+    asyncio.run(drive())
+
+
+def test_after_a_download_colores_reclaims_the_bar_twice(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "STEAM_DOWNLOAD_SETTLE_DELAY", 0)
+    monkeypatch.setattr(main_module, "STEAM_DOWNLOAD_REASSERT_DELAY", 0)
+    reclaims = []
+
+    async def drive():
+        p = _steam_machine(main_module)
+        p._reclaim_leds = lambda: reclaims.append(p._steam_download_active)
+        await p.set_steam_download_active(True)
+        await p.set_steam_download_active(False)
+        await asyncio.sleep(0.01)
+
+    asyncio.run(drive())
+    assert reclaims == [False, False]
+
+
+def test_reclaim_invalidates_the_driver_before_reapplying(main_module):
+    p = _steam_machine(main_module)
+    order = []
+    p._controller.invalidate = lambda: order.append("invalidate")
+    p._apply = lambda: order.append("apply")
+    p._reclaim_leds()
+    assert order == ["invalidate", "apply"]
+
+
+def test_a_flapping_download_state_never_flashes_our_mode(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "STEAM_DOWNLOAD_SETTLE_DELAY", 0.05)
+    monkeypatch.setattr(main_module, "STEAM_DOWNLOAD_REASSERT_DELAY", 0.05)
+    reclaims = []
+
+    async def drive():
+        p = _steam_machine(main_module)
+        p._reclaim_leds = lambda: reclaims.append(True)
+        await p.set_steam_download_active(True)
+        await p.set_steam_download_active(False)
+        await asyncio.sleep(0.02)
+        await p.set_steam_download_active(True)
+        await asyncio.sleep(0.15)
+        assert p._steam_download_active is True
+
+    asyncio.run(drive())
+    assert reclaims == []
+
+
+def test_devices_without_a_steam_led_bar_ignore_downloads(main_module):
+    async def drive():
+        p = _plugin(main_module, "solid", hw=False, per_zone=True)
+        p._steam_download_active = False
+        p._steam_download_task = None
+        await p.set_steam_download_active(True)
+        assert p._steam_download_active is False
+
+    asyncio.run(drive())
+
+
+def _hidraw(root, mapping):
+    base = os.path.join(root, "sys/class/hidraw")
+    os.makedirs(base, exist_ok=True)
+    for name in os.listdir(base):
+        os.unlink(os.path.join(base, name))
+    for name, target in mapping.items():
+        full = os.path.join(root, target)
+        os.makedirs(full, exist_ok=True)
+        os.symlink(full, os.path.join(base, name))
+
+
+def test_hidraw_fingerprint_changes_when_a_controller_re_enumerates(main_module, tmp_path):
+    root = str(tmp_path)
+    assert main_module.hidraw_fingerprint(root) is None
+    _hidraw(root, {"hidraw0": "devices/usb1/1-3:1.0/hidraw/hidraw0"})
+    first = main_module.hidraw_fingerprint(root)
+    _hidraw(root, {"hidraw0": "devices/usb1/1-3:1.0/hidraw/hidraw0"})
+    assert main_module.hidraw_fingerprint(root) == first
+    _hidraw(root, {"hidraw4": "devices/usb1/1-3:1.2/hidraw/hidraw4"})
+    assert main_module.hidraw_fingerprint(root) != first
+
+
+def test_a_re_enumerated_controller_gets_its_static_lighting_back(main_module):
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p._controller.calls.clear()
+    p._controller.invalidated = False
+    reconnects = []
+    p._controller.reconnect = lambda: reconnects.append(True) or True
+    p._recover_after_hid_change()
+    assert reconnects == [True]
+    assert p._controller.invalidated is True
+    assert p._engine.events and p._engine.events[-1][0] == "static"
+
+
+def test_a_re_enumeration_does_not_restart_a_running_effect(main_module):
+    p = _plugin(
+        main_module, "effect",
+        {"id": "breathing", "speed": 50, "use_gradient": True},
+        hw=False, per_zone=True,
+    )
+    p._engine.events.clear()
+    p._recover_after_hid_change()
+    assert not p._engine.events
+
+
+def test_no_recovery_while_suspending(main_module):
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p._suspend_prepared = True
+    p._engine.events.clear()
+    p._recover_after_hid_change()
+    assert not p._engine.events
+
+
+def test_hid_watch_recovers_once_per_change(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "HID_WATCH_INTERVAL", 0.001)
+    monkeypatch.setattr(main_module, "HID_SETTLE_DELAY", 0.001)
+    prints = iter([("a",), ("a",), ("b",), ("b",), ("b",), ("b",)])
+    monkeypatch.setattr(main_module, "hidraw_fingerprint", lambda root="/": next(prints, ("b",)))
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    recoveries = []
+    p._recover_after_hid_change = lambda: recoveries.append(True)
+
+    async def drive():
+        task = asyncio.create_task(p._hid_watch())
+        await asyncio.sleep(0.05)
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+    asyncio.run(drive())
+    assert recoveries == [True]
+
+
+def test_startup_re_asserts_static_lighting_several_times(main_module, monkeypatch):
+    monkeypatch.setattr(main_module, "ACQUIRE_INTERVAL", 0.001)
+    monkeypatch.setattr(main_module, "REASSERT_DELAYS", (0.001, 0.001, 0.001))
+    p = _plugin(main_module, "solid", hw=False, per_zone=True)
+    p._engine.events.clear()
+    asyncio.run(p._acquire_and_reassert())
+    assert sum(1 for e in p._engine.events if e[0] == "static") == 3

@@ -61,6 +61,7 @@ export interface Capabilities {
   audioMode: boolean;
   conflictsWithSystemRgb: boolean;
   persistentStartup: boolean;
+  yieldsToSteamDownloads?: boolean;
   layoutKind: string;
 }
 

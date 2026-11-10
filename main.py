@@ -116,9 +116,17 @@ FORCE_CONTROL_INTERVAL = 2.0
 
 ACQUIRE_ATTEMPTS = 20
 ACQUIRE_INTERVAL = 1.0
-REASSERT_DELAY = 5.0
+# HHD or controller firmware can reset the LEDs well after boot, and a controller that
+# re-enumerates comes back with default LEDs and a dead handle.
+REASSERT_DELAYS = (5.0, 10.0, 30.0)
+HID_WATCH_INTERVAL = 3.0
+HID_SETTLE_DELAY = 2.0
 RESUME_POLL_INTERVAL = 1.0
 RESUME_REAPPLY_DELAY = 2.0
+# Steam flickers its download state while one starts and repaints its idle color after it
+# ends, so the bar is reclaimed after a settle and once more.
+STEAM_DOWNLOAD_SETTLE_DELAY = 5.0
+STEAM_DOWNLOAD_REASSERT_DELAY = 3.0
 RESUME_SUSPEND_THRESHOLD = 1.0
 RESUME_RECONNECT_ATTEMPTS = 3
 RESUME_RECONNECT_INTERVAL = 1.0
@@ -126,6 +134,15 @@ RESUME_DEDUP_INTERVAL = 5.0
 JOURNAL_CONTEXT_DELAY = 5.0
 JOURNAL_CONTEXT_INTERVAL = 900.0
 STOCK_HOSTNAMES = frozenset({"localhost", "steamdeck", "armada"})
+
+
+def hidraw_fingerprint(root="/"):
+    base = os.path.join(root, "sys/class/hidraw")
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return None
+    return tuple((name, os.path.realpath(os.path.join(base, name))) for name in names)
 
 
 def _rgb(values):
@@ -312,6 +329,8 @@ class Plugin:
             return
         self._stopping = False
         self._suspend_prepared = False
+        self._steam_download_active = False
+        self._steam_download_task = None
         self._suspend_lock = asyncio.Lock()
         self._resume_lock = asyncio.Lock()
         self._resume_handled_at = None
@@ -416,12 +435,50 @@ class Plugin:
                 await asyncio.sleep(ACQUIRE_INTERVAL)
                 if self._reprobe_device():
                     self._apply()
-            await asyncio.sleep(REASSERT_DELAY)
-            self._reprobe_device()
-            if not self._wants_render_loop():
-                self._apply()
+            for delay in REASSERT_DELAYS:
+                await asyncio.sleep(delay)
+                self._reprobe_device()
+                self._reapply_static()
         except Exception as error:
             decky.logger.warning("Colores: acquire/reassert failed: %s", error)
+
+    async def _hid_watch(self) -> None:
+        previous = hidraw_fingerprint()
+        if previous is None:
+            return
+        try:
+            while True:
+                await asyncio.sleep(HID_WATCH_INTERVAL)
+                current = hidraw_fingerprint()
+                if current is None or current == previous:
+                    continue
+                await asyncio.sleep(HID_SETTLE_DELAY)
+                previous = hidraw_fingerprint() or current
+                self._recover_after_hid_change()
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            decky.logger.warning("Colores: HID watch failed: %s", error)
+
+    def _recover_after_hid_change(self) -> None:
+        if self._stopping or getattr(self, "_suspend_prepared", False):
+            return
+        decky.logger.info("Colores: HID devices changed; re-applying lighting")
+        self._reprobe_device()
+        if self._controller.available:
+            self._controller.reconnect()
+            self._controller.invalidate()
+        self._reapply_static()
+
+    def _reapply_static(self) -> None:
+        # A render loop rewrites every frame; reapplying would restart it from frame 0.
+        if not self._wants_render_loop():
+            self._apply()
+
+    def _leds_yielded(self) -> bool:
+        return getattr(self, "_suspend_prepared", False) or getattr(
+            self, "_steam_download_active", False
+        )
 
     def _apply_power_led(self) -> None:
         if not (self._power_led and self._capabilities.get("powerLed")):
@@ -834,7 +891,6 @@ class Plugin:
         if key == self._current_app_key:
             return self._profile_state("game" if key else "global", key)
         self._current_app_key = key
-        self._ambilight.stop()
         self._audio.stop()
         self._engine.stop()
         self._sync_effective_profile()
@@ -1200,11 +1256,44 @@ class Plugin:
         if hasattr(self, "_profiles"):
             self._sync_effective_profile()
         self._apply_sleep_charging_indicator()
-        if self._settings["mode"] == "ambient":
-            self._ambilight.stop()
         self._apply()
         self._journal_device()
         return bool(ok)
+
+    async def set_steam_download_active(self, active: bool) -> None:
+        self._init()
+        if not self._capabilities.get("yieldsToSteamDownloads"):
+            return
+        active = bool(active)
+        if active == self._steam_download_active:
+            return
+        self._steam_download_active = active
+        self._journal_state("steam_download", active=active)
+        task = self._steam_download_task
+        if task is not None:
+            task.cancel()
+            self._steam_download_task = None
+        if active:
+            decky.logger.info("Colores: Steam download shows its progress on the LED bar")
+            return
+        self._steam_download_task = asyncio.create_task(self._reclaim_leds_later())
+
+    def _reclaim_leds(self) -> None:
+        self._controller.invalidate()
+        self._apply()
+
+    async def _reclaim_leds_later(self) -> None:
+        try:
+            for delay in (STEAM_DOWNLOAD_SETTLE_DELAY, STEAM_DOWNLOAD_REASSERT_DELAY):
+                await asyncio.sleep(delay)
+                if self._steam_download_active:
+                    return
+                self._reclaim_leds()
+            decky.logger.info("Colores: LED bar reclaimed after Steam download")
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            decky.logger.warning("Colores: LED reclaim after download failed: %s", error)
 
     async def get_ambilight_status(self) -> str:
         self._init()
@@ -1499,7 +1588,7 @@ class Plugin:
         self._render(frame)
 
     def _render(self, zone_colors) -> None:
-        if getattr(self, "_suspend_prepared", False):
+        if self._leds_yielded():
             return
         if getattr(self, "_calibration_preview", None) is not None:
             return
@@ -1538,6 +1627,10 @@ class Plugin:
                 return True
             if effect["id"] == "spiral":
                 return True
+            if effect["id"] == "rainbow" and getattr(
+                self._controller, "renders_rainbow_in_software", False
+            ):
+                return True
             if effect["id"] == "wave":
                 return self._controller.supports_per_zone() or bool(
                     self._capabilities.get("perControllerColor", False)
@@ -1546,7 +1639,7 @@ class Plugin:
         return False
 
     def _apply(self) -> None:
-        if getattr(self, "_suspend_prepared", False):
+        if self._leds_yielded():
             return
         self._last_frame = None
         if getattr(self, "_calibration_preview", None) is not None:
@@ -1688,6 +1781,7 @@ class Plugin:
         self._suspend_monitor.start()
         self._apply()
         self._reassert_task = asyncio.create_task(self._acquire_and_reassert())
+        self._hid_watch_task = asyncio.create_task(self._hid_watch())
         self._charger_task = asyncio.create_task(self._charger_watch())
         if self._capabilities.get("screenBrightness"):
             self._screen_task = asyncio.create_task(self._screen_brightness_watch())
@@ -1803,8 +1897,7 @@ class Plugin:
                     claim = await self._claim_hhd_rgb()
                     if claim == "changed":
                         self._controller.invalidate()
-                if not self._wants_render_loop():
-                    self._apply()
+                self._reapply_static()
         except asyncio.CancelledError:
             raise
         except Exception as error:
@@ -1836,6 +1929,8 @@ class Plugin:
             "_screen_task",
             "_screen_ramp_task",
             "_calibration_expiry_task",
+            "_steam_download_task",
+            "_hid_watch_task",
         ):
             task = getattr(self, attr, None)
             if task:
