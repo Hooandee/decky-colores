@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.0...decky-colores-v0.35.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* stop Ambilight from crashing gamescope and harden LED ownership ([#223](https://github.com/Hooandee/decky-colores/issues/223)) ([6adfeb3](https://github.com/Hooandee/decky-colores/commit/6adfeb3bbf0e1b4c259fab1cbfb2cbaa0f8fade1))
+
 ## [0.35.0](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.34.1...decky-colores-v0.35.0) (2026-11-04)
 
 
