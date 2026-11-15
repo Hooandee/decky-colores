@@ -117,8 +117,20 @@ def test_kernel_logs_runner_raising_is_null():
 def test_kernel_logs_captures_hhd_journal():
     def run(cmd):
         return "HHD reasserted /home/deck/x" if "hhd.service" in cmd else None
+    assert "hhd" not in kernel_logs(run, extra=rgb_conflict_cmds(False))
     out = kernel_logs(run, extra=rgb_conflict_cmds(True), home="/home/deck")
     assert "~/x" in out["hhd"] and "/home/deck" not in out["hhd"]
+
+
+def test_capabilities_from_prefers_reported_driver_and_copies_effects():
+    effects = ["breathing", "wave"]
+    caps = capabilities_from(
+        {"capabilities": {"driver": "sysfs_rgb", "supportedEffects": effects, "zones": 0}},
+        driver="AsusAllyHidDevice",
+    )
+    assert caps["driver"] == "sysfs_rgb"
+    assert caps["supported_effects"] == effects and caps["supported_effects"] is not effects
+    assert capabilities_from({"capabilities": {"supportedEffects": "wave"}})["supported_effects"] == []
 
 
 def test_capabilities_from_empty_is_safe():
