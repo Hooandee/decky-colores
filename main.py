@@ -416,13 +416,14 @@ class Plugin:
         self._audio = AudioReactive(self._render, self._zones, runtime_dir, uid, gid)
         self._journal_device()
 
-    def _reprobe_device(self) -> bool:
+    def _replace_unavailable_controller(self) -> bool:
         if self._controller.available:
-            return True
+            return False
         ctx = self._build_context()
         if not ctx["device"].available:
             return False
         self._ambilight.stop()
+        self._audio.stop()
         self._engine.stop()
         self._setup_device(ctx)
         return True
@@ -433,13 +434,12 @@ class Plugin:
                 if self._controller.available:
                     break
                 await asyncio.sleep(ACQUIRE_INTERVAL)
-                if self._reprobe_device():
+                self._replace_unavailable_controller()
+                if self._controller.available:
                     self._apply()
             for delay in REASSERT_DELAYS:
                 await asyncio.sleep(delay)
-                previous_controller = self._controller
-                self._reprobe_device()
-                self._reapply_static(controller_changed=self._controller is not previous_controller)
+                self._reapply_lighting(self._replace_unavailable_controller())
         except Exception as error:
             decky.logger.warning("Colores: acquire/reassert failed: %s", error)
 
@@ -465,16 +465,19 @@ class Plugin:
         if self._stopping or getattr(self, "_suspend_prepared", False):
             return
         decky.logger.info("Colores: HID devices changed; re-applying lighting")
-        previous_controller = self._controller
-        self._reprobe_device()
+        controller_changed = self._replace_unavailable_controller()
         if self._controller.available:
             self._controller.reconnect()
             self._controller.invalidate()
-        self._reapply_static(controller_changed=self._controller is not previous_controller)
+        self._reapply_lighting(controller_changed)
 
-    def _reapply_static(self, *, controller_changed: bool = False) -> None:
-        # Only restart a render loop when switching to a new controller.
-        if controller_changed or not self._wants_render_loop():
+    def _reapply_lighting(self, controller_changed: bool = False) -> None:
+        if (
+            controller_changed
+            or not self._effective_power()
+            or getattr(self, "_calibration_preview", None) is not None
+            or not self._wants_render_loop()
+        ):
             self._apply()
 
     def _leds_yielded(self) -> bool:
@@ -1241,7 +1244,7 @@ class Plugin:
             claim = await self._claim_hhd_rgb()
             if claim == "stopping" or self._stopping:
                 return False
-        self._reprobe_device()
+        self._replace_unavailable_controller()
         ok = self._controller.reconnect()
         sleep_controller = getattr(self, "_sleep_charging_controller", None)
         if sleep_controller is not None:
@@ -1897,7 +1900,7 @@ class Plugin:
                     claim = await self._claim_hhd_rgb()
                     if claim == "changed":
                         self._controller.invalidate()
-                self._reapply_static()
+                self._reapply_lighting()
         except asyncio.CancelledError:
             raise
         except Exception as error:
