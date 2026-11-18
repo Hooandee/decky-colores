@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.1...decky-colores-v0.35.2) (2026-11-18)
+
+
+### Bug Fixes
+
+* rotate multiple colors in Ally Cycle effect ([#228](https://github.com/Hooandee/decky-colores/issues/228)) ([2c46c68](https://github.com/Hooandee/decky-colores/commit/2c46c68878e50c94b4569e58a9bd30f53948901b))
+
 ## [0.35.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.0...decky-colores-v0.35.1) (2026-11-10)
 
 
