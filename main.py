@@ -1627,9 +1627,7 @@ class Plugin:
                 return True
             if effect["id"] == "spiral":
                 return True
-            if effect["id"] == "rainbow" and getattr(
-                self._controller, "renders_rainbow_in_software", False
-            ):
+            if effect["id"] in getattr(self._controller, "software_effects", ()):
                 return True
             if effect["id"] == "wave":
                 return self._controller.supports_per_zone() or bool(

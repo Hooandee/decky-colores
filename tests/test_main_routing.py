@@ -2088,12 +2088,13 @@ def test_import_rejects_deeply_nested_json(main_module, tmp_path):
         asyncio.run(p.import_styles(str(bomb)))
 
 
-def test_ally_aura_rainbow_is_rendered_per_zone_not_by_firmware(main_module):
-    p = _plugin(main_module, "effect", effect={"id": "rainbow", "speed": 50}, hw=True, per_zone=True)
-    p._controller.renders_rainbow_in_software = True
+@pytest.mark.parametrize("effect_id", ["rainbow", "cycle"])
+def test_ally_aura_renders_spectrum_effects_per_zone(main_module, effect_id):
+    from hid_adapters import AsusAllyHidDevice
+
+    p = _plugin(main_module, "effect", effect={"id": effect_id, "speed": 50}, hw=True, per_zone=True)
+    p._controller = AsusAllyHidDevice(None)
     assert p._wants_render_loop() is True
-    p._settings["effect"] = {"id": "cycle", "speed": 50}
-    assert p._wants_render_loop() is False
 
 
 def test_rainbow_stays_on_firmware_where_it_mixes_hues(main_module):

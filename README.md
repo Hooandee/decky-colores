@@ -41,7 +41,7 @@ En este vídeo enseño y explico el plugin a fondo:
 - **Color fijo.** Elige un tono y una saturación. Lo más simple y lo que casi todo el mundo quiere.
 - **Brillo.** En las consolas que lo permiten.
 - **Degradados.** Un editor con presets (Atardecer, Océano, Aurora, Lava, Galaxia y más), ajuste color a color por zona, una paleta automática y un botón de "Sorpréndeme" para cuando no te decidas. Puedes guardar tus degradados favoritos y reutilizarlos.
-- **Efectos.** Respiración, arcoíris, onda, ciclo y espiral. Los efectos de color usan tu color fijo, y varios pueden correr sobre tu degradado personalizado si activas esa opción.
+- **Efectos.** Respiración, arcoíris, onda, ciclo y espiral. Los efectos de color usan tu color fijo, y varios pueden correr sobre tu degradado personalizado si activas esa opción. En las ROG Ally, Ciclo desplaza varios colores a la vez por las zonas de los aros.
 - **Ambilight.** Las luces siguen lo que pasa en pantalla, tomando el color de la zona cercana a cada joystick. Tiene controles de intensidad, suavizado y tasa de captura.
 - **Español, inglés, italiano, alemán, portugués de Brasil y francés.** Cambias de idioma desde un selector compacto en Ajustes. El plugin arranca en español.
 
