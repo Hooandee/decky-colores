@@ -243,8 +243,9 @@ def test_frame_gradient_sweep_starts_and_turns_at_palette_ends():
 def test_frame_cycle_valid():
     for t in range(20):
         frame = frame_cycle(4, t / 5.0, 50)
-        assert len(frame) == 4
+        assert len(set(frame)) == 4
         assert all(_valid(c) for c in frame)
+    assert frame_cycle(4, 0, 100)[1:] == frame_cycle(4, 0.75, 100)[:3]
 
 
 def test_frame_spiral_at_t0_matches_palette():

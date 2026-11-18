@@ -1035,13 +1035,15 @@ def _late_ctx(device):
 
 def test_reprobe_recovers_late_led_and_rebuilds_zones(main_module, monkeypatch):
     # Cold-boot: the LED node wasn't present at load (NullDevice). Once it appears,
-    # _reprobe_device must swap in the real controller and rebuild the engine to the
+    # _replace_unavailable_controller must swap in the real controller and rebuild the engine to the
     # device's real zone count.
     p = _plugin(main_module, "solid")
     p._controller.available = False
+    previous_audio = p._audio
     new_ctrl = FakeController(hw=False, per_zone=True)
     monkeypatch.setattr(main_module, "build_device", lambda **k: _late_ctx(new_ctrl))
-    assert p._reprobe_device() is True
+    assert p._replace_unavailable_controller() is True
+    assert ("stop",) in previous_audio.events
     assert p._controller is new_ctrl
     assert p._zones == 4
 
@@ -1054,7 +1056,7 @@ def test_reprobe_is_noop_when_already_available(main_module, monkeypatch):
         main_module, "build_device",
         lambda **k: (_ for _ in ()).throw(AssertionError("must not reprobe")),
     )
-    assert p._reprobe_device() is True
+    assert p._replace_unavailable_controller() is False
 
 
 def test_acquire_applies_when_led_appears_late(main_module, monkeypatch):
@@ -2088,12 +2090,13 @@ def test_import_rejects_deeply_nested_json(main_module, tmp_path):
         asyncio.run(p.import_styles(str(bomb)))
 
 
-def test_ally_aura_rainbow_is_rendered_per_zone_not_by_firmware(main_module):
-    p = _plugin(main_module, "effect", effect={"id": "rainbow", "speed": 50}, hw=True, per_zone=True)
-    p._controller.renders_rainbow_in_software = True
+@pytest.mark.parametrize("effect_id", ["rainbow", "cycle"])
+def test_ally_aura_renders_spectrum_effects_per_zone(main_module, effect_id):
+    from hid_adapters import AsusAllyHidDevice
+
+    p = _plugin(main_module, "effect", effect={"id": effect_id, "speed": 50}, hw=True, per_zone=True)
+    p._controller = AsusAllyHidDevice(None)
     assert p._wants_render_loop() is True
-    p._settings["effect"] = {"id": "cycle", "speed": 50}
-    assert p._wants_render_loop() is False
 
 
 def test_rainbow_stays_on_firmware_where_it_mixes_hues(main_module):
@@ -2210,6 +2213,32 @@ def test_a_re_enumerated_controller_gets_its_static_lighting_back(main_module):
     assert reconnects == [True]
     assert p._controller.invalidated is True
     assert p._engine.events and p._engine.events[-1][0] == "static"
+
+
+def test_hid_change_turns_ally_cycle_back_off(main_module):
+    from hid_adapters import AsusAllyHidDevice
+
+    p = _plugin(main_module, "effect", {"id": "cycle", "speed": 50}, power=False)
+    p._controller.software_effects = AsusAllyHidDevice.software_effects
+
+    p._recover_after_hid_change()
+
+    assert ("static", [(0, 0, 0)] * p._zones) in p._engine.events
+
+
+def test_late_ally_controller_starts_cycle_after_hid_change(main_module, monkeypatch):
+    from hid_adapters import AsusAllyHidDevice
+
+    p = _plugin(main_module, "effect", {"id": "cycle", "speed": 50})
+    p._controller.available = False
+    controller = FakeController(hw=True, per_zone=True)
+    controller.software_effects = AsusAllyHidDevice.software_effects
+    monkeypatch.setattr(main_module, "build_device", lambda **kwargs: _late_ctx(controller))
+    monkeypatch.setattr(main_module, "EffectEngine", lambda *args, **kwargs: FakeEngine())
+
+    p._recover_after_hid_change()
+
+    assert ("effect", "cycle") in [event[:2] for event in p._engine.events]
 
 
 def test_a_re_enumeration_does_not_restart_a_running_effect(main_module):

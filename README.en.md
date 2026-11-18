@@ -41,7 +41,7 @@ Not on the list? Colores still tries to use your device by reading whatever LEDs
 - **Solid color.** Pick a hue and saturation. The simplest option, and what most people want.
 - **Brightness.** On devices that support it.
 - **Gradients.** An editor with presets (Sunset, Ocean, Aurora, Lava, Galaxy and more), per-zone color tuning, an auto palette, and a "Surprise me" button for when you can't decide. You can save your favorite gradients and reuse them.
-- **Effects.** Breathing, rainbow, wave, cycle and spiral. Color effects use your solid color, and several can run over your custom gradient if you turn that on.
+- **Effects.** Breathing, rainbow, wave, cycle and spiral. Color effects use your solid color, and several can run over your custom gradient if you turn that on. On ROG Ally devices, Cycle moves multiple colors through the ring zones at the same time.
 - **Ambient (Ambilight).** The lights follow what's on screen, taking color from the region near each joystick. It has vividness, smoothing and capture-rate controls.
 - **Spanish, English, Italian, German, Brazilian Portuguese, and French.** Switch language from a compact selector in Settings. The plugin starts in Spanish.
 
