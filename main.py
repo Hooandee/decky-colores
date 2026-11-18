@@ -437,8 +437,9 @@ class Plugin:
                     self._apply()
             for delay in REASSERT_DELAYS:
                 await asyncio.sleep(delay)
+                previous_controller = self._controller
                 self._reprobe_device()
-                self._reapply_static()
+                self._reapply_static(controller_changed=self._controller is not previous_controller)
         except Exception as error:
             decky.logger.warning("Colores: acquire/reassert failed: %s", error)
 
@@ -464,15 +465,16 @@ class Plugin:
         if self._stopping or getattr(self, "_suspend_prepared", False):
             return
         decky.logger.info("Colores: HID devices changed; re-applying lighting")
+        previous_controller = self._controller
         self._reprobe_device()
         if self._controller.available:
             self._controller.reconnect()
             self._controller.invalidate()
-        self._reapply_static()
+        self._reapply_static(controller_changed=self._controller is not previous_controller)
 
-    def _reapply_static(self) -> None:
-        # A render loop rewrites every frame; reapplying would restart it from frame 0.
-        if not self._wants_render_loop():
+    def _reapply_static(self, *, controller_changed: bool = False) -> None:
+        # Only restart a render loop when switching to a new controller.
+        if controller_changed or not self._wants_render_loop():
             self._apply()
 
     def _leds_yielded(self) -> bool:

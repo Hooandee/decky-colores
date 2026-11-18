@@ -2213,6 +2213,19 @@ def test_a_re_enumerated_controller_gets_its_static_lighting_back(main_module):
     assert p._engine.events and p._engine.events[-1][0] == "static"
 
 
+def test_late_ally_controller_starts_cycle_after_hid_change(main_module, monkeypatch):
+    p = _plugin(main_module, "effect", {"id": "cycle", "speed": 50})
+    p._controller.available = False
+    controller = FakeController(hw=True, per_zone=True)
+    controller.software_effects = ("rainbow", "cycle")
+    monkeypatch.setattr(main_module, "build_device", lambda **kwargs: _late_ctx(controller))
+    monkeypatch.setattr(main_module, "EffectEngine", lambda *args, **kwargs: FakeEngine())
+
+    p._recover_after_hid_change()
+
+    assert ("effect", "cycle") == p._engine.events[-1][:2]
+
+
 def test_a_re_enumeration_does_not_restart_a_running_effect(main_module):
     p = _plugin(
         main_module, "effect",
