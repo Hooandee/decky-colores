@@ -72,6 +72,7 @@ def _make_portal_leds(root, count=8):
 
 def test_lookup_name_matches_board():
     assert lookup_name("RC73XA", "ROG Xbox Ally X RC73XA_RC73XA") == "ROG Xbox Ally X"
+    assert lookup_name("RC74XA", "ROG XBOX Ally X RC74XA RC74XA") == "ROG Xbox Ally X20"
 
 
 def test_lookup_name_unknown_falls_back_to_product():
@@ -780,12 +781,12 @@ def test_generic_rgb_nodes_ignore_invalid_and_single_color_leds(tmp_path):
 
 
 def test_newer_ally_board_uses_the_ally_rings_when_the_kernel_exposes_them(tmp_path):
-    _make_dmi(str(tmp_path), "RC74XA", "ROG XBOX Ally X RC74XA RC74XA")
+    _make_dmi(str(tmp_path), "RC75XA", "ROG Ally RC75XA RC75XA")
     _make_led(str(tmp_path), "ally:rgb:joystick_rings",
               {"multi_intensity": "0 0 0 0", "multi_index": "rgb rgb rgb rgb",
                "max_brightness": "255", "brightness": "0"})
     ctx = build_device(str(tmp_path))
-    assert ctx["info"]["name"] == "ROG XBOX Ally X RC74XA RC74XA"
+    assert ctx["info"]["name"] == "ROG Ally RC75XA RC75XA"
     assert isinstance(ctx["device"], SysfsRgbDevice)
     assert ctx["capabilities"]["zones"] == 4
     assert ctx["capabilities"]["states"]["color"] == "experimental"
@@ -794,7 +795,7 @@ def test_newer_ally_board_uses_the_ally_rings_when_the_kernel_exposes_them(tmp_p
 def test_newer_ally_board_without_any_led_endpoint_claims_nothing(tmp_path, monkeypatch):
     import py_modules.device as device_module
 
-    _make_dmi(str(tmp_path), "RC74XA", "ROG XBOX Ally X RC74XA RC74XA")
+    _make_dmi(str(tmp_path), "RC75XA", "ROG Ally RC75XA RC75XA")
     os.makedirs(os.path.join(str(tmp_path), "sys/class/leds"))
     monkeypatch.setattr(device_module, "HID_AVAILABLE", False)
     ctx = build_device(str(tmp_path))
