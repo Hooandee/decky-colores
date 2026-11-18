@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.35.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.1...decky-colores-v0.35.2) (2026-11-18)
+
+
+### Español
+
+* En la familia ROG Ally, Ciclo hace girar varios colores a la vez alrededor de los joysticks.
+
+### English
+
+* Across the ROG Ally family, Cycle rotates several colors around the joystick rings at once.
+
+### Italiano
+
+* Sui dispositivi della famiglia ROG Ally, Ciclo fa ruotare più colori contemporaneamente attorno agli stick.
+
+### Deutsch
+
+* Auf Geräten der ROG-Ally-Familie lässt der Effekt Farbwechsel mehrere Farben gleichzeitig um die Sticks kreisen.
+
+### Português (Brasil)
+
+* Nos dispositivos da família ROG Ally, o efeito Ciclo faz várias cores girarem ao mesmo tempo ao redor dos analógicos.
+
+### Français
+
+* Sur les appareils de la gamme ROG Ally, l’effet Cycle fait tourner plusieurs couleurs à la fois autour des joysticks.
+
 ## [0.35.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.0...decky-colores-v0.35.1) (2026-11-10)
 
 
