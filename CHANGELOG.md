@@ -3,9 +3,29 @@
 ## [0.35.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.1...decky-colores-v0.35.2) (2026-11-18)
 
 
-### Bug Fixes
+### Español
 
-* rotate multiple colors in Ally Cycle effect ([#228](https://github.com/Hooandee/decky-colores/issues/228)) ([2c46c68](https://github.com/Hooandee/decky-colores/commit/2c46c68878e50c94b4569e58a9bd30f53948901b))
+* En la ROG Ally original, Ciclo hace girar varios colores a la vez alrededor de los joysticks.
+
+### English
+
+* On the original ROG Ally, Cycle now rotates several colors around the joystick rings at once.
+
+### Italiano
+
+* Sulla ROG Ally originale, Ciclo fa ruotare più colori contemporaneamente attorno agli stick.
+
+### Deutsch
+
+* Auf der ursprünglichen ROG Ally lässt der Effekt Farbwechsel jetzt mehrere Farben gleichzeitig um die Sticks kreisen.
+
+### Português (Brasil)
+
+* No ROG Ally original, o efeito Ciclo agora faz várias cores girarem ao mesmo tempo ao redor dos analógicos.
+
+### Français
+
+* Sur la ROG Ally d’origine, l’effet Cycle fait désormais tourner plusieurs couleurs à la fois autour des joysticks.
 
 ## [0.35.1](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.0...decky-colores-v0.35.1) (2026-11-10)
 
