@@ -15,6 +15,17 @@ def test_xbox_ally_x_matches_by_board():
     assert p["driver"] == "sysfs"
 
 
+def test_xbox_ally_x20_rc74xa_drives_eight_aura_zones_over_hid():
+    profile, matched = resolve_profile_match("RC74XA", "ROG XBOX Ally X RC74XA RC74XA")
+
+    assert matched is True
+    assert profile["name"] == "ROG Xbox Ally X20"
+    assert profile["driver"] == "hid_asus_ally"
+    assert profile["zones"] == 8
+    assert profile["sleep_charging"] == "hid_asus_ally"
+    assert profile["experimental"] == []
+
+
 def test_msi_claw_8_profile_is_bgr_hid():
     p = resolve_profile("", "Claw 8 AI+ A2VM")
     assert p["name"] == "MSI Claw 8 AI+"

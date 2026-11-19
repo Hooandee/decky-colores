@@ -696,11 +696,12 @@ def test_col_mdf5_solid_color_also_addresses_both_rings_at_once(hid_env, tmp_pat
     assert controller.apply_solid((74, 125, 255), 100, True) is True
 
     zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
-    assert [p[2] for p in zone_packets] == [0x00, 0x01, 0x02, 0x03, 0x04]
+    # The X20 has eight ring zones: 1-4 left, 5-8 right.
+    assert [p[2] for p in zone_packets] == list(range(0x00, 0x09))
     assert len({tuple(p[4:7]) for p in zone_packets}) == 1
     writes.clear()
     assert controller.apply_hardware_effect("breathing", (74, 125, 255), 50, 100, True)
-    assert [p[2] for p in writes if p[:2] == bytes([0x5D, 0xB3])] == [0x00, 0x01, 0x02, 0x03, 0x04]
+    assert [p[2] for p in writes if p[:2] == bytes([0x5D, 0xB3])] == list(range(0x00, 0x09))
     sys.modules.pop("device", None)
 
 
@@ -712,9 +713,9 @@ def test_col_mdf5_per_zone_frames_keep_only_their_own_zones(hid_env, tmp_path):
     controller.apply_solid((1, 0, 0), 100, True)
     writes.clear()
 
-    assert controller.apply_zones([(10, 0, 0), (20, 0, 0), (30, 0, 0), (40, 0, 0)], 100, True)
+    assert controller.apply_zones([(i * 10, 0, 0) for i in range(1, 9)], 100, True)
 
-    assert [p[2] for p in writes if p[:2] == bytes([0x5D, 0xB3])] == [0x01, 0x02, 0x03, 0x04]
+    assert [p[2] for p in writes if p[:2] == bytes([0x5D, 0xB3])] == list(range(0x01, 0x09))
     sys.modules.pop("device", None)
 
 
@@ -787,6 +788,84 @@ def test_ally_sleep_charging_setting_is_reasserted_with_rgb_mode(hid_env):
     writes.clear()
     assert dev.set_sleep_charging_indicator(False) is True
     assert writes[-1][:5] == bytes.fromhex("5ad1090102")
+
+
+def test_ally_eight_zone_solid_covers_both_rings(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.set_zone_count(8)
+    writes.clear()
+
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+
+    zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
+    assert [p[2] for p in zone_packets] == list(range(0x01, 0x09))
+    assert all(tuple(p[4:7]) == (255, 0, 0) for p in zone_packets)
+
+
+def test_ally_eight_zone_colors_map_in_order(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.set_color_correction((1.0, 1.0, 1.0))
+    dev.set_zone_count(8)
+    colors = [(i * 10, 0, 0) for i in range(1, 9)]
+    writes.clear()
+
+    assert dev.apply_zones(colors, 100, True) is True
+
+    zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
+    assert [(p[2], p[4]) for p in zone_packets] == [(i, i * 10) for i in range(1, 9)]
+
+
+def test_ally_eight_zone_hardware_effect_reaches_every_zone(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.set_zone_count(8)
+    writes.clear()
+
+    assert dev.apply_hardware_effect("breathing", (0, 255, 0), 50, 100, True) is True
+
+    zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
+    assert [p[2] for p in zone_packets] == list(range(0x01, 0x09))
+
+
+def test_build_device_xbox_ally_x20_uses_eight_zone_hid(hid_env, tmp_path):
+    import os
+
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    device = _reload_device()
+    dmi = os.path.join(str(tmp_path), "sys/class/dmi/id")
+    os.makedirs(dmi)
+    with open(os.path.join(dmi, "board_name"), "w") as handle:
+        handle.write("RC74XA")
+    with open(os.path.join(dmi, "product_name"), "w") as handle:
+        handle.write("ROG XBOX Ally X RC74XA RC74XA")
+    led = os.path.join(str(tmp_path), "sys/class/leds", "ally:rgb:joystick_rings")
+    os.makedirs(led)
+    for name, content in {
+        "multi_intensity": "0 0 0 0",
+        "multi_index": "rgb rgb rgb rgb",
+        "max_brightness": "255",
+        "brightness": "0",
+    }.items():
+        with open(os.path.join(led, name), "w") as handle:
+            handle.write(content)
+
+    ctx = device.build_device(sysfs_root=str(tmp_path), ambilight=False)
+
+    assert isinstance(ctx["device"], adapters.AsusAllyHidDevice)
+    assert ctx["capabilities"]["zones"] == 8
+    assert ctx["info"]["name"] == "ROG Xbox Ally X20"
+    writes.clear()
+    assert ctx["device"].apply_solid((0, 0, 255), 100, True) is True
+    zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
+    # Uniform color: the all-zone write first, then every ring zone.
+    assert [p[2] for p in zone_packets] == list(range(0x00, 0x09))
+    sys.modules.pop("device", None)
 
 
 def test_ally_second_solid_skips_init_but_latches_the_colors(hid_env):
