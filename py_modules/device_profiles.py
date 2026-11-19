@@ -173,8 +173,9 @@ GENERIC = {
     "experimental": ["color", "brightness", "effects", "ambilight"],
 }
 
-ASUS_SYSFS["fallback"] = ASUS_ALLY_HID
-ASUS_SYSFS_SLEEP["fallback"] = ASUS_ALLY_HID
+ASUS_ALLY_X_HID = {**ASUS_ALLY_HID, "aura_all_zone": True}
+ASUS_SYSFS["fallback"] = ASUS_ALLY_X_HID
+ASUS_SYSFS_SLEEP["fallback"] = ASUS_ALLY_X_HID
 OXP_SYSFS["fallback"] = OXP_HID
 OXP_APEX["fallback"] = OXP_APEX_HID
 

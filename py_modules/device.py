@@ -263,6 +263,8 @@ def _build_hid_context(profile, ambilight, power_led=None, battery=False, temper
     correction = profile.get("color_correction")
     if correction and hasattr(device, "set_color_correction"):
         device.set_color_correction(correction)
+    if profile.get("aura_all_zone") and hasattr(device, "set_all_zone_first"):
+        device.set_all_zone_first(True)
     zones = profile.get("zones") or 1
     capabilities = build_capabilities(profile, True, zones, 100, ambilight, power_led, battery, temperature)
     capabilities["perZone"] = device.supports_per_zone()

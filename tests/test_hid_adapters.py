@@ -655,6 +655,87 @@ def test_build_device_ally_x_null_when_no_sysfs_and_no_hid(hid_env, tmp_path):
     sys.modules.pop("device", None)
 
 
+def _make_col_mdf5_root(tmp_path):
+    # COL-MDF5: ROG XBOX Ally X RC74XA on SteamOS kernel 7.3, whose LED core clamps the
+    # packed ring colors to multi_max_intensity, so Colores drives the rings over Aura HID.
+    import os
+
+    root = str(tmp_path)
+    dmi = os.path.join(root, "sys/class/dmi/id")
+    os.makedirs(dmi)
+    for name, content in {
+        "board_name": "RC74XA",
+        "product_name": "ROG XBOX Ally X RC74XA RC74XA",
+        "sys_vendor": "ASUS",
+    }.items():
+        with open(os.path.join(dmi, name), "w") as handle:
+            handle.write(content)
+    led = os.path.join(root, "sys/class/leds", "ally:rgb:joystick_rings")
+    os.makedirs(led)
+    for name, content in {
+        "multi_index": "rgb rgb rgb rgb",
+        "multi_intensity": "0 0 0 0",
+        "multi_max_intensity": "255 255 255 255",
+        "max_brightness": "255",
+        "brightness": "128",
+    }.items():
+        with open(os.path.join(led, name), "w") as handle:
+            handle.write(content)
+    return root
+
+
+def test_col_mdf5_solid_color_also_addresses_both_rings_at_once(hid_env, tmp_path):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    device = _reload_device()
+    ctx = device.build_device(sysfs_root=_make_col_mdf5_root(tmp_path), ambilight=False)
+    controller = ctx["device"]
+    assert isinstance(controller, adapters.AsusAllyHidDevice)
+    writes.clear()
+
+    assert controller.apply_solid((74, 125, 255), 100, True) is True
+
+    zone_packets = [p for p in writes if p[:2] == bytes([0x5D, 0xB3])]
+    assert [p[2] for p in zone_packets] == [0x00, 0x01, 0x02, 0x03, 0x04]
+    assert len({tuple(p[4:7]) for p in zone_packets}) == 1
+    writes.clear()
+    assert controller.apply_hardware_effect("breathing", (74, 125, 255), 50, 100, True)
+    assert [p[2] for p in writes if p[:2] == bytes([0x5D, 0xB3])] == [0x00, 0x01, 0x02, 0x03, 0x04]
+    sys.modules.pop("device", None)
+
+
+def test_col_mdf5_per_zone_frames_keep_only_their_own_zones(hid_env, tmp_path):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    device = _reload_device()
+    controller = device.build_device(sysfs_root=_make_col_mdf5_root(tmp_path))["device"]
+    controller.apply_solid((1, 0, 0), 100, True)
+    writes.clear()
+
+    assert controller.apply_zones([(10, 0, 0), (20, 0, 0), (30, 0, 0), (40, 0, 0)], 100, True)
+
+    assert [p[2] for p in writes if p[:2] == bytes([0x5D, 0xB3])] == [0x01, 0x02, 0x03, 0x04]
+    sys.modules.pop("device", None)
+
+
+def test_original_ally_keeps_its_verified_per_zone_solid(hid_env, tmp_path):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    device = _reload_device()
+    root = _make_dmi_root(tmp_path, "ROG Ally RC71L_RC71L")
+    import os
+
+    with open(os.path.join(root, "sys/class/dmi/id/board_name"), "w") as handle:
+        handle.write("RC71L")
+    controller = device.build_device(sysfs_root=root)["device"]
+    writes.clear()
+
+    assert controller.apply_solid((74, 125, 255), 100, True)
+
+    assert [p[2] for p in writes if p[:2] == bytes([0x5D, 0xB3])] == [0x01, 0x02, 0x03, 0x04]
+    sys.modules.pop("device", None)
+
+
 def test_ally_first_solid_sends_init_and_apply(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
