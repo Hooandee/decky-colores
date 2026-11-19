@@ -553,6 +553,9 @@ class AsusAllyHidDevice(_BaseHidDevice):
         return self._heal(_do)
 
     def apply_zones(self, zone_colors, brightness, power):
+        return self._apply_static(zone_colors, brightness, power, latch=False)
+
+    def _apply_static(self, zone_colors, brightness, power, latch):
         if not power or _clamp_pct(brightness) == 0:
             return self._off()
 
@@ -571,8 +574,13 @@ class AsusAllyHidDevice(_BaseHidDevice):
             reps.append(brightness_cmd(3))
             reps.extend(self._zone_cmds(self._fit(zone_colors, brightness), MODE_SOLID))
             # hid-asus-ally repaints the rings with its own LED report on probe, resume and any
-            # write to its LED node; the MCU then ignores Aura colors that are not latched again.
-            reps.extend(set_apply_cmds() if new_mode else [latch_cmd()])
+            # write to its LED node; the MCU then ignores Aura colors until they are latched again.
+            # Software frames skip it (a latch per frame makes the RC71L right ring flicker) and
+            # get the full sequence once the kernel's repaint is noticed (invalidate).
+            if new_mode:
+                reps.extend(set_apply_cmds())
+            elif latch:
+                reps.append(latch_cmd())
             ok = self._write(reps)
             if ok:
                 self._transport.prev_mode = "solid"
@@ -581,7 +589,7 @@ class AsusAllyHidDevice(_BaseHidDevice):
         return self._heal(_do)
 
     def apply_solid(self, color, brightness, power):
-        return self.apply_zones([tuple(color)] * 4, brightness, power)
+        return self._apply_static([tuple(color)] * 4, brightness, power, latch=True)
 
     def apply_hardware_effect(self, effect_id, color, speed, brightness, power):
         if not power or _clamp_pct(brightness) == 0:

@@ -803,6 +803,17 @@ def test_ally_second_solid_skips_init_but_latches_the_colors(hid_env):
     assert writes[5][:2] == bytes([0x5D, 0xB5])
 
 
+def test_ally_software_frames_do_not_latch_every_frame(hid_env):
+    # A latch per ambilight frame makes the RC71L right ring flicker.
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    dev.apply_zones([(255, 0, 0)] * 4, 100, True)
+    writes.clear()
+    assert dev.apply_zones([(0, 0, 255), (0, 0, 255), (0, 255, 0), (0, 255, 0)], 100, True) is True
+    assert not any(p[:2] == bytes([0x5D, 0xB5]) for p in writes)
+
+
 def test_ally_per_zone_distinct_colors(hid_env):
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]

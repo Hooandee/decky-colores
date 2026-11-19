@@ -469,6 +469,7 @@ class Plugin:
                 current_ring = self._kernel_ring_state()
                 if current_ring is not None and ring is not None and current_ring != ring:
                     decky.logger.info("Colores: kernel repainted the stick rings; re-applying lighting")
+                    self._controller.invalidate()
                     self._reapply_lighting()
                 ring = current_ring
                 current = hidraw_fingerprint()
