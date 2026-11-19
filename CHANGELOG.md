@@ -3,9 +3,35 @@
 ## [0.35.3](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.2...decky-colores-v0.35.3) (2026-11-19)
 
 
-### Bug Fixes
+### Español
 
-* take the Ally rings back after hid-asus-ally repaints them ([#232](https://github.com/Hooandee/decky-colores/issues/232)) ([7b6bffe](https://github.com/Hooandee/decky-colores/commit/7b6bffe772d94bd718f948d3e9d0def4251efe7a))
+* **ROG Xbox Ally:** El aro del joystick derecho ya no se queda en azul o apagado cuando el sistema repinta las luces. Colores vuelve a poner tu color en los dos aros, también con efectos y Ambilight.
+* **Ambilight y el modo de audio vuelven a arrancar:** En algunos sistemas no llegaban a empezar y las luces se quedaban quietas. Ahora funcionan.
+
+### English
+
+* **ROG Xbox Ally:** The right joystick ring no longer stays blue or dark when the system repaints the lights. Colores puts your color back on both rings, with effects and Ambilight too.
+* **Ambilight and audio mode start again:** On some systems they never started and the lights stayed still. They work now.
+
+### Italiano
+
+* **ROG Xbox Ally:** L'anello dello stick destro non resta più blu o spento quando il sistema ridipinge le luci. Colores rimette il tuo colore su entrambi gli anelli, anche con gli effetti e Ambilight.
+* **Ambilight e la modalità audio ripartono:** Su alcuni sistemi non si avviavano e le luci restavano ferme. Ora funzionano.
+
+### Deutsch
+
+* **ROG Xbox Ally:** Der rechte Stick-Ring bleibt nicht mehr blau oder dunkel, wenn das System die Beleuchtung neu setzt. Colores setzt deine Farbe auf beiden Ringen wieder, auch mit Effekten und Ambilight.
+* **Ambilight und Audiomodus starten wieder:** Auf manchen Systemen starteten sie gar nicht, und die Beleuchtung blieb stehen. Jetzt funktionieren sie.
+
+### Português (Brasil)
+
+* **ROG Xbox Ally:** O anel do analógico direito não fica mais azul ou apagado quando o sistema repinta as luzes. O Colores volta a colocar sua cor nos dois anéis, também com efeitos e Ambilight.
+* **O Ambilight e o modo de áudio voltam a funcionar:** Em alguns sistemas eles nem chegavam a começar e as luzes ficavam paradas. Agora funcionam.
+
+### Français
+
+* **ROG Xbox Ally :** L'anneau du joystick droit ne reste plus bleu ou éteint quand le système redessine l'éclairage. Colores remet votre couleur sur les deux anneaux, y compris avec les effets et Ambilight.
+* **Ambilight et le mode audio redémarrent :** Sur certains systèmes, ils ne démarraient pas et l'éclairage restait figé. Ils fonctionnent maintenant.
 
 ## [0.35.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.1...decky-colores-v0.35.2) (2026-11-18)
 
