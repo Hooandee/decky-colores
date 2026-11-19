@@ -3,7 +3,7 @@ from run_as_user import user_env
 
 def test_user_env_drops_deckys_bundled_libraries(monkeypatch):
     # Decky's frozen backend points LD_LIBRARY_PATH at its own libpython; a host Python of
-    # the same version (Python 3.14 on Anatase) then loads it and cannot find its stdlib.
+    # the same version loads it and cannot find its stdlib.
     monkeypatch.setenv("LD_LIBRARY_PATH", "/tmp/_MEI0000061aYZH4r8")
     monkeypatch.delenv("LD_LIBRARY_PATH_ORIG", raising=False)
     monkeypatch.setenv("LD_PRELOAD", "/tmp/_MEI0000061aYZH4r8/libx.so")

@@ -487,9 +487,8 @@ class AsusAllyHidDevice(_BaseHidDevice):
         self._all_zone_first = False
 
     def set_all_zone_first(self, enabled):
-        # Ally X family boards reached through the Aura fallback: a uniform color is also
-        # sent to zone 0x00 (both rings, the zone HHD uses) so a ring that ignores its own
-        # zone codes still lights.
+        # Xbox Ally boards: a uniform color also goes to zone 0x00 (both rings), because one
+        # ring ignores its own zone code after hid-asus-ally repaints it.
         self._all_zone_first = bool(enabled)
 
     def _zone_cmds(self, colors, mode, speed=0x00):
@@ -573,10 +572,8 @@ class AsusAllyHidDevice(_BaseHidDevice):
             )
             reps.append(brightness_cmd(3))
             reps.extend(self._zone_cmds(self._fit(zone_colors, brightness), MODE_SOLID))
-            # hid-asus-ally repaints the rings with its own LED report on probe, resume and any
-            # write to its LED node; the MCU then ignores Aura colors until they are latched again.
-            # Software frames skip it (a latch per frame makes the RC71L right ring flicker) and
-            # get the full sequence once the kernel's repaint is noticed (invalidate).
+            # The MCU ignores Aura colors after hid-asus-ally repaints until they are latched again.
+            # Not per frame: latching every frame makes the RC71L right ring flicker.
             if new_mode:
                 reps.extend(set_apply_cmds())
             elif latch:

@@ -656,8 +656,8 @@ def test_build_device_ally_x_null_when_no_sysfs_and_no_hid(hid_env, tmp_path):
 
 
 def _make_col_mdf5_root(tmp_path):
-    # COL-MDF5: ROG XBOX Ally X RC74XA on SteamOS kernel 7.3, whose LED core clamps the
-    # packed ring colors to multi_max_intensity, so Colores drives the rings over Aura HID.
+    # The kernel LED core clamps the packed ring colors to multi_max_intensity, so the rings
+    # go over Aura HID.
     import os
 
     root = str(tmp_path)
