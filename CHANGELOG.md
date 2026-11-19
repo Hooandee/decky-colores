@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.3](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.2...decky-colores-v0.35.3) (2026-11-19)
+
+
+### Bug Fixes
+
+* take the Ally rings back after hid-asus-ally repaints them ([#232](https://github.com/Hooandee/decky-colores/issues/232)) ([7b6bffe](https://github.com/Hooandee/decky-colores/commit/7b6bffe772d94bd718f948d3e9d0def4251efe7a))
+
 ## [0.35.2](https://github.com/Hooandee/decky-colores/compare/decky-colores-v0.35.1...decky-colores-v0.35.2) (2026-11-18)
 
 
