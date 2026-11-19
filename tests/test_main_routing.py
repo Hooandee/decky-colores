@@ -1619,9 +1619,7 @@ def test_led_brightness_without_smart_brightness_is_user_brightness(main_module)
 def test_smart_brightness_scales_static_color(main_module):
     p = _smart(main_module, level=19483 / 65535)
     p._apply()
-    expected = main_module.led_brightness(80, main_module.perceived_level(19483 / 65535))
-    assert expected < 80
-    assert ("solid", (255, 0, 0), expected, True) in p._controller.calls
+    assert ("solid", (255, 0, 0), 49, True) in p._controller.calls
 
 
 def test_smart_brightness_without_reading_keeps_user_brightness(main_module):
@@ -1633,8 +1631,7 @@ def test_smart_brightness_without_reading_keeps_user_brightness(main_module):
 def test_smart_brightness_scales_render_loop_frames(main_module):
     p = _smart(main_module, mode="ambient", level=0.3, hw=False)
     p._render([(10, 20, 30), (40, 50, 60)])
-    expected = main_module.led_brightness(80, main_module.perceived_level(0.3))
-    assert p._controller.calls[-1] == ("zones", [(10, 20, 30), (40, 50, 60)], expected, True)
+    assert p._controller.calls[-1] == ("zones", [(10, 20, 30), (40, 50, 60)], 49, True)
 
 
 def test_screen_change_rerenders_last_frame_on_software_path(main_module):
@@ -1643,16 +1640,14 @@ def test_screen_change_rerenders_last_frame_on_software_path(main_module):
     p._last_render_at = 0.0
     _in_loop(lambda: p._on_screen_level(0.3))
     p._refresh_led_brightness(final=True)
-    expected = main_module.led_brightness(80, main_module.perceived_level(0.3))
-    assert p._controller.calls[-1] == ("zones", [(1, 2, 3), (4, 5, 6)], expected, True)
+    assert p._controller.calls[-1] == ("zones", [(1, 2, 3), (4, 5, 6)], 49, True)
 
 
 def test_screen_change_reapplies_hardware_solid(main_module):
     p = _smart(main_module, mode="solid", level=1.0)
     _in_loop(lambda: p._on_screen_level(0.3))
     p._refresh_led_brightness(final=False)
-    expected = main_module.led_brightness(80, main_module.perceived_level(0.3))
-    assert p._controller.calls[-1] == ("solid", (255, 0, 0), expected, True)
+    assert p._controller.calls[-1] == ("solid", (255, 0, 0), 49, True)
 
 
 def test_hardware_effect_only_rewritten_when_ramp_settles(main_module):
@@ -1701,7 +1696,7 @@ def test_set_smart_brightness_persists_and_retargets(main_module, monkeypatch):
 
     assert p._settings["smart_brightness"] is True
     assert saved and saved[-1]["smart_brightness"] is True
-    assert p._screen_ramp.target == pytest.approx(main_module.perceived_level(0.3))
+    assert p._screen_ramp.target == pytest.approx(0.6165, abs=1e-4)
 
 
 def test_set_smart_brightness_ignored_without_backlight(main_module):
@@ -1725,9 +1720,8 @@ def test_screen_ramp_steps_down_smoothly_and_lands_on_target(main_module):
     asyncio.run(run())
 
     levels = [call[2] for call in p._controller.calls]
-    expected = main_module.led_brightness(80, main_module.perceived_level(0.05))
     assert levels[0] == 80
-    assert levels[-1] == expected
+    assert levels[-1] == 21
     assert len(set(levels)) >= 3
     assert levels == sorted(levels, reverse=True)
 
