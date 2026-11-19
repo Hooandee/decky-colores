@@ -789,15 +789,18 @@ def test_ally_sleep_charging_setting_is_reasserted_with_rgb_mode(hid_env):
     assert writes[-1][:5] == bytes.fromhex("5ad1090102")
 
 
-def test_ally_second_solid_skips_init(hid_env):
+def test_ally_second_solid_skips_init_but_latches_the_colors(hid_env):
+    # hid-asus-ally repaints the rings with its own 0x5a 0xd1 0x08 report; until an Aura
+    # write is latched again the MCU keeps the kernel's colors (only the left ring on the X20).
     adapters, writes = hid_env
     sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_entry()]
     dev = adapters.AsusAllyHidDevice.create()
     dev.apply_solid((255, 0, 0), 100, True)
     writes.clear()
     assert dev.apply_solid((0, 0, 255), 100, True) is True
-    assert len(writes) == 5
+    assert len(writes) == 6
     assert all(tuple(p[4:7]) == (0, 0, 255) for p in writes[1:5])
+    assert writes[5][:2] == bytes([0x5D, 0xB5])
 
 
 def test_ally_per_zone_distinct_colors(hid_env):

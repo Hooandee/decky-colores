@@ -51,6 +51,7 @@ try:
         zone_cmd,
         init_cmds,
         set_apply_cmds,
+        latch_cmd,
         pct_to_level,
         speed_to_code,
         mode_code,
@@ -569,8 +570,9 @@ class AsusAllyHidDevice(_BaseHidDevice):
             )
             reps.append(brightness_cmd(3))
             reps.extend(self._zone_cmds(self._fit(zone_colors, brightness), MODE_SOLID))
-            if new_mode:
-                reps.extend(set_apply_cmds())
+            # hid-asus-ally repaints the rings with its own LED report on probe, resume and any
+            # write to its LED node; the MCU then ignores Aura colors that are not latched again.
+            reps.extend(set_apply_cmds() if new_mode else [latch_cmd()])
             ok = self._write(reps)
             if ok:
                 self._transport.prev_mode = "solid"

@@ -94,8 +94,12 @@ def init_cmds():
     return [bytes([RGB_ID]) + b"ASUS Tech.Inc." + bytes(49)]
 
 
+def latch_cmd():
+    return buf([RGB_ID, 0xB5])
+
+
 def set_apply_cmds():
-    return [buf([RGB_ID, 0xB5]), buf([RGB_ID, 0xB4])]
+    return [latch_cmd(), buf([RGB_ID, 0xB4])]
 
 
 class AsusAllyTransport:
