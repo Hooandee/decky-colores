@@ -14,6 +14,7 @@ MODE_RAINBOW = 0x03
 
 # Our flat zone indices 0..3 map to the four Aura zone codes (2 per stick ring).
 ZONE_CODES = (0x01, 0x02, 0x03, 0x04)
+ZONE_ALL = 0x00
 
 _MODE_BY_EFFECT = {
     "solid": MODE_SOLID,
@@ -93,8 +94,12 @@ def init_cmds():
     return [bytes([RGB_ID]) + b"ASUS Tech.Inc." + bytes(49)]
 
 
+def latch_cmd():
+    return buf([RGB_ID, 0xB5])
+
+
 def set_apply_cmds():
-    return [buf([RGB_ID, 0xB5]), buf([RGB_ID, 0xB4])]
+    return [latch_cmd(), buf([RGB_ID, 0xB4])]
 
 
 class AsusAllyTransport:

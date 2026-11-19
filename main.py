@@ -120,6 +120,7 @@ ACQUIRE_INTERVAL = 1.0
 # re-enumerates comes back with default LEDs and a dead handle.
 REASSERT_DELAYS = (5.0, 10.0, 30.0)
 HID_WATCH_INTERVAL = 3.0
+KERNEL_RING_NODE = "/sys/class/leds/ally:rgb:joystick_rings"
 HID_SETTLE_DELAY = 2.0
 RESUME_POLL_INTERVAL = 1.0
 RESUME_REAPPLY_DELAY = 2.0
@@ -443,13 +444,34 @@ class Plugin:
         except Exception as error:
             decky.logger.warning("Colores: acquire/reassert failed: %s", error)
 
+    def _kernel_ring_state(self):
+        # hid-asus-ally repaints the rings itself whenever its LED node is written (Steam,
+        # InputPlumber); Colores then has to latch its own colors again over Aura.
+        if self._controller.led_path:
+            return None
+        try:
+            values = []
+            for name in ("brightness", "multi_intensity"):
+                with open(os.path.join(KERNEL_RING_NODE, name)) as handle:
+                    values.append(handle.read())
+            return tuple(values)
+        except OSError:
+            return None
+
     async def _hid_watch(self) -> None:
         previous = hidraw_fingerprint()
         if previous is None:
             return
+        ring = self._kernel_ring_state()
         try:
             while True:
                 await asyncio.sleep(HID_WATCH_INTERVAL)
+                current_ring = self._kernel_ring_state()
+                if current_ring is not None and ring is not None and current_ring != ring:
+                    decky.logger.info("Colores: kernel repainted the stick rings; re-applying lighting")
+                    self._controller.invalidate()
+                    self._reapply_lighting()
+                ring = current_ring
                 current = hidraw_fingerprint()
                 if current is None or current == previous:
                     continue

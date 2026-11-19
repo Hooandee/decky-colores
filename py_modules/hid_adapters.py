@@ -51,10 +51,12 @@ try:
         zone_cmd,
         init_cmds,
         set_apply_cmds,
+        latch_cmd,
         pct_to_level,
         speed_to_code,
         mode_code,
         sleep_charging_power_cmd,
+        ZONE_ALL,
         ZONE_CODES,
         MODE_SOLID,
     )
@@ -482,6 +484,22 @@ class AsusAllyHidDevice(_BaseHidDevice):
     def __init__(self, transport):
         super().__init__(transport)
         self._sleep_charging_indicator = False
+        self._all_zone_first = False
+
+    def set_all_zone_first(self, enabled):
+        # Xbox Ally boards: a uniform color also goes to zone 0x00 (both rings), because one
+        # ring ignores its own zone code after hid-asus-ally repaints it.
+        self._all_zone_first = bool(enabled)
+
+    def _zone_cmds(self, colors, mode, speed=0x00):
+        reps = []
+        if self._all_zone_first and len(set(colors)) == 1:
+            reps.append(zone_cmd(ZONE_ALL, mode, *colors[0], speed=speed))
+        reps.extend(
+            zone_cmd(code, mode, *color, speed=speed)
+            for code, color in zip(ZONE_CODES, colors)
+        )
+        return reps
 
     @classmethod
     def create(cls):
@@ -534,6 +552,9 @@ class AsusAllyHidDevice(_BaseHidDevice):
         return self._heal(_do)
 
     def apply_zones(self, zone_colors, brightness, power):
+        return self._apply_static(zone_colors, brightness, power, latch=False)
+
+    def _apply_static(self, zone_colors, brightness, power, latch):
         if not power or _clamp_pct(brightness) == 0:
             return self._off()
 
@@ -550,10 +571,13 @@ class AsusAllyHidDevice(_BaseHidDevice):
                 else []
             )
             reps.append(brightness_cmd(3))
-            for code, (r, g, b) in zip(ZONE_CODES, self._fit(zone_colors, brightness)):
-                reps.append(zone_cmd(code, MODE_SOLID, r, g, b))
+            reps.extend(self._zone_cmds(self._fit(zone_colors, brightness), MODE_SOLID))
+            # The MCU ignores Aura colors after hid-asus-ally repaints until they are latched again.
+            # Not per frame: latching every frame makes the RC71L right ring flicker.
             if new_mode:
                 reps.extend(set_apply_cmds())
+            elif latch:
+                reps.append(latch_cmd())
             ok = self._write(reps)
             if ok:
                 self._transport.prev_mode = "solid"
@@ -562,7 +586,7 @@ class AsusAllyHidDevice(_BaseHidDevice):
         return self._heal(_do)
 
     def apply_solid(self, color, brightness, power):
-        return self.apply_zones([tuple(color)] * 4, brightness, power)
+        return self._apply_static([tuple(color)] * 4, brightness, power, latch=True)
 
     def apply_hardware_effect(self, effect_id, color, speed, brightness, power):
         if not power or _clamp_pct(brightness) == 0:
@@ -581,8 +605,7 @@ class AsusAllyHidDevice(_BaseHidDevice):
                 )
             reps.extend(init_cmds())
             reps.append(brightness_cmd(pct_to_level(brightness)))
-            for zone in ZONE_CODES:
-                reps.append(zone_cmd(zone, code, r, g, b, speed=speed_byte))
+            reps.extend(self._zone_cmds([(r, g, b)] * len(ZONE_CODES), code, speed_byte))
             reps.extend(set_apply_cmds())
             ok = self._write(reps)
             if ok:

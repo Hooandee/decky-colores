@@ -175,6 +175,10 @@ GENERIC = {
 
 ASUS_SYSFS["fallback"] = ASUS_ALLY_HID
 ASUS_SYSFS_SLEEP["fallback"] = ASUS_ALLY_HID
+# Xbox Ally boards: hid-asus-ally repaints the right ring unless the all-zone command goes first.
+XBOX_ALLY_HID = {**ASUS_ALLY_HID, "aura_all_zone": True}
+XBOX_ALLY_SYSFS = {**ASUS_SYSFS, "fallback": XBOX_ALLY_HID}
+XBOX_ALLY_SYSFS_SLEEP = {**ASUS_SYSFS_SLEEP, "fallback": XBOX_ALLY_HID}
 OXP_SYSFS["fallback"] = OXP_HID
 OXP_APEX["fallback"] = OXP_APEX_HID
 
@@ -204,8 +208,8 @@ def _profile(base, name, power_led=None):
 PROFILES = [
     ("board", "RC71L", _profile(ASUS_ALLY_HID, "ROG Ally")),
     ("board", "RC72LA", _profile(ASUS_SYSFS_SLEEP, "ROG Ally X")),
-    ("board", "RC73YA", _profile(ASUS_SYSFS, "ROG Xbox Ally")),
-    ("board", "RC73XA", _profile(ASUS_SYSFS_SLEEP, "ROG Xbox Ally X")),
+    ("board", "RC73YA", _profile(XBOX_ALLY_SYSFS, "ROG Xbox Ally")),
+    ("board", "RC73XA", _profile(XBOX_ALLY_SYSFS_SLEEP, "ROG Xbox Ally X")),
     ("product", "83E1", _profile(LEGION_GO_HID, "Legion Go", POWER_LED_LEDPM)),
     ("product", "83N0", _profile(LEGION_GO_HID, "Legion Go 2", POWER_LED_LPBL)),
     ("product", "83N1", _profile(LEGION_GO_HID, "Legion Go 2", POWER_LED_LPBL)),
@@ -223,7 +227,7 @@ PROFILES = [
     ("product_contains", "ONEXPLAYER", _profile(OXP_SYSFS, "")),
     # Unlisted Ally boards try the same sysfs then Aura probe and claim nothing without one.
     ("board_prefix", "RC7", _profile(
-        {**ASUS_SYSFS_SLEEP, "experimental": ["color", "brightness", "effects", "ambilight"]}, ""
+        {**XBOX_ALLY_SYSFS_SLEEP, "experimental": ["color", "brightness", "effects", "ambilight"]}, ""
     )),
 ]
 
