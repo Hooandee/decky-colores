@@ -10,6 +10,9 @@ vi.mock("@decky/ui", () => ({
   Navigation: { NavigateToExternalWeb: vi.fn() },
   PanelSectionRow: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ToggleField: ({ label }: { label: string }) => <div>{label}</div>,
+  SliderField: ({ label, value }: { label: string; value: number }) => (
+    <div data-value={value}>{label}</div>
+  ),
 }));
 
 vi.mock("../api", () => ({ getVersion: vi.fn() }));
@@ -42,6 +45,7 @@ const capabilities = {
   powerLed: true,
   powerLedSeparateStates: true,
   sleepChargingIndicator: false,
+  xboxButtonLed: false,
   hasBattery: true,
   batteryMode: true,
   temperatureMode: true,
@@ -62,7 +66,11 @@ const styleActions = {
   importFrom: vi.fn(),
 };
 
-const renderSettings = (caps: Capabilities, withStyles = false) =>
+const renderSettings = (
+  caps: Capabilities,
+  withStyles = false,
+  xboxButtonLed = { enabled: false, level: 3 },
+) =>
   renderToStaticMarkup(
     <SettingsSection
       caps={caps}
@@ -74,6 +82,8 @@ const renderSettings = (caps: Capabilities, withStyles = false) =>
       powerLedAwakeOff={false}
       powerLedSuspendOff={true}
       sleepChargingIndicator={false}
+      xboxButtonLed={xboxButtonLed.enabled}
+      xboxButtonLedLevel={xboxButtonLed.level}
       colorCalibration={{ yellow: 0, orange: 0, white: 0 }}
       onColorCalibration={() => {}}
       styleActions={withStyles ? styleActions : undefined}
@@ -81,6 +91,7 @@ const renderSettings = (caps: Capabilities, withStyles = false) =>
       onPowerLed={() => {}}
       onPowerLedState={() => {}}
       onSleepChargingIndicator={() => {}}
+      onXboxButtonLed={() => {}}
       onExperiment={() => {}}
       onReconnect={() => {}}
     />,
@@ -131,5 +142,22 @@ describe("SettingsSection saved presets", () => {
   it("lists saved presets in settings when the LEDs take color", () => {
     expect(renderSettings({ ...capabilities, color: true }, true)).toContain("styles.button");
     expect(renderSettings({ ...capabilities, color: false }, true)).not.toContain("styles.button");
+  });
+});
+
+describe("SettingsSection Xbox button light", () => {
+  it("appears only when the controller reports a backlit Xbox button", () => {
+    expect(renderSettings({ ...capabilities, xboxButtonLed: true })).toContain("xboxButtonLed.label");
+    expect(renderSettings(capabilities)).not.toContain("xboxButtonLed.label");
+  });
+
+  it("offers the brightness levels only while the light is on", () => {
+    const caps = { ...capabilities, xboxButtonLed: true };
+    const off = renderSettings(caps, false, { enabled: false, level: 2 });
+    const on = renderSettings(caps, false, { enabled: true, level: 2 });
+
+    expect(off).not.toContain("xboxButtonLed.brightness");
+    expect(on).toContain("xboxButtonLed.brightness");
+    expect(on).toContain('data-value="2"');
   });
 });

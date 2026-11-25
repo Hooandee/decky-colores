@@ -169,6 +169,7 @@ def build_capabilities(profile, has_led, zones, max_brightness, ambilight, power
             power_led_available and power_led.supports_independent_states()
         ),
         "sleepChargingIndicator": False,
+        "xboxButtonLed": False,
         "hasBattery": bool(battery),
         "batteryMode": bool(battery) and active["color"],
         "temperatureMode": bool(temperature) and active["color"],
@@ -298,7 +299,7 @@ def _with_sleep_charging(profile, context):
     supports = getattr(controller, "supports_sleep_charging_indicator", None)
     if not driver:
         context["capabilities"]["sleepChargingIndicator"] = False
-        return context
+        return _with_xbox_button_led(profile, context)
     if not (callable(supports) and supports()):
         controller = build_hid_device(driver) if HID_AVAILABLE else None
         supports = getattr(controller, "supports_sleep_charging_indicator", None)
@@ -310,6 +311,31 @@ def _with_sleep_charging(profile, context):
     )
     context["capabilities"]["sleepChargingIndicator"] = available
     context["sleep_charging_controller"] = controller
+    return _with_xbox_button_led(profile, context)
+
+
+def _with_xbox_button_led(profile, context):
+    # The power mask also carries the sleep-charging bit, so both share one controller.
+    driver = profile.get("xbox_button_led")
+    context["capabilities"]["xboxButtonLed"] = False
+    if not driver:
+        return context
+    controller = None
+    for candidate in (context.get("sleep_charging_controller"), context["device"]):
+        if callable(getattr(candidate, "supports_xbox_button_led", None)):
+            controller = candidate
+            break
+    if controller is None and HID_AVAILABLE:
+        controller = build_hid_device(driver)
+    supports = getattr(controller, "supports_xbox_button_led", None)
+    available = bool(
+        controller
+        and callable(supports)
+        and controller.available
+        and supports()
+    )
+    context["capabilities"]["xboxButtonLed"] = available
+    context["xbox_button_led_controller"] = controller
     return context
 
 

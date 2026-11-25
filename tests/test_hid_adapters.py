@@ -1331,3 +1331,129 @@ def test_oxp_short_write_logs_failure_before_recovery(hid_env, caplog):
     assert "kind=enable length=64 result=32" in caplog.text
     assert "short write" in caplog.text.lower()
     assert "reconnect" in caplog.text.lower()
+
+
+def _answer_xbox_led_query(reply=bytes.fromhex("5ad11b03ff3f00"), queries=None):
+    """Teach the fake HID device the feature-report round trip of GetXboxLedSupport."""
+    queries = queries if queries is not None else []
+    device_class = sys.modules["lib_hid"].Device
+
+    def send_feature_report(self, data):
+        queries.append(bytes(data))
+        return len(data)
+
+    def get_feature_report(self, report_id, size):
+        return reply if callable(reply) is False else reply()
+
+    device_class.send_feature_report = send_feature_report
+    device_class.get_feature_report = get_feature_report
+    return queries
+
+
+def test_xbox_led_support_is_asked_once_and_kept(hid_env):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    queries = _answer_xbox_led_query()
+    dev = adapters.AsusAllyHidDevice.create()
+
+    assert dev.supports_xbox_button_led() is True
+    assert dev.supports_xbox_button_led() is True
+    assert [q[:4] for q in queries] == [bytes.fromhex("5ad11b03")]
+
+
+def test_xbox_led_unsupported_reply_is_kept(hid_env):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    queries = _answer_xbox_led_query(bytes.fromhex("5ad11b03ff3700"))
+    dev = adapters.AsusAllyHidDevice.create()
+
+    assert dev.supports_xbox_button_led() is False
+    assert dev.supports_xbox_button_led() is False
+    assert len(queries) == 1
+
+
+def test_xbox_led_missing_reply_is_asked_again_later(hid_env):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    replies = [b"", b"", bytes.fromhex("5ad11b03ff3f00")]
+    queries = _answer_xbox_led_query(lambda: replies.pop(0))
+    dev = adapters.AsusAllyHidDevice.create()
+
+    assert dev.supports_xbox_button_led() is False  # no echo twice: not an answer
+    assert dev.supports_xbox_button_led() is True
+    assert len(queries) == 3
+
+
+def test_xbox_led_level_sets_the_mask_bit_and_brightness(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    writes.clear()
+
+    assert dev.set_xbox_button_led(2) is True
+    assert [w[:5] for w in writes] == [bytes.fromhex("5ad1090112"), bytes.fromhex("5ad1200102")]
+
+    writes.clear()
+    assert dev.set_xbox_button_led(0) is True
+    assert [w[:5] for w in writes] == [bytes.fromhex("5ad1090102"), bytes.fromhex("5ad1200100")]
+
+
+def test_xbox_led_survives_ring_changes_and_the_sleep_charging_setting(hid_env):
+    adapters, writes = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    dev = adapters.AsusAllyHidDevice.create()
+    assert dev.set_xbox_button_led(3) is True
+
+    # A new ring mode re-sends the power mask: it must keep the Xbox button lit.
+    dev.invalidate()
+    writes.clear()
+    assert dev.apply_solid((255, 0, 0), 100, True) is True
+    assert writes[0][:5] == bytes.fromhex("5ad1090112")
+    assert writes[1][:5] == bytes.fromhex("5ad1200103")
+    assert writes[2][:15] == bytes([0x5D]) + b"ASUS Tech.Inc."
+
+    dev.invalidate()
+    writes.clear()
+    assert dev.apply_hardware_effect("breathing", (0, 0, 255), 50, 100, True) is True
+    assert writes[0][:5] == bytes.fromhex("5ad1090112")
+
+    writes.clear()
+    assert dev.set_sleep_charging_indicator(True) is True
+    assert writes[-1][:5] == bytes.fromhex("5ad1090116")
+
+
+def test_build_device_x20_offers_the_xbox_button_led(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    _answer_xbox_led_query()
+    device = _reload_device()
+    ctx = device.build_device(sysfs_root=_make_col_mdf5_root(tmp_path), ambilight=False)
+
+    assert ctx["capabilities"]["xboxButtonLed"] is True
+    # Same controller as the rings and the sleep-charging bit: one power mask, one owner.
+    assert ctx["xbox_button_led_controller"] is ctx["device"]
+    assert ctx["sleep_charging_controller"] is ctx["device"]
+    sys.modules.pop("device", None)
+
+
+def test_build_device_x20_hides_the_xbox_button_led_when_the_mcu_says_no(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    _answer_xbox_led_query(bytes.fromhex("5ad11b03ff3700"))
+    device = _reload_device()
+    ctx = device.build_device(sysfs_root=_make_col_mdf5_root(tmp_path), ambilight=False)
+
+    assert ctx["capabilities"]["xboxButtonLed"] is False
+    sys.modules.pop("device", None)
+
+
+def test_build_device_original_ally_never_asks_for_an_xbox_button(hid_env, tmp_path):
+    adapters, _ = hid_env
+    sys.modules["lib_hid"].enumerate = lambda vid=0, pid=0: [_ally_x_entry()]
+    queries = _answer_xbox_led_query()
+    device = _reload_device()
+    ctx = device.build_device(sysfs_root=_make_ally_x_root(tmp_path), ambilight=False)
+
+    assert ctx["capabilities"]["xboxButtonLed"] is False
+    assert queries == []
+    sys.modules.pop("device", None)

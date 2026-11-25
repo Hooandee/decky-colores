@@ -243,6 +243,13 @@ export const de: Record<string, string> = {
   "sleepCharging.section": "Ruhemodus",
   "sleepCharging.label": "Ladeanzeige im Ruhemodus",
   "sleepCharging.hint": "Lässt die Ringe blinken, während die Konsole im Ruhemodus lädt.",
+  "xboxButtonLed.section": "Xbox-Taste",
+  "xboxButtonLed.label": "Beleuchtung der Xbox-Taste",
+  "xboxButtonLed.hint": "Beleuchtet die Xbox-Taste wie unter Windows.",
+  "xboxButtonLed.brightness": "Helligkeit",
+  "xboxButtonLed.low": "Niedrig",
+  "xboxButtonLed.medium": "Mittel",
+  "xboxButtonLed.high": "Hoch",
 
   "report.button": "Bericht senden",
   "report.button.desc": "Funktioniert etwas nicht oder wünschst du dir eine neue Funktion in Colores? Beschreibe es mir; ich sende auch den technischen Beleuchtungskontext mit.",

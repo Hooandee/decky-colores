@@ -580,6 +580,7 @@ function Content() {
     setPowerLed,
     setPowerLedState,
     setSleepChargingIndicator,
+    setXboxButtonLed,
     setForceControl,
     setRememberStartup,
     setBatteryBreathe,
@@ -776,6 +777,8 @@ function Content() {
     powerLedAwakeOff,
     powerLedSuspendOff,
     sleepChargingIndicator,
+    xboxButtonLed,
+    xboxButtonLedLevel,
     chargerOnly,
     smartBrightness,
     forceControl,
@@ -1259,6 +1262,8 @@ function Content() {
             powerLedAwakeOff={powerLedAwakeOff}
             powerLedSuspendOff={powerLedSuspendOff}
             sleepChargingIndicator={sleepChargingIndicator}
+            xboxButtonLed={xboxButtonLed}
+            xboxButtonLedLevel={xboxButtonLedLevel}
             colorCalibration={colorCalibration}
             onColorCalibration={setColorCalibration}
             styles={state.styles}
@@ -1269,6 +1274,7 @@ function Content() {
             onPowerLed={setPowerLed}
             onPowerLedState={setPowerLedState}
             onSleepChargingIndicator={setSleepChargingIndicator}
+            onXboxButtonLed={setXboxButtonLed}
             onExperiment={setExperiment}
             onReconnect={reconnect}
           />

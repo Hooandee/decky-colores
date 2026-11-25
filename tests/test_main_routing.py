@@ -96,6 +96,13 @@ class FakeController:
     def supports_sleep_charging_indicator(self):
         return True
 
+    def set_xbox_button_led(self, level):
+        self.calls.append(("xbox_led", level))
+        return True
+
+    def supports_xbox_button_led(self):
+        return True
+
 
 class FakeEngine:
     def __init__(self):
@@ -2286,3 +2293,52 @@ def test_startup_re_asserts_static_lighting_several_times(main_module, monkeypat
     p._engine.events.clear()
     asyncio.run(p._acquire_and_reassert())
     assert sum(1 for e in p._engine.events if e[0] == "static") == 3
+
+
+def test_xbox_button_led_setting_is_saved_and_applied(main_module):
+    p = _plugin(main_module, "solid")
+    p._xbox_button_led_controller = p._controller
+    p._capabilities["xboxButtonLed"] = True
+    saved = []
+    p._persist_settings = lambda: saved.append(dict(p._settings))
+
+    asyncio.run(p.set_xbox_button_led(True, 2))
+    assert p._settings["xbox_button_led"] is True
+    assert p._settings["xbox_button_led_level"] == 2
+    assert p._controller.calls[-1] == ("xbox_led", 2)
+
+    asyncio.run(p.set_xbox_button_led(False, 2))
+    assert p._controller.calls[-1] == ("xbox_led", 0)
+    assert [(s["xbox_button_led"], s["xbox_button_led_level"]) for s in saved] == [
+        (True, 2),
+        (False, 2),
+    ]
+
+
+def test_xbox_button_led_settings_are_global_not_per_game(main_module):
+    assert "xbox_button_led" in main_module.GLOBAL_KEYS
+    assert "xbox_button_led_level" in main_module.GLOBAL_KEYS
+
+
+def test_xbox_button_led_is_ignored_without_the_capability(main_module):
+    p = _plugin(main_module, "solid")
+    p._xbox_button_led_controller = p._controller
+    p._capabilities["xboxButtonLed"] = False
+
+    asyncio.run(p.set_xbox_button_led(True, 3))
+
+    assert ("xbox_led", 3) not in p._controller.calls
+    assert p._settings.get("xbox_button_led", False) is False
+
+
+def test_reconnect_reasserts_the_xbox_button_led(main_module):
+    p = _plugin(main_module, "solid")
+    p._xbox_button_led_controller = p._controller
+    p._capabilities["xboxButtonLed"] = True
+    p._settings["xbox_button_led"] = True
+    p._settings["xbox_button_led_level"] = 3
+
+    assert asyncio.run(p.reconnect()) is True
+
+    assert ("xbox_led", 3) in p._controller.calls
+    assert p._capabilities["xboxButtonLed"] is True

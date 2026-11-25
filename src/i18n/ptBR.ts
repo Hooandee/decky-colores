@@ -243,6 +243,13 @@ export const ptBR: Record<string, string> = {
   "sleepCharging.section": "Suspensão",
   "sleepCharging.label": "Indicador de carga durante a suspensão",
   "sleepCharging.hint": "Faz os anéis piscarem enquanto o console está suspenso e carregando.",
+  "xboxButtonLed.section": "Botão Xbox",
+  "xboxButtonLed.label": "Luz do botão Xbox",
+  "xboxButtonLed.hint": "Acende o botão Xbox, como no Windows.",
+  "xboxButtonLed.brightness": "Brilho",
+  "xboxButtonLed.low": "Baixo",
+  "xboxButtonLed.medium": "Médio",
+  "xboxButtonLed.high": "Alto",
 
   "report.button": "Enviar um relatório",
   "report.button.desc": "Encontrou um problema ou tem uma ideia para o Colores? Me conte. Também enviarei o contexto técnico das luzes.",

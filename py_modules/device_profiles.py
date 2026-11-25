@@ -210,7 +210,10 @@ PROFILES = [
     ("board", "RC72LA", _profile(ASUS_SYSFS_SLEEP, "ROG Ally X")),
     ("board", "RC73YA", _profile(XBOX_ALLY_SYSFS, "ROG Xbox Ally")),
     ("board", "RC73XA", _profile(XBOX_ALLY_SYSFS_SLEEP, "ROG Xbox Ally X")),
-    ("board", "RC74XA", _profile({**XBOX_ALLY_HID, "zones": 8}, "ROG Xbox Ally X20")),
+    # The X20 is the Xbox Ally with a backlit Xbox button.
+    ("board", "RC74XA", _profile(
+        {**XBOX_ALLY_HID, "zones": 8, "xbox_button_led": "hid_asus_ally"}, "ROG Xbox Ally X20"
+    )),
     ("product", "83E1", _profile(LEGION_GO_HID, "Legion Go", POWER_LED_LEDPM)),
     ("product", "83N0", _profile(LEGION_GO_HID, "Legion Go 2", POWER_LED_LPBL)),
     ("product", "83N1", _profile(LEGION_GO_HID, "Legion Go 2", POWER_LED_LPBL)),

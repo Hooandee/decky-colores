@@ -198,3 +198,15 @@ def test_onexplayer_profile_has_hid_fallback():
 
     family = resolve_profile("ONEXPLAYER X1 mini", "ONEXPLAYER X1 mini")
     assert family["fallback"]["driver"] == "hid_oxp_v2"
+
+
+def test_only_the_x20_offers_the_xbox_button_light():
+    assert resolve_profile("RC74XA", "ROG XBOX Ally X RC74XA RC74XA").get("xbox_button_led") == "hid_asus_ally"
+    for board, product in (
+        ("RC71L", "ROG Ally RC71L"),
+        ("RC72LA", "ROG Ally X RC72LA"),
+        ("RC73YA", "ROG Xbox Ally RC73YA"),
+        ("RC73XA", "ROG Xbox Ally X RC73XA"),
+        ("RC75XA", "ROG Xbox Ally RC75XA"),
+    ):
+        assert "xbox_button_led" not in resolve_profile(board, product), board

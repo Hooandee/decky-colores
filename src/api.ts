@@ -28,6 +28,7 @@ export const setExperiment = callable<[feature: string, on: boolean], void>("set
 export const setPowerLed = callable<[off: boolean], void>("set_power_led");
 export const setPowerLedState = callable<[state: PowerLedState, off: boolean], void>("set_power_led_state");
 export const setSleepChargingIndicator = callable<[enabled: boolean], void>("set_sleep_charging_indicator");
+export const setXboxButtonLed = callable<[enabled: boolean, level: number], void>("set_xbox_button_led");
 export const reconnect = callable<[], boolean>("reconnect");
 export const setForceControl = callable<[on: boolean], void>("set_force_control");
 export const setRememberStartup = callable<[on: boolean], void>("set_remember_startup");

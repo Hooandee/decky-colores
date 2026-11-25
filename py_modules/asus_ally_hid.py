@@ -68,9 +68,37 @@ def brightness_cmd(level):
     return buf([DRIVER_ID, 0xBA, 0xC5, 0xC4, max(0, min(3, int(level)))])
 
 
-def sleep_charging_power_cmd(enabled):
-    mask = 0x02 | (0x04 if enabled else 0x00)
+POWER_AWAKE = 0x02
+POWER_SLEEP_CHARGING = 0x04
+# The MCU keeps the Xbox button dark, whatever its level, until this bit is set.
+POWER_XBOX_LED_AWAKE = 0x10
+
+
+def power_mask_cmd(sleep_charging=False, xbox_led=False):
+    mask = POWER_AWAKE
+    if sleep_charging:
+        mask |= POWER_SLEEP_CHARGING
+    if xbox_led:
+        mask |= POWER_XBOX_LED_AWAKE
     return buf([DRIVER_ID, 0xD1, 0x09, 0x01, mask])
+
+
+def sleep_charging_power_cmd(enabled, xbox_led=False):
+    return power_mask_cmd(sleep_charging=enabled, xbox_led=xbox_led)
+
+
+def xbox_led_brightness_cmd(level):
+    return buf([DRIVER_ID, 0xD1, 0x20, 0x01, max(0, min(3, int(level)))])
+
+
+def xbox_led_support_query():
+    return buf([DRIVER_ID, 0xD1, 0x1B, 0x03])
+
+
+def xbox_led_supported(reply):
+    # The RC74XA answers ff 3f 00; bit 3 of the second byte flags the Xbox button LED.
+    data = bytes(reply or b"")
+    return len(data) > 5 and data[:4] == bytes([DRIVER_ID, 0xD1, 0x1B, 0x03]) and bool(data[5] & 0x08)
 
 
 def zone_cmd(zone, mode, r, g, b, speed=0x00, direction=0x00, r2=0, g2=0, b2=0):
@@ -131,7 +159,10 @@ class AsusAllyTransport:
                 return True
         return False
 
-    def awake_restore_cmds(self, sleep_charging=False):
+    def awake_restore_cmds(self, sleep_charging=False, xbox_led_level=0):
         if not self.is_ready():
             return []
-        return [sleep_charging_power_cmd(sleep_charging)]
+        reps = [power_mask_cmd(sleep_charging, xbox_led=xbox_led_level > 0)]
+        if xbox_led_level > 0:
+            reps.append(xbox_led_brightness_cmd(xbox_led_level))
+        return reps
