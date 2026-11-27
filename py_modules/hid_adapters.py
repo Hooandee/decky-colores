@@ -57,7 +57,6 @@ try:
         mode_code,
         sleep_charging_power_cmd,
         ZONE_ALL,
-        ZONE_CODES,
         zone_codes,
         MODE_SOLID,
     )

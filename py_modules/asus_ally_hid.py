@@ -12,8 +12,6 @@ MODE_BREATHING = 0x01
 MODE_COLORCYCLE = 0x02
 MODE_RAINBOW = 0x03
 
-# Our flat zone indices 0..3 map to the four Aura zone codes (2 per stick ring).
-ZONE_CODES = (0x01, 0x02, 0x03, 0x04)
 ZONE_ALL = 0x00
 
 # Flat zone index i maps to Aura zone code i + 1. Four zones by default; the
