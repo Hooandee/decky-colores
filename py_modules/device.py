@@ -26,6 +26,7 @@ DEVICE_REGISTRY = [
     ("board", "RC72LA", "ROG Ally X"),
     ("board", "RC73YA", "ROG Xbox Ally"),
     ("board", "RC73XA", "ROG Xbox Ally X"),
+    ("board", "RC74XA", "ROG Xbox Ally X20"),
     ("product", "83E1", "Legion Go"),
     ("product", "83L3", "Legion Go S"),
     ("product", "83Q2", "Legion Go S"),
@@ -266,6 +267,8 @@ def _build_hid_context(profile, ambilight, power_led=None, battery=False, temper
     if profile.get("aura_all_zone") and hasattr(device, "set_all_zone_first"):
         device.set_all_zone_first(True)
     zones = profile.get("zones") or 1
+    if hasattr(device, "set_zone_count"):
+        device.set_zone_count(zones)
     capabilities = build_capabilities(profile, True, zones, 100, ambilight, power_led, battery, temperature)
     capabilities["perZone"] = device.supports_per_zone()
     capabilities["hardwareEffects"] = device.supports_hardware_effects()
