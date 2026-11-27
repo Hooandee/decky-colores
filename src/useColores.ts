@@ -412,6 +412,13 @@ export function useColores() {
     );
   };
 
+  const setXboxButtonLed = (xboxButtonLed: boolean, xboxButtonLedLevel: number) => {
+    setState((s) => (s ? { ...s, xboxButtonLed, xboxButtonLedLevel } : s));
+    api.setXboxButtonLed(xboxButtonLed, xboxButtonLedLevel).catch((e) =>
+      console.error("Colores: setXboxButtonLed failed", e),
+    );
+  };
+
   const setForceControl = (forceControl: boolean) => {
     setState((s) => (s ? { ...s, forceControl } : s));
     api.setForceControl(forceControl).catch((e) =>
@@ -502,6 +509,7 @@ export function useColores() {
     setPowerLed,
     setPowerLedState,
     setSleepChargingIndicator,
+    setXboxButtonLed,
     setForceControl,
     setRememberStartup,
     setBatteryBreathe,

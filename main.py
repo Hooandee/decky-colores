@@ -71,6 +71,8 @@ DEFAULTS = {
     "power_led_awake_off": None,
     "power_led_suspend_off": None,
     "sleep_charging_indicator": False,
+    "xbox_button_led": False,
+    "xbox_button_led_level": 3,
     "charger_only": False,
     "force_control": False,
     "hhd_rgb_restore": None,
@@ -378,6 +380,7 @@ class Plugin:
         self._screen_ramp.snap(self._screen_target())
         self._apply_power_led()
         self._apply_sleep_charging_indicator()
+        self._apply_xbox_button_led()
         self._capture_startup_factory()
         self._ready = True
 
@@ -401,6 +404,7 @@ class Plugin:
         self._controller = ctx["device"]
         self._power_led = ctx.get("power_led")
         self._sleep_charging_controller = ctx.get("sleep_charging_controller")
+        self._xbox_button_led_controller = ctx.get("xbox_button_led_controller")
         self._cpu_sampler = CpuSampler()
         max_render_fps = self._capabilities.get("maxRenderFps", 30)
         self._engine = EffectEngine(self._render, self._zones, max_fps=max_render_fps)
@@ -540,6 +544,24 @@ class Plugin:
             "Colores: sleep charging indicator write failed (enabled=%s)",
             enabled,
         )
+        return False
+
+    def _xbox_button_led_level(self) -> int:
+        if not self._settings.get("xbox_button_led", False):
+            return 0
+        level = self._settings.get("xbox_button_led_level", DEFAULTS["xbox_button_led_level"])
+        return max(1, min(3, int(level)))
+
+    def _apply_xbox_button_led(self) -> bool:
+        if not self._capabilities.get("xboxButtonLed"):
+            return False
+        controller = getattr(self, "_xbox_button_led_controller", None)
+        if controller is None:
+            return False
+        level = self._xbox_button_led_level()
+        if controller.set_xbox_button_led(level):
+            return True
+        decky.logger.warning("Colores: Xbox button LED write failed (level=%s)", level)
         return False
 
     def _power_led_state_values(self) -> tuple[bool, bool]:
@@ -948,6 +970,10 @@ class Plugin:
             "powerLedAwakeOff": power_led_awake_off,
             "powerLedSuspendOff": power_led_suspend_off,
             "sleepChargingIndicator": s.get("sleep_charging_indicator", False),
+            "xboxButtonLed": s.get("xbox_button_led", False),
+            "xboxButtonLedLevel": s.get(
+                "xbox_button_led_level", DEFAULTS["xbox_button_led_level"]
+            ),
             "chargerOnly": s.get("charger_only", False),
             "forceControl": s.get("force_control", False),
             "batteryBreathe": s.get("battery_breathe", True),
@@ -1280,9 +1306,22 @@ class Plugin:
             self._capabilities["sleepChargingIndicator"] = bool(
                 sleep_ok and callable(supports) and supports()
             )
+        xbox_controller = getattr(self, "_xbox_button_led_controller", None)
+        if xbox_controller is not None:
+            if xbox_controller is self._controller:
+                xbox_ok = bool(ok)
+            elif xbox_controller is sleep_controller:
+                xbox_ok = sleep_ok
+            else:
+                xbox_ok = bool(xbox_controller.reconnect())
+            supports = getattr(xbox_controller, "supports_xbox_button_led", None)
+            self._capabilities["xboxButtonLed"] = bool(
+                xbox_ok and callable(supports) and supports()
+            )
         if hasattr(self, "_profiles"):
             self._sync_effective_profile()
         self._apply_sleep_charging_indicator()
+        self._apply_xbox_button_led()
         self._apply()
         self._journal_device()
         return bool(ok)
@@ -1403,6 +1442,15 @@ class Plugin:
         self._settings["sleep_charging_indicator"] = bool(enabled)
         self._persist_settings()
         self._apply_sleep_charging_indicator()
+
+    async def set_xbox_button_led(self, enabled: bool, level: int) -> None:
+        self._init()
+        if not self._capabilities.get("xboxButtonLed"):
+            return
+        self._settings["xbox_button_led"] = bool(enabled)
+        self._settings["xbox_button_led_level"] = max(1, min(3, int(level)))
+        self._persist_settings()
+        self._apply_xbox_button_led()
 
     async def set_experiment(self, feature: str, on: bool) -> None:
         self._init()

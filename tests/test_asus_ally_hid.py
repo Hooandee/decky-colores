@@ -71,3 +71,27 @@ def test_set_apply_order():
     reps = set_apply_cmds()
     assert reps[0][:2] == bytes([0x5D, 0xB5])
     assert reps[1][:2] == bytes([0x5D, 0xB4])
+
+
+def test_power_mask_adds_the_xbox_button_bit():
+    assert ally_hid.sleep_charging_power_cmd(False, xbox_led=True) == (
+        bytes.fromhex("5ad1090112") + bytes(59)
+    )
+    assert ally_hid.sleep_charging_power_cmd(True, xbox_led=True)[:5] == bytes.fromhex("5ad1090116")
+    assert ally_hid.power_mask_cmd()[:5] == bytes.fromhex("5ad1090102")
+
+
+def test_xbox_led_brightness_cmd_clamps_to_firmware_levels():
+    assert ally_hid.xbox_led_brightness_cmd(3) == bytes.fromhex("5ad1200103") + bytes(59)
+    assert ally_hid.xbox_led_brightness_cmd(9)[:5] == bytes.fromhex("5ad1200103")
+    assert ally_hid.xbox_led_brightness_cmd(-1)[:5] == bytes.fromhex("5ad1200100")
+
+
+def test_xbox_led_support_query_and_reply():
+    assert ally_hid.xbox_led_support_query() == bytes.fromhex("5ad11b03") + bytes(60)
+    # What an RC74XA answers.
+    assert ally_hid.xbox_led_supported(bytes.fromhex("5ad11b03ff3f00") + bytes(57)) is True
+    assert ally_hid.xbox_led_supported(bytes.fromhex("5ad11b03ff3700")) is False
+    assert ally_hid.xbox_led_supported(bytes.fromhex("5ad11b04ff3f00")) is False
+    assert ally_hid.xbox_led_supported(b"") is False
+    assert ally_hid.xbox_led_supported(None) is False

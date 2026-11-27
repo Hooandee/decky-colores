@@ -1,5 +1,5 @@
 import { FC, Fragment, ReactNode, useEffect, useState } from "react";
-import { ButtonItem, Focusable, Navigation, PanelSectionRow, ToggleField } from "@decky/ui";
+import { ButtonItem, Focusable, Navigation, PanelSectionRow, SliderField, ToggleField } from "@decky/ui";
 
 import { getVersion } from "../api";
 import { useI18n, LanguageSelector, type Lang } from "../i18n";
@@ -42,6 +42,8 @@ interface SettingsSectionProps {
   powerLedAwakeOff: boolean;
   powerLedSuspendOff: boolean;
   sleepChargingIndicator: boolean;
+  xboxButtonLed?: boolean;
+  xboxButtonLedLevel?: number;
   colorCalibration: CalibrationSteps;
   onColorCalibration: (steps: CalibrationSteps) => void;
   styles?: SavedStyle[];
@@ -52,6 +54,7 @@ interface SettingsSectionProps {
   onPowerLed: (v: boolean) => void;
   onPowerLedState: (state: PowerLedState, value: boolean) => void;
   onSleepChargingIndicator: (value: boolean) => void;
+  onXboxButtonLed?: (enabled: boolean, level: number) => void;
   onExperiment: (feature: string, val: boolean) => void;
   onReconnect: () => void;
 }
@@ -66,6 +69,8 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
   powerLedAwakeOff,
   powerLedSuspendOff,
   sleepChargingIndicator,
+  xboxButtonLed = false,
+  xboxButtonLedLevel = 3,
   colorCalibration,
   onColorCalibration,
   styles,
@@ -76,6 +81,7 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
   onPowerLed,
   onPowerLedState,
   onSleepChargingIndicator,
+  onXboxButtonLed,
   onExperiment,
   onReconnect,
 }) => {
@@ -214,6 +220,40 @@ export const SettingsSection: FC<SettingsSectionProps> = ({
             bottomSeparator="none"
           />
         </PanelSectionRow>
+      </>
+    ) : null,
+
+    caps.xboxButtonLed && onXboxButtonLed ? (
+      <>
+        {sectionTitle(t("xboxButtonLed.section"))}
+        <PanelSectionRow>
+          <ToggleField
+            label={t("xboxButtonLed.label")}
+            description={t("xboxButtonLed.hint")}
+            checked={xboxButtonLed}
+            onChange={(on) => onXboxButtonLed(on, xboxButtonLedLevel)}
+            bottomSeparator="none"
+          />
+        </PanelSectionRow>
+        {xboxButtonLed && (
+          <PanelSectionRow>
+            <SliderField
+              label={t("xboxButtonLed.brightness")}
+              value={Math.max(1, Math.min(3, xboxButtonLedLevel))}
+              min={1}
+              max={3}
+              step={1}
+              notchCount={3}
+              notchLabels={[
+                { notchIndex: 0, label: t("xboxButtonLed.low"), value: 1 },
+                { notchIndex: 1, label: t("xboxButtonLed.medium"), value: 2 },
+                { notchIndex: 2, label: t("xboxButtonLed.high"), value: 3 },
+              ]}
+              notchTicksVisible
+              onChange={(level) => onXboxButtonLed(true, level)}
+            />
+          </PanelSectionRow>
+        )}
       </>
     ) : null,
 

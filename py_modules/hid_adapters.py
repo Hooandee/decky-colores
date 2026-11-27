@@ -56,8 +56,11 @@ try:
         speed_to_code,
         mode_code,
         sleep_charging_power_cmd,
+        xbox_led_brightness_cmd,
+        xbox_led_support_query,
+        xbox_led_supported,
         ZONE_ALL,
-        ZONE_CODES,
+        zone_codes,
         MODE_SOLID,
     )
     HID_AVAILABLE = True
@@ -485,6 +488,16 @@ class AsusAllyHidDevice(_BaseHidDevice):
         super().__init__(transport)
         self._sleep_charging_indicator = False
         self._all_zone_first = False
+        self._zone_count = 4
+        self._xbox_led_level = 0
+        self._xbox_led_support = None
+
+    def set_zone_count(self, count):
+        self._zone_count = max(1, int(count))
+
+    @property
+    def _zone_codes(self):
+        return zone_codes(self._zone_count)
 
     def set_all_zone_first(self, enabled):
         # Xbox Ally boards: a uniform color also goes to zone 0x00 (both rings), because one
@@ -497,7 +510,7 @@ class AsusAllyHidDevice(_BaseHidDevice):
             reps.append(zone_cmd(ZONE_ALL, mode, *colors[0], speed=speed))
         reps.extend(
             zone_cmd(code, mode, *color, speed=speed)
-            for code, color in zip(ZONE_CODES, colors)
+            for code, color in zip(self._zone_codes, colors)
         )
         return reps
 
@@ -527,18 +540,64 @@ class AsusAllyHidDevice(_BaseHidDevice):
         self._sleep_charging_indicator = bool(enabled)
         return self._heal(
             lambda: self._write(
-                [sleep_charging_power_cmd(self._sleep_charging_indicator)]
+                [
+                    sleep_charging_power_cmd(
+                        self._sleep_charging_indicator,
+                        xbox_led=self._xbox_led_level > 0,
+                    )
+                ]
             )
         )
 
+    def supports_xbox_button_led(self):
+        if self._xbox_led_support is None:
+            for attempt in range(2):
+                reply = self._query_xbox_led_support()
+                if reply is not None:
+                    self._xbox_led_support = xbox_led_supported(reply)
+                    break
+                if attempt == 0 and not self.reconnect():
+                    break
+        return bool(self._xbox_led_support)
+
+    def _query_xbox_led_support(self):
+        try:
+            if not self._transport.is_ready():
+                return None
+            device = self._transport.hid_device
+            query = xbox_led_support_query()
+            device.send_feature_report(query)
+            reply = bytes(device.get_feature_report(query[0], len(query)) or b"")
+        except Exception:
+            return None
+        return reply if reply[:4] == query[:4] else None
+
+    def set_xbox_button_led(self, level):
+        self._xbox_led_level = max(0, min(3, int(level)))
+        on = self._xbox_led_level > 0
+        return self._heal(
+            lambda: self._write(
+                [
+                    sleep_charging_power_cmd(self._sleep_charging_indicator, xbox_led=on),
+                    xbox_led_brightness_cmd(self._xbox_led_level),
+                ]
+            )
+        )
+
+    def _awake_restore_cmds(self):
+        return self._transport.awake_restore_cmds(
+            self._sleep_charging_indicator, self._xbox_led_level
+        )
+
     def _fit(self, zone_colors, brightness):
+        count = len(self._zone_codes)
         colors = [tuple(c) for c in zone_colors] or [(0, 0, 0)]
-        if len(colors) < 4:
-            colors += [colors[-1]] * (4 - len(colors))
+        if len(colors) < count:
+            colors += [colors[-1]] * (count - len(colors))
         scale = _clamp_pct(brightness) / 100.0
         return [
             tuple(_clamp8(round(channel * scale)) for channel in self._correct(color))
-            for color in colors[:4]
+            for color in colors[:count]
         ]
 
     def _off(self):
@@ -561,12 +620,7 @@ class AsusAllyHidDevice(_BaseHidDevice):
         def _do():
             new_mode = self._transport.prev_mode != "solid"
             reps = (
-                [
-                    *self._transport.awake_restore_cmds(
-                        self._sleep_charging_indicator
-                    ),
-                    *init_cmds(),
-                ]
+                [*self._awake_restore_cmds(), *init_cmds()]
                 if new_mode
                 else []
             )
@@ -586,7 +640,7 @@ class AsusAllyHidDevice(_BaseHidDevice):
         return self._heal(_do)
 
     def apply_solid(self, color, brightness, power):
-        return self._apply_static([tuple(color)] * 4, brightness, power, latch=True)
+        return self._apply_static([tuple(color)] * len(self._zone_codes), brightness, power, latch=True)
 
     def apply_hardware_effect(self, effect_id, color, speed, brightness, power):
         if not power or _clamp_pct(brightness) == 0:
@@ -598,14 +652,10 @@ class AsusAllyHidDevice(_BaseHidDevice):
         def _do():
             reps = []
             if self._transport.prev_mode is None:
-                reps.extend(
-                    self._transport.awake_restore_cmds(
-                        self._sleep_charging_indicator
-                    )
-                )
+                reps.extend(self._awake_restore_cmds())
             reps.extend(init_cmds())
             reps.append(brightness_cmd(pct_to_level(brightness)))
-            reps.extend(self._zone_cmds([(r, g, b)] * len(ZONE_CODES), code, speed_byte))
+            reps.extend(self._zone_cmds([(r, g, b)] * len(self._zone_codes), code, speed_byte))
             reps.extend(set_apply_cmds())
             ok = self._write(reps)
             if ok:

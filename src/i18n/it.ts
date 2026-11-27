@@ -256,6 +256,13 @@ export const it: Record<string, string> = {
   "sleepCharging.section": "Sospensione",
   "sleepCharging.label": "Indicatore di carica durante la sospensione",
   "sleepCharging.hint": "Fa lampeggiare gli anelli mentre la console è sospesa e in carica.",
+  "xboxButtonLed.section": "Pulsante Xbox",
+  "xboxButtonLed.label": "Luce del pulsante Xbox",
+  "xboxButtonLed.hint": "Accende il pulsante Xbox, come su Windows.",
+  "xboxButtonLed.brightness": "Luminosità",
+  "xboxButtonLed.low": "Bassa",
+  "xboxButtonLed.medium": "Media",
+  "xboxButtonLed.high": "Alta",
 
   "report.button": "Invia una segnalazione",
   "report.button.desc":

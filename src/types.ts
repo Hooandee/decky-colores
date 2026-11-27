@@ -53,6 +53,7 @@ export interface Capabilities {
   powerLed: boolean;
   powerLedSeparateStates: boolean;
   sleepChargingIndicator: boolean;
+  xboxButtonLed: boolean;
   hasBattery: boolean;
   batteryMode: boolean;
   temperatureMode: boolean;
@@ -140,6 +141,8 @@ export interface ColoresState {
   powerLedAwakeOff: boolean;
   powerLedSuspendOff: boolean;
   sleepChargingIndicator: boolean;
+  xboxButtonLed: boolean;
+  xboxButtonLedLevel: number;
   chargerOnly: boolean;
   smartBrightness: boolean;
   forceControl: boolean;
